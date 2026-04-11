@@ -1,0 +1,102 @@
+{
+  "version": 1,
+  "checks": [
+    {
+      "id": "repo.instructions",
+      "description": "Required repo instruction and policy files exist",
+      "kind": "files",
+      "enabled": true,
+      "required": true,
+      "workingDirectory": ".",
+      "timeoutMs": 1000,
+      "tags": ["repo", "docs", "conventions"],
+      "prerequisiteFiles": [],
+      "prerequisiteCommands": [],
+      "missingPrerequisitePolicy": "fail",
+      "paths": [
+        "AGENTS.md",
+        "CLAUDE.md",
+        "CONVENTIONS.md",
+        "audit.config.json",
+        "package.json",
+        "pnpm-lock.yaml",
+        "scripts/audit.mjs"
+      ]
+    },
+    {
+      "id": "quality.lint",
+      "description": "ESLint passes on the checked-in source tree",
+      "kind": "command",
+      "enabled": true,
+      "required": true,
+      "workingDirectory": ".",
+      "command": "pnpm",
+      "args": ["lint"],
+      "timeoutMs": 120000,
+      "tags": ["quality", "lint"],
+      "prerequisiteFiles": ["package.json", "eslint.config.js"],
+      "prerequisiteCommands": ["pnpm"],
+      "missingPrerequisitePolicy": "fail"
+    },
+    {
+      "id": "quality.typecheck",
+      "description": "TypeScript typecheck passes without emitting",
+      "kind": "command",
+      "enabled": true,
+      "required": true,
+      "workingDirectory": ".",
+      "command": "pnpm",
+      "args": ["typecheck"],
+      "timeoutMs": 120000,
+      "tags": ["quality", "types"],
+      "prerequisiteFiles": ["package.json", "tsconfig.json"],
+      "prerequisiteCommands": ["pnpm"],
+      "missingPrerequisitePolicy": "fail"
+    },
+    {
+      "id": "quality.test",
+      "description": "Vitest unit tests pass",
+      "kind": "command",
+      "enabled": true,
+      "required": true,
+      "workingDirectory": ".",
+      "command": "pnpm",
+      "args": ["test"],
+      "timeoutMs": 120000,
+      "tags": ["quality", "test"],
+      "prerequisiteFiles": ["package.json", "vitest.config.ts"],
+      "prerequisiteCommands": ["pnpm"],
+      "missingPrerequisitePolicy": "fail"
+    },
+    {
+      "id": "build.compile",
+      "description": "TypeScript build completes successfully",
+      "kind": "command",
+      "enabled": true,
+      "required": true,
+      "workingDirectory": ".",
+      "command": "pnpm",
+      "args": ["build"],
+      "timeoutMs": 120000,
+      "tags": ["build", "typescript"],
+      "prerequisiteFiles": ["package.json", "tsconfig.json", "src/cli/main.ts"],
+      "prerequisiteCommands": ["pnpm"],
+      "missingPrerequisitePolicy": "fail"
+    },
+    {
+      "id": "security.dependencies",
+      "description": "Production dependency audit reports no known vulnerabilities",
+      "kind": "command",
+      "enabled": false,
+      "required": true,
+      "workingDirectory": ".",
+      "command": "pnpm",
+      "args": ["audit", "--prod"],
+      "timeoutMs": 180000,
+      "tags": ["security", "dependencies", "network"],
+      "prerequisiteFiles": ["package.json", "pnpm-lock.yaml"],
+      "prerequisiteCommands": ["pnpm"],
+      "missingPrerequisitePolicy": "fail"
+    }
+  ]
+}

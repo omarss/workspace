@@ -1,0 +1,1620 @@
+{
+  "schema_version": "2.0",
+  "title": "Software Engineering Competency Matrix",
+  "format": "3d_matrix",
+  "description": "A multidimensional matrix linking competencies to technologies, frameworks, languages, and adjacent disciplines including data science, machine learning, and AI engineering across career levels.",
+  "notes": {
+    "design_principles": [
+      "Competencies are primary. Technologies are evidence, not competencies by themselves.",
+      "Coverage is intentionally broad across mainstream modern engineering stacks.",
+      "This is designed for assessment, hiring, promotion, and capability mapping."
+    ],
+    "interpretation": {
+      "x_axis": "competencies",
+      "y_axis": "levels",
+      "z_axis": "technology_domains"
+    }
+  },
+  "dimensions": {
+    "levels": [
+      "junior",
+      "mid",
+      "senior",
+      "staff",
+      "principal"
+    ],
+    "roles": [
+      "backend_engineer",
+      "frontend_engineer",
+      "mobile_engineer",
+      "data_engineer",
+      "platform_engineer",
+      "security_engineer",
+      "data_scientist",
+      "machine_learning_engineer",
+      "ai_engineer",
+      "full_stack_engineer",
+      "qa_automation_engineer",
+      "site_reliability_engineer"
+    ],
+    "competencies": [
+      "programming_fundamentals",
+      "data_structures_and_algorithms",
+      "clean_code_and_maintainability",
+      "version_control_and_collaboration",
+      "testing_and_quality_engineering",
+      "api_design_and_integration",
+      "databases_and_persistence",
+      "distributed_systems",
+      "system_design_and_architecture",
+      "security_engineering",
+      "reliability_and_resilience",
+      "observability_and_telemetry",
+      "performance_engineering",
+      "ci_cd_and_developer_experience",
+      "cloud_and_infrastructure",
+      "frontend_engineering",
+      "mobile_engineering",
+      "data_engineering",
+      "data_science_and_statistics",
+      "machine_learning_engineering",
+      "ai_engineering_and_llm_systems",
+      "mlops_and_model_operations",
+      "domain_modeling",
+      "product_thinking",
+      "technical_communication",
+      "execution_and_delivery",
+      "mentorship_and_technical_leadership",
+      "incident_response_and_operational_excellence",
+      "governance_compliance_and_risk"
+    ],
+    "technology_domains": [
+      "languages",
+      "runtime_and_sdk",
+      "backend_frameworks",
+      "frontend_frameworks",
+      "mobile_frameworks",
+      "api_protocols_and_contracts",
+      "databases",
+      "orms_and_data_access",
+      "messaging_and_streaming",
+      "cloud_and_infrastructure",
+      "containers_and_orchestration",
+      "iac_and_configuration",
+      "ci_cd_and_build",
+      "testing_and_quality_tools",
+      "observability_and_apm",
+      "security_and_identity",
+      "data_platforms_and_processing",
+      "analytics_and_bi",
+      "scientific_computing_and_notebooks",
+      "machine_learning_frameworks",
+      "classical_ml_libraries",
+      "deep_learning_frameworks",
+      "model_serving_and_inference",
+      "feature_stores_and_experimentation",
+      "mlops_and_orchestration",
+      "llm_and_genai_frameworks",
+      "vector_databases_and_retrieval",
+      "agent_and_workflow_frameworks",
+      "ai_evaluation_and_guardrails",
+      "collaboration_and_design_artifacts"
+    ]
+  },
+  "level_definitions": {
+    "junior": {
+      "scope": "Delivers well-scoped tasks with guidance"
+    },
+    "mid": {
+      "scope": "Owns features or bounded components end to end"
+    },
+    "senior": {
+      "scope": "Owns systems, quality, and technical decisions across a team area"
+    },
+    "staff": {
+      "scope": "Shapes architecture and technical direction across multiple teams"
+    },
+    "principal": {
+      "scope": "Defines engineering strategy, standards, and system direction across the organization"
+    }
+  },
+  "technology_taxonomy": {
+    "languages": {
+      "general_purpose": [
+        "Java",
+        "Kotlin",
+        "Scala",
+        "Groovy",
+        "TypeScript",
+        "JavaScript",
+        "Python",
+        "Go",
+        "Rust",
+        "C#",
+        "F#",
+        "C++",
+        "C",
+        "Swift",
+        "Objective-C",
+        "Dart",
+        "Ruby",
+        "PHP",
+        "Elixir",
+        "Erlang"
+      ],
+      "data_query_and_modeling": [
+        "SQL",
+        "PL/pgSQL",
+        "GraphQL",
+        "MDX",
+        "DAX"
+      ],
+      "scripting_and_shell": [
+        "Bash",
+        "Zsh",
+        "PowerShell"
+      ],
+      "data_serialization_and_config": [
+        "JSON",
+        "YAML",
+        "TOML",
+        "XML",
+        "Protocol Buffers",
+        "Avro"
+      ]
+    },
+    "runtime_and_sdk": {
+      "jvm": [
+        "JDK",
+        "Spring Runtime",
+        "Quarkus Runtime"
+      ],
+      "javascript": [
+        "Node.js",
+        "Deno",
+        "Bun"
+      ],
+      "python": [
+        "CPython",
+        "PyPy"
+      ],
+      "dotnet": [
+        ".NET",
+        ".NET Aspire"
+      ],
+      "native_and_mobile": [
+        "Android SDK",
+        "iOS SDK"
+      ]
+    },
+    "backend_frameworks": {
+      "java_jvm": [
+        "Spring Boot",
+        "Spring MVC",
+        "Spring WebFlux",
+        "Quarkus",
+        "Micronaut",
+        "Dropwizard",
+        "Ktor"
+      ],
+      "node_typescript": [
+        "NestJS",
+        "Express",
+        "Fastify",
+        "Hono",
+        "Koa",
+        "AdonisJS"
+      ],
+      "python": [
+        "FastAPI",
+        "Django",
+        "Flask",
+        "Starlette"
+      ],
+      "go": [
+        "Gin",
+        "Echo",
+        "Fiber",
+        "chi"
+      ],
+      "dotnet": [
+        "ASP.NET Core"
+      ],
+      "ruby_php_elixir": [
+        "Ruby on Rails",
+        "Laravel",
+        "Phoenix"
+      ]
+    },
+    "frontend_frameworks": {
+      "core": [
+        "React",
+        "Next.js",
+        "Vue",
+        "Nuxt",
+        "Angular",
+        "Svelte",
+        "SvelteKit",
+        "SolidJS",
+        "Astro",
+        "Remix",
+        "Qwik"
+      ],
+      "state_management": [
+        "Redux",
+        "Zustand",
+        "MobX",
+        "Recoil",
+        "TanStack Query",
+        "RTK Query",
+        "Apollo Client"
+      ],
+      "styling_and_ui": [
+        "Tailwind CSS",
+        "Material UI",
+        "Chakra UI",
+        "Ant Design",
+        "shadcn/ui",
+        "Bootstrap"
+      ],
+      "build_tooling": [
+        "Vite",
+        "Webpack",
+        "Rspack",
+        "Parcel",
+        "esbuild",
+        "Turbopack"
+      ]
+    },
+    "mobile_frameworks": {
+      "native": [
+        "Android SDK",
+        "Jetpack Compose",
+        "iOS SDK",
+        "SwiftUI",
+        "UIKit"
+      ],
+      "cross_platform": [
+        "React Native",
+        "Expo",
+        "Flutter",
+        "Kotlin Multiplatform"
+      ]
+    },
+    "api_protocols_and_contracts": {
+      "synchronous": [
+        "REST",
+        "GraphQL",
+        "gRPC",
+        "SOAP"
+      ],
+      "asynchronous": [
+        "Webhooks",
+        "WebSocket",
+        "Server-Sent Events",
+        "MQTT"
+      ],
+      "contracts_and_specs": [
+        "OpenAPI",
+        "AsyncAPI",
+        "JSON Schema",
+        "Protocol Buffers",
+        "Apache Avro"
+      ]
+    },
+    "databases": {
+      "relational": [
+        "PostgreSQL",
+        "MySQL",
+        "MariaDB",
+        "SQL Server",
+        "Oracle Database",
+        "SQLite"
+      ],
+      "document": [
+        "MongoDB",
+        "Couchbase",
+        "Firestore"
+      ],
+      "key_value_and_cache": [
+        "Redis",
+        "Valkey",
+        "Memcached",
+        "DynamoDB"
+      ],
+      "search_and_analytics": [
+        "Elasticsearch",
+        "OpenSearch",
+        "Solr"
+      ],
+      "time_series": [
+        "TimescaleDB",
+        "InfluxDB"
+      ],
+      "graph": [
+        "Neo4j",
+        "Amazon Neptune"
+      ],
+      "columnar_and_olap": [
+        "ClickHouse",
+        "Apache Druid",
+        "Apache Pinot"
+      ],
+      "warehouse_and_lakehouse": [
+        "BigQuery",
+        "Snowflake",
+        "Redshift",
+        "Databricks"
+      ]
+    },
+    "orms_and_data_access": {
+      "jvm": [
+        "JPA",
+        "Hibernate",
+        "Spring Data",
+        "jOOQ",
+        "MyBatis",
+        "Exposed"
+      ],
+      "typescript_node": [
+        "Prisma",
+        "TypeORM",
+        "Drizzle ORM",
+        "Sequelize",
+        "Mongoose"
+      ],
+      "python": [
+        "SQLAlchemy",
+        "Django ORM",
+        "Pydantic"
+      ],
+      "dotnet": [
+        "Entity Framework Core",
+        "Dapper"
+      ],
+      "go": [
+        "GORM",
+        "sqlc"
+      ]
+    },
+    "messaging_and_streaming": {
+      "queues_and_brokers": [
+        "Kafka",
+        "RabbitMQ",
+        "NATS",
+        "Apache Pulsar",
+        "ActiveMQ",
+        "Amazon SQS",
+        "Google Pub/Sub",
+        "Azure Service Bus"
+      ],
+      "stream_processing": [
+        "Kafka Streams",
+        "Apache Flink",
+        "Spark Structured Streaming",
+        "ksqlDB",
+        "Beam"
+      ],
+      "event_formats": [
+        "CloudEvents",
+        "Avro",
+        "Protobuf",
+        "JSON"
+      ]
+    },
+    "cloud_and_infrastructure": {
+      "cloud_providers": [
+        "AWS",
+        "GCP",
+        "Azure",
+        "Cloudflare"
+      ],
+      "compute": [
+        "EC2",
+        "Compute Engine",
+        "Azure VM",
+        "Lambda",
+        "Cloud Run",
+        "App Runner",
+        "Azure Container Apps"
+      ],
+      "networking_and_edge": [
+        "CDN",
+        "WAF",
+        "Load Balancer",
+        "API Gateway",
+        "DNS"
+      ],
+      "storage": [
+        "S3",
+        "GCS",
+        "Azure Blob Storage",
+        "EBS",
+        "Persistent Disk"
+      ]
+    },
+    "containers_and_orchestration": {
+      "containers": [
+        "Docker",
+        "Podman",
+        "containerd"
+      ],
+      "orchestration": [
+        "Kubernetes",
+        "OpenShift",
+        "Nomad"
+      ],
+      "packaging_and_release": [
+        "Helm",
+        "Kustomize",
+        "OCI Artifacts"
+      ],
+      "service_mesh": [
+        "Istio",
+        "Linkerd",
+        "Consul"
+      ]
+    },
+    "iac_and_configuration": {
+      "infrastructure_as_code": [
+        "Terraform",
+        "OpenTofu",
+        "Pulumi",
+        "AWS CDK",
+        "Crossplane"
+      ],
+      "config_management": [
+        "Ansible",
+        "Chef",
+        "Puppet"
+      ],
+      "policy_as_code": [
+        "OPA",
+        "Gatekeeper",
+        "Kyverno"
+      ],
+      "secrets_and_config": [
+        "Vault",
+        "AWS Secrets Manager",
+        "Google Secret Manager",
+        "Azure Key Vault",
+        "External Secrets Operator"
+      ]
+    },
+    "ci_cd_and_build": {
+      "build_tools": [
+        "Maven",
+        "Gradle",
+        "Bazel",
+        "Pants",
+        "npm",
+        "pnpm",
+        "yarn",
+        "Poetry",
+        "uv",
+        "pip",
+        "Cargo"
+      ],
+      "ci_cd": [
+        "GitHub Actions",
+        "GitLab CI",
+        "Jenkins",
+        "CircleCI",
+        "Buildkite",
+        "Argo CD",
+        "Flux"
+      ],
+      "monorepo_and_tasking": [
+        "Nx",
+        "Turborepo",
+        "Taskfile",
+        "Make",
+        "Lerna"
+      ],
+      "artifact_and_package_management": [
+        "Artifact Registry",
+        "ECR",
+        "GitHub Packages",
+        "Nexus",
+        "JFrog Artifactory"
+      ]
+    },
+    "testing_and_quality_tools": {
+      "unit_and_integration": [
+        "JUnit",
+        "Mockito",
+        "AssertJ",
+        "Jest",
+        "Vitest",
+        "Mocha",
+        "Pytest",
+        "unittest",
+        "Go test",
+        "xUnit",
+        "Testcontainers",
+        "WireMock"
+      ],
+      "e2e_and_ui": [
+        "Playwright",
+        "Cypress",
+        "Selenium",
+        "Appium",
+        "Detox"
+      ],
+      "contract_and_api_testing": [
+        "Pact",
+        "Postman",
+        "Newman",
+        "Karate"
+      ],
+      "load_and_performance": [
+        "k6",
+        "Gatling",
+        "Locust",
+        "JMeter",
+        "BenchmarkDotNet",
+        "JMH"
+      ],
+      "static_analysis_and_linting": [
+        "ESLint",
+        "Prettier",
+        "Checkstyle",
+        "SpotBugs",
+        "Spotless",
+        "Ruff",
+        "Pylint",
+        "mypy",
+        "golangci-lint",
+        "Semgrep",
+        "SonarQube",
+        "SonarCloud"
+      ]
+    },
+    "observability_and_apm": {
+      "telemetry": [
+        "OpenTelemetry",
+        "OpenMetrics"
+      ],
+      "metrics_and_dashboards": [
+        "Prometheus",
+        "Grafana",
+        "Cloud Monitoring"
+      ],
+      "logging": [
+        "ELK",
+        "OpenSearch Dashboards",
+        "Loki",
+        "Fluent Bit"
+      ],
+      "tracing_and_apm": [
+        "Jaeger",
+        "Tempo",
+        "Datadog",
+        "New Relic",
+        "Dynatrace",
+        "Sentry"
+      ]
+    },
+    "security_and_identity": {
+      "identity_and_access": [
+        "OAuth 2.0",
+        "OpenID Connect",
+        "SAML",
+        "JWT",
+        "mTLS",
+        "IAM",
+        "Keycloak",
+        "Auth0",
+        "Okta",
+        "Microsoft Entra ID"
+      ],
+      "appsec": [
+        "OWASP ASVS",
+        "OWASP Top 10",
+        "SAST",
+        "DAST",
+        "RASP",
+        "dependency_scanning",
+        "container_scanning"
+      ],
+      "supply_chain": [
+        "SBOM",
+        "Sigstore",
+        "Cosign",
+        "SLSA"
+      ],
+      "compliance_and_governance": [
+        "PCI DSS",
+        "SOC 2",
+        "ISO 27001",
+        "GDPR",
+        "HIPAA"
+      ]
+    },
+    "data_platforms_and_processing": {
+      "orchestration": [
+        "Airflow",
+        "Dagster",
+        "Prefect"
+      ],
+      "transformation": [
+        "dbt",
+        "Spark",
+        "Beam",
+        "Trino",
+        "Presto"
+      ],
+      "storage_and_tables": [
+        "Delta Lake",
+        "Apache Iceberg",
+        "Apache Hudi",
+        "Parquet"
+      ],
+      "stream_and_batch": [
+        "Flink",
+        "Spark",
+        "Kafka",
+        "Beam"
+      ]
+    },
+    "analytics_and_bi": {
+      "visualization_and_semantic": [
+        "Looker",
+        "Power BI",
+        "Tableau",
+        "Metabase",
+        "Apache Superset"
+      ],
+      "product_analytics": [
+        "Mixpanel",
+        "Amplitude",
+        "PostHog",
+        "GA4"
+      ]
+    },
+    "scientific_computing_and_notebooks": {
+      "core": [
+        "NumPy",
+        "SciPy",
+        "Pandas",
+        "Polars",
+        "Statsmodels"
+      ],
+      "visualization": [
+        "Matplotlib",
+        "Plotly",
+        "Seaborn",
+        "Altair"
+      ],
+      "notebooks_and_apps": [
+        "Jupyter",
+        "JupyterLab",
+        "Google Colab",
+        "Streamlit",
+        "Gradio"
+      ]
+    },
+    "classical_ml_libraries": {
+      "core": [
+        "scikit-learn",
+        "XGBoost",
+        "LightGBM",
+        "CatBoost",
+        "statsmodels"
+      ]
+    },
+    "deep_learning_frameworks": {
+      "core": [
+        "PyTorch",
+        "TensorFlow",
+        "Keras",
+        "JAX"
+      ],
+      "training_acceleration": [
+        "torch.compile",
+        "XLA",
+        "DeepSpeed",
+        "Horovod",
+        "NCCL"
+      ],
+      "computer_vision_nlp_audio": [
+        "TorchVision",
+        "TorchText",
+        "TorchAudio",
+        "TensorFlow Datasets"
+      ]
+    },
+    "machine_learning_frameworks": {
+      "workflow_and_pipelines": [
+        "PyTorch Lightning",
+        "Keras",
+        "scikit-learn Pipelines"
+      ],
+      "distributed_training": [
+        "Ray Train",
+        "torch.distributed",
+        "Horovod"
+      ]
+    },
+    "model_serving_and_inference": {
+      "serving": [
+        "TorchServe",
+        "TensorFlow Serving",
+        "KServe",
+        "Seldon Core",
+        "BentoML",
+        "NVIDIA Triton Inference Server",
+        "vLLM",
+        "llama.cpp",
+        "Ollama"
+      ],
+      "optimization": [
+        "ONNX",
+        "ONNX Runtime",
+        "TensorRT",
+        "OpenVINO",
+        "quantization"
+      ]
+    },
+    "feature_stores_and_experimentation": {
+      "feature_stores": [
+        "Feast",
+        "Tecton"
+      ],
+      "experimentation_and_tracking": [
+        "MLflow",
+        "Weights & Biases",
+        "Neptune",
+        "Comet"
+      ]
+    },
+    "mlops_and_orchestration": {
+      "pipelines": [
+        "Kubeflow",
+        "MLflow",
+        "Metaflow",
+        "Dagster",
+        "Prefect",
+        "Airflow"
+      ],
+      "data_and_model_versioning": [
+        "DVC",
+        "LakeFS",
+        "MLflow Model Registry"
+      ],
+      "deployment_and_monitoring": [
+        "KServe",
+        "Seldon Core",
+        "Evidently"
+      ]
+    },
+    "llm_and_genai_frameworks": {
+      "model_and_inference_ecosystem": [
+        "Transformers",
+        "Hugging Face Hub",
+        "Diffusers",
+        "sentence-transformers"
+      ],
+      "application_frameworks": [
+        "LangChain",
+        "LlamaIndex",
+        "DSPy",
+        "Haystack",
+        "Semantic Kernel"
+      ],
+      "provider_apis": [
+        "OpenAI API",
+        "Anthropic API",
+        "Google Gemini API",
+        "Azure OpenAI",
+        "Vertex AI",
+        "Amazon Bedrock"
+      ]
+    },
+    "vector_databases_and_retrieval": {
+      "vector_stores": [
+        "Pinecone",
+        "Weaviate",
+        "Milvus",
+        "Qdrant",
+        "pgvector",
+        "FAISS",
+        "Chroma"
+      ],
+      "retrieval_patterns": [
+        "RAG",
+        "hybrid_search",
+        "reranking",
+        "embeddings",
+        "chunking"
+      ]
+    },
+    "agent_and_workflow_frameworks": {
+      "agent_frameworks": [
+        "LangGraph",
+        "CrewAI",
+        "AutoGen",
+        "Semantic Kernel"
+      ],
+      "workflow_and_tools": [
+        "tool_calling",
+        "function_calling",
+        "planner_executor_patterns",
+        "human_in_the_loop"
+      ]
+    },
+    "ai_evaluation_and_guardrails": {
+      "evaluation": [
+        "Ragas",
+        "DeepEval",
+        "promptfoo",
+        "OpenAI Evals"
+      ],
+      "guardrails_and_safety": [
+        "Guardrails AI",
+        "PydanticAI",
+        "content_filtering",
+        "policy_enforcement"
+      ],
+      "observability": [
+        "Langfuse",
+        "Helicone",
+        "Arize Phoenix"
+      ]
+    },
+    "collaboration_and_design_artifacts": {
+      "design_and_decision_artifacts": [
+        "RFC",
+        "ADR",
+        "runbook",
+        "postmortem",
+        "architecture_diagram",
+        "sequence_diagram"
+      ],
+      "delivery_and_tracking": [
+        "Jira",
+        "Linear",
+        "GitHub Projects",
+        "Confluence",
+        "Notion"
+      ]
+    }
+  },
+  "competency_matrix": {
+    "programming_fundamentals": {
+      "technology_domains": [
+        "languages",
+        "runtime_and_sdk",
+        "backend_frameworks",
+        "frontend_frameworks",
+        "mobile_frameworks"
+      ],
+      "levels": {
+        "junior": "Writes readable code, understands control flow, functions, modules, types, and basic debugging.",
+        "mid": "Uses language idioms appropriately, structures modules well, and handles common edge cases independently.",
+        "senior": "Uses advanced language features judiciously, reduces complexity, and raises code quality across the team.",
+        "staff": "Defines language usage patterns, shared abstractions, and coding standards across teams.",
+        "principal": "Makes strategic language and platform choices based on long-term maintainability, talent availability, and business leverage."
+      }
+    },
+    "data_structures_and_algorithms": {
+      "technology_domains": [
+        "languages",
+        "scientific_computing_and_notebooks",
+        "classical_ml_libraries",
+        "deep_learning_frameworks"
+      ],
+      "levels": {
+        "junior": "Understands basic collections, recursion, iteration, and simple complexity analysis.",
+        "mid": "Chooses appropriate structures and avoids obvious performance pitfalls.",
+        "senior": "Balances readability, latency, throughput, and memory tradeoffs in production systems.",
+        "staff": "Defines where algorithmic optimization matters and how teams should evaluate performance-critical code.",
+        "principal": "Sets organizational guidance on where complexity investment is justified and where simpler solutions should win."
+      }
+    },
+    "clean_code_and_maintainability": {
+      "technology_domains": [
+        "languages",
+        "testing_and_quality_tools",
+        "collaboration_and_design_artifacts"
+      ],
+      "levels": {
+        "junior": "Follows naming, structure, formatting, and review conventions.",
+        "mid": "Refactors safely, improves cohesion, and avoids accidental complexity.",
+        "senior": "Systematically improves maintainability and mentors others on code health.",
+        "staff": "Defines maintainability standards, shared libraries, and code review expectations across domains.",
+        "principal": "Drives simplification strategy and long-term reduction of technical entropy across the organization."
+      }
+    },
+    "version_control_and_collaboration": {
+      "technology_domains": [
+        "ci_cd_and_build",
+        "collaboration_and_design_artifacts"
+      ],
+      "levels": {
+        "junior": "Uses branches, commits, pull requests, and basic review workflows correctly.",
+        "mid": "Structures changes well, resolves conflicts, and reviews straightforward work effectively.",
+        "senior": "Uses review to improve design quality and delivery safety, not only correctness.",
+        "staff": "Defines repository, branching, and review strategies across teams.",
+        "principal": "Shapes company-wide software development workflow for velocity, traceability, and governance."
+      }
+    },
+    "testing_and_quality_engineering": {
+      "technology_domains": [
+        "testing_and_quality_tools",
+        "api_protocols_and_contracts",
+        "backend_frameworks",
+        "frontend_frameworks",
+        "mobile_frameworks"
+      ],
+      "levels": {
+        "junior": "Writes basic unit tests and covers happy paths plus simple edge cases.",
+        "mid": "Writes maintainable unit, integration, and API tests and understands when to use mocks versus real dependencies.",
+        "senior": "Builds effective test strategies, reduces flakiness, and improves confidence in delivery.",
+        "staff": "Defines quality gates, test pyramid expectations, and reusable testing patterns across systems.",
+        "principal": "Sets organizational confidence strategy balancing reliability, delivery speed, and operating cost."
+      }
+    },
+    "api_design_and_integration": {
+      "technology_domains": [
+        "backend_frameworks",
+        "api_protocols_and_contracts",
+        "messaging_and_streaming",
+        "security_and_identity"
+      ],
+      "levels": {
+        "junior": "Consumes APIs correctly and implements basic endpoints or integrations.",
+        "mid": "Designs predictable APIs with validation, pagination, error handling, and authentication.",
+        "senior": "Designs versioning, idempotency, backward compatibility, and sound service boundaries.",
+        "staff": "Defines cross-team API standards, contract governance, and integration patterns.",
+        "principal": "Sets enterprise integration strategy across synchronous, asynchronous, internal, and external interfaces."
+      }
+    },
+    "databases_and_persistence": {
+      "technology_domains": [
+        "databases",
+        "orms_and_data_access",
+        "data_platforms_and_processing"
+      ],
+      "levels": {
+        "junior": "Writes simple queries and understands CRUD, indexes, and transactional basics.",
+        "mid": "Designs schemas for a bounded service, adds indexes appropriately, and handles consistency concerns.",
+        "senior": "Models data for performance, auditability, scale, and lifecycle management.",
+        "staff": "Defines patterns for polyglot persistence, ownership boundaries, and shared data concerns.",
+        "principal": "Sets enterprise data architecture strategy across operational, analytical, and regulatory constraints."
+      }
+    },
+    "distributed_systems": {
+      "technology_domains": [
+        "messaging_and_streaming",
+        "cloud_and_infrastructure",
+        "containers_and_orchestration",
+        "observability_and_apm"
+      ],
+      "levels": {
+        "junior": "Understands asynchronous workflows, eventual consistency, and common failure modes conceptually.",
+        "mid": "Implements retries, idempotency, timeouts, dead-letter handling, and safe message processing.",
+        "senior": "Designs resilient service interactions, boundaries, and recovery behavior.",
+        "staff": "Shapes reliability and integration patterns across teams and shared platform capabilities.",
+        "principal": "Defines distributed systems principles and tradeoff frameworks for the company."
+      }
+    },
+    "system_design_and_architecture": {
+      "technology_domains": [
+        "backend_frameworks",
+        "frontend_frameworks",
+        "mobile_frameworks",
+        "cloud_and_infrastructure",
+        "containers_and_orchestration"
+      ],
+      "levels": {
+        "junior": "Understands the architecture they work within and respects existing boundaries.",
+        "mid": "Designs features within an established architecture and reasons about component boundaries.",
+        "senior": "Designs services, applications, or subsystems with explicit tradeoffs and operational implications.",
+        "staff": "Leads architecture across multiple teams and resolves cross-cutting design conflicts.",
+        "principal": "Defines the target architecture and evolution strategy across the organization."
+      }
+    },
+    "security_engineering": {
+      "technology_domains": [
+        "security_and_identity",
+        "cloud_and_infrastructure",
+        "containers_and_orchestration",
+        "ci_cd_and_build",
+        "ai_evaluation_and_guardrails"
+      ],
+      "levels": {
+        "junior": "Follows secure coding basics and handles secrets and credentials correctly.",
+        "mid": "Implements authentication, authorization, validation, dependency hygiene, and secure defaults.",
+        "senior": "Designs threat-aware systems with layered controls and operational safeguards.",
+        "staff": "Defines security guardrails, reusable secure patterns, and platform-level controls.",
+        "principal": "Aligns security architecture with regulatory posture, business risk, and strategic growth."
+      }
+    },
+    "reliability_and_resilience": {
+      "technology_domains": [
+        "messaging_and_streaming",
+        "cloud_and_infrastructure",
+        "containers_and_orchestration",
+        "observability_and_apm"
+      ],
+      "levels": {
+        "junior": "Recognizes common reliability failure modes and basic mitigation concepts.",
+        "mid": "Implements safe retries, backoff, circuit breaking, and operationally sound failure handling.",
+        "senior": "Designs for fault isolation, graceful degradation, recovery, and predictable failure domains.",
+        "staff": "Defines SLO-oriented reliability patterns and platform standards across teams.",
+        "principal": "Makes resilience an organizational design constraint with explicit investment and cost tradeoffs."
+      }
+    },
+    "observability_and_telemetry": {
+      "technology_domains": [
+        "observability_and_apm",
+        "cloud_and_infrastructure",
+        "mlops_and_orchestration",
+        "ai_evaluation_and_guardrails"
+      ],
+      "levels": {
+        "junior": "Adds useful logs, metrics, and traces with guidance.",
+        "mid": "Instruments services and jobs meaningfully and uses dashboards and traces during debugging.",
+        "senior": "Designs observability for diagnosis, incident response, capacity planning, and service learning.",
+        "staff": "Defines telemetry schemas, alert quality standards, and shared observability practices.",
+        "principal": "Shapes organization-wide visibility strategy for systems, models, and AI applications."
+      }
+    },
+    "performance_engineering": {
+      "technology_domains": [
+        "languages",
+        "testing_and_quality_tools",
+        "frontend_frameworks",
+        "deep_learning_frameworks",
+        "model_serving_and_inference"
+      ],
+      "levels": {
+        "junior": "Understands basic latency, throughput, memory, and startup cost concepts.",
+        "mid": "Measures bottlenecks and fixes obvious inefficiencies in code, queries, or pipelines.",
+        "senior": "Designs applications, data pipelines, and inference paths for predictable performance under load.",
+        "staff": "Defines budgets, benchmarking strategy, and capacity tradeoffs across domains.",
+        "principal": "Determines where performance is strategically differentiating and funds the right optimization work."
+      }
+    },
+    "ci_cd_and_developer_experience": {
+      "technology_domains": [
+        "ci_cd_and_build",
+        "containers_and_orchestration",
+        "iac_and_configuration",
+        "collaboration_and_design_artifacts"
+      ],
+      "levels": {
+        "junior": "Uses pipelines, local tooling, and build systems effectively and resolves basic issues.",
+        "mid": "Contributes automation, improves build reliability, and removes repetitive development friction.",
+        "senior": "Designs delivery pipelines with quality gates, rollback paths, and reproducible workflows.",
+        "staff": "Defines platform delivery standards, reusable workflows, and shared developer tooling.",
+        "principal": "Sets company-level delivery model for speed, governance, auditability, and developer leverage."
+      }
+    },
+    "cloud_and_infrastructure": {
+      "technology_domains": [
+        "cloud_and_infrastructure",
+        "containers_and_orchestration",
+        "iac_and_configuration",
+        "security_and_identity"
+      ],
+      "levels": {
+        "junior": "Understands environments, containers, networking basics, and managed services at a practical level.",
+        "mid": "Deploys, debugs, and operates applications in cloud environments safely.",
+        "senior": "Designs runtime, storage, network, tenancy, and cost tradeoffs deliberately.",
+        "staff": "Defines infrastructure patterns, platform abstractions, and tenancy or region strategies.",
+        "principal": "Sets long-term infrastructure, cloud, sovereignty, and platform investment strategy."
+      }
+    },
+    "frontend_engineering": {
+      "technology_domains": [
+        "frontend_frameworks",
+        "api_protocols_and_contracts",
+        "testing_and_quality_tools",
+        "observability_and_apm"
+      ],
+      "levels": {
+        "junior": "Builds basic components, forms, and client-side state with guidance.",
+        "mid": "Delivers complete features including routing, API integration, accessibility basics, and error handling.",
+        "senior": "Owns frontend architecture quality, performance, design system usage, and maintainability.",
+        "staff": "Defines frontend conventions, platform standards, and reusable UI foundations.",
+        "principal": "Aligns frontend architecture with product strategy and multi-surface consistency."
+      }
+    },
+    "mobile_engineering": {
+      "technology_domains": [
+        "mobile_frameworks",
+        "api_protocols_and_contracts",
+        "testing_and_quality_tools",
+        "observability_and_apm"
+      ],
+      "levels": {
+        "junior": "Ships scoped screens and handles platform basics.",
+        "mid": "Owns features involving state, networking, lifecycle, device integration, and release readiness.",
+        "senior": "Designs maintainable mobile architecture, telemetry, offline behavior, and performance.",
+        "staff": "Sets mobile platform standards and shared foundations across apps or teams.",
+        "principal": "Defines organization-wide mobile strategy across native, cross-platform, and distribution constraints."
+      }
+    },
+    "data_engineering": {
+      "technology_domains": [
+        "databases",
+        "data_platforms_and_processing",
+        "analytics_and_bi",
+        "ci_cd_and_build"
+      ],
+      "levels": {
+        "junior": "Writes SQL, basic transformations, and simple batch or streaming jobs.",
+        "mid": "Builds dependable pipelines, data models, and validations with clear ownership.",
+        "senior": "Designs lineage-aware, SLA-driven data systems for analytical and operational use.",
+        "staff": "Defines data contracts, storage patterns, and cross-team platform standards.",
+        "principal": "Sets the enterprise data platform direction across warehouse, lakehouse, streaming, and governance needs."
+      }
+    },
+    "data_science_and_statistics": {
+      "technology_domains": [
+        "scientific_computing_and_notebooks",
+        "classical_ml_libraries",
+        "analytics_and_bi"
+      ],
+      "levels": {
+        "junior": "Performs exploratory analysis, feature preparation, and basic statistical reasoning.",
+        "mid": "Builds reproducible analysis, selects metrics, and evaluates models with sound statistical discipline.",
+        "senior": "Designs experiments, interprets uncertainty, and guides reliable analytical decision-making.",
+        "staff": "Defines scientific standards, reproducibility expectations, and model evaluation frameworks.",
+        "principal": "Aligns data science direction with product, risk, and organizational decision quality."
+      }
+    },
+    "machine_learning_engineering": {
+      "technology_domains": [
+        "classical_ml_libraries",
+        "deep_learning_frameworks",
+        "machine_learning_frameworks",
+        "model_serving_and_inference"
+      ],
+      "levels": {
+        "junior": "Builds simple training pipelines and understands features, labels, metrics, and train-test separation.",
+        "mid": "Implements reproducible training, validation, tuning, and packaging for deployment.",
+        "senior": "Designs production-grade model systems including data interfaces, serving paths, monitoring, and rollback.",
+        "staff": "Defines model architecture patterns, serving standards, and ML platform expectations across teams.",
+        "principal": "Sets company-wide ML engineering strategy spanning experimentation, deployment, governance, and value capture."
+      }
+    },
+    "ai_engineering_and_llm_systems": {
+      "technology_domains": [
+        "llm_and_genai_frameworks",
+        "vector_databases_and_retrieval",
+        "agent_and_workflow_frameworks",
+        "ai_evaluation_and_guardrails",
+        "model_serving_and_inference"
+      ],
+      "levels": {
+        "junior": "Builds basic prompt-driven features and understands core concepts like embeddings, retrieval, and tool calling.",
+        "mid": "Implements RAG, structured outputs, evaluation loops, safety checks, and provider integration responsibly.",
+        "senior": "Designs reliable AI applications with retrieval quality, latency control, fallback behavior, observability, and risk mitigation.",
+        "staff": "Defines AI architecture patterns, evaluation standards, platform abstractions, and guardrail strategies across teams.",
+        "principal": "Sets enterprise AI application strategy across model selection, governance, risk, economics, and long-term capability building."
+      }
+    },
+    "mlops_and_model_operations": {
+      "technology_domains": [
+        "mlops_and_orchestration",
+        "feature_stores_and_experimentation",
+        "model_serving_and_inference",
+        "observability_and_apm"
+      ],
+      "levels": {
+        "junior": "Understands experiment tracking, versioning, and the basics of model deployment and monitoring.",
+        "mid": "Operates training and deployment pipelines with reproducibility, traceability, and rollback support.",
+        "senior": "Designs model lifecycle systems covering feature management, registry, deployment, drift, and alerting.",
+        "staff": "Defines shared MLOps platform standards and integrations across data, ML, and application teams.",
+        "principal": "Sets organization-wide model operations strategy across compliance, scale, cost, and deployment models."
+      }
+    },
+    "domain_modeling": {
+      "technology_domains": [
+        "backend_frameworks",
+        "databases",
+        "api_protocols_and_contracts",
+        "collaboration_and_design_artifacts"
+      ],
+      "levels": {
+        "junior": "Understands the business workflow for assigned features.",
+        "mid": "Maps requirements into entities, workflows, and service boundaries coherently.",
+        "senior": "Shapes domain boundaries and models invariants explicitly across subsystems.",
+        "staff": "Resolves domain ambiguity across products, teams, and integration boundaries.",
+        "principal": "Defines business capability maps and system boundaries across the organization."
+      }
+    },
+    "product_thinking": {
+      "technology_domains": [
+        "frontend_frameworks",
+        "analytics_and_bi",
+        "llm_and_genai_frameworks",
+        "collaboration_and_design_artifacts"
+      ],
+      "levels": {
+        "junior": "Understands the user problem behind the assigned task.",
+        "mid": "Makes sensible tradeoffs between scope, quality, speed, and user value.",
+        "senior": "Influences roadmap through technical insight, metrics awareness, and user impact reasoning.",
+        "staff": "Connects technical direction to product outcomes across teams and surfaces.",
+        "principal": "Guides company-level product and engineering tradeoffs and strategic bets."
+      }
+    },
+    "technical_communication": {
+      "technology_domains": [
+        "collaboration_and_design_artifacts"
+      ],
+      "levels": {
+        "junior": "Explains implementation decisions clearly in code, comments, and pull requests.",
+        "mid": "Writes usable docs and communicates tradeoffs effectively in team contexts.",
+        "senior": "Produces strong design docs, review feedback, and incident analysis.",
+        "staff": "Creates alignment across teams through crisp technical narratives and structured decision-making.",
+        "principal": "Influences engineering leaders and executives through clear technical strategy communication."
+      }
+    },
+    "execution_and_delivery": {
+      "technology_domains": [
+        "ci_cd_and_build",
+        "collaboration_and_design_artifacts",
+        "cloud_and_infrastructure"
+      ],
+      "levels": {
+        "junior": "Delivers scoped tasks reliably and surfaces blockers early.",
+        "mid": "Breaks down features, manages dependencies, and executes with reasonable predictability.",
+        "senior": "De-risks delivery, sequences work well, and handles cross-cutting concerns proactively.",
+        "staff": "Coordinates technical execution across teams, streams, or programs.",
+        "principal": "Converts strategic goals into realistic engineering execution models with explicit tradeoffs."
+      }
+    },
+    "mentorship_and_technical_leadership": {
+      "technology_domains": [
+        "collaboration_and_design_artifacts"
+      ],
+      "levels": {
+        "junior": "Accepts feedback well and improves through coaching.",
+        "mid": "Gives useful peer feedback and helps teammates informally.",
+        "senior": "Mentors engineers actively and raises the technical bar for the team.",
+        "staff": "Develops senior engineers and leads communities of practice.",
+        "principal": "Builds technical leadership bench strength and engineering culture at scale."
+      }
+    },
+    "incident_response_and_operational_excellence": {
+      "technology_domains": [
+        "observability_and_apm",
+        "cloud_and_infrastructure",
+        "containers_and_orchestration",
+        "mlops_and_orchestration"
+      ],
+      "levels": {
+        "junior": "Participates effectively in incident handling with support.",
+        "mid": "Triages, debugs, and resolves routine incidents and follow-up tasks.",
+        "senior": "Leads major incident response and drives durable prevention work.",
+        "staff": "Defines readiness, severity, escalation, and learning-loop standards across teams.",
+        "principal": "Sets the organizational operating model for resilience, incident learning, and risk response."
+      }
+    },
+    "governance_compliance_and_risk": {
+      "technology_domains": [
+        "security_and_identity",
+        "cloud_and_infrastructure",
+        "ci_cd_and_build",
+        "ai_evaluation_and_guardrails",
+        "mlops_and_orchestration"
+      ],
+      "levels": {
+        "junior": "Follows required controls, process, and documentation expectations.",
+        "mid": "Understands why controls exist and implements the needed technical evidence or process hooks.",
+        "senior": "Builds compliant systems with minimal delivery friction and clear auditability.",
+        "staff": "Designs compliant-by-default platforms, policies, and reusable controls.",
+        "principal": "Aligns engineering governance with regulation, enterprise trust, data usage rules, and strategic risk posture."
+      }
+    }
+  },
+  "role_emphasis_matrix": {
+    "backend_engineer": {
+      "very_high": [
+        "api_design_and_integration",
+        "databases_and_persistence",
+        "distributed_systems"
+      ],
+      "high": [
+        "programming_fundamentals",
+        "testing_and_quality_engineering",
+        "system_design_and_architecture",
+        "security_engineering",
+        "reliability_and_resilience",
+        "observability_and_telemetry",
+        "performance_engineering",
+        "ci_cd_and_developer_experience",
+        "cloud_and_infrastructure",
+        "domain_modeling",
+        "technical_communication",
+        "execution_and_delivery"
+      ],
+      "medium": [
+        "frontend_engineering",
+        "data_engineering",
+        "governance_compliance_and_risk"
+      ],
+      "low": [
+        "mobile_engineering",
+        "data_science_and_statistics"
+      ]
+    },
+    "frontend_engineer": {
+      "very_high": [
+        "frontend_engineering",
+        "product_thinking"
+      ],
+      "high": [
+        "programming_fundamentals",
+        "testing_and_quality_engineering",
+        "performance_engineering",
+        "technical_communication",
+        "execution_and_delivery",
+        "security_engineering",
+        "observability_and_telemetry"
+      ],
+      "medium": [
+        "api_design_and_integration",
+        "system_design_and_architecture",
+        "ci_cd_and_developer_experience",
+        "cloud_and_infrastructure",
+        "domain_modeling"
+      ],
+      "low": [
+        "databases_and_persistence",
+        "distributed_systems",
+        "mobile_engineering",
+        "data_engineering",
+        "data_science_and_statistics"
+      ]
+    },
+    "mobile_engineer": {
+      "very_high": [
+        "mobile_engineering",
+        "product_thinking"
+      ],
+      "high": [
+        "programming_fundamentals",
+        "testing_and_quality_engineering",
+        "performance_engineering",
+        "security_engineering",
+        "observability_and_telemetry",
+        "execution_and_delivery"
+      ],
+      "medium": [
+        "api_design_and_integration",
+        "system_design_and_architecture",
+        "ci_cd_and_developer_experience",
+        "cloud_and_infrastructure",
+        "domain_modeling"
+      ],
+      "low": [
+        "databases_and_persistence",
+        "distributed_systems",
+        "data_engineering",
+        "data_science_and_statistics"
+      ]
+    },
+    "data_engineer": {
+      "very_high": [
+        "data_engineering",
+        "databases_and_persistence"
+      ],
+      "high": [
+        "programming_fundamentals",
+        "distributed_systems",
+        "cloud_and_infrastructure",
+        "ci_cd_and_developer_experience",
+        "observability_and_telemetry",
+        "governance_compliance_and_risk"
+      ],
+      "medium": [
+        "system_design_and_architecture",
+        "security_engineering",
+        "performance_engineering",
+        "technical_communication",
+        "execution_and_delivery",
+        "machine_learning_engineering"
+      ],
+      "low": [
+        "frontend_engineering",
+        "mobile_engineering"
+      ]
+    },
+    "platform_engineer": {
+      "very_high": [
+        "cloud_and_infrastructure",
+        "ci_cd_and_developer_experience",
+        "reliability_and_resilience",
+        "distributed_systems",
+        "incident_response_and_operational_excellence"
+      ],
+      "high": [
+        "security_engineering",
+        "observability_and_telemetry",
+        "system_design_and_architecture",
+        "performance_engineering",
+        "governance_compliance_and_risk",
+        "execution_and_delivery"
+      ],
+      "medium": [
+        "api_design_and_integration",
+        "databases_and_persistence",
+        "data_engineering",
+        "technical_communication"
+      ],
+      "low": [
+        "frontend_engineering",
+        "mobile_engineering",
+        "data_science_and_statistics"
+      ]
+    },
+    "security_engineer": {
+      "very_high": [
+        "security_engineering",
+        "governance_compliance_and_risk"
+      ],
+      "high": [
+        "cloud_and_infrastructure",
+        "ci_cd_and_developer_experience",
+        "reliability_and_resilience",
+        "observability_and_telemetry",
+        "incident_response_and_operational_excellence"
+      ],
+      "medium": [
+        "system_design_and_architecture",
+        "api_design_and_integration",
+        "distributed_systems",
+        "technical_communication"
+      ],
+      "low": [
+        "frontend_engineering",
+        "mobile_engineering",
+        "product_thinking"
+      ]
+    },
+    "data_scientist": {
+      "very_high": [
+        "data_science_and_statistics"
+      ],
+      "high": [
+        "programming_fundamentals",
+        "data_engineering",
+        "machine_learning_engineering",
+        "technical_communication",
+        "product_thinking"
+      ],
+      "medium": [
+        "mlops_and_model_operations",
+        "governance_compliance_and_risk",
+        "observability_and_telemetry"
+      ],
+      "low": [
+        "frontend_engineering",
+        "mobile_engineering",
+        "distributed_systems"
+      ]
+    },
+    "machine_learning_engineer": {
+      "very_high": [
+        "machine_learning_engineering",
+        "mlops_and_model_operations"
+      ],
+      "high": [
+        "programming_fundamentals",
+        "data_engineering",
+        "data_science_and_statistics",
+        "performance_engineering",
+        "observability_and_telemetry",
+        "cloud_and_infrastructure"
+      ],
+      "medium": [
+        "system_design_and_architecture",
+        "security_engineering",
+        "governance_compliance_and_risk",
+        "ai_engineering_and_llm_systems"
+      ],
+      "low": [
+        "frontend_engineering",
+        "mobile_engineering"
+      ]
+    },
+    "ai_engineer": {
+      "very_high": [
+        "ai_engineering_and_llm_systems"
+      ],
+      "high": [
+        "machine_learning_engineering",
+        "mlops_and_model_operations",
+        "data_engineering",
+        "product_thinking",
+        "security_engineering",
+        "observability_and_telemetry"
+      ],
+      "medium": [
+        "system_design_and_architecture",
+        "performance_engineering",
+        "governance_compliance_and_risk",
+        "technical_communication"
+      ],
+      "low": [
+        "mobile_engineering"
+      ]
+    },
+    "full_stack_engineer": {
+      "very_high": [
+        "frontend_engineering",
+        "api_design_and_integration"
+      ],
+      "high": [
+        "programming_fundamentals",
+        "testing_and_quality_engineering",
+        "databases_and_persistence",
+        "system_design_and_architecture",
+        "security_engineering",
+        "ci_cd_and_developer_experience",
+        "product_thinking",
+        "execution_and_delivery"
+      ],
+      "medium": [
+        "cloud_and_infrastructure",
+        "distributed_systems",
+        "observability_and_telemetry"
+      ],
+      "low": [
+        "mobile_engineering",
+        "data_science_and_statistics"
+      ]
+    },
+    "qa_automation_engineer": {
+      "very_high": [
+        "testing_and_quality_engineering"
+      ],
+      "high": [
+        "programming_fundamentals",
+        "ci_cd_and_developer_experience",
+        "api_design_and_integration",
+        "frontend_engineering",
+        "mobile_engineering",
+        "technical_communication"
+      ],
+      "medium": [
+        "observability_and_telemetry",
+        "security_engineering",
+        "execution_and_delivery"
+      ],
+      "low": [
+        "data_science_and_statistics",
+        "ai_engineering_and_llm_systems"
+      ]
+    },
+    "site_reliability_engineer": {
+      "very_high": [
+        "reliability_and_resilience",
+        "incident_response_and_operational_excellence",
+        "observability_and_telemetry",
+        "cloud_and_infrastructure"
+      ],
+      "high": [
+        "distributed_systems",
+        "ci_cd_and_developer_experience",
+        "security_engineering",
+        "performance_engineering",
+        "governance_compliance_and_risk"
+      ],
+      "medium": [
+        "system_design_and_architecture",
+        "databases_and_persistence",
+        "execution_and_delivery"
+      ],
+      "low": [
+        "frontend_engineering",
+        "mobile_engineering"
+      ]
+    }
+  }
+}

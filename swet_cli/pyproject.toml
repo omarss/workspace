@@ -1,0 +1,79 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "swet-cli"
+version = "0.1.0"
+description = "Terminal-based software engineering assessment tool"
+requires-python = ">=3.12"
+dependencies = [
+    "typer>=0.14.0",
+    "rich>=13.0.0",
+    "questionary>=2.0.0",
+    "anthropic>=0.40.0",
+    "python-dotenv>=1.0.0",
+    "tenacity>=9.0.0",
+    "pydantic>=2.0.0",
+]
+
+[project.scripts]
+swet = "swet_cli.main:app"
+swet-bot = "swet_telegram.bot:main"
+swet-slack = "swet_slack.bot:main"
+swet-whatsapp = "swet_whatsapp.bot:main"
+
+[project.optional-dependencies]
+proxy = [
+    "openai>=1.0.0",
+]
+api = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.34.0",
+    "pyjwt>=2.9.0",
+]
+telegram = [
+    "python-telegram-bot>=22.0",
+]
+slack = [
+    "slack-bolt>=1.20",
+    "slack-sdk>=3.30",
+]
+whatsapp = [
+    "twilio>=9.0",
+    "flask>=3.0",
+]
+dev = [
+    "pytest>=8.3.0",
+    "ruff>=0.8.0",
+    "mypy>=1.13.0",
+    "openai>=1.0.0",
+    "httpx>=0.27.0",
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.34.0",
+    "pyjwt>=2.9.0",
+    "python-telegram-bot>=22.0",
+    "slack-bolt>=1.20",
+    "slack-sdk>=3.30",
+    "twilio>=9.0",
+    "flask>=3.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP"]
+
+[tool.ruff.lint.per-file-ignores]
+"src/swet_api/auth/providers.py" = ["T201"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_return_any = true
+warn_unused_configs = true

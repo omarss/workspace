@@ -1,0 +1,41 @@
+services:
+  cassandra:
+    image: docker.io/library/cassandra:4.1
+    environment:
+      CASSANDRA_CLUSTER_NAME: reach_me
+      CASSANDRA_DC: datacenter1
+      CASSANDRA_RACK: rack1
+    ports:
+      - "9042:9042"
+    volumes:
+      - cassandra_data:/var/lib/cassandra
+  cassandra-init:
+    image: docker.io/library/cassandra:4.1
+    depends_on:
+      - cassandra
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >
+        until cqlsh cassandra 9042 -e "DESCRIBE KEYSPACES" >/dev/null 2>&1; do
+          sleep 5;
+        done;
+        cqlsh cassandra 9042 -e
+        "CREATE KEYSPACE IF NOT EXISTS reach_me
+        WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};"
+    restart: "no"
+
+  app:
+    build: .
+    environment:
+      PORT: "3000"
+      ENGAGE_STORE: cassandra
+      CASSANDRA_CONTACT_POINTS: cassandra
+      CASSANDRA_DATACENTER: datacenter1
+      CASSANDRA_KEYSPACE: reach_me
+    depends_on:
+      - cassandra-init
+    ports:
+      - "3000:3000"
+
+volumes:
+  cassandra_data:

@@ -1,0 +1,121 @@
+import React, { useState } from "react";
+import {
+  View,
+  Text,
+  TextInput,
+  Pressable,
+  KeyboardAvoidingView,
+  Platform,
+  ActivityIndicator,
+} from "react-native";
+import { useTranslation } from "react-i18next";
+import { useRouter } from "expo-router";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { useAuth } from "../../src/hooks/useAuth";
+
+export default function LoginScreen() {
+  const { t } = useTranslation();
+  const router = useRouter();
+  const { login, continueAsGuest } = useAuth();
+
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const canSubmit = email.trim().length > 0 && password.length > 0;
+
+  const handleLogin = async () => {
+    if (!email.trim()) {
+      setError(t("auth.emailRequired"));
+      return;
+    }
+    if (!password) {
+      setError(t("auth.passwordRequired"));
+      return;
+    }
+    setError("");
+    setLoading(true);
+    try {
+      await login(email.trim(), password);
+    } catch {
+      setError(t("auth.loginError"));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <SafeAreaView className="flex-1 bg-white dark:bg-slate-900">
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        className="flex-1 justify-center px-6"
+      >
+        {/* Header */}
+        <View className="mb-10 items-center">
+          <Text className="text-4xl font-bold text-primary-600">
+            {t("common.appName")}
+          </Text>
+          <Text className="mt-2 text-gray-500 dark:text-gray-400">
+            {t("auth.login")}
+          </Text>
+        </View>
+
+        {/* Form */}
+        <View className="gap-4">
+          <TextInput
+            placeholder={t("auth.email")}
+            value={email}
+            onChangeText={setEmail}
+            autoCapitalize="none"
+            keyboardType="email-address"
+            className="rounded-xl border border-gray-300 bg-gray-50 px-4 py-4 text-base text-gray-900 dark:border-gray-600 dark:bg-slate-800 dark:text-white"
+            placeholderTextColor="#9ca3af"
+          />
+          <TextInput
+            placeholder={t("auth.password")}
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+            className="rounded-xl border border-gray-300 bg-gray-50 px-4 py-4 text-base text-gray-900 dark:border-gray-600 dark:bg-slate-800 dark:text-white"
+            placeholderTextColor="#9ca3af"
+          />
+
+          {error ? (
+            <Text className="text-center text-sm text-red-500">{error}</Text>
+          ) : null}
+
+          <Pressable
+            onPress={handleLogin}
+            disabled={loading || !canSubmit}
+            className={`items-center rounded-xl py-4 ${canSubmit ? "bg-primary-600 active:bg-primary-700" : "bg-gray-300 dark:bg-gray-700"}`}
+          >
+            {loading ? (
+              <ActivityIndicator color="white" />
+            ) : (
+              <Text className="text-base font-semibold text-white">
+                {t("auth.login")}
+              </Text>
+            )}
+          </Pressable>
+        </View>
+
+        {/* Footer links */}
+        <View className="mt-6 items-center gap-4">
+          <Pressable onPress={() => router.push("/(auth)/register")}>
+            <Text className="text-primary-600 dark:text-primary-400">
+              {t("auth.noAccount")}{" "}
+              <Text className="font-semibold">{t("auth.register")}</Text>
+            </Text>
+          </Pressable>
+
+          <Pressable onPress={continueAsGuest}>
+            <Text className="text-gray-500 dark:text-gray-400">
+              {t("auth.continueAsGuest")}
+            </Text>
+          </Pressable>
+        </View>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
+  );
+}

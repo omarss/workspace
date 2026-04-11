@@ -1,0 +1,170 @@
+@import 'tailwindcss';
+
+/* --- Custom theme tokens --- */
+@theme {
+	--color-bg: #0a0a0f;
+	--color-bg-subtle: #111118;
+	--color-bg-muted: #1a1a24;
+	--color-bg-elevated: #22222e;
+	--color-border: #2a2a3a;
+	--color-border-subtle: #1e1e2e;
+	--color-text: #e4e4ef;
+	--color-text-muted: #8888a0;
+	--color-text-dim: #555570;
+	--color-accent: #06b6d4;
+	--color-accent-dim: #0e7490;
+	--color-success: #22c55e;
+	--color-warning: #eab308;
+	--color-error: #ef4444;
+	--color-info: #3b82f6;
+
+	/* Difficulty level colors */
+	--color-l1: #22c55e;
+	--color-l2: #3b82f6;
+	--color-l3: #a855f7;
+	--color-l4: #f97316;
+	--color-l5: #ef4444;
+
+	--font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+	--font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+}
+
+/* --- Base styles --- */
+html {
+	background-color: var(--color-bg);
+	color: var(--color-text);
+	font-family: var(--font-sans);
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+}
+
+body {
+	min-height: 100dvh;
+}
+
+/* --- Dot grid background --- */
+.dot-grid {
+	background-image: radial-gradient(circle, var(--color-border-subtle) 1px, transparent 1px);
+	background-size: 24px 24px;
+}
+
+/* --- Code blocks inherit mono --- */
+code,
+pre,
+kbd {
+	font-family: var(--font-mono);
+}
+
+/* --- Scrollbar styling --- */
+::-webkit-scrollbar {
+	width: 6px;
+	height: 6px;
+}
+::-webkit-scrollbar-track {
+	background: transparent;
+}
+::-webkit-scrollbar-thumb {
+	background: var(--color-border);
+	border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+	background: var(--color-text-dim);
+}
+
+/* --- Focus ring --- */
+*:focus-visible {
+	outline: 2px solid var(--color-accent);
+	outline-offset: 2px;
+}
+
+/* --- Selection --- */
+::selection {
+	background-color: var(--color-accent);
+	color: var(--color-bg);
+}
+
+/* --- Transitions --- */
+.fade-in {
+	animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+	from {
+		opacity: 0;
+		transform: translateY(8px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+/* --- Shimmer loading effect --- */
+.shimmer {
+	background: linear-gradient(
+		90deg,
+		var(--color-bg-muted) 25%,
+		var(--color-bg-elevated) 50%,
+		var(--color-bg-muted) 75%
+	);
+	background-size: 200% 100%;
+	animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+	0% {
+		background-position: 200% 0;
+	}
+	100% {
+		background-position: -200% 0;
+	}
+}
+
+/* --- Markdown content styling --- */
+.markdown-body h1,
+.markdown-body h2,
+.markdown-body h3 {
+	color: var(--color-text);
+	font-weight: 600;
+	margin-top: 1em;
+	margin-bottom: 0.5em;
+}
+.markdown-body p {
+	margin-bottom: 0.75em;
+	line-height: 1.7;
+}
+.markdown-body ul,
+.markdown-body ol {
+	padding-left: 1.5em;
+	margin-bottom: 0.75em;
+}
+.markdown-body li {
+	margin-bottom: 0.25em;
+}
+.markdown-body code {
+	background: var(--color-bg-muted);
+	padding: 0.15em 0.4em;
+	border-radius: 4px;
+	font-size: 0.9em;
+}
+.markdown-body pre {
+	background: var(--color-bg-subtle);
+	border: 1px solid var(--color-border);
+	border-radius: 8px;
+	padding: 1em;
+	overflow-x: auto;
+	margin-bottom: 1em;
+}
+.markdown-body pre code {
+	background: transparent;
+	padding: 0;
+}
+.markdown-body strong {
+	color: var(--color-text);
+	font-weight: 600;
+}
+.markdown-body a {
+	color: var(--color-accent);
+	text-decoration: underline;
+	text-underline-offset: 2px;
+}

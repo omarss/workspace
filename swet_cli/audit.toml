@@ -1,0 +1,115 @@
+[tools]
+python = ".venv/bin/python"
+pnpm = "pnpm"
+
+[[checks]]
+id = "python-pytest"
+description = "Run the Python test suite"
+enabled = true
+required = true
+cwd = "."
+args = ["{python}", "-m", "pytest", "tests/", "-v"]
+timeout_seconds = 1200
+tags = ["python", "tests"]
+requires_paths = ["tests"]
+missing_policy = "fail"
+
+[[checks]]
+id = "python-ruff-check"
+description = "Run Ruff lint checks"
+enabled = true
+required = true
+cwd = "."
+args = ["{python}", "-m", "ruff", "check", "src/", "tests/"]
+timeout_seconds = 300
+tags = ["python", "lint"]
+requires_paths = ["src", "tests"]
+missing_policy = "fail"
+
+[[checks]]
+id = "python-ruff-format"
+description = "Verify Ruff formatting"
+enabled = true
+required = true
+cwd = "."
+args = ["{python}", "-m", "ruff", "format", "--check", "src/", "tests/"]
+timeout_seconds = 300
+tags = ["python", "format"]
+requires_paths = ["src", "tests"]
+missing_policy = "fail"
+
+[[checks]]
+id = "python-mypy"
+description = "Run strict mypy checks"
+enabled = true
+required = true
+cwd = "."
+args = ["{python}", "-m", "mypy", "src"]
+timeout_seconds = 600
+tags = ["python", "types"]
+requires_paths = ["src"]
+missing_policy = "fail"
+
+[[checks]]
+id = "web-check"
+description = "Run Svelte and TypeScript checks"
+enabled = true
+required = true
+cwd = "web"
+args = ["{pnpm}", "check"]
+timeout_seconds = 600
+tags = ["web", "types"]
+requires_paths = ["web/package.json"]
+requires_commands = ["{pnpm}"]
+missing_policy = "fail"
+
+[[checks]]
+id = "web-lint"
+description = "Run frontend lint checks"
+enabled = true
+required = true
+cwd = "web"
+args = ["{pnpm}", "lint"]
+timeout_seconds = 600
+tags = ["web", "lint"]
+requires_paths = ["web/package.json"]
+requires_commands = ["{pnpm}"]
+missing_policy = "fail"
+
+[[checks]]
+id = "web-build"
+description = "Build the frontend"
+enabled = true
+required = true
+cwd = "web"
+args = ["{pnpm}", "build"]
+timeout_seconds = 900
+tags = ["web", "build"]
+requires_paths = ["web/package.json"]
+requires_commands = ["{pnpm}"]
+missing_policy = "fail"
+
+[[checks]]
+id = "web-pnpm-audit"
+description = "Run pnpm security audit"
+enabled = false
+required = false
+cwd = "web"
+args = ["{pnpm}", "audit"]
+timeout_seconds = 600
+tags = ["web", "security"]
+requires_paths = ["web/package.json"]
+requires_commands = ["{pnpm}"]
+missing_policy = "skip"
+
+[[checks]]
+id = "python-pip-audit"
+description = "Run Python dependency security audit"
+enabled = false
+required = false
+cwd = "."
+args = ["{python}", "-m", "pip_audit"]
+timeout_seconds = 600
+tags = ["python", "security"]
+requires_paths = ["pyproject.toml"]
+missing_policy = "skip"

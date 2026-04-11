@@ -1,0 +1,1355 @@
+{
+  "roles": [
+    "backend_engineer",
+    "frontend_engineer",
+    "mobile_engineer",
+    "data_engineer",
+    "platform_engineer",
+    "security_engineer",
+    "data_scientist",
+    "machine_learning_engineer",
+    "ai_engineer",
+    "full_stack_engineer",
+    "qa_automation_engineer",
+    "site_reliability_engineer"
+  ],
+  "levels": [
+    "junior",
+    "mid",
+    "senior",
+    "staff",
+    "principal"
+  ],
+  "competencies": {
+    "programming_fundamentals": {
+      "name": "Programming Fundamentals",
+      "technology_domains": [
+        "languages",
+        "runtime_and_sdk",
+        "backend_frameworks",
+        "frontend_frameworks",
+        "mobile_frameworks"
+      ]
+    },
+    "data_structures_and_algorithms": {
+      "name": "Data Structures And Algorithms",
+      "technology_domains": [
+        "languages",
+        "scientific_computing_and_notebooks",
+        "classical_ml_libraries",
+        "deep_learning_frameworks"
+      ]
+    },
+    "clean_code_and_maintainability": {
+      "name": "Clean Code And Maintainability",
+      "technology_domains": [
+        "languages",
+        "testing_and_quality_tools",
+        "collaboration_and_design_artifacts"
+      ]
+    },
+    "version_control_and_collaboration": {
+      "name": "Version Control And Collaboration",
+      "technology_domains": [
+        "ci_cd_and_build",
+        "collaboration_and_design_artifacts"
+      ]
+    },
+    "testing_and_quality_engineering": {
+      "name": "Testing And Quality Engineering",
+      "technology_domains": [
+        "testing_and_quality_tools",
+        "api_protocols_and_contracts",
+        "backend_frameworks",
+        "frontend_frameworks",
+        "mobile_frameworks"
+      ]
+    },
+    "api_design_and_integration": {
+      "name": "Api Design And Integration",
+      "technology_domains": [
+        "backend_frameworks",
+        "api_protocols_and_contracts",
+        "messaging_and_streaming",
+        "security_and_identity"
+      ]
+    },
+    "databases_and_persistence": {
+      "name": "Databases And Persistence",
+      "technology_domains": [
+        "databases",
+        "orms_and_data_access",
+        "data_platforms_and_processing"
+      ]
+    },
+    "distributed_systems": {
+      "name": "Distributed Systems",
+      "technology_domains": [
+        "messaging_and_streaming",
+        "cloud_and_infrastructure",
+        "containers_and_orchestration",
+        "observability_and_apm"
+      ]
+    },
+    "system_design_and_architecture": {
+      "name": "System Design And Architecture",
+      "technology_domains": [
+        "backend_frameworks",
+        "frontend_frameworks",
+        "mobile_frameworks",
+        "cloud_and_infrastructure",
+        "containers_and_orchestration"
+      ]
+    },
+    "security_engineering": {
+      "name": "Security Engineering",
+      "technology_domains": [
+        "security_and_identity",
+        "cloud_and_infrastructure",
+        "containers_and_orchestration",
+        "ci_cd_and_build",
+        "ai_evaluation_and_guardrails"
+      ]
+    },
+    "reliability_and_resilience": {
+      "name": "Reliability And Resilience",
+      "technology_domains": [
+        "messaging_and_streaming",
+        "cloud_and_infrastructure",
+        "containers_and_orchestration",
+        "observability_and_apm"
+      ]
+    },
+    "observability_and_telemetry": {
+      "name": "Observability And Telemetry",
+      "technology_domains": [
+        "observability_and_apm",
+        "cloud_and_infrastructure",
+        "mlops_and_orchestration",
+        "ai_evaluation_and_guardrails"
+      ]
+    },
+    "performance_engineering": {
+      "name": "Performance Engineering",
+      "technology_domains": [
+        "languages",
+        "testing_and_quality_tools",
+        "frontend_frameworks",
+        "deep_learning_frameworks",
+        "model_serving_and_inference"
+      ]
+    },
+    "ci_cd_and_developer_experience": {
+      "name": "Ci Cd And Developer Experience",
+      "technology_domains": [
+        "ci_cd_and_build",
+        "containers_and_orchestration",
+        "iac_and_configuration",
+        "collaboration_and_design_artifacts"
+      ]
+    },
+    "cloud_and_infrastructure": {
+      "name": "Cloud And Infrastructure",
+      "technology_domains": [
+        "cloud_and_infrastructure",
+        "containers_and_orchestration",
+        "iac_and_configuration",
+        "security_and_identity"
+      ]
+    },
+    "frontend_engineering": {
+      "name": "Frontend Engineering",
+      "technology_domains": [
+        "frontend_frameworks",
+        "api_protocols_and_contracts",
+        "testing_and_quality_tools",
+        "observability_and_apm"
+      ]
+    },
+    "mobile_engineering": {
+      "name": "Mobile Engineering",
+      "technology_domains": [
+        "mobile_frameworks",
+        "api_protocols_and_contracts",
+        "testing_and_quality_tools",
+        "observability_and_apm"
+      ]
+    },
+    "data_engineering": {
+      "name": "Data Engineering",
+      "technology_domains": [
+        "databases",
+        "data_platforms_and_processing",
+        "analytics_and_bi",
+        "ci_cd_and_build"
+      ]
+    },
+    "data_science_and_statistics": {
+      "name": "Data Science And Statistics",
+      "technology_domains": [
+        "scientific_computing_and_notebooks",
+        "classical_ml_libraries",
+        "analytics_and_bi"
+      ]
+    },
+    "machine_learning_engineering": {
+      "name": "Machine Learning Engineering",
+      "technology_domains": [
+        "classical_ml_libraries",
+        "deep_learning_frameworks",
+        "machine_learning_frameworks",
+        "model_serving_and_inference"
+      ]
+    },
+    "ai_engineering_and_llm_systems": {
+      "name": "Ai Engineering And Llm Systems",
+      "technology_domains": [
+        "llm_and_genai_frameworks",
+        "vector_databases_and_retrieval",
+        "agent_and_workflow_frameworks",
+        "ai_evaluation_and_guardrails",
+        "model_serving_and_inference"
+      ]
+    },
+    "mlops_and_model_operations": {
+      "name": "Mlops And Model Operations",
+      "technology_domains": [
+        "mlops_and_orchestration",
+        "feature_stores_and_experimentation",
+        "model_serving_and_inference",
+        "observability_and_apm"
+      ]
+    },
+    "domain_modeling": {
+      "name": "Domain Modeling",
+      "technology_domains": [
+        "backend_frameworks",
+        "databases",
+        "api_protocols_and_contracts",
+        "collaboration_and_design_artifacts"
+      ]
+    },
+    "product_thinking": {
+      "name": "Product Thinking",
+      "technology_domains": [
+        "frontend_frameworks",
+        "analytics_and_bi",
+        "llm_and_genai_frameworks",
+        "collaboration_and_design_artifacts"
+      ]
+    },
+    "technical_communication": {
+      "name": "Technical Communication",
+      "technology_domains": [
+        "collaboration_and_design_artifacts"
+      ]
+    },
+    "execution_and_delivery": {
+      "name": "Execution And Delivery",
+      "technology_domains": [
+        "ci_cd_and_build",
+        "collaboration_and_design_artifacts",
+        "cloud_and_infrastructure"
+      ]
+    },
+    "mentorship_and_technical_leadership": {
+      "name": "Mentorship And Technical Leadership",
+      "technology_domains": [
+        "collaboration_and_design_artifacts"
+      ]
+    },
+    "incident_response_and_operational_excellence": {
+      "name": "Incident Response And Operational Excellence",
+      "technology_domains": [
+        "observability_and_apm",
+        "cloud_and_infrastructure",
+        "containers_and_orchestration",
+        "mlops_and_orchestration"
+      ]
+    },
+    "governance_compliance_and_risk": {
+      "name": "Governance Compliance And Risk",
+      "technology_domains": [
+        "security_and_identity",
+        "cloud_and_infrastructure",
+        "ci_cd_and_build",
+        "ai_evaluation_and_guardrails",
+        "mlops_and_orchestration"
+      ]
+    }
+  },
+  "role_emphasis": {
+    "backend_engineer": {
+      "very_high": [
+        "api_design_and_integration",
+        "databases_and_persistence",
+        "distributed_systems"
+      ],
+      "high": [
+        "programming_fundamentals",
+        "testing_and_quality_engineering",
+        "system_design_and_architecture",
+        "security_engineering",
+        "reliability_and_resilience",
+        "observability_and_telemetry",
+        "performance_engineering",
+        "ci_cd_and_developer_experience",
+        "cloud_and_infrastructure",
+        "domain_modeling",
+        "technical_communication",
+        "execution_and_delivery"
+      ],
+      "medium": [
+        "frontend_engineering",
+        "data_engineering",
+        "governance_compliance_and_risk"
+      ],
+      "low": [
+        "mobile_engineering",
+        "data_science_and_statistics"
+      ]
+    },
+    "frontend_engineer": {
+      "very_high": [
+        "frontend_engineering",
+        "product_thinking"
+      ],
+      "high": [
+        "programming_fundamentals",
+        "testing_and_quality_engineering",
+        "performance_engineering",
+        "technical_communication",
+        "execution_and_delivery",
+        "security_engineering",
+        "observability_and_telemetry"
+      ],
+      "medium": [
+        "api_design_and_integration",
+        "system_design_and_architecture",
+        "ci_cd_and_developer_experience",
+        "cloud_and_infrastructure",
+        "domain_modeling"
+      ],
+      "low": [
+        "databases_and_persistence",
+        "distributed_systems",
+        "mobile_engineering",
+        "data_engineering",
+        "data_science_and_statistics"
+      ]
+    },
+    "mobile_engineer": {
+      "very_high": [
+        "mobile_engineering",
+        "product_thinking"
+      ],
+      "high": [
+        "programming_fundamentals",
+        "testing_and_quality_engineering",
+        "performance_engineering",
+        "security_engineering",
+        "observability_and_telemetry",
+        "execution_and_delivery"
+      ],
+      "medium": [
+        "api_design_and_integration",
+        "system_design_and_architecture",
+        "ci_cd_and_developer_experience",
+        "cloud_and_infrastructure",
+        "domain_modeling"
+      ],
+      "low": [
+        "databases_and_persistence",
+        "distributed_systems",
+        "data_engineering",
+        "data_science_and_statistics"
+      ]
+    },
+    "data_engineer": {
+      "very_high": [
+        "data_engineering",
+        "databases_and_persistence"
+      ],
+      "high": [
+        "programming_fundamentals",
+        "distributed_systems",
+        "cloud_and_infrastructure",
+        "ci_cd_and_developer_experience",
+        "observability_and_telemetry",
+        "governance_compliance_and_risk"
+      ],
+      "medium": [
+        "system_design_and_architecture",
+        "security_engineering",
+        "performance_engineering",
+        "technical_communication",
+        "execution_and_delivery",
+        "machine_learning_engineering"
+      ],
+      "low": [
+        "frontend_engineering",
+        "mobile_engineering"
+      ]
+    },
+    "platform_engineer": {
+      "very_high": [
+        "cloud_and_infrastructure",
+        "ci_cd_and_developer_experience",
+        "reliability_and_resilience",
+        "distributed_systems",
+        "incident_response_and_operational_excellence"
+      ],
+      "high": [
+        "security_engineering",
+        "observability_and_telemetry",
+        "system_design_and_architecture",
+        "performance_engineering",
+        "governance_compliance_and_risk",
+        "execution_and_delivery"
+      ],
+      "medium": [
+        "api_design_and_integration",
+        "databases_and_persistence",
+        "data_engineering",
+        "technical_communication"
+      ],
+      "low": [
+        "frontend_engineering",
+        "mobile_engineering",
+        "data_science_and_statistics"
+      ]
+    },
+    "security_engineer": {
+      "very_high": [
+        "security_engineering",
+        "governance_compliance_and_risk"
+      ],
+      "high": [
+        "cloud_and_infrastructure",
+        "ci_cd_and_developer_experience",
+        "reliability_and_resilience",
+        "observability_and_telemetry",
+        "incident_response_and_operational_excellence"
+      ],
+      "medium": [
+        "system_design_and_architecture",
+        "api_design_and_integration",
+        "distributed_systems",
+        "technical_communication"
+      ],
+      "low": [
+        "frontend_engineering",
+        "mobile_engineering",
+        "product_thinking"
+      ]
+    },
+    "data_scientist": {
+      "very_high": [
+        "data_science_and_statistics"
+      ],
+      "high": [
+        "programming_fundamentals",
+        "data_engineering",
+        "machine_learning_engineering",
+        "technical_communication",
+        "product_thinking"
+      ],
+      "medium": [
+        "mlops_and_model_operations",
+        "governance_compliance_and_risk",
+        "observability_and_telemetry"
+      ],
+      "low": [
+        "frontend_engineering",
+        "mobile_engineering",
+        "distributed_systems"
+      ]
+    },
+    "machine_learning_engineer": {
+      "very_high": [
+        "machine_learning_engineering",
+        "mlops_and_model_operations"
+      ],
+      "high": [
+        "programming_fundamentals",
+        "data_engineering",
+        "data_science_and_statistics",
+        "performance_engineering",
+        "observability_and_telemetry",
+        "cloud_and_infrastructure"
+      ],
+      "medium": [
+        "system_design_and_architecture",
+        "security_engineering",
+        "governance_compliance_and_risk",
+        "ai_engineering_and_llm_systems"
+      ],
+      "low": [
+        "frontend_engineering",
+        "mobile_engineering"
+      ]
+    },
+    "ai_engineer": {
+      "very_high": [
+        "ai_engineering_and_llm_systems"
+      ],
+      "high": [
+        "machine_learning_engineering",
+        "mlops_and_model_operations",
+        "data_engineering",
+        "product_thinking",
+        "security_engineering",
+        "observability_and_telemetry"
+      ],
+      "medium": [
+        "system_design_and_architecture",
+        "performance_engineering",
+        "governance_compliance_and_risk",
+        "technical_communication"
+      ],
+      "low": [
+        "mobile_engineering"
+      ]
+    },
+    "full_stack_engineer": {
+      "very_high": [
+        "frontend_engineering",
+        "api_design_and_integration"
+      ],
+      "high": [
+        "programming_fundamentals",
+        "testing_and_quality_engineering",
+        "databases_and_persistence",
+        "system_design_and_architecture",
+        "security_engineering",
+        "ci_cd_and_developer_experience",
+        "product_thinking",
+        "execution_and_delivery"
+      ],
+      "medium": [
+        "cloud_and_infrastructure",
+        "distributed_systems",
+        "observability_and_telemetry"
+      ],
+      "low": [
+        "mobile_engineering",
+        "data_science_and_statistics"
+      ]
+    },
+    "qa_automation_engineer": {
+      "very_high": [
+        "testing_and_quality_engineering"
+      ],
+      "high": [
+        "programming_fundamentals",
+        "ci_cd_and_developer_experience",
+        "api_design_and_integration",
+        "frontend_engineering",
+        "mobile_engineering",
+        "technical_communication"
+      ],
+      "medium": [
+        "observability_and_telemetry",
+        "security_engineering",
+        "execution_and_delivery"
+      ],
+      "low": [
+        "data_science_and_statistics",
+        "ai_engineering_and_llm_systems"
+      ]
+    },
+    "site_reliability_engineer": {
+      "very_high": [
+        "reliability_and_resilience",
+        "incident_response_and_operational_excellence",
+        "observability_and_telemetry",
+        "cloud_and_infrastructure"
+      ],
+      "high": [
+        "distributed_systems",
+        "ci_cd_and_developer_experience",
+        "security_engineering",
+        "performance_engineering",
+        "governance_compliance_and_risk"
+      ],
+      "medium": [
+        "system_design_and_architecture",
+        "databases_and_persistence",
+        "execution_and_delivery"
+      ],
+      "low": [
+        "frontend_engineering",
+        "mobile_engineering"
+      ]
+    }
+  },
+  "technology_taxonomy": {
+    "languages": {
+      "general_purpose": [
+        "Java",
+        "Kotlin",
+        "Scala",
+        "Groovy",
+        "TypeScript",
+        "JavaScript",
+        "Python",
+        "Go",
+        "Rust",
+        "C#",
+        "F#",
+        "C++",
+        "C",
+        "Swift",
+        "Objective-C",
+        "Dart",
+        "Ruby",
+        "PHP",
+        "Elixir",
+        "Erlang"
+      ],
+      "data_query_and_modeling": [
+        "SQL",
+        "PL/pgSQL",
+        "GraphQL",
+        "MDX",
+        "DAX"
+      ],
+      "scripting_and_shell": [
+        "Bash",
+        "Zsh",
+        "PowerShell"
+      ],
+      "data_serialization_and_config": [
+        "JSON",
+        "YAML",
+        "TOML",
+        "XML",
+        "Protocol Buffers",
+        "Avro"
+      ]
+    },
+    "runtime_and_sdk": {
+      "jvm": [
+        "JDK",
+        "Spring Runtime",
+        "Quarkus Runtime"
+      ],
+      "javascript": [
+        "Node.js",
+        "Deno",
+        "Bun"
+      ],
+      "python": [
+        "CPython",
+        "PyPy"
+      ],
+      "dotnet": [
+        ".NET",
+        ".NET Aspire"
+      ],
+      "native_and_mobile": [
+        "Android SDK",
+        "iOS SDK"
+      ]
+    },
+    "backend_frameworks": {
+      "java_jvm": [
+        "Spring Boot",
+        "Spring MVC",
+        "Spring WebFlux",
+        "Quarkus",
+        "Micronaut",
+        "Dropwizard",
+        "Ktor"
+      ],
+      "node_typescript": [
+        "NestJS",
+        "Express",
+        "Fastify",
+        "Hono",
+        "Koa",
+        "AdonisJS"
+      ],
+      "python": [
+        "FastAPI",
+        "Django",
+        "Flask",
+        "Starlette"
+      ],
+      "go": [
+        "Gin",
+        "Echo",
+        "Fiber",
+        "chi"
+      ],
+      "dotnet": [
+        "ASP.NET Core"
+      ],
+      "ruby_php_elixir": [
+        "Ruby on Rails",
+        "Laravel",
+        "Phoenix"
+      ]
+    },
+    "frontend_frameworks": {
+      "core": [
+        "React",
+        "Next.js",
+        "Vue",
+        "Nuxt",
+        "Angular",
+        "Svelte",
+        "SvelteKit",
+        "SolidJS",
+        "Astro",
+        "Remix",
+        "Qwik"
+      ],
+      "state_management": [
+        "Redux",
+        "Zustand",
+        "MobX",
+        "Recoil",
+        "TanStack Query",
+        "RTK Query",
+        "Apollo Client"
+      ],
+      "styling_and_ui": [
+        "Tailwind CSS",
+        "Material UI",
+        "Chakra UI",
+        "Ant Design",
+        "shadcn/ui",
+        "Bootstrap"
+      ],
+      "build_tooling": [
+        "Vite",
+        "Webpack",
+        "Rspack",
+        "Parcel",
+        "esbuild",
+        "Turbopack"
+      ]
+    },
+    "mobile_frameworks": {
+      "native": [
+        "Android SDK",
+        "Jetpack Compose",
+        "iOS SDK",
+        "SwiftUI",
+        "UIKit"
+      ],
+      "cross_platform": [
+        "React Native",
+        "Expo",
+        "Flutter",
+        "Kotlin Multiplatform"
+      ]
+    },
+    "api_protocols_and_contracts": {
+      "synchronous": [
+        "REST",
+        "GraphQL",
+        "gRPC",
+        "SOAP"
+      ],
+      "asynchronous": [
+        "Webhooks",
+        "WebSocket",
+        "Server-Sent Events",
+        "MQTT"
+      ],
+      "contracts_and_specs": [
+        "OpenAPI",
+        "AsyncAPI",
+        "JSON Schema",
+        "Protocol Buffers",
+        "Apache Avro"
+      ]
+    },
+    "databases": {
+      "relational": [
+        "PostgreSQL",
+        "MySQL",
+        "MariaDB",
+        "SQL Server",
+        "Oracle Database",
+        "SQLite"
+      ],
+      "document": [
+        "MongoDB",
+        "Couchbase",
+        "Firestore"
+      ],
+      "key_value_and_cache": [
+        "Redis",
+        "Valkey",
+        "Memcached",
+        "DynamoDB"
+      ],
+      "search_and_analytics": [
+        "Elasticsearch",
+        "OpenSearch",
+        "Solr"
+      ],
+      "time_series": [
+        "TimescaleDB",
+        "InfluxDB"
+      ],
+      "graph": [
+        "Neo4j",
+        "Amazon Neptune"
+      ],
+      "columnar_and_olap": [
+        "ClickHouse",
+        "Apache Druid",
+        "Apache Pinot"
+      ],
+      "warehouse_and_lakehouse": [
+        "BigQuery",
+        "Snowflake",
+        "Redshift",
+        "Databricks"
+      ]
+    },
+    "orms_and_data_access": {
+      "jvm": [
+        "JPA",
+        "Hibernate",
+        "Spring Data",
+        "jOOQ",
+        "MyBatis",
+        "Exposed"
+      ],
+      "typescript_node": [
+        "Prisma",
+        "TypeORM",
+        "Drizzle ORM",
+        "Sequelize",
+        "Mongoose"
+      ],
+      "python": [
+        "SQLAlchemy",
+        "Django ORM",
+        "Pydantic"
+      ],
+      "dotnet": [
+        "Entity Framework Core",
+        "Dapper"
+      ],
+      "go": [
+        "GORM",
+        "sqlc"
+      ]
+    },
+    "messaging_and_streaming": {
+      "queues_and_brokers": [
+        "Kafka",
+        "RabbitMQ",
+        "NATS",
+        "Apache Pulsar",
+        "ActiveMQ",
+        "Amazon SQS",
+        "Google Pub/Sub",
+        "Azure Service Bus"
+      ],
+      "stream_processing": [
+        "Kafka Streams",
+        "Apache Flink",
+        "Spark Structured Streaming",
+        "ksqlDB",
+        "Beam"
+      ],
+      "event_formats": [
+        "CloudEvents",
+        "Avro",
+        "Protobuf",
+        "JSON"
+      ]
+    },
+    "cloud_and_infrastructure": {
+      "cloud_providers": [
+        "AWS",
+        "GCP",
+        "Azure",
+        "Cloudflare"
+      ],
+      "compute": [
+        "EC2",
+        "Compute Engine",
+        "Azure VM",
+        "Lambda",
+        "Cloud Run",
+        "App Runner",
+        "Azure Container Apps"
+      ],
+      "networking_and_edge": [
+        "CDN",
+        "WAF",
+        "Load Balancer",
+        "API Gateway",
+        "DNS"
+      ],
+      "storage": [
+        "S3",
+        "GCS",
+        "Azure Blob Storage",
+        "EBS",
+        "Persistent Disk"
+      ]
+    },
+    "containers_and_orchestration": {
+      "containers": [
+        "Docker",
+        "Podman",
+        "containerd"
+      ],
+      "orchestration": [
+        "Kubernetes",
+        "OpenShift",
+        "Nomad"
+      ],
+      "packaging_and_release": [
+        "Helm",
+        "Kustomize",
+        "OCI Artifacts"
+      ],
+      "service_mesh": [
+        "Istio",
+        "Linkerd",
+        "Consul"
+      ]
+    },
+    "iac_and_configuration": {
+      "infrastructure_as_code": [
+        "Terraform",
+        "OpenTofu",
+        "Pulumi",
+        "AWS CDK",
+        "Crossplane"
+      ],
+      "config_management": [
+        "Ansible",
+        "Chef",
+        "Puppet"
+      ],
+      "policy_as_code": [
+        "OPA",
+        "Gatekeeper",
+        "Kyverno"
+      ],
+      "secrets_and_config": [
+        "Vault",
+        "AWS Secrets Manager",
+        "Google Secret Manager",
+        "Azure Key Vault",
+        "External Secrets Operator"
+      ]
+    },
+    "ci_cd_and_build": {
+      "build_tools": [
+        "Maven",
+        "Gradle",
+        "Bazel",
+        "Pants",
+        "npm",
+        "pnpm",
+        "yarn",
+        "Poetry",
+        "uv",
+        "pip",
+        "Cargo"
+      ],
+      "ci_cd": [
+        "GitHub Actions",
+        "GitLab CI",
+        "Jenkins",
+        "CircleCI",
+        "Buildkite",
+        "Argo CD",
+        "Flux"
+      ],
+      "monorepo_and_tasking": [
+        "Nx",
+        "Turborepo",
+        "Taskfile",
+        "Make",
+        "Lerna"
+      ],
+      "artifact_and_package_management": [
+        "Artifact Registry",
+        "ECR",
+        "GitHub Packages",
+        "Nexus",
+        "JFrog Artifactory"
+      ]
+    },
+    "testing_and_quality_tools": {
+      "unit_and_integration": [
+        "JUnit",
+        "Mockito",
+        "AssertJ",
+        "Jest",
+        "Vitest",
+        "Mocha",
+        "Pytest",
+        "unittest",
+        "Go test",
+        "xUnit",
+        "Testcontainers",
+        "WireMock"
+      ],
+      "e2e_and_ui": [
+        "Playwright",
+        "Cypress",
+        "Selenium",
+        "Appium",
+        "Detox"
+      ],
+      "contract_and_api_testing": [
+        "Pact",
+        "Postman",
+        "Newman",
+        "Karate"
+      ],
+      "load_and_performance": [
+        "k6",
+        "Gatling",
+        "Locust",
+        "JMeter",
+        "BenchmarkDotNet",
+        "JMH"
+      ],
+      "static_analysis_and_linting": [
+        "ESLint",
+        "Prettier",
+        "Checkstyle",
+        "SpotBugs",
+        "Spotless",
+        "Ruff",
+        "Pylint",
+        "mypy",
+        "golangci-lint",
+        "Semgrep",
+        "SonarQube",
+        "SonarCloud"
+      ]
+    },
+    "observability_and_apm": {
+      "telemetry": [
+        "OpenTelemetry",
+        "OpenMetrics"
+      ],
+      "metrics_and_dashboards": [
+        "Prometheus",
+        "Grafana",
+        "Cloud Monitoring"
+      ],
+      "logging": [
+        "ELK",
+        "OpenSearch Dashboards",
+        "Loki",
+        "Fluent Bit"
+      ],
+      "tracing_and_apm": [
+        "Jaeger",
+        "Tempo",
+        "Datadog",
+        "New Relic",
+        "Dynatrace",
+        "Sentry"
+      ]
+    },
+    "security_and_identity": {
+      "identity_and_access": [
+        "OAuth 2.0",
+        "OpenID Connect",
+        "SAML",
+        "JWT",
+        "mTLS",
+        "IAM",
+        "Keycloak",
+        "Auth0",
+        "Okta",
+        "Microsoft Entra ID"
+      ],
+      "appsec": [
+        "OWASP ASVS",
+        "OWASP Top 10",
+        "SAST",
+        "DAST",
+        "RASP",
+        "dependency_scanning",
+        "container_scanning"
+      ],
+      "supply_chain": [
+        "SBOM",
+        "Sigstore",
+        "Cosign",
+        "SLSA"
+      ],
+      "compliance_and_governance": [
+        "PCI DSS",
+        "SOC 2",
+        "ISO 27001",
+        "GDPR",
+        "HIPAA"
+      ]
+    },
+    "data_platforms_and_processing": {
+      "orchestration": [
+        "Airflow",
+        "Dagster",
+        "Prefect"
+      ],
+      "transformation": [
+        "dbt",
+        "Spark",
+        "Beam",
+        "Trino",
+        "Presto"
+      ],
+      "storage_and_tables": [
+        "Delta Lake",
+        "Apache Iceberg",
+        "Apache Hudi",
+        "Parquet"
+      ],
+      "stream_and_batch": [
+        "Flink",
+        "Spark",
+        "Kafka",
+        "Beam"
+      ]
+    },
+    "analytics_and_bi": {
+      "visualization_and_semantic": [
+        "Looker",
+        "Power BI",
+        "Tableau",
+        "Metabase",
+        "Apache Superset"
+      ],
+      "product_analytics": [
+        "Mixpanel",
+        "Amplitude",
+        "PostHog",
+        "GA4"
+      ]
+    },
+    "scientific_computing_and_notebooks": {
+      "core": [
+        "NumPy",
+        "SciPy",
+        "Pandas",
+        "Polars",
+        "Statsmodels"
+      ],
+      "visualization": [
+        "Matplotlib",
+        "Plotly",
+        "Seaborn",
+        "Altair"
+      ],
+      "notebooks_and_apps": [
+        "Jupyter",
+        "JupyterLab",
+        "Google Colab",
+        "Streamlit",
+        "Gradio"
+      ]
+    },
+    "classical_ml_libraries": {
+      "core": [
+        "scikit-learn",
+        "XGBoost",
+        "LightGBM",
+        "CatBoost",
+        "statsmodels"
+      ]
+    },
+    "deep_learning_frameworks": {
+      "core": [
+        "PyTorch",
+        "TensorFlow",
+        "Keras",
+        "JAX"
+      ],
+      "training_acceleration": [
+        "torch.compile",
+        "XLA",
+        "DeepSpeed",
+        "Horovod",
+        "NCCL"
+      ],
+      "computer_vision_nlp_audio": [
+        "TorchVision",
+        "TorchText",
+        "TorchAudio",
+        "TensorFlow Datasets"
+      ]
+    },
+    "machine_learning_frameworks": {
+      "workflow_and_pipelines": [
+        "PyTorch Lightning",
+        "Keras",
+        "scikit-learn Pipelines"
+      ],
+      "distributed_training": [
+        "Ray Train",
+        "torch.distributed",
+        "Horovod"
+      ]
+    },
+    "model_serving_and_inference": {
+      "serving": [
+        "TorchServe",
+        "TensorFlow Serving",
+        "KServe",
+        "Seldon Core",
+        "BentoML",
+        "NVIDIA Triton Inference Server",
+        "vLLM",
+        "llama.cpp",
+        "Ollama"
+      ],
+      "optimization": [
+        "ONNX",
+        "ONNX Runtime",
+        "TensorRT",
+        "OpenVINO",
+        "quantization"
+      ]
+    },
+    "feature_stores_and_experimentation": {
+      "feature_stores": [
+        "Feast",
+        "Tecton"
+      ],
+      "experimentation_and_tracking": [
+        "MLflow",
+        "Weights & Biases",
+        "Neptune",
+        "Comet"
+      ]
+    },
+    "mlops_and_orchestration": {
+      "pipelines": [
+        "Kubeflow",
+        "MLflow",
+        "Metaflow",
+        "Dagster",
+        "Prefect",
+        "Airflow"
+      ],
+      "data_and_model_versioning": [
+        "DVC",
+        "LakeFS",
+        "MLflow Model Registry"
+      ],
+      "deployment_and_monitoring": [
+        "KServe",
+        "Seldon Core",
+        "Evidently"
+      ]
+    },
+    "llm_and_genai_frameworks": {
+      "model_and_inference_ecosystem": [
+        "Transformers",
+        "Hugging Face Hub",
+        "Diffusers",
+        "sentence-transformers"
+      ],
+      "application_frameworks": [
+        "LangChain",
+        "LlamaIndex",
+        "DSPy",
+        "Haystack",
+        "Semantic Kernel"
+      ],
+      "provider_apis": [
+        "OpenAI API",
+        "Anthropic API",
+        "Google Gemini API",
+        "Azure OpenAI",
+        "Vertex AI",
+        "Amazon Bedrock"
+      ]
+    },
+    "vector_databases_and_retrieval": {
+      "vector_stores": [
+        "Pinecone",
+        "Weaviate",
+        "Milvus",
+        "Qdrant",
+        "pgvector",
+        "FAISS",
+        "Chroma"
+      ],
+      "retrieval_patterns": [
+        "RAG",
+        "hybrid_search",
+        "reranking",
+        "embeddings",
+        "chunking"
+      ]
+    },
+    "agent_and_workflow_frameworks": {
+      "agent_frameworks": [
+        "LangGraph",
+        "CrewAI",
+        "AutoGen",
+        "Semantic Kernel"
+      ],
+      "workflow_and_tools": [
+        "tool_calling",
+        "function_calling",
+        "planner_executor_patterns",
+        "human_in_the_loop"
+      ]
+    },
+    "ai_evaluation_and_guardrails": {
+      "evaluation": [
+        "Ragas",
+        "DeepEval",
+        "promptfoo",
+        "OpenAI Evals"
+      ],
+      "guardrails_and_safety": [
+        "Guardrails AI",
+        "PydanticAI",
+        "content_filtering",
+        "policy_enforcement"
+      ],
+      "observability": [
+        "Langfuse",
+        "Helicone",
+        "Arize Phoenix"
+      ]
+    },
+    "collaboration_and_design_artifacts": {
+      "design_and_decision_artifacts": [
+        "RFC",
+        "ADR",
+        "runbook",
+        "postmortem",
+        "architecture_diagram",
+        "sequence_diagram"
+      ],
+      "delivery_and_tracking": [
+        "Jira",
+        "Linear",
+        "GitHub Projects",
+        "Confluence",
+        "Notion"
+      ]
+    }
+  },
+  "question_formats": [
+    "mcq",
+    "code_review",
+    "debugging",
+    "short_answer",
+    "design_prompt"
+  ]
+}

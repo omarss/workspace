@@ -1,0 +1,21 @@
+# Local development compose — runs web worker with Chromium
+# Android worker requires host KVM, not included here by default.
+services:
+  web-worker:
+    build:
+      context: .
+      dockerfile: infra/docker/web/Dockerfile
+    volumes:
+      - ./artifacts:/app/artifacts
+    # Override entrypoint for interactive use
+    entrypoint: ["node", "dist/cli/main.js"]
+    # Example: docker compose run web-worker web snapshot https://example.com
+    network_mode: host
+
+  # CLI-only container (no browser, no adb)
+  cli:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ./artifacts:/app/artifacts
