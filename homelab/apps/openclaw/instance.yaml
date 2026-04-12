@@ -7,6 +7,8 @@ spec:
   env:
     - name: OLLAMA_HOST
       value: "http://10.42.0.1:11434"
+    - name: OLLAMA_API_KEY
+      value: "ollama"
   storage:
     persistence:
       enabled: true
@@ -16,5 +18,21 @@ spec:
       enabled: true
   config:
     raw:
-      model: "qwen3.5:4b"
-      provider: "ollama"
+      models:
+        providers:
+          ollama:
+            baseUrl: "http://10.42.0.1:11434"
+            apiKey: "ollama"
+            api: "ollama"
+            models:
+              - id: "qwen3.5:4b"
+                name: "Qwen 3.5 4B"
+                reasoning: false
+                input: ["text"]
+                cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }
+                contextWindow: 32768
+                maxTokens: 32768
+      agents:
+        defaults:
+          model:
+            primary: "ollama/qwen3.5:4b"
