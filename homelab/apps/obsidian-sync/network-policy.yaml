@@ -1,0 +1,17 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: couchdb-allow-ingress
+  namespace: obsidian-sync
+spec:
+  podSelector:
+    matchLabels:
+      app: couchdb
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - ports:
+        - port: 5984
+  egress:
+    - {}

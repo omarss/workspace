@@ -1,0 +1,14 @@
+# k3s server configuration — security hardened
+disable:
+  - traefik
+  - servicelb
+kube-apiserver-arg:
+  - "admission-control-config-file=/etc/rancher/k3s/admission-control.yaml"
+  - "audit-log-path=/var/log/k3s/audit.log"
+  - "audit-policy-file=/etc/rancher/k3s/audit-policy.yaml"
+  - "audit-log-maxage=30"
+  - "audit-log-maxbackup=10"
+  - "audit-log-maxsize=100"
+  - "enable-admission-plugins=NodeRestriction"
+secrets-encryption: true
+protect-kernel-defaults: false

@@ -1,0 +1,20 @@
+apiVersion: openclaw.rocks/v1alpha1
+kind: OpenClawInstance
+metadata:
+  name: openclaw
+  namespace: openclaw
+spec:
+  env:
+    - name: OLLAMA_HOST
+      value: "http://10.42.0.1:11434"
+  storage:
+    persistence:
+      enabled: true
+      size: 10Gi
+  security:
+    networkPolicy:
+      enabled: true
+  config:
+    raw:
+      model: "qwen3.5:4b"
+      provider: "ollama"
