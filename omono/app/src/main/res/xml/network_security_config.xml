@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Locks the app to HTTPS only. No domain carve-outs, no debug overrides.
+  We don't make any HTTP calls today — this is purely a defence-in-depth
+  setting so any accidental cleartext URL (from a future dep) fails loud.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

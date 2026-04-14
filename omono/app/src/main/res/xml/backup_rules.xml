@@ -1,4 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Scoped full-backup rules. Only the single DataStore preferences file
+  (a SpeedUnit enum) is backed up. Everything else — databases, shared
+  prefs, external storage — is excluded by default because Android's
+  backup system only backs up what's explicitly included here.
+-->
 <full-backup-content>
-    <include domain="sharedpref" path="." />
+    <include domain="file" path="datastore/omono_prefs.preferences_pb" />
 </full-backup-content>

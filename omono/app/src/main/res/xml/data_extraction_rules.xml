@@ -1,9 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android 12+ backup scoping. Same allow-list as backup_rules.xml: only
+  the one DataStore file is transferred / cloud-backed.
+-->
 <data-extraction-rules>
     <cloud-backup>
-        <include domain="sharedpref" path="." />
+        <include domain="file" path="datastore/omono_prefs.preferences_pb" />
     </cloud-backup>
     <device-transfer>
-        <include domain="sharedpref" path="." />
+        <include domain="file" path="datastore/omono_prefs.preferences_pb" />
     </device-transfer>
 </data-extraction-rules>
