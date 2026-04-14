@@ -56,6 +56,10 @@ if [[ ! -f "$APK_PATH" ]]; then
 fi
 
 SIZE=$(stat -c '%s' "$APK_PATH")
+# SHA-256 is recorded so the index page can display it for verification.
+# Users who care can `sha256sum omono.latest.apk | grep $sha` to confirm
+# the file they downloaded matches what the manifest claims.
+SHA256=$(sha256sum "$APK_PATH" | awk '{print $1}')
 RELEASED_AT=$(date -u -Iseconds | sed 's/+00:00/Z/')
 NOW=$RELEASED_AT
 
@@ -76,9 +80,10 @@ NEW_RELEASE=$(jq -n \
     --arg version "$VERSION" \
     --arg apk "$APK" \
     --arg released_at "$RELEASED_AT" \
+    --arg sha256 "$SHA256" \
     --argjson size "$SIZE" \
     --argjson changelog "$CHANGELOG_JSON" \
-    '{version:$version, apk:$apk, released_at:$released_at, size_bytes:$size, changelog:$changelog}')
+    '{version:$version, apk:$apk, released_at:$released_at, size_bytes:$size, sha256:$sha256, changelog:$changelog}')
 
 # Merge:
 #   - update or insert apps[$app]
