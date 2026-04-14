@@ -23,8 +23,32 @@ build: ## Assemble debug APK for all modules
 	$(GRADLEW) assembleDebug
 
 .PHONY: release
-release: ## Assemble release APK (unsigned)
+release: ## Assemble release APK (signed via app/keystore.properties or debug)
 	$(GRADLEW) assembleRelease
+	@echo
+	@echo "  APK: app/build/outputs/apk/release/app-release.apk"
+
+.PHONY: release-keystore
+release-keystore: ## Generate a personal release keystore (interactive)
+	@if [ -f app/keystore.properties ]; then \
+		echo "app/keystore.properties already exists — refusing to overwrite."; \
+		exit 1; \
+	fi
+	@mkdir -p $$HOME/.android
+	keytool -genkeypair -v \
+		-keystore $$HOME/.android/omono-release.jks \
+		-keyalg RSA -keysize 4096 -validity 10000 \
+		-alias omono
+	@echo
+	@echo "Now create app/keystore.properties with:"
+	@echo "  storeFile=$$HOME/.android/omono-release.jks"
+	@echo "  storePassword=<your store password>"
+	@echo "  keyAlias=omono"
+	@echo "  keyPassword=<your key password>"
+
+.PHONY: publish
+publish: ## Upload the release APK to OMONO_RELEASE_HOST (rsync target)
+	@./scripts/publish.sh
 
 .PHONY: lint
 lint: ## Run Android lint on debug variant
