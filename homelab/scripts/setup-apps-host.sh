@@ -27,14 +27,16 @@ DOC_ROOT=/srv/apps
 STATIC_SOURCE="${REPO_ROOT}/static/apps"
 NGINX_AVAIL=/etc/nginx/sites-available/apps.omarss.net
 NGINX_ENABLED=/etc/nginx/sites-enabled/apps.omarss.net
+NGINX_SNIPPETS=/etc/nginx/snippets
 CONF_SOURCE="${REPO_ROOT}/nginx/apps.omarss.net.conf"
+SNIPPET_SOURCE="${REPO_ROOT}/nginx/snippets/apps-security-headers.conf"
 MANIFEST_HELPER_SOURCE="${REPO_ROOT}/scripts/update-apps-manifest.sh"
 MANIFEST_HELPER_TARGET=/usr/local/bin/update-apps-manifest
 DOMAIN=apps.omarss.net
 TARGET_USER=omar
 TARGET_GROUP=omar
 
-for f in "$CONF_SOURCE" "$MANIFEST_HELPER_SOURCE" \
+for f in "$CONF_SOURCE" "$SNIPPET_SOURCE" "$MANIFEST_HELPER_SOURCE" \
          "$STATIC_SOURCE/index.html" \
          "$STATIC_SOURCE/assets/app.css" \
          "$STATIC_SOURCE/assets/app.js" \
@@ -88,6 +90,10 @@ fi
 
 echo "==> Installing update-apps-manifest helper"
 install -m 755 "$MANIFEST_HELPER_SOURCE" "$MANIFEST_HELPER_TARGET"
+
+echo "==> Installing nginx security-headers snippet"
+install -d -m 755 "$NGINX_SNIPPETS"
+install -m 644 "$SNIPPET_SOURCE" "$NGINX_SNIPPETS/apps-security-headers.conf"
 
 echo "==> Installing nginx vhost"
 cp "$CONF_SOURCE" "$NGINX_AVAIL"
