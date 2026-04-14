@@ -12,4 +12,5 @@ dependencies {
     implementation(projects.core.notification)
     implementation(libs.androidx.lifecycle.service)
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.timber)
 }

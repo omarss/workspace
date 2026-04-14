@@ -9,6 +9,8 @@ android {
 
 dependencies {
     implementation(projects.core.common)
-    implementation(libs.androidx.datastore.preferences)
+    // api: features that depend on :core:data should see DataStore types
+    // (Preferences, edit, stringPreferencesKey) without re-declaring the dep.
+    api(libs.androidx.datastore.preferences)
     implementation(libs.kotlinx.coroutines.android)
 }

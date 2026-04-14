@@ -11,4 +11,5 @@ dependencies {
     implementation(projects.core.notification)
     implementation(libs.play.services.location)
     implementation(libs.kotlinx.coroutines.play.services)
+    implementation(libs.timber)
 }

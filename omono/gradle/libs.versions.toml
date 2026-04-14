@@ -33,6 +33,12 @@ coroutines = "1.10.1"
 # Google Play Services
 playServicesLocation = "21.3.0"
 
+# Permissions UX
+accompanistPermissions = "0.37.3"
+
+# Logging facade
+timber = "5.0.1"
+
 # Testing
 junit = "4.13.2"
 androidxTestExt = "1.2.1"
@@ -73,6 +79,12 @@ kotlinx-coroutines-play-services = { group = "org.jetbrains.kotlinx", name = "ko
 
 # Google Play Services
 play-services-location = { group = "com.google.android.gms", name = "play-services-location", version.ref = "playServicesLocation" }
+
+# Permissions UX (Compose)
+accompanist-permissions = { group = "com.google.accompanist", name = "accompanist-permissions", version.ref = "accompanistPermissions" }
+
+# Logging
+timber = { group = "com.jakewharton.timber", name = "timber", version.ref = "timber" }
 
 # Testing
 junit = { group = "junit", name = "junit", version.ref = "junit" }
