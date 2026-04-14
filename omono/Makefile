@@ -23,7 +23,11 @@ build: ## Assemble debug APK for all modules
 	$(GRADLEW) assembleDebug
 
 .PHONY: release
-release: ## Assemble release APK (signed via app/keystore.properties or debug)
+release: ## Auto-bump semver, build, publish, tag, push (one-shot)
+	@./scripts/release.sh
+
+.PHONY: assemble-release
+assemble-release: ## Assemble release APK without bumping/publishing
 	$(GRADLEW) assembleRelease
 	@echo
 	@echo "  APK: app/build/outputs/apk/release/app-release.apk"

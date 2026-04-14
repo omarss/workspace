@@ -1,16 +1,20 @@
 #!/usr/bin/env bash
-# Publish a release APK so Obtainium can pick it up.
+# Publish a release APK to the apps host so Obtainium can pick it up.
 #
-# Defaults target the homelab apps host on this machine — override the
-# env vars to push elsewhere.
+# Usually called by ./scripts/release.sh, which sets RELEASE_VERSION and
+# CHANGELOG_FILE. Can also be called standalone after `make release`
+# (a debug-/manual-built APK) — it'll fall back to the build file's
+# versionName and an empty changelog.
 #
-# Env (all optional unless overriding):
+# Env (all optional):
 #   OMONO_RELEASE_HOST  rsync target. Local path or user@host:/path.
-#                      default: /srv/apps
-#   OMONO_RELEASE_URL   public base URL (used for the "Done" message).
-#                      default: https://apps.omarss.net
-#
-# Usage: scripts/publish.sh
+#                       default: /srv/apps
+#   OMONO_RELEASE_URL   public base URL for the success message.
+#                       default: https://apps.omarss.net
+#   RELEASE_VERSION     version string to publish. Default: parsed from
+#                       app/build.gradle.kts.
+#   CHANGELOG_FILE      path to a file with one bullet per line. Default
+#                       empty (no entries).
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -18,11 +22,13 @@ cd "$(dirname "$0")/.."
 OMONO_RELEASE_HOST="${OMONO_RELEASE_HOST:-/srv/apps}"
 OMONO_RELEASE_URL="${OMONO_RELEASE_URL:-https://apps.omarss.net}"
 
-# Read versionName from the app module without invoking Gradle. Quick and
-# deterministic for a single-line declaration.
-VERSION=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)
+if [[ -n "${RELEASE_VERSION:-}" ]]; then
+    VERSION=$RELEASE_VERSION
+else
+    VERSION=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)
+fi
 if [[ -z "$VERSION" ]]; then
-    echo "Could not determine versionName from app/build.gradle.kts" >&2
+    echo "Could not determine version" >&2
     exit 1
 fi
 
@@ -32,9 +38,6 @@ if [[ ! -f "$APK_SOURCE" ]]; then
     exit 1
 fi
 
-# Filename layout matches the apps.omarss.net nginx vhost:
-#   {app}.latest.apk      ← Obtainium target, short-cached
-#   {app}.{version}.apk   ← rollback / pinning, immutable
 VERSIONED="omono.${VERSION}.apk"
 LATEST="omono.latest.apk"
 TMP_DIR=$(mktemp -d)
@@ -43,24 +46,57 @@ trap 'rm -rf "$TMP_DIR"' EXIT
 cp "$APK_SOURCE" "$TMP_DIR/$VERSIONED"
 cp "$APK_SOURCE" "$TMP_DIR/$LATEST"
 
-# Tiny manifest sidecar, useful for tooling that wants to read the
-# current version without parsing the APK.
-cat >"$TMP_DIR/omono.latest.json" <<JSON
-{
-  "version": "${VERSION}",
-  "apk": "${VERSIONED}",
-  "latest": "${LATEST}"
-}
-JSON
-
 echo "==> Uploading ${VERSIONED} + ${LATEST} to ${OMONO_RELEASE_HOST}"
-rsync -av --progress "$TMP_DIR/" "${OMONO_RELEASE_HOST%/}/"
+rsync -a --info=progress2 "$TMP_DIR/" "${OMONO_RELEASE_HOST%/}/"
+
+# Ask the apps host to merge the new release into manifest.json.
+# If we're publishing locally and update-apps-manifest is on PATH,
+# call it directly. Otherwise SSH to the remote.
+update_manifest_local() {
+    update-apps-manifest \
+        --app omono \
+        --name omono \
+        --description "Background speed monitor" \
+        --version "$VERSION" \
+        --apk "$VERSIONED" \
+        ${CHANGELOG_FILE:+--changelog-file "$CHANGELOG_FILE"}
+}
+
+update_manifest_remote() {
+    local host_part="${OMONO_RELEASE_HOST%%:*}"
+    local remote_changelog=""
+    if [[ -n "${CHANGELOG_FILE:-}" && -f "$CHANGELOG_FILE" ]]; then
+        remote_changelog=/tmp/omono-changelog.$$.txt
+        scp -q "$CHANGELOG_FILE" "${host_part}:${remote_changelog}"
+    fi
+    ssh "$host_part" "update-apps-manifest \
+        --app omono \
+        --name omono \
+        --description 'Background speed monitor' \
+        --version '$VERSION' \
+        --apk '$VERSIONED' \
+        ${remote_changelog:+--changelog-file '$remote_changelog'} \
+        && ${remote_changelog:+rm -f '$remote_changelog'}"
+}
+
+echo "==> Updating manifest.json"
+if [[ "$OMONO_RELEASE_HOST" == *:* ]]; then
+    update_manifest_remote
+else
+    if command -v update-apps-manifest >/dev/null 2>&1; then
+        update_manifest_local
+    else
+        echo "    update-apps-manifest not found on PATH; skipping manifest update." >&2
+        echo "    (run 'sudo make -C homelab apply-apps-host' to install it)" >&2
+    fi
+fi
 
 echo
 echo "==> Published omono ${VERSION}"
+echo "    Index:     ${OMONO_RELEASE_URL%/}/"
 echo "    Latest:    ${OMONO_RELEASE_URL%/}/${LATEST}"
 echo "    Versioned: ${OMONO_RELEASE_URL%/}/${VERSIONED}"
-echo "    Manifest:  ${OMONO_RELEASE_URL%/}/omono.latest.json"
+echo "    Manifest:  ${OMONO_RELEASE_URL%/}/manifest.json"
 echo
 echo "    In Obtainium, add a new app with source 'Direct APK link' and URL:"
 echo "      ${OMONO_RELEASE_URL%/}/${LATEST}"
