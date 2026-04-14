@@ -2,7 +2,11 @@ package net.omarss.omono.ui
 
 import android.Manifest
 import android.os.Build
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
@@ -10,30 +14,40 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.LocationOff
+import androidx.compose.material.icons.filled.MyLocation
+import androidx.compose.material.icons.filled.NotificationsActive
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
-import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.MultiplePermissionsState
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
 import net.omarss.omono.core.common.SpeedUnit
 import net.omarss.omono.core.service.FeatureHostService
 
-// Required at runtime to start the foreground location service.
-// Background location is requested in a follow-up step (Android requires
-// a separate prompt) — kept out of this list to avoid the system dialog
-// burying the rationale for fine location.
 private val foregroundPermissions: List<String> = buildList {
     add(Manifest.permission.ACCESS_FINE_LOCATION)
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -43,21 +57,45 @@ private val foregroundPermissions: List<String> = buildList {
 
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
-fun OmonoMainScreen(
+fun OmonoMainRoute(
     contentPadding: PaddingValues,
     viewModel: OmonoMainViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
-    val unit by viewModel.unit.collectAsState()
-    val permissionsState = rememberMultiplePermissionsState(foregroundPermissions)
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
 
-    @OptIn(ExperimentalPermissionsApi::class)
-    val backgroundPermissionState = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+    val foreground = rememberMultiplePermissionsState(foregroundPermissions)
+    val background = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
         rememberMultiplePermissionsState(listOf(Manifest.permission.ACCESS_BACKGROUND_LOCATION))
     } else {
         null
     }
 
+    OmonoMainScreen(
+        contentPadding = contentPadding,
+        state = state,
+        foregroundGranted = foreground.allPermissionsGranted,
+        backgroundGranted = background?.allPermissionsGranted ?: true,
+        onRequestForeground = foreground::launchMultiplePermissionRequest,
+        onRequestBackground = { background?.launchMultiplePermissionRequest() },
+        onUnitSelect = viewModel::setUnit,
+        onStart = { FeatureHostService.start(context) },
+        onStop = { FeatureHostService.stop(context) },
+    )
+}
+
+@Composable
+fun OmonoMainScreen(
+    contentPadding: PaddingValues,
+    state: OmonoMainUiState,
+    foregroundGranted: Boolean,
+    backgroundGranted: Boolean,
+    onRequestForeground: () -> Unit,
+    onRequestBackground: () -> Unit,
+    onUnitSelect: (SpeedUnit) -> Unit,
+    onStart: () -> Unit,
+    onStop: () -> Unit,
+) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -65,78 +103,98 @@ fun OmonoMainScreen(
             .padding(horizontal = 24.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp),
     ) {
-        Text(
-            text = "Omono",
-            style = androidx.compose.material3.MaterialTheme.typography.headlineMedium,
-        )
+        BrandHeader()
+        HeroCard(state = state)
 
-        PermissionsCard(
-            foreground = permissionsState,
-            background = backgroundPermissionState,
-        )
-
-        UnitPicker(
-            current = unit,
-            onSelect = viewModel::setUnit,
-        )
-
-        Spacer(Modifier.height(8.dp))
-
-        Button(
-            onClick = { FeatureHostService.start(context) },
-            enabled = permissionsState.allPermissionsGranted,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Text("Start tracking")
+        AnimatedVisibility(visible = !foregroundGranted || !backgroundGranted) {
+            PermissionsCard(
+                foregroundGranted = foregroundGranted,
+                backgroundGranted = backgroundGranted,
+                onRequestForeground = onRequestForeground,
+                onRequestBackground = onRequestBackground,
+            )
         }
 
-        OutlinedButton(
-            onClick = { FeatureHostService.stop(context) },
-            modifier = Modifier.fillMaxWidth(),
+        Text(
+            text = "Unit",
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        UnitPicker(current = state.unit, onSelect = onUnitSelect)
+
+        Spacer(Modifier.height(4.dp))
+
+        PrimaryAction(
+            running = state.running,
+            enabled = foregroundGranted,
+            onStart = onStart,
+            onStop = onStop,
+        )
+    }
+}
+
+@Composable
+private fun BrandHeader() {
+    Text(
+        text = "omono",
+        style = MaterialTheme.typography.headlineLarge,
+        color = MaterialTheme.colorScheme.primary,
+    )
+}
+
+@Composable
+private fun HeroCard(state: OmonoMainUiState) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.elevatedCardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+        ),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp, vertical = 32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Text("Stop tracking")
+            StatusDot(state)
+            Spacer(Modifier.height(12.dp))
+            Text(
+                text = state.heroValue,
+                style = MaterialTheme.typography.displayLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Text(
+                text = state.heroUnit,
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = state.status.label,
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
 
-@OptIn(ExperimentalPermissionsApi::class)
 @Composable
-private fun PermissionsCard(
-    foreground: MultiplePermissionsState,
-    background: MultiplePermissionsState?,
-) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            val foregroundOk = foreground.allPermissionsGranted
-            val backgroundOk = background?.allPermissionsGranted ?: true
-
-            Text(
-                text = when {
-                    foregroundOk && backgroundOk -> "All permissions granted"
-                    foregroundOk -> "Background location not granted"
-                    else -> "Location & notification permissions required"
-                },
-                style = androidx.compose.material3.MaterialTheme.typography.titleMedium,
-            )
-            Text(
-                text = "Speed monitoring needs precise location while running, " +
-                    "and background location to keep working when you leave the app.",
-                style = androidx.compose.material3.MaterialTheme.typography.bodyMedium,
-            )
-            if (!foregroundOk) {
-                Button(onClick = { foreground.launchMultiplePermissionRequest() }) {
-                    Text("Grant location & notifications")
-                }
-            } else if (background != null && !backgroundOk) {
-                Button(onClick = { background.launchMultiplePermissionRequest() }) {
-                    Text("Grant background location")
-                }
-            }
-        }
-    }
+private fun StatusDot(state: OmonoMainUiState) {
+    val color by animateColorAsState(
+        targetValue = when (state.status) {
+            is Status.Tracking -> MaterialTheme.colorScheme.primary
+            is Status.Waiting -> MaterialTheme.colorScheme.tertiary
+            is Status.Error -> MaterialTheme.colorScheme.error
+            Status.Stopped -> MaterialTheme.colorScheme.outlineVariant
+        },
+        label = "statusDot",
+    )
+    Box(
+        modifier = Modifier
+            .size(12.dp)
+            .clip(CircleShape)
+            .background(color),
+    )
 }
 
 @Composable
@@ -154,6 +212,93 @@ private fun UnitPicker(
             ) {
                 Text(option.label)
             }
+        }
+    }
+}
+
+@Composable
+private fun PermissionsCard(
+    foregroundGranted: Boolean,
+    backgroundGranted: Boolean,
+    onRequestForeground: () -> Unit,
+    onRequestBackground: () -> Unit,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+        ),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            val icon = if (foregroundGranted) Icons.Filled.NotificationsActive else Icons.Filled.LocationOff
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onTertiaryContainer,
+            )
+            Text(
+                text = when {
+                    !foregroundGranted -> "Location & notifications needed"
+                    !backgroundGranted -> "Background location needed"
+                    else -> "All permissions granted"
+                },
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onTertiaryContainer,
+            )
+            Text(
+                text = "Omono needs precise location while tracking, plus background " +
+                    "location to keep measuring when you leave the app.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onTertiaryContainer,
+            )
+            when {
+                !foregroundGranted -> FilledTonalButton(
+                    onClick = onRequestForeground,
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text("Grant location & notifications") }
+                !backgroundGranted -> FilledTonalButton(
+                    onClick = onRequestBackground,
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text("Grant background location") }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PrimaryAction(
+    running: Boolean,
+    enabled: Boolean,
+    onStart: () -> Unit,
+    onStop: () -> Unit,
+) {
+    if (running) {
+        FilledTonalButton(
+            onClick = onStop,
+            modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.filledTonalButtonColors(
+                containerColor = MaterialTheme.colorScheme.errorContainer,
+                contentColor = MaterialTheme.colorScheme.onErrorContainer,
+            ),
+        ) {
+            Icon(Icons.Filled.Stop, contentDescription = null)
+            Spacer(Modifier.size(8.dp))
+            Text("Stop tracking")
+        }
+    } else {
+        Button(
+            onClick = onStart,
+            enabled = enabled,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Icon(Icons.Filled.PlayArrow, contentDescription = null)
+            Spacer(Modifier.size(8.dp))
+            Text("Start tracking")
         }
     }
 }

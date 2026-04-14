@@ -25,7 +25,7 @@ import javax.inject.Singleton
 // the safest choice for a service callback.
 @Singleton
 class SpeedRepository @Inject constructor(
-    @ApplicationContext private val context: Context,
+    @param:ApplicationContext private val context: Context,
 ) {
     private val client by lazy { LocationServices.getFusedLocationProviderClient(context) }
 

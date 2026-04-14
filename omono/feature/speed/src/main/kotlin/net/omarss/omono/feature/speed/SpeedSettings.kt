@@ -18,7 +18,7 @@ private val UNIT_KEY = stringPreferencesKey("speed.unit")
 
 @Singleton
 class SpeedSettingsRepository @Inject constructor(
-    @ApplicationContext private val context: Context,
+    @param:ApplicationContext private val context: Context,
 ) {
     val unit: Flow<SpeedUnit> = context.omonoDataStore.data.map { prefs ->
         prefs[UNIT_KEY]?.let { saved -> runCatching { SpeedUnit.valueOf(saved) }.getOrNull() }

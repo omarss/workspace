@@ -11,8 +11,6 @@ import androidx.lifecycle.LifecycleService
 import androidx.lifecycle.lifecycleScope
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import net.omarss.omono.core.notification.OmonoNotificationController
 import timber.log.Timber
@@ -23,20 +21,18 @@ import javax.inject.Inject
 // Lifecycle:
 //   start  -> startForeground with a placeholder notification, then for
 //             each registered feature: launch a coroutine that collects
-//             feature.start(scope) into the aggregated state map and
+//             feature.start(scope) into the shared state holder and
 //             refreshes the notification on every update.
-//   stop   -> cancel the per-feature jobs (each feature's start() scope
-//             is cancelled), then stopSelf.
+//   stop   -> cancel the per-feature jobs, drop foreground, stopSelf.
+//
+// State is written to FeatureHostStateHolder so the UI layer can observe
+// it without binding to this service.
 @AndroidEntryPoint
 class FeatureHostService : LifecycleService() {
 
     @Inject lateinit var registry: FeatureRegistry
     @Inject lateinit var notifications: OmonoNotificationController
-
-    // FeatureId -> latest summary line. StateFlow gives us coalesced
-    // updates so a burst of fast emits only redraws the notification once
-    // per pass through the main loop.
-    private val states = MutableStateFlow<Map<FeatureId, String>>(emptyMap())
+    @Inject lateinit var stateHolder: FeatureHostStateHolder
 
     private val featureJobs = mutableMapOf<FeatureId, Job>()
     private var started = false
@@ -63,6 +59,7 @@ class FeatureHostService : LifecycleService() {
     private fun ensureStarted() {
         if (started) return
         started = true
+        stateHolder.setRunning(true)
 
         // Promote to foreground BEFORE launching feature collectors —
         // Android requires startForeground within 5s of startForegroundService.
@@ -79,7 +76,7 @@ class FeatureHostService : LifecycleService() {
 
         // Re-render the notification whenever any feature emits a new state.
         lifecycleScope.launch {
-            states.collect { snapshot ->
+            stateHolder.states.collect { snapshot ->
                 postNotificationSafely(buildNotificationFrom(snapshot))
             }
         }
@@ -94,7 +91,7 @@ class FeatureHostService : LifecycleService() {
         Timber.i("Starting feature %s", feature.id.value)
         val job = lifecycleScope.launch {
             feature.start(this).collect { state ->
-                states.update { it + (feature.id to state.summary) }
+                stateHolder.updateState(feature.id, state)
             }
         }
         featureJobs[feature.id] = job
@@ -105,7 +102,8 @@ class FeatureHostService : LifecycleService() {
         featureJobs.values.forEach { it.cancel() }
         featureJobs.clear()
         registry.all().forEach { runCatching { it.stop() } }
-        states.value = emptyMap()
+        stateHolder.clearStates()
+        stateHolder.setRunning(false)
         started = false
     }
 
@@ -128,18 +126,18 @@ class FeatureHostService : LifecycleService() {
         }
     }
 
-    private fun buildNotification() = buildNotificationFrom(states.value)
+    private fun buildNotification() = buildNotificationFrom(stateHolder.states.value)
 
-    private fun buildNotificationFrom(snapshot: Map<FeatureId, String>) =
+    private fun buildNotificationFrom(snapshot: Map<FeatureId, FeatureState>) =
         notifications.buildOngoing(
             context = this,
             title = "Omono",
-            bodyLines = snapshot.values.toList(),
+            bodyLines = snapshot.values.map { it.summary },
             contentIntent = openAppIntent(),
         )
 
-    // Tap on the notification opens the launcher activity, whatever it is.
-    // Resolving it dynamically avoids a hard reference from :core to :app.
+    // Tap on the notification opens the launcher activity. Resolving it
+    // dynamically avoids a hard reference from :core to :app.
     private fun openAppIntent(): PendingIntent? {
         val launchIntent = packageManager.getLaunchIntentForPackage(packageName) ?: return null
         return PendingIntent.getActivity(

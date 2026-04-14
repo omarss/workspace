@@ -9,7 +9,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.ui.Modifier
 import dagger.hilt.android.AndroidEntryPoint
 import net.omarss.omono.core.designsystem.theme.OmonoTheme
-import net.omarss.omono.ui.OmonoMainScreen
+import net.omarss.omono.ui.OmonoMainRoute
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -19,7 +19,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             OmonoTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { padding ->
-                    OmonoMainScreen(contentPadding = padding)
+                    OmonoMainRoute(contentPadding = padding)
                 }
             }
         }
