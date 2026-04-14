@@ -1,4 +1,4 @@
-.PHONY: k3s-config apply-k8s apply-obsidian apply-openclaw apply-network-policies apply-nginx apply-all
+.PHONY: k3s-config apply-k8s apply-obsidian apply-openclaw apply-network-policies apply-nginx apply-apps-host apply-all
 
 # Copy k3s server configs to /etc/rancher/k3s/
 k3s-config:
@@ -28,9 +28,17 @@ apply-openclaw:
 apply-nginx:
 	sudo cp nginx/swet.omarss.net.conf /etc/nginx/sites-available/swet.omarss.net
 	sudo cp nginx/sync.omarss.net.conf /etc/nginx/sites-available/sync.omarss.net
+	sudo cp nginx/apps.omarss.net.conf /etc/nginx/sites-available/apps.omarss.net
 	sudo ln -sf /etc/nginx/sites-available/swet.omarss.net /etc/nginx/sites-enabled/
 	sudo ln -sf /etc/nginx/sites-available/sync.omarss.net /etc/nginx/sites-enabled/
+	sudo ln -sf /etc/nginx/sites-available/apps.omarss.net /etc/nginx/sites-enabled/
 	sudo nginx -t && sudo systemctl reload nginx
+
+# One-shot full setup for the apps.omarss.net APK host:
+# creates /srv/apps owned by omar, installs vhost, reloads nginx.
+# After this, run: sudo certbot --nginx -d apps.omarss.net
+apply-apps-host:
+	sudo bash scripts/setup-apps-host.sh
 
 # Apply all k8s resources
 apply-k8s: apply-network-policies apply-obsidian apply-openclaw
