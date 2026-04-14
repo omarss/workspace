@@ -40,14 +40,19 @@ fi
 
 VERSIONED="omono.${VERSION}.apk"
 LATEST="omono.latest.apk"
-TMP_DIR=$(mktemp -d)
-trap 'rm -rf "$TMP_DIR"' EXIT
 
-cp "$APK_SOURCE" "$TMP_DIR/$VERSIONED"
-cp "$APK_SOURCE" "$TMP_DIR/$LATEST"
+# Per-file rsync (no temp dir, no `-a`). The previous version staged
+# both files in mktemp -d and rsync'd the directory with -a — which
+# also propagated mktemp's 700 mode onto /srv/apps, locking nginx
+# out with a 403. --no-perms / --no-owner / --no-group keep file
+# attributes minimal so the destination dir mode is never touched.
+RSYNC_OPTS=(-t --no-perms --no-owner --no-group --info=progress2)
+DEST="${OMONO_RELEASE_HOST%/}"
 
-echo "==> Uploading ${VERSIONED} + ${LATEST} to ${OMONO_RELEASE_HOST}"
-rsync -a --info=progress2 "$TMP_DIR/" "${OMONO_RELEASE_HOST%/}/"
+echo "==> Uploading ${VERSIONED} to ${DEST}"
+rsync "${RSYNC_OPTS[@]}" "$APK_SOURCE" "${DEST}/${VERSIONED}"
+echo "==> Uploading ${LATEST} to ${DEST}"
+rsync "${RSYNC_OPTS[@]}" "$APK_SOURCE" "${DEST}/${LATEST}"
 
 # Ask the apps host to merge the new release into manifest.json.
 # If we're publishing locally and update-apps-manifest is on PATH,
