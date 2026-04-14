@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 108" width="108" height="108" role="img" aria-label="omono">
+    <defs>
+        <radialGradient id="bg" cx="50%" cy="37%" r="80%">
+            <stop offset="0%" stop-color="#1E3A8A" />
+            <stop offset="55%" stop-color="#0F172A" />
+            <stop offset="100%" stop-color="#020617" />
+        </radialGradient>
+        <linearGradient id="ring" x1="24%" y1="24%" x2="76%" y2="76%">
+            <stop offset="0%" stop-color="#93C5FD" />
+            <stop offset="50%" stop-color="#3B82F6" />
+            <stop offset="100%" stop-color="#1D4ED8" />
+        </linearGradient>
+    </defs>
+    <rect width="108" height="108" rx="22" fill="url(#bg)" />
+    <path fill-rule="evenodd" fill="url(#ring)"
+          d="M54,26 a28,28 0 1,1 -0.001,0 Z M54,36 a18,18 0 1,0 0.001,0 Z" />
+    <path fill="#F8FAFC" d="M52.5,55.5 L72,36 L76,40 L55.5,59.5 Z" />
+    <circle cx="54" cy="54" r="5" fill="#F8FAFC" />
+</svg>

@@ -5,7 +5,7 @@
 # Steps:
 #   1. Ensure /srv/apps exists with the right owner + mode (nginx must
 #      be able to traverse it).
-#   2. Install the static index.html that any browser sees at /.
+#   2. Install the static site (index.html + assets/ + icons/).
 #   3. Seed an empty manifest.json so the index page renders cleanly
 #      before the first publish.
 #   4. Install update-apps-manifest to /usr/local/bin so any project's
@@ -24,17 +24,22 @@ fi
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 DOC_ROOT=/srv/apps
+STATIC_SOURCE="${REPO_ROOT}/static/apps"
 NGINX_AVAIL=/etc/nginx/sites-available/apps.omarss.net
 NGINX_ENABLED=/etc/nginx/sites-enabled/apps.omarss.net
 CONF_SOURCE="${REPO_ROOT}/nginx/apps.omarss.net.conf"
-INDEX_SOURCE="${REPO_ROOT}/static/apps/index.html"
 MANIFEST_HELPER_SOURCE="${REPO_ROOT}/scripts/update-apps-manifest.sh"
 MANIFEST_HELPER_TARGET=/usr/local/bin/update-apps-manifest
 DOMAIN=apps.omarss.net
 TARGET_USER=omar
 TARGET_GROUP=omar
 
-for f in "$CONF_SOURCE" "$INDEX_SOURCE" "$MANIFEST_HELPER_SOURCE"; do
+for f in "$CONF_SOURCE" "$MANIFEST_HELPER_SOURCE" \
+         "$STATIC_SOURCE/index.html" \
+         "$STATIC_SOURCE/assets/app.css" \
+         "$STATIC_SOURCE/assets/app.js" \
+         "$STATIC_SOURCE/icons/omono.svg" \
+         "$STATIC_SOURCE/icons/favicon.svg"; do
     if [[ ! -f "$f" ]]; then
         echo "Missing source file: $f" >&2
         exit 1
@@ -53,12 +58,25 @@ echo "==> Ensuring document root $DOC_ROOT exists"
 # 700 directory that nginx (www-data) can't traverse — exactly the
 # kind of silent failure that gives us a 403 with no logs.
 install -d -m 755 -o "$TARGET_USER" -g "$TARGET_GROUP" "$DOC_ROOT"
-# Belt-and-braces: re-assert mode on an existing dir too.
-chmod 755 "$DOC_ROOT"
-chown "${TARGET_USER}:${TARGET_GROUP}" "$DOC_ROOT"
+install -d -m 755 -o "$TARGET_USER" -g "$TARGET_GROUP" "$DOC_ROOT/assets"
+install -d -m 755 -o "$TARGET_USER" -g "$TARGET_GROUP" "$DOC_ROOT/icons"
+# Belt-and-braces: re-assert mode on existing dirs too (other writers
+# like rsync with `-a` can silently flip these back to 700).
+chmod 755 "$DOC_ROOT" "$DOC_ROOT/assets" "$DOC_ROOT/icons"
+chown -R "${TARGET_USER}:${TARGET_GROUP}" \
+    "$DOC_ROOT/assets" "$DOC_ROOT/icons"
 
-echo "==> Installing index.html"
-install -m 644 -o "$TARGET_USER" -g "$TARGET_GROUP" "$INDEX_SOURCE" "$DOC_ROOT/index.html"
+echo "==> Installing static site"
+install -m 644 -o "$TARGET_USER" -g "$TARGET_GROUP" \
+    "$STATIC_SOURCE/index.html" "$DOC_ROOT/index.html"
+install -m 644 -o "$TARGET_USER" -g "$TARGET_GROUP" \
+    "$STATIC_SOURCE/assets/app.css" "$DOC_ROOT/assets/app.css"
+install -m 644 -o "$TARGET_USER" -g "$TARGET_GROUP" \
+    "$STATIC_SOURCE/assets/app.js" "$DOC_ROOT/assets/app.js"
+install -m 644 -o "$TARGET_USER" -g "$TARGET_GROUP" \
+    "$STATIC_SOURCE/icons/omono.svg" "$DOC_ROOT/icons/omono.svg"
+install -m 644 -o "$TARGET_USER" -g "$TARGET_GROUP" \
+    "$STATIC_SOURCE/icons/favicon.svg" "$DOC_ROOT/icons/favicon.svg"
 
 echo "==> Seeding manifest.json (only if missing)"
 if [[ ! -f "$DOC_ROOT/manifest.json" ]]; then
@@ -85,12 +103,8 @@ echo
 echo "==> Done."
 echo
 echo "Next steps (run by hand):"
-echo "  1. Confirm DNS resolves: dig +short ${DOMAIN}"
-echo "     (must point at this machine's public IP)"
-echo
-echo "  2. Issue the cert (Let's Encrypt rate-limits failed challenges, so"
-echo "     do step 1 first):"
+echo "  1. Re-run certbot to re-inject the TLS block after the vhost rewrite:"
 echo "     sudo certbot --nginx -d ${DOMAIN}"
 echo
-echo "  3. From the omono project: make release"
+echo "  2. From the omono project: make release"
 echo "     The APK + changelog will land at https://${DOMAIN}/"
