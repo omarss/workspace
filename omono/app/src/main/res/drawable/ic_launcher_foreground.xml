@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!--
+      Adaptive icon safe zone is a ~66dp centred circle on the 108dp canvas.
+      All geometry here is inset well within that to survive all device masks.
+    -->
+
+    <!--
+      Outer ring: the "O" of omono rendered as a donut via two concentric
+      full-circle subpaths + evenOdd fill rule. Linear gradient mimics a
+      lit gauge bezel.
+    -->
+    <path
+        android:fillType="evenOdd"
+        android:pathData="M54,26 A28,28 0 1,1 53.999,26 Z M54,36 A18,18 0 1,0 54.001,36 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="26"
+                android:startY="26"
+                android:endX="82"
+                android:endY="82">
+                <item android:offset="0.0" android:color="#FF93C5FD" />
+                <item android:offset="0.5" android:color="#FF3B82F6" />
+                <item android:offset="1.0" android:color="#FF1D4ED8" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!--
+      Needle: a narrow quad from the hub pointing to the upper-right tick,
+      conveying "motion" without being literal. Kept inside the ring.
+    -->
+    <path
+        android:pathData="M52.5,55.5 L72,36 L76,40 L55.5,59.5 Z"
+        android:fillColor="#FFF8FAFC" />
+
+    <!--
+      Center hub cap.
+    -->
+    <path
+        android:pathData="M54,54 m-5,0 a5,5 0 1,0 10,0 a5,5 0 1,0 -10,0 Z"
+        android:fillColor="#FFF8FAFC" />
+</vector>
