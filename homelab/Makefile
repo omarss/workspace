@@ -1,4 +1,4 @@
-.PHONY: k3s-config apply-k8s apply-obsidian apply-openclaw apply-network-policies apply-nginx apply-apps-host apply-all
+.PHONY: k3s-config apply-k8s apply-obsidian apply-openclaw apply-network-policies apply-nginx apply-apps-host apply-geofence geofence-status geofence-disable geofence-enable geofence-refresh apply-all
 
 # Copy k3s server configs to /etc/rancher/k3s/
 k3s-config:
@@ -39,6 +39,24 @@ apply-nginx:
 # After this, run: sudo certbot --nginx -d apps.omarss.net
 apply-apps-host:
 	sudo bash scripts/setup-apps-host.sh
+
+# Saudi Arabia geofence: blocks all incoming TCP from non-SA IPs except
+# tailscale, LAN, and tcp/80 (kept open for ACME). Pre-flights against
+# the host's own public IP and refuses to apply if it would lock you out.
+apply-geofence:
+	sudo bash geofence/setup.sh
+
+geofence-status:
+	sudo geofence-status
+
+geofence-disable:
+	sudo geofence-disable
+
+geofence-enable:
+	sudo geofence-apply
+
+geofence-refresh:
+	sudo geofence-refresh
 
 # Apply all k8s resources
 apply-k8s: apply-network-policies apply-obsidian apply-openclaw

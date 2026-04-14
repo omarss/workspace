@@ -1,0 +1,15 @@
+[Unit]
+Description=Apply Saudi Arabia geofence (ipset + iptables)
+Documentation=https://github.com/omarss/workspace
+After=network-pre.target
+Wants=network-pre.target
+Before=network.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/sbin/geofence-apply
+ExecStop=/usr/local/sbin/geofence-disable
+
+[Install]
+WantedBy=multi-user.target

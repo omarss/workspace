@@ -52,10 +52,35 @@ Self-hosted sideload target for Android apps via [Obtainium](https://github.com/
 - `apply-obsidian`, `apply-openclaw` — k8s apps
 - `apply-all` — everything
 
+### Saudi Arabia geofence (incoming traffic)
+ipset + iptables/ip6tables block any incoming TCP from outside SA on every port. Lives entirely in `homelab/geofence/`.
+
+- **Apply**: `sudo make -C homelab apply-geofence` (idempotent; safe to re-run)
+- **Disable** (panic button): `sudo make -C homelab geofence-disable` — flushes the `PRE_GEOFENCE` chain, ipset sets stay on disk for fast re-enable
+- **Re-enable**: `sudo make -C homelab geofence-enable`
+- **Status**: `sudo make -C homelab geofence-status`
+- **Refresh**: daily systemd timer (`geofence-refresh.timer`) re-fetches zones from ipdeny.com — manual: `sudo make -C homelab geofence-refresh`
+
+The `apply` script pre-flights the host's own public IPv4/IPv6 against the new SA set and **refuses to install the chain if it would lock the host out** — so it's safe to run from a remote SSH session as long as you started the session from a SA IP.
+
+Always allowed (regardless of source country):
+- loopback / conntrack ESTABLISHED,RELATED
+- `tailscale0` interface and `100.64.0.0/10` (Tailscale CGNAT)
+- RFC1918 private (10/8, 172.16/12, 192.168/16) — LAN access
+- `tcp/80` globally (Let's Encrypt ACME challenge keeps working — no 80 to 443 redirect content is geo-fenced)
+- IPv6: ICMPv6, link-local, multicast destinations
+
+Tradeoffs to remember:
+- omono on the user's phone gets blocked when the carrier IP isn't SA (travel) — acceptable per user's call
+- No GitHub webhooks / external monitoring without explicit allowlist
+- ipdeny.com is a third-party data source. If it goes down the rules still work, just don't update
+
 ### Gotchas / known warts
 1. **`apply-nginx` clobbers certbot** (documented above)
 2. **`rsync -a` vs `/srv/apps` mode** — solved in `omono/scripts/publish.sh`. If you're writing a new publish script for a different app: use `-t --no-perms --no-owner --no-group` so rsync never touches the destination directory's attributes. `-a` on a staging dir will propagate `mktemp -d`'s 700 mode onto `/srv/apps` and lock nginx out with a 403
 3. **`sudo umask`** — `mkdir -p` under `sudo` can inherit 077 on this machine. Use `install -d -m 755 -o omar -g omar` instead of `mkdir && chmod && chown`
+4. **nginx `add_header` has no inheritance** — any location with its own `add_header` drops *all* of its parent's headers. Use the `snippets/apps-security-headers.conf` include in every location that adds a header
+5. **nginx `if` is evil** — `if` inside a location creates an implicit nested context that drops parent `add_header` directives. Use multiple regex location blocks instead
 
 ## omono/
 

@@ -1,0 +1,9 @@
+[Unit]
+Description=Refresh SA zone files and re-apply geofence
+Documentation=https://github.com/omarss/workspace
+After=network-online.target geofence.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/geofence-refresh
