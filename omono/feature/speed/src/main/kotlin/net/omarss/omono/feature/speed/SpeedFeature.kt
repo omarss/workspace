@@ -4,8 +4,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onStart
 import net.omarss.omono.core.common.SpeedUnit
 import net.omarss.omono.core.service.FeatureId
@@ -18,7 +16,17 @@ import javax.inject.Singleton
 // Speeds reported by FusedLocation below this threshold are unreliable
 // (GPS noise dominates). We render them as "—" so the notification
 // doesn't flicker when the user is standing still.
-private const val STATIONARY_THRESHOLD_MPS = 0.5f
+internal const val STATIONARY_THRESHOLD_MPS: Float = 0.5f
+
+// Pure formatter — exposed at file scope so it's trivial to unit-test
+// without instantiating SpeedFeature or its Android dependencies.
+internal fun formatSpeedState(mps: Float, unit: SpeedUnit): FeatureState {
+    if (mps < STATIONARY_THRESHOLD_MPS) {
+        return FeatureState.Idle("— ${unit.label}")
+    }
+    val converted = unit.fromMetersPerSecond(mps)
+    return FeatureState.Active("%.1f %s".format(converted, unit.label))
+}
 
 @Singleton
 class SpeedFeature @Inject constructor(
@@ -38,19 +46,11 @@ class SpeedFeature @Inject constructor(
         combine(
             speedRepository.speedMetersPerSecond(),
             settings.unit,
-        ) { mps, unit -> render(mps, unit) }
+        ) { mps, unit -> formatSpeedState(mps, unit) }
             .onStart { emit(FeatureState.Idle("Waiting for GPS fix")) }
             .catch { error ->
                 emit(FeatureState.Error(error.message ?: error::class.simpleName.orEmpty()))
             }
 
     override fun stop() = Unit
-
-    private fun render(mps: Float, unit: SpeedUnit): FeatureState {
-        if (mps < STATIONARY_THRESHOLD_MPS) {
-            return FeatureState.Idle("— ${unit.label}")
-        }
-        val converted = unit.fromMetersPerSecond(mps)
-        return FeatureState.Active("%.1f %s".format(converted, unit.label))
-    }
 }

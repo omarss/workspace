@@ -55,8 +55,12 @@ lint: ## Run Android lint on debug variant
 	$(GRADLEW) lintDebug
 
 .PHONY: test
-test: ## Run unit tests
+test: ## Run JVM + Robolectric unit tests
 	$(GRADLEW) testDebugUnitTest
+
+.PHONY: connected-test
+connected-test: ## Run instrumentation tests on a connected device/emulator
+	$(GRADLEW) connectedDebugAndroidTest
 
 .PHONY: check
 check: ## Run full verification (lint + tests)

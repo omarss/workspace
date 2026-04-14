@@ -4,6 +4,12 @@ plugins {
 
 android {
     namespace = "net.omarss.omono.feature.speed"
+
+    testOptions {
+        unitTests {
+            isIncludeAndroidResources = true
+        }
+    }
 }
 
 dependencies {
@@ -12,4 +18,11 @@ dependencies {
     implementation(libs.play.services.location)
     implementation(libs.kotlinx.coroutines.play.services)
     implementation(libs.timber)
+
+    testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.turbine)
+    testImplementation(libs.kotest.assertions.core)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.test.core.ktx)
 }
