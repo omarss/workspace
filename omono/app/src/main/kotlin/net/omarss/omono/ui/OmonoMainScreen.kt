@@ -17,8 +17,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.BatteryFull
 import androidx.compose.material.icons.filled.LocationOff
-import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Stop
@@ -70,14 +70,17 @@ fun OmonoMainRoute(
     } else {
         null
     }
+    val batteryExempt by rememberBatteryOptimizationState()
 
     OmonoMainScreen(
         contentPadding = contentPadding,
         state = state,
         foregroundGranted = foreground.allPermissionsGranted,
         backgroundGranted = background?.allPermissionsGranted ?: true,
+        batteryExempt = batteryExempt,
         onRequestForeground = foreground::launchMultiplePermissionRequest,
         onRequestBackground = { background?.launchMultiplePermissionRequest() },
+        onRequestBatteryExemption = { launchBatteryOptimizationDialog(context) },
         onUnitSelect = viewModel::setUnit,
         onStart = { FeatureHostService.start(context) },
         onStop = { FeatureHostService.stop(context) },
@@ -90,8 +93,10 @@ fun OmonoMainScreen(
     state: OmonoMainUiState,
     foregroundGranted: Boolean,
     backgroundGranted: Boolean,
+    batteryExempt: Boolean,
     onRequestForeground: () -> Unit,
     onRequestBackground: () -> Unit,
+    onRequestBatteryExemption: () -> Unit,
     onUnitSelect: (SpeedUnit) -> Unit,
     onStart: () -> Unit,
     onStop: () -> Unit,
@@ -113,6 +118,10 @@ fun OmonoMainScreen(
                 onRequestForeground = onRequestForeground,
                 onRequestBackground = onRequestBackground,
             )
+        }
+
+        AnimatedVisibility(visible = !batteryExempt) {
+            BatteryCard(onRequest = onRequestBatteryExemption)
         }
 
         Text(
@@ -144,6 +153,15 @@ private fun BrandHeader() {
 
 @Composable
 private fun HeroCard(state: OmonoMainUiState) {
+    val heroColor by animateColorAsState(
+        targetValue = if (state.overLimit) {
+            MaterialTheme.colorScheme.error
+        } else {
+            MaterialTheme.colorScheme.onSurface
+        },
+        label = "heroColor",
+    )
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.elevatedCardColors(
@@ -161,7 +179,7 @@ private fun HeroCard(state: OmonoMainUiState) {
             Text(
                 text = state.heroValue,
                 style = MaterialTheme.typography.displayLarge,
-                color = MaterialTheme.colorScheme.onSurface,
+                color = heroColor,
             )
             Text(
                 text = state.heroUnit,
@@ -174,6 +192,10 @@ private fun HeroCard(state: OmonoMainUiState) {
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            if (state.limitDisplay != null) {
+                Spacer(Modifier.height(12.dp))
+                LimitChip(text = "Limit ${state.limitDisplay}", overLimit = state.overLimit)
+            }
         }
     }
 }
@@ -195,6 +217,32 @@ private fun StatusDot(state: OmonoMainUiState) {
             .clip(CircleShape)
             .background(color),
     )
+}
+
+@Composable
+private fun LimitChip(text: String, overLimit: Boolean) {
+    val container = if (overLimit) {
+        MaterialTheme.colorScheme.errorContainer
+    } else {
+        MaterialTheme.colorScheme.secondaryContainer
+    }
+    val onContainer = if (overLimit) {
+        MaterialTheme.colorScheme.onErrorContainer
+    } else {
+        MaterialTheme.colorScheme.onSecondaryContainer
+    }
+    Box(
+        modifier = Modifier
+            .clip(CircleShape)
+            .background(container)
+            .padding(horizontal = 14.dp, vertical = 6.dp),
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelLarge,
+            color = onContainer,
+        )
+    }
 }
 
 @Composable
@@ -266,6 +314,44 @@ private fun PermissionsCard(
                     modifier = Modifier.fillMaxWidth(),
                 ) { Text("Grant background location") }
             }
+        }
+    }
+}
+
+@Composable
+private fun BatteryCard(onRequest: () -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+        ),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Icon(
+                imageVector = Icons.Filled.BatteryFull,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSecondaryContainer,
+            )
+            Text(
+                text = "Disable battery optimisation",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSecondaryContainer,
+            )
+            Text(
+                text = "Android may stop background tracking after a few minutes if " +
+                    "Omono isn't on the battery allow-list. One tap fixes it.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSecondaryContainer,
+            )
+            FilledTonalButton(
+                onClick = onRequest,
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text("Allow background activity") }
         }
     }
 }

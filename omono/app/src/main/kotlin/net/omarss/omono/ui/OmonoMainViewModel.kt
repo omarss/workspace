@@ -46,7 +46,27 @@ class OmonoMainViewModel @Inject constructor(
         running: Boolean,
         speedState: FeatureState?,
     ): OmonoMainUiState {
-        val (value, label) = parseSummary(speedState?.summary, unit)
+        val metadata = when (speedState) {
+            is FeatureState.Active -> speedState.metadata
+            is FeatureState.Idle -> speedState.metadata
+            else -> emptyMap()
+        }
+        val speedKmh = metadata[FeatureState.META_SPEED_KMH]?.toFloat()
+        val limitKmh = metadata[FeatureState.META_SPEED_LIMIT_KMH]?.toFloat()
+        val isMoving = speedState is FeatureState.Active
+
+        val heroValue = if (isMoving && speedKmh != null) {
+            val mps = speedKmh / 3.6f
+            "%.1f".format(unit.fromMetersPerSecond(mps))
+        } else {
+            HERO_PLACEHOLDER
+        }
+        val limitDisplay = limitKmh?.let { kmh ->
+            val mps = kmh / 3.6f
+            "%.0f %s".format(unit.fromMetersPerSecond(mps), unit.label)
+        }
+        val overLimit = isMoving && speedKmh != null && limitKmh != null && speedKmh > limitKmh
+
         val status = when {
             !running -> Status.Stopped
             speedState is FeatureState.Active -> Status.Tracking
@@ -56,20 +76,12 @@ class OmonoMainViewModel @Inject constructor(
         return OmonoMainUiState(
             unit = unit,
             running = running,
-            heroValue = value,
-            heroUnit = label ?: unit.label,
+            heroValue = heroValue,
+            heroUnit = unit.label,
             status = status,
+            limitDisplay = limitDisplay,
+            overLimit = overLimit,
         )
-    }
-
-    // Both Active and Idle summaries follow "<value> <unit>" by construction
-    // (see formatSpeedState in :feature:speed). Split on the last space so we
-    // can render the value big and the unit label small.
-    private fun parseSummary(summary: String?, fallbackUnit: SpeedUnit): Pair<String, String?> {
-        if (summary.isNullOrBlank()) return HERO_PLACEHOLDER to fallbackUnit.label
-        val idx = summary.lastIndexOf(' ')
-        if (idx <= 0) return summary to null
-        return summary.substring(0, idx) to summary.substring(idx + 1)
     }
 
     private companion object {
@@ -83,6 +95,8 @@ data class OmonoMainUiState(
     val heroValue: String = "—",
     val heroUnit: String = SpeedUnit.KmH.label,
     val status: Status = Status.Stopped,
+    val limitDisplay: String? = null,
+    val overLimit: Boolean = false,
 )
 
 sealed interface Status {
