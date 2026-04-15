@@ -79,6 +79,7 @@ dependencies {
     implementation(projects.core.notification)
     implementation(projects.core.service)
     implementation(projects.feature.speed)
+    implementation(projects.feature.spending)
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)

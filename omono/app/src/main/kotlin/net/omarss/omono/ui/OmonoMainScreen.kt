@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -20,6 +21,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BatteryFull
 import androidx.compose.material.icons.filled.DoNotDisturbOn
 import androidx.compose.material.icons.filled.LocationOff
+import androidx.compose.material.icons.filled.Message
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Stop
@@ -45,7 +47,6 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
-import com.google.accompanist.permissions.MultiplePermissionsState
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
 import net.omarss.omono.core.common.SpeedUnit
 import net.omarss.omono.core.service.FeatureHostService
@@ -56,6 +57,11 @@ private val foregroundPermissions: List<String> = buildList {
         add(Manifest.permission.POST_NOTIFICATIONS)
     }
 }
+
+private val smsPermissions: List<String> = listOf(
+    Manifest.permission.READ_SMS,
+    Manifest.permission.RECEIVE_SMS,
+)
 
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
@@ -72,6 +78,7 @@ fun OmonoMainRoute(
     } else {
         null
     }
+    val sms = rememberMultiplePermissionsState(smsPermissions)
     val batteryExempt by rememberBatteryOptimizationState()
     val dndAccessGranted by rememberNotificationPolicyAccessState()
 
@@ -80,10 +87,12 @@ fun OmonoMainRoute(
         state = state,
         foregroundGranted = foreground.allPermissionsGranted,
         backgroundGranted = background?.allPermissionsGranted ?: true,
+        smsGranted = sms.allPermissionsGranted,
         batteryExempt = batteryExempt,
         dndAccessGranted = dndAccessGranted,
         onRequestForeground = foreground::launchMultiplePermissionRequest,
         onRequestBackground = { background?.launchMultiplePermissionRequest() },
+        onRequestSms = sms::launchMultiplePermissionRequest,
         onRequestBatteryExemption = { launchBatteryOptimizationDialog(context) },
         onRequestDndAccess = { launchNotificationPolicyAccessSettings(context) },
         onUnitSelect = viewModel::setUnit,
@@ -99,10 +108,12 @@ fun OmonoMainScreen(
     state: OmonoMainUiState,
     foregroundGranted: Boolean,
     backgroundGranted: Boolean,
+    smsGranted: Boolean,
     batteryExempt: Boolean,
     dndAccessGranted: Boolean,
     onRequestForeground: () -> Unit,
     onRequestBackground: () -> Unit,
+    onRequestSms: () -> Unit,
     onRequestBatteryExemption: () -> Unit,
     onRequestDndAccess: () -> Unit,
     onUnitSelect: (SpeedUnit) -> Unit,
@@ -119,6 +130,14 @@ fun OmonoMainScreen(
     ) {
         BrandHeader()
         HeroCard(state = state)
+
+        AnimatedVisibility(visible = state.spending.available || !smsGranted) {
+            SpendingCard(
+                spending = state.spending,
+                smsGranted = smsGranted,
+                onRequestSms = onRequestSms,
+            )
+        }
 
         AnimatedVisibility(visible = !foregroundGranted || !backgroundGranted) {
             PermissionsCard(
@@ -219,6 +238,74 @@ private fun HeroCard(state: OmonoMainUiState) {
 }
 
 @Composable
+private fun SpendingCard(
+    spending: SpendingUi,
+    smsGranted: Boolean,
+    onRequestSms: () -> Unit,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.elevatedCardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+        ),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp, vertical = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(
+                text = "Spending",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (!smsGranted) {
+                Text(
+                    text = "Grant SMS access to read your Al Rajhi and STC " +
+                        "Bank transaction messages. Nothing is uploaded — " +
+                        "totals are computed on-device.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                FilledTonalButton(
+                    onClick = onRequestSms,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Icon(Icons.Filled.Message, contentDescription = null)
+                    Spacer(Modifier.size(8.dp))
+                    Text("Grant SMS access")
+                }
+            } else {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    SpendingStat(label = "Today", value = "SAR ${spending.today}")
+                    SpendingStat(label = "Month", value = "SAR ${spending.month}")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SpendingStat(label: String, value: String) {
+    Column {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.headlineSmall,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+    }
+}
+
+@Composable
 private fun StatusDot(state: OmonoMainUiState) {
     val color by animateColorAsState(
         targetValue = when (state.status) {
@@ -287,7 +374,7 @@ private fun AlertSettingRow(
     enabled: Boolean,
     onChange: (Boolean) -> Unit,
 ) {
-    androidx.compose.foundation.layout.Row(
+    Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
     ) {

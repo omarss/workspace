@@ -44,9 +44,25 @@
          page when the user has alerts enabled. -->
     <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
 
+    <!-- Spending feature: reads the SMS inbox (Al Rajhi Bank + STC Bank
+         transaction messages only, filtered at query time) and watches
+         for new ones to keep the today/month totals fresh. Both are
+         dangerous runtime permissions — the main screen guides the
+         user through granting them, and the feature emits an error
+         state when they aren't. -->
+    <uses-permission android:name="android.permission.READ_SMS" />
+    <uses-permission android:name="android.permission.RECEIVE_SMS" />
+
     <!-- Declare GPS as optional hardware so devices without GPS can still install. -->
     <uses-feature
         android:name="android.hardware.location.gps"
+        android:required="false" />
+
+    <!-- Telephony is optional too — READ_SMS / RECEIVE_SMS normally imply
+         a hardware requirement, but omono is a driver-assist app that
+         still renders the speedometer fine on SMS-less devices. -->
+    <uses-feature
+        android:name="android.hardware.telephony"
         android:required="false" />
 
     <application

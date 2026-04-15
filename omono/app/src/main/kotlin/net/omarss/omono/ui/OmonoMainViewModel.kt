@@ -24,6 +24,7 @@ class OmonoMainViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val speedFeatureId = FeatureId("speed")
+    private val spendingFeatureId = FeatureId("spending")
 
     val uiState: StateFlow<OmonoMainUiState> = combine(
         speedSettings.unit,
@@ -31,7 +32,13 @@ class OmonoMainViewModel @Inject constructor(
         stateHolder.running,
         stateHolder.states,
     ) { unit, alertEnabled, running, states ->
-        buildUiState(unit, alertEnabled, running, states[speedFeatureId])
+        buildUiState(
+            unit = unit,
+            alertOnOverLimit = alertEnabled,
+            running = running,
+            speedState = states[speedFeatureId],
+            spendingState = states[spendingFeatureId],
+        )
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(stopTimeoutMillis = 5_000),
@@ -51,14 +58,15 @@ class OmonoMainViewModel @Inject constructor(
         alertOnOverLimit: Boolean,
         running: Boolean,
         speedState: FeatureState?,
+        spendingState: FeatureState?,
     ): OmonoMainUiState {
-        val metadata = when (speedState) {
+        val speedMetadata = when (speedState) {
             is FeatureState.Active -> speedState.metadata
             is FeatureState.Idle -> speedState.metadata
             else -> emptyMap()
         }
-        val speedKmh = metadata[FeatureState.META_SPEED_KMH]?.toFloat()
-        val limitKmh = metadata[FeatureState.META_SPEED_LIMIT_KMH]?.toFloat()
+        val speedKmh = speedMetadata[FeatureState.META_SPEED_KMH]?.toFloat()
+        val limitKmh = speedMetadata[FeatureState.META_SPEED_LIMIT_KMH]?.toFloat()
         val isMoving = speedState is FeatureState.Active
 
         val heroValue = if (isMoving && speedKmh != null) {
@@ -79,6 +87,9 @@ class OmonoMainViewModel @Inject constructor(
             speedState is FeatureState.Error -> Status.Error(speedState.message)
             else -> Status.Waiting
         }
+
+        val spending = buildSpendingUi(spendingState)
+
         return OmonoMainUiState(
             unit = unit,
             running = running,
@@ -88,6 +99,28 @@ class OmonoMainViewModel @Inject constructor(
             limitDisplay = limitDisplay,
             overLimit = overLimit,
             alertOnOverLimit = alertOnOverLimit,
+            spending = spending,
+        )
+    }
+
+    private fun buildSpendingUi(state: FeatureState?): SpendingUi {
+        if (state is FeatureState.Error) {
+            return SpendingUi(available = false, errorMessage = state.message)
+        }
+        val metadata = when (state) {
+            is FeatureState.Active -> state.metadata
+            is FeatureState.Idle -> state.metadata
+            else -> emptyMap()
+        }
+        val today = metadata[FeatureState.META_SPENT_TODAY_SAR]
+        val month = metadata[FeatureState.META_SPENT_MONTH_SAR]
+        if (today == null && month == null) {
+            return SpendingUi(available = false)
+        }
+        return SpendingUi(
+            available = true,
+            today = today?.let { "%,.0f".format(it) } ?: "—",
+            month = month?.let { "%,.0f".format(it) } ?: "—",
         )
     }
 
@@ -105,6 +138,14 @@ data class OmonoMainUiState(
     val limitDisplay: String? = null,
     val overLimit: Boolean = false,
     val alertOnOverLimit: Boolean = true,
+    val spending: SpendingUi = SpendingUi(),
+)
+
+data class SpendingUi(
+    val available: Boolean = false,
+    val today: String = "—",
+    val month: String = "—",
+    val errorMessage: String? = null,
 )
 
 sealed interface Status {
