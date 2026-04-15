@@ -1,7 +1,9 @@
 package net.omarss.omono.ui
 
 import android.Manifest
+import android.content.Intent
 import android.os.Build
+import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
@@ -19,28 +21,43 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.core.content.FileProvider
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BatteryFull
 import androidx.compose.material.icons.filled.DoNotDisturbOn
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.LocationOff
 import androidx.compose.material.icons.filled.Message
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Route
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.ProgressIndicatorDefaults
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -85,6 +102,17 @@ fun OmonoMainRoute(
     val batteryExempt by rememberBatteryOptimizationState()
     val dndAccessGranted by rememberNotificationPolicyAccessState()
 
+    // Turn one-shot export events into FileProvider ACTION_SEND intents.
+    LaunchedEffect(Unit) {
+        viewModel.exportEvents.collect { event ->
+            when (event) {
+                is ExportEvent.Success -> launchSmsExportShare(context, event)
+                is ExportEvent.Failure ->
+                    Toast.makeText(context, "Export failed: ${event.message}", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
     OmonoMainScreen(
         contentPadding = contentPadding,
         state = state,
@@ -100,9 +128,35 @@ fun OmonoMainRoute(
         onRequestDndAccess = { launchNotificationPolicyAccessSettings(context) },
         onUnitSelect = viewModel::setUnit,
         onAlertOnOverLimitChange = viewModel::setAlertOnOverLimit,
+        onBudgetChange = viewModel::setMonthlyBudget,
+        onExportSms = viewModel::onExportSmsRequested,
         onStart = { FeatureHostService.start(context) },
         onStop = { FeatureHostService.stop(context) },
     )
+}
+
+private fun launchSmsExportShare(
+    context: android.content.Context,
+    event: ExportEvent.Success,
+) {
+    val uri = FileProvider.getUriForFile(
+        context,
+        "${context.packageName}.fileprovider",
+        event.file,
+    )
+    val send = Intent(Intent.ACTION_SEND).apply {
+        type = "text/plain"
+        putExtra(Intent.EXTRA_STREAM, uri)
+        putExtra(
+            Intent.EXTRA_SUBJECT,
+            "Omono bank SMS export (${event.count} messages)",
+        )
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    }
+    context.startActivity(Intent.createChooser(send, "Share SMS export").apply {
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    })
 }
 
 @Composable
@@ -121,9 +175,23 @@ fun OmonoMainScreen(
     onRequestDndAccess: () -> Unit,
     onUnitSelect: (SpeedUnit) -> Unit,
     onAlertOnOverLimitChange: (Boolean) -> Unit,
+    onBudgetChange: (Double) -> Unit,
+    onExportSms: () -> Unit,
     onStart: () -> Unit,
     onStop: () -> Unit,
 ) {
+    var showBudgetDialog by remember { mutableStateOf(false) }
+    if (showBudgetDialog) {
+        BudgetDialog(
+            currentBudget = state.spending.budgetSar,
+            onDismiss = { showBudgetDialog = false },
+            onConfirm = { value ->
+                onBudgetChange(value)
+                showBudgetDialog = false
+            },
+        )
+    }
+
     // Root Column scrolls because on smaller devices the stack of
     // permission / battery / DND / spending cards can easily exceed
     // the viewport height before any of them are dismissed.
@@ -143,7 +211,13 @@ fun OmonoMainScreen(
                 spending = state.spending,
                 smsGranted = smsGranted,
                 onRequestSms = onRequestSms,
+                onEditBudget = { showBudgetDialog = true },
+                onExportSms = onExportSms,
             )
+        }
+
+        AnimatedVisibility(visible = state.recentTrips.isNotEmpty()) {
+            RecentTripsCard(trips = state.recentTrips)
         }
 
         AnimatedVisibility(visible = !foregroundGranted || !backgroundGranted) {
@@ -263,6 +337,8 @@ private fun SpendingCard(
     spending: SpendingUi,
     smsGranted: Boolean,
     onRequestSms: () -> Unit,
+    onEditBudget: () -> Unit,
+    onExportSms: () -> Unit,
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -305,9 +381,155 @@ private fun SpendingCard(
                     SpendingStat(label = "Today", value = "SAR ${spending.today}")
                     SpendingStat(label = "Month", value = "SAR ${spending.month}")
                 }
+
+                if (spending.budgetSar > 0) {
+                    Spacer(Modifier.height(4.dp))
+                    val progressColor = if (spending.overBudget) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.primary
+                    }
+                    LinearProgressIndicator(
+                        progress = { spending.monthProgress },
+                        modifier = Modifier.fillMaxWidth(),
+                        color = progressColor,
+                        trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = "Budget SAR ${spending.budgetDisplay}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.weight(1f),
+                        )
+                        IconButton(onClick = onEditBudget) {
+                            Icon(
+                                Icons.Filled.Edit,
+                                contentDescription = "Edit budget",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                TextButton(
+                    onClick = onExportSms,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Icon(Icons.Filled.Download, contentDescription = null)
+                    Spacer(Modifier.size(8.dp))
+                    Text("Share SMS for analysis")
+                }
             }
         }
     }
+}
+
+@Composable
+private fun RecentTripsCard(trips: List<TripUi>) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.elevatedCardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+        ),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp, vertical = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Filled.Route,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.size(8.dp))
+                Text(
+                    text = "Recent trips",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            trips.forEachIndexed { index, trip ->
+                if (index > 0) {
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                }
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(
+                        text = trip.startedAt,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    ) {
+                        Text(
+                            text = trip.distance,
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Text(
+                            text = "max ${trip.maxSpeed}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Text(
+                            text = trip.duration,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun BudgetDialog(
+    currentBudget: Double,
+    onDismiss: () -> Unit,
+    onConfirm: (Double) -> Unit,
+) {
+    var text by remember { mutableStateOf("%.0f".format(currentBudget)) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Monthly budget") },
+        text = {
+            Column {
+                Text(
+                    "Set the SAR amount you want to stay under each month. " +
+                        "The progress bar on the spending card turns red if you go over.",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Spacer(Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = text,
+                    onValueChange = { new -> text = new.filter { it.isDigit() || it == '.' } },
+                    label = { Text("SAR") },
+                    singleLine = true,
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(text.toDoubleOrNull() ?: 0.0) }) {
+                Text("Save")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        },
+    )
 }
 
 @Composable
