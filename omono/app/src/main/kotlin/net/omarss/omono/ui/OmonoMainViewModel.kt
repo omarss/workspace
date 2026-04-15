@@ -164,6 +164,7 @@ class OmonoMainViewModel @Inject constructor(
         val metadata = metadataOf(state)
         val today = metadata[FeatureState.META_SPENT_TODAY_SAR]
         val month = metadata[FeatureState.META_SPENT_MONTH_SAR]
+        val transfersMonth = metadata[FeatureState.META_TRANSFERS_MONTH_SAR] ?: 0.0
         if (today == null && month == null) {
             return SpendingUi(available = false, budgetSar = budgetSar)
         }
@@ -173,6 +174,7 @@ class OmonoMainViewModel @Inject constructor(
             available = true,
             today = today?.let { "%,.0f".format(it) } ?: "—",
             month = month?.let { "%,.0f".format(it) } ?: "—",
+            transfersMonth = if (transfersMonth > 0) "%,.0f".format(transfersMonth) else null,
             budgetSar = budgetSar,
             budgetDisplay = "%,.0f".format(budgetSar),
             monthProgress = progress,
@@ -215,6 +217,9 @@ data class SpendingUi(
     val available: Boolean = false,
     val today: String = "—",
     val month: String = "—",
+    // Null when there are no outgoing transfers this month — we hide
+    // the row in that case to keep the card tight.
+    val transfersMonth: String? = null,
     val errorMessage: String? = null,
     val budgetSar: Double = 0.0,
     val budgetDisplay: String = "0",

@@ -61,6 +61,7 @@ class SpendingFeature @Inject constructor(
             metadata = mapOf(
                 FeatureState.META_SPENT_TODAY_SAR to totals.todaySar,
                 FeatureState.META_SPENT_MONTH_SAR to totals.monthSar,
+                FeatureState.META_TRANSFERS_MONTH_SAR to totals.monthTransfersSar,
             ),
         )
     }

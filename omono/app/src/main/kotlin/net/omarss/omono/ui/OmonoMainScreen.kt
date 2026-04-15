@@ -382,6 +382,14 @@ private fun SpendingCard(
                     SpendingStat(label = "Month", value = "SAR ${spending.month}")
                 }
 
+                if (spending.transfersMonth != null) {
+                    Text(
+                        text = "Transfers this month: SAR ${spending.transfersMonth}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+
                 if (spending.budgetSar > 0) {
                     Spacer(Modifier.height(4.dp))
                     val progressColor = if (spending.overBudget) {

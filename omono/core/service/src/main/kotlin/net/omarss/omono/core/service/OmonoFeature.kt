@@ -70,5 +70,6 @@ sealed interface FeatureState {
         const val META_SPEED_LIMIT_KMH: String = "speed.limit_kmh"
         const val META_SPENT_TODAY_SAR: String = "spending.today_sar"
         const val META_SPENT_MONTH_SAR: String = "spending.month_sar"
+        const val META_TRANSFERS_MONTH_SAR: String = "spending.transfers_month_sar"
     }
 }

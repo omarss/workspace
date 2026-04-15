@@ -7,7 +7,7 @@ import org.junit.Test
 
 class SmsParserTest {
 
-    // ── AlRajhi: capture ────────────────────────────────────────────────
+    // ── AlRajhi: purchases ─────────────────────────────────────────────
 
     @Test
     fun `alrajhi pos with mada pay is captured`() {
@@ -42,8 +42,10 @@ class SmsParserTest {
     }
 
     @Test
-    fun `alrajhi biller payment is captured`() {
+    fun `alrajhi bill payment with SAR amount is captured`() {
         val body = """
+            Bill Payment
+            From:7131
             Amount:SAR 1000
             Biller:207
             Service:STC PAY
@@ -56,12 +58,105 @@ class SmsParserTest {
         parsed.kind shouldBe Transaction.Kind.BILLER
     }
 
-    // ── AlRajhi: reject ─────────────────────────────────────────────────
+    @Test
+    fun `alrajhi bill payment with SR currency abbreviation is captured`() {
+        // Real export had this: "Amount:SR 800" not "Amount:SAR 800"
+        val body = """
+            Bill Payment
+            From:7131
+            Amount:SR 800
+            Biller:207
+            Service:STC PAY
+            Bill:61409921865
+            26/4/11 07:06
+        """.trimIndent()
+        val parsed = SmsParser.parse("AlRajhiBank", body)
+        parsed.shouldNotBeNull()
+        parsed.amountSar shouldBe 800.0
+        parsed.kind shouldBe Transaction.Kind.BILLER
+    }
+
+    @Test
+    fun `alrajhi moi payment is captured as govt`() {
+        val body = """
+            MOI Payments
+            From:7131
+            Amount:SAR 338
+            Provider:Traffic Violations
+            Service:Traffic Violations Payment
+            26/2/27 14:29
+        """.trimIndent()
+        val parsed = SmsParser.parse("AlRajhiBank", body)
+        parsed.shouldNotBeNull()
+        parsed.amountSar shouldBe 338.0
+        parsed.kind shouldBe Transaction.Kind.GOVT_PAYMENT
+    }
+
+    @Test
+    fun `alrajhi credit card payment is captured`() {
+        val body = """
+            Credit Card:Payment
+            Card:Visa 4527
+            Amount:SAR 200
+            Balance:220.1 SAR
+            18/3/26 1:49
+        """.trimIndent()
+        val parsed = SmsParser.parse("AlRajhiBank", body)
+        parsed.shouldNotBeNull()
+        parsed.amountSar shouldBe 200.0
+        parsed.kind shouldBe Transaction.Kind.CREDIT_CARD_PAYMENT
+    }
+
+    @Test
+    fun `alrajhi atm withdrawal is captured as cash`() {
+        val body = """
+            Withdrawal:ATM
+            By:8025;mada
+            Amount:SAR 450
+            Place:AL DEREHMIYA
+            21/3/26 13:53
+        """.trimIndent()
+        val parsed = SmsParser.parse("AlRajhiBank", body)
+        parsed.shouldNotBeNull()
+        parsed.amountSar shouldBe 450.0
+        parsed.kind shouldBe Transaction.Kind.CASH_WITHDRAWAL
+        parsed.merchant shouldBe "AL DEREHMIYA"
+    }
+
+    // ── AlRajhi: transfers (separate from purchases) ───────────────────
+
+    @Test
+    fun `alrajhi international transfer is captured as transfer_out`() {
+        val body = """
+            International Transfer
+            Country:Morocco
+            From:7131
+            To:Souad Bouaqa
+            Amount:SAR 4969.50
+            26/3/29 23:21
+        """.trimIndent()
+        val parsed = SmsParser.parse("AlRajhiBank", body)
+        parsed.shouldNotBeNull()
+        parsed.amountSar shouldBe 4969.50
+        parsed.kind shouldBe Transaction.Kind.TRANSFER_OUT
+    }
+
+    @Test
+    fun `transfer_out kind is NOT a purchase`() {
+        Transaction.Kind.TRANSFER_OUT.isPurchase shouldBe false
+        Transaction.Kind.POS.isPurchase shouldBe true
+        Transaction.Kind.ONLINE_PURCHASE.isPurchase shouldBe true
+        Transaction.Kind.BILLER.isPurchase shouldBe true
+        Transaction.Kind.CASH_WITHDRAWAL.isPurchase shouldBe true
+        Transaction.Kind.CREDIT_CARD_PAYMENT.isPurchase shouldBe true
+        Transaction.Kind.GOVT_PAYMENT.isPurchase shouldBe true
+    }
+
+    // ── AlRajhi: rejects ───────────────────────────────────────────────
 
     @Test
     fun `alrajhi otp is ignored`() {
-        val body = "OTP Code:7665\nReason:Selling gold - Mobile App"
-        SmsParser.parse("AlRajhiBank", body).shouldBeNull()
+        SmsParser.parse("AlRajhiBank", "OTP Code:7665\nReason:Selling gold - Mobile App").shouldBeNull()
     }
 
     @Test
@@ -78,13 +173,14 @@ class SmsParserTest {
     }
 
     @Test
-    fun `alrajhi declined inactive card is ignored`() {
+    fun `alrajhi notification declined pos is ignored`() {
         val body = """
-            Transaction Declined: Inactive Card
-            Transaction: Online Purchase
-            Card: 0110
-            Amount: USD 1
-            Date: 11/4/26 20:10
+            Notification : Declined due to insufficient fund
+            Transaction : PoS
+            Card: 4527
+            Amount : SAR 39.99
+            Merchant : APPLE.COM
+            Date : 20/2/26 00:50
         """.trimIndent()
         SmsParser.parse("AlRajhiBank", body).shouldBeNull()
     }
@@ -110,13 +206,76 @@ class SmsParserTest {
         SmsParser.parse("AlRajhiBank", body).shouldBeNull()
     }
 
-    // ── STC Bank: capture ───────────────────────────────────────────────
+    @Test
+    fun `alrajhi transfer between your accounts is ignored`() {
+        val body = """
+            Transfer Between Your Accounts
+            Amount: SAR 15000
+            To: 7131
+            26/3/15 22:39
+        """.trimIndent()
+        SmsParser.parse("AlRajhiBank", body).shouldBeNull()
+    }
 
     @Test
-    fun `stc online purchase with SAR suffix is captured`() {
+    fun `alrajhi credit transfer local is ignored as incoming`() {
         val body = """
-            Online Purchase Transaction
-            Amount 57 SAR
+            Credit Transfer Local
+            Via:ANB
+            Amount:SAR 30000
+            To:7131
+            From:شركة القمة الهامة للتقنية المالية
+            From:0019
+            26/3/29 09:01
+        """.trimIndent()
+        SmsParser.parse("AlRajhiBank", body).shouldBeNull()
+    }
+
+    @Test
+    fun `alrajhi deposit is ignored as incoming`() {
+        val body = """
+            Deposit:Saving Account Monthly Profit
+            Amount:SAR 1.11
+            To:0758
+            1/3/26 07:21
+        """.trimIndent()
+        SmsParser.parse("AlRajhiBank", body).shouldBeNull()
+    }
+
+    @Test
+    fun `alrajhi credit card transfer is ignored as duplicate`() {
+        val body = """
+            Credit Card:transfer
+            From card:4527;Visa
+            To Account:7131
+            Amount:SAR 220.10
+            26/3/18 01:51
+        """.trimIndent()
+        SmsParser.parse("AlRajhiBank", body).shouldBeNull()
+    }
+
+    @Test
+    fun `alrajhi dear customer marketing is ignored`() {
+        val body = """
+            Dear Customer,
+            You have a request to add your card ending with 8025 to MadaPay.
+        """.trimIndent()
+        SmsParser.parse("AlRajhiBank", body).shouldBeNull()
+    }
+
+    @Test
+    fun `alrajhi mada pay admin is ignored`() {
+        val body = "Your card 8025 is successfully added to MadaPay following your request."
+        SmsParser.parse("AlRajhiBank", body).shouldBeNull()
+    }
+
+    // ── STC Bank: purchases ─────────────────────────────────────────────
+
+    @Test
+    fun `stc online purchase with amount on same line as header is captured`() {
+        // Real export: "Online Purchase Transaction Amount 57 SAR" is one line.
+        val body = """
+            Online Purchase Transaction Amount 57 SAR
             From: Jahez
              Card: *6066
             Date 11/04/26 20:21
@@ -132,8 +291,7 @@ class SmsParserTest {
     @Test
     fun `stc online purchase with decimal and no SAR suffix is captured`() {
         val body = """
-            Online Purchase Transaction
-            Amount 111.75
+            Online Purchase Transaction Amount 111.75
             From: Ninja Retail Company
              Card: *******9928
             Date 10/04/2026
@@ -145,20 +303,24 @@ class SmsParserTest {
     }
 
     @Test
-    fun `stc online purchase masked card is still parsed`() {
+    fun `stc local purchase with colon amount is captured as POS`() {
+        // Real export shape: "Amount: 13 SAR" with colon and SAR suffix,
+        // merchant under "At:" not "From:".
         val body = """
-            Online Purchase Transaction
-            Amount 104 SAR
-            From: MF(Tur
-             Card: *6066
-            Date 11/04/26 21:05
+            Local Purchase
+            Card: *6066; mada Pay (Atheer)
+            Amount: 13 SAR
+            At: ucoffe
+            Date: 26/02/26 18:28
         """.trimIndent()
-        val parsed = SmsParser.parse("STCBank", body)
+        val parsed = SmsParser.parse("STC Bank", body)
         parsed.shouldNotBeNull()
-        parsed.amountSar shouldBe 104.0
+        parsed.amountSar shouldBe 13.0
+        parsed.kind shouldBe Transaction.Kind.POS
+        parsed.merchant shouldBe "ucoffe"
     }
 
-    // ── STC Bank: reject ────────────────────────────────────────────────
+    // ── STC Bank: rejects ──────────────────────────────────────────────
 
     @Test
     fun `stc otp is ignored`() {
@@ -183,17 +345,18 @@ class SmsParserTest {
     }
 
     @Test
-    fun `stc declined is ignored`() {
-        val body = "The transaction is not allowed. You can change the card setting through the app."
-        SmsParser.parse("STC Bank", body).shouldBeNull()
+    fun `stc not allowed is ignored`() {
+        SmsParser.parse(
+            "STC Bank",
+            "The transaction is not allowed. You can change the card setting through the app.",
+        ).shouldBeNull()
     }
 
     // ── Unknown senders ────────────────────────────────────────────────
 
     @Test
     fun `unknown sender is ignored`() {
-        val body = "PoS Amount:SAR 50 At:test"
-        SmsParser.parse("RandomBank", body).shouldBeNull()
+        SmsParser.parse("RandomBank", "PoS Amount:SAR 50 At:test").shouldBeNull()
     }
 
     @Test
@@ -210,8 +373,16 @@ class SmsParserTest {
     }
 
     @Test
-    fun `isKnownSender matches stc variants`() {
+    fun `isKnownSender matches stc bank variants`() {
         SmsParser.isKnownSender("STC Bank") shouldBe true
         SmsParser.isKnownSender("STCBank") shouldBe true
+    }
+
+    @Test
+    fun `isKnownSender rejects stc telecom sender`() {
+        // Regression: previously "equals('STC')" was catching the
+        // telecom provider's Arabic VAT notifications.
+        SmsParser.isKnownSender("stc") shouldBe false
+        SmsParser.isKnownSender("STC") shouldBe false
     }
 }

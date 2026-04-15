@@ -4,14 +4,30 @@ import java.time.Instant
 import java.time.ZoneId
 
 data class SpendingTotals(
+    // Purchase totals — consumer spending (PoS, online, bills, MOI,
+    // withdrawals, CC payments). These drive the headline "spending"
+    // numbers in the UI and notification.
     val todaySar: Double,
     val monthSar: Double,
     val todayCount: Int,
     val monthCount: Int,
     val monthByCategory: Map<SpendingCategory, Double> = emptyMap(),
+    // Transfer totals — money sent to other people / accounts. Kept
+    // separate so salary remittances don't inflate the spending
+    // headline.
+    val monthTransfersSar: Double = 0.0,
+    val monthTransfersCount: Int = 0,
 ) {
     companion object {
-        val Empty = SpendingTotals(0.0, 0.0, 0, 0, emptyMap())
+        val Empty = SpendingTotals(
+            todaySar = 0.0,
+            monthSar = 0.0,
+            todayCount = 0,
+            monthCount = 0,
+            monthByCategory = emptyMap(),
+            monthTransfersSar = 0.0,
+            monthTransfersCount = 0,
+        )
     }
 }
 
@@ -31,17 +47,26 @@ internal fun computeTotals(
     var todayCount = 0
     var monthSum = 0.0
     var monthCount = 0
+    var monthTransferSum = 0.0
+    var monthTransferCount = 0
     val monthByCategory = mutableMapOf<SpendingCategory, Double>()
     for (tx in transactions) {
-        if (tx.timestampMillis >= startOfMonth) {
+        val inMonth = tx.timestampMillis >= startOfMonth
+        val inDay = tx.timestampMillis >= startOfDay
+        if (!inMonth) continue
+
+        if (tx.kind.isPurchase) {
             monthSum += tx.amountSar
             monthCount += 1
             val category = MerchantCategorizer.categorize(tx.merchant)
             monthByCategory.merge(category, tx.amountSar) { a, b -> a + b }
-        }
-        if (tx.timestampMillis >= startOfDay) {
-            todaySum += tx.amountSar
-            todayCount += 1
+            if (inDay) {
+                todaySum += tx.amountSar
+                todayCount += 1
+            }
+        } else {
+            monthTransferSum += tx.amountSar
+            monthTransferCount += 1
         }
     }
     return SpendingTotals(
@@ -50,5 +75,7 @@ internal fun computeTotals(
         todayCount = todayCount,
         monthCount = monthCount,
         monthByCategory = monthByCategory,
+        monthTransfersSar = monthTransferSum,
+        monthTransfersCount = monthTransferCount,
     )
 }
