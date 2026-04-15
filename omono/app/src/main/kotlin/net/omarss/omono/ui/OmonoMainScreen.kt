@@ -5,6 +5,8 @@ import android.os.Build
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -122,10 +124,14 @@ fun OmonoMainScreen(
     onStart: () -> Unit,
     onStop: () -> Unit,
 ) {
+    // Root Column scrolls because on smaller devices the stack of
+    // permission / battery / DND / spending cards can easily exceed
+    // the viewport height before any of them are dismissed.
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(contentPadding)
+            .verticalScroll(rememberScrollState())
             .padding(horizontal = 24.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp),
     ) {

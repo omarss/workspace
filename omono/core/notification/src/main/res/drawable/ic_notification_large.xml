@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Large icon rendered on the left side of the ongoing notification
+  (the prominent square). Full colour unlike the tinted small icon,
+  using the same O-gauge motif as the launcher adaptive icon so the
+  notification visually matches the app's identity.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="96dp"
+    android:height="96dp"
+    android:viewportWidth="96"
+    android:viewportHeight="96">
+
+    <!-- Dark rounded square background -->
+    <path
+        android:pathData="M0,0 L96,0 L96,96 L0,96 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="radial"
+                android:centerX="48"
+                android:centerY="32"
+                android:gradientRadius="72">
+                <item android:offset="0.0" android:color="#FF1E3A8A" />
+                <item android:offset="0.55" android:color="#FF0F172A" />
+                <item android:offset="1.0" android:color="#FF020617" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Outer ring donut via evenOdd fill. -->
+    <path
+        android:fillType="evenOdd"
+        android:pathData="M48,18 A24,24 0 1,1 47.99,18 Z M48,26 A16,16 0 1,0 48.01,26 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="20"
+                android:startY="20"
+                android:endX="76"
+                android:endY="76">
+                <item android:offset="0.0" android:color="#FF93C5FD" />
+                <item android:offset="0.5" android:color="#FF3B82F6" />
+                <item android:offset="1.0" android:color="#FF1D4ED8" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Needle. -->
+    <path
+        android:pathData="M46,49 L64,30 L68,34 L50,53 Z"
+        android:fillColor="#FFF8FAFC" />
+
+    <!-- Hub. -->
+    <path
+        android:pathData="M48,48 m-4,0 a4,4 0 1,0 8,0 a4,4 0 1,0 -8,0 Z"
+        android:fillColor="#FFF8FAFC" />
+</vector>

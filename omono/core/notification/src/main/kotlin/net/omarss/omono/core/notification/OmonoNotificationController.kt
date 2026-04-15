@@ -5,9 +5,12 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
+import android.graphics.Bitmap
 import android.graphics.Color
 import androidx.core.app.NotificationCompat
 import androidx.core.content.getSystemService
+import androidx.core.content.res.ResourcesCompat
+import androidx.core.graphics.drawable.toBitmap
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -78,6 +81,7 @@ class OmonoNotificationController @Inject constructor() {
             OmonoNotificationChannels.FEATURE_HOST_CHANNEL_ID,
         )
             .setSmallIcon(R.drawable.ic_notification_small)
+            .setLargeIcon(loadLargeIcon(context))
             .setColor(BRAND_COLOR)
             .setContentTitle(title)
             .setContentText(firstLine)
@@ -96,6 +100,25 @@ class OmonoNotificationController @Inject constructor() {
         actions.forEach { builder.addAction(it) }
 
         return builder.build()
+    }
+
+    // Rasterises the full-colour omono vector into the 96dp square
+    // large-icon slot. Cached on first render so subsequent updates
+    // (every GPS tick) reuse the same bitmap instead of re-inflating
+    // a vector drawable at 1 Hz.
+    private var cachedLargeIcon: Bitmap? = null
+    private fun loadLargeIcon(context: Context): Bitmap? {
+        cachedLargeIcon?.let { return it }
+        val drawable = ResourcesCompat.getDrawable(
+            context.resources,
+            R.drawable.ic_notification_large,
+            context.theme,
+        ) ?: return null
+        val density = context.resources.displayMetrics.density
+        val sizePx = (96 * density).toInt().coerceAtLeast(96)
+        val bitmap = drawable.toBitmap(width = sizePx, height = sizePx)
+        cachedLargeIcon = bitmap
+        return bitmap
     }
 
     companion object {
