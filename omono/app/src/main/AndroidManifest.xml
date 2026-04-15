@@ -28,9 +28,17 @@
          specific category, but we sideload via Obtainium. -->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
-    <!-- Network access for the OSM Overpass speed-limit lookup. -->
+    <!-- Network access for the OSM Overpass speed-limit lookup and the
+         self-update check against the apps.omarss.net manifest. -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <!-- Self-updater: lets omono hand a freshly downloaded APK to the
+         system installer. Android still shows the confirmation dialog —
+         this permission just allows us to *launch* that dialog without
+         the user digging through settings first. Merged from
+         :feature:selfupdate but duplicated here for visibility. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <!-- Temporarily raises alarm volume during the over-limit beep and
          restores it afterwards. Normal permission, granted at install. -->

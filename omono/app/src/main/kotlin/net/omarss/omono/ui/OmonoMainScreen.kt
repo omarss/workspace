@@ -72,6 +72,9 @@ import com.google.accompanist.permissions.rememberMultiplePermissionsState
 import net.omarss.omono.BuildConfig
 import net.omarss.omono.core.common.SpeedUnit
 import net.omarss.omono.core.service.FeatureHostService
+import net.omarss.omono.ui.update.SelfUpdateBanner
+import net.omarss.omono.ui.update.SelfUpdateUiState
+import net.omarss.omono.ui.update.SelfUpdateViewModel
 
 private val foregroundPermissions: List<String> = buildList {
     add(Manifest.permission.ACCESS_FINE_LOCATION)
@@ -92,9 +95,18 @@ fun OmonoMainRoute(
     onOpenPlaces: () -> Unit = {},
     onOpenFinance: () -> Unit = {},
     viewModel: OmonoMainViewModel = hiltViewModel(),
+    updateViewModel: SelfUpdateViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val updateState by updateViewModel.state.collectAsStateWithLifecycle()
+
+    // Re-check "Install unknown sources" every time the user returns to
+    // the main screen — they may have flipped the toggle while the app
+    // was backgrounded by the system settings deep-link.
+    LaunchedEffect(Unit) {
+        updateViewModel.refreshPermission()
+    }
 
     val foreground = rememberMultiplePermissionsState(foregroundPermissions)
     val background = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -120,6 +132,7 @@ fun OmonoMainRoute(
     OmonoMainScreen(
         contentPadding = contentPadding,
         state = state,
+        updateState = updateState,
         foregroundGranted = foreground.allPermissionsGranted,
         backgroundGranted = background?.allPermissionsGranted ?: true,
         smsGranted = sms.allPermissionsGranted,
@@ -136,6 +149,10 @@ fun OmonoMainRoute(
         onExportSms = viewModel::onExportSmsRequested,
         onOpenPlaces = onOpenPlaces,
         onOpenFinance = onOpenFinance,
+        onDownloadUpdate = updateViewModel::startDownload,
+        onInstallUpdate = updateViewModel::installNow,
+        onGrantInstallPermission = updateViewModel::grantInstallPermission,
+        onDismissUpdate = updateViewModel::dismiss,
         onStart = { FeatureHostService.start(context) },
         onStop = { FeatureHostService.stop(context) },
     )
@@ -169,6 +186,7 @@ private fun launchSmsExportShare(
 fun OmonoMainScreen(
     contentPadding: PaddingValues,
     state: OmonoMainUiState,
+    updateState: SelfUpdateUiState = SelfUpdateUiState(),
     foregroundGranted: Boolean,
     backgroundGranted: Boolean,
     smsGranted: Boolean,
@@ -185,6 +203,10 @@ fun OmonoMainScreen(
     onExportSms: () -> Unit,
     onOpenPlaces: () -> Unit = {},
     onOpenFinance: () -> Unit = {},
+    onDownloadUpdate: () -> Unit = {},
+    onInstallUpdate: () -> Unit = {},
+    onGrantInstallPermission: () -> Unit = {},
+    onDismissUpdate: () -> Unit = {},
     onStart: () -> Unit,
     onStop: () -> Unit,
 ) {
@@ -215,6 +237,17 @@ fun OmonoMainScreen(
             onOpenPlaces = onOpenPlaces,
             onOpenFinance = onOpenFinance,
         )
+
+        AnimatedVisibility(visible = updateState.showBanner) {
+            SelfUpdateBanner(
+                state = updateState,
+                onDownload = onDownloadUpdate,
+                onInstall = onInstallUpdate,
+                onGrantPermission = onGrantInstallPermission,
+                onDismiss = onDismissUpdate,
+            )
+        }
+
         HeroCard(state = state)
 
         AnimatedVisibility(visible = state.spending.available || !smsGranted) {

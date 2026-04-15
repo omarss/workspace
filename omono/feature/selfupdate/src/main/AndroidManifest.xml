@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Lets the app launch the system installer dialog with a downloaded
+         APK. On Android 8+ this is a per-app setting the user grants via
+         a deep-linked settings page; the self-updater surfaces that flow
+         before it tries to install. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
+</manifest>
