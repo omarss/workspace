@@ -1,5 +1,6 @@
 package net.omarss.omono.core.notification
 
+import android.app.Notification
 import android.app.NotificationManager
 import android.content.Context
 import androidx.core.content.getSystemService
@@ -39,23 +40,34 @@ class OmonoNotificationControllerTest {
     }
 
     @Test
-    fun `buildOngoing produces an ongoing notification with body lines`() {
+    fun `buildOngoing produces an ongoing notification with each line`() {
         controller.ensureChannel(context)
 
         val notification = controller.buildOngoing(
             context = context,
             title = "Omono",
-            bodyLines = listOf("12.3 km/h", "75 dB"),
+            subText = "Tracking",
+            bodyLines = listOf("12.3 km/h", "Today SAR 45 · Month SAR 1,234"),
             contentIntent = null,
         )
 
-        // FLAG_ONGOING_EVENT (2) and FLAG_NO_CLEAR (32) should be set
-        // because the controller marks the notification as ongoing.
-        val isOngoing = notification.flags and android.app.Notification.FLAG_ONGOING_EVENT != 0
+        // FLAG_ONGOING_EVENT (2) should be set because the controller
+        // marks the notification as ongoing.
+        val isOngoing = notification.flags and Notification.FLAG_ONGOING_EVENT != 0
         isOngoing shouldBe true
 
-        val body = notification.extras.getCharSequence(android.app.Notification.EXTRA_BIG_TEXT)?.toString()
-        body shouldBe "12.3 km/h\n75 dB"
+        // Collapsed content text shows the first (most important) line.
+        val collapsed = notification.extras.getCharSequence(Notification.EXTRA_TEXT)?.toString()
+        collapsed shouldBe "12.3 km/h"
+
+        // SubText sits next to the app name in the header.
+        val sub = notification.extras.getCharSequence(Notification.EXTRA_SUB_TEXT)?.toString()
+        sub shouldBe "Tracking"
+
+        // InboxStyle stores the expanded lines in EXTRA_TEXT_LINES.
+        val lines = notification.extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES)
+            ?.map { it.toString() }
+        lines shouldBe listOf("12.3 km/h", "Today SAR 45 · Month SAR 1,234")
     }
 
     @Test
@@ -65,11 +77,28 @@ class OmonoNotificationControllerTest {
         val notification = controller.buildOngoing(
             context = context,
             title = "Omono",
+            subText = null,
             bodyLines = emptyList(),
             contentIntent = null,
         )
 
-        val text = notification.extras.getCharSequence(android.app.Notification.EXTRA_TEXT)?.toString()
-        text shouldBe "Starting…"
+        val lines = notification.extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES)
+            ?.map { it.toString() }
+        lines shouldBe listOf("Starting…")
+    }
+
+    @Test
+    fun `buildOngoing uses the brand color`() {
+        controller.ensureChannel(context)
+
+        val notification = controller.buildOngoing(
+            context = context,
+            title = "Omono",
+            subText = null,
+            bodyLines = listOf("42.5 km/h"),
+            contentIntent = null,
+        )
+
+        notification.color shouldBe android.graphics.Color.parseColor("#2563EB")
     }
 }

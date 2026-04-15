@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
+import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.ServiceCompat
 import androidx.lifecycle.LifecycleService
@@ -13,6 +14,7 @@ import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import net.omarss.omono.core.notification.OmonoNotificationController
+import net.omarss.omono.core.notification.R as NotificationR
 import timber.log.Timber
 import javax.inject.Inject
 
@@ -128,13 +130,55 @@ class FeatureHostService : LifecycleService() {
 
     private fun buildNotification() = buildNotificationFrom(stateHolder.states.value)
 
-    private fun buildNotificationFrom(snapshot: Map<FeatureId, FeatureState>) =
-        notifications.buildOngoing(
+    private fun buildNotificationFrom(snapshot: Map<FeatureId, FeatureState>): android.app.Notification {
+        // Sort so the same feature always sits on the same line across
+        // emissions — keeps the notification stable instead of jumping
+        // between "speed first, spending second" and vice versa as
+        // different features happen to emit first.
+        val lines = snapshot.entries
+            .sortedBy { it.key.value }
+            .map { it.value.summary }
+
+        return notifications.buildOngoing(
             context = this,
             title = "Omono",
-            bodyLines = snapshot.values.map { it.summary },
+            subText = summarySubText(snapshot),
+            bodyLines = lines,
             contentIntent = openAppIntent(),
+            actions = listOf(buildStopAction()),
         )
+    }
+
+    // Short status word that sits next to the app name in the
+    // collapsed notification header. Active > Waiting > Error > Idle
+    // so the user sees the most interesting state when multiple
+    // features are running at once.
+    private fun summarySubText(snapshot: Map<FeatureId, FeatureState>): String? {
+        if (snapshot.isEmpty()) return null
+        val states = snapshot.values
+        return when {
+            states.any { it is FeatureState.Active } -> "Tracking"
+            states.any { it is FeatureState.Error } ->
+                (states.first { it is FeatureState.Error } as FeatureState.Error).summary
+            states.any { it is FeatureState.Idle } -> "Idle"
+            else -> null
+        }
+    }
+
+    private fun buildStopAction(): NotificationCompat.Action {
+        val intent = Intent(this, FeatureHostService::class.java).setAction(ACTION_STOP)
+        val pending = PendingIntent.getService(
+            this,
+            STOP_REQUEST_CODE,
+            intent,
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+        return NotificationCompat.Action.Builder(
+            NotificationR.drawable.ic_notification_stop,
+            "Stop",
+            pending,
+        ).build()
+    }
 
     // Tap on the notification opens the launcher activity. Resolving it
     // dynamically avoids a hard reference from :core to :app.
@@ -142,7 +186,7 @@ class FeatureHostService : LifecycleService() {
         val launchIntent = packageManager.getLaunchIntentForPackage(packageName) ?: return null
         return PendingIntent.getActivity(
             this,
-            0,
+            OPEN_APP_REQUEST_CODE,
             launchIntent,
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
@@ -151,6 +195,9 @@ class FeatureHostService : LifecycleService() {
     companion object {
         const val ACTION_START: String = "net.omarss.omono.action.START"
         const val ACTION_STOP: String = "net.omarss.omono.action.STOP"
+
+        private const val OPEN_APP_REQUEST_CODE = 0
+        private const val STOP_REQUEST_CODE = 1
 
         fun start(context: Context) {
             val intent = Intent(context, FeatureHostService::class.java).setAction(ACTION_START)

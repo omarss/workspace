@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Small icon shown in the status bar and collapsed notification chrome.
+  Android tints single-color masks, so all fills are pure white on
+  transparent. Based on the omono adaptive icon: a donut "O" with a
+  needle and a central hub, scaled down to the 24dp notification size.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+
+    <!-- Outer ring rendered as a donut via two concentric circles and
+         the evenOdd fill rule. -->
+    <path
+        android:fillType="evenOdd"
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M12,3 A9,9 0 1,1 11.99,3 Z M12,6 A6,6 0 1,0 12.01,6 Z" />
+
+    <!-- Needle — a narrow quad from the hub toward the upper right. -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M11,12 L17,6 L18,7 L12,13 Z" />
+
+    <!-- Center hub. -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M12,12 m-1.5,0 a1.5,1.5 0 1,0 3,0 a1.5,1.5 0 1,0 -3,0 Z" />
+</vector>
