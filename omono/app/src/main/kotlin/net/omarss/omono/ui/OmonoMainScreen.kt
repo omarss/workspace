@@ -32,6 +32,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -82,6 +83,7 @@ fun OmonoMainRoute(
         onRequestBackground = { background?.launchMultiplePermissionRequest() },
         onRequestBatteryExemption = { launchBatteryOptimizationDialog(context) },
         onUnitSelect = viewModel::setUnit,
+        onAlertOnOverLimitChange = viewModel::setAlertOnOverLimit,
         onStart = { FeatureHostService.start(context) },
         onStop = { FeatureHostService.stop(context) },
     )
@@ -98,6 +100,7 @@ fun OmonoMainScreen(
     onRequestBackground: () -> Unit,
     onRequestBatteryExemption: () -> Unit,
     onUnitSelect: (SpeedUnit) -> Unit,
+    onAlertOnOverLimitChange: (Boolean) -> Unit,
     onStart: () -> Unit,
     onStop: () -> Unit,
 ) {
@@ -130,6 +133,11 @@ fun OmonoMainScreen(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         UnitPicker(current = state.unit, onSelect = onUnitSelect)
+
+        AlertSettingRow(
+            enabled = state.alertOnOverLimit,
+            onChange = onAlertOnOverLimitChange,
+        )
 
         Spacer(Modifier.height(4.dp))
 
@@ -261,6 +269,31 @@ private fun UnitPicker(
                 Text(option.label)
             }
         }
+    }
+}
+
+@Composable
+private fun AlertSettingRow(
+    enabled: Boolean,
+    onChange: (Boolean) -> Unit,
+) {
+    androidx.compose.foundation.layout.Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = "Alert over limit",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Text(
+                text = "Loud beep the moment you cross a posted speed limit",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Switch(checked = enabled, onCheckedChange = onChange)
     }
 }
 

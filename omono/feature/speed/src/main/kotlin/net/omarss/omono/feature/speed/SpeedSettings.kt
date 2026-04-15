@@ -1,6 +1,7 @@
 package net.omarss.omono.feature.speed
 
 import android.content.Context
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -15,6 +16,7 @@ import javax.inject.Singleton
 // shared omonoDataStore. New features should use their own prefix
 // (e.g. "noise.threshold") rather than spawning a sibling DataStore.
 private val UNIT_KEY = stringPreferencesKey("speed.unit")
+private val ALERT_ON_OVER_LIMIT_KEY = booleanPreferencesKey("speed.alert_on_over_limit")
 
 @Singleton
 class SpeedSettingsRepository @Inject constructor(
@@ -25,7 +27,17 @@ class SpeedSettingsRepository @Inject constructor(
             ?: SpeedUnit.KmH
     }
 
+    // Loud beep when the user crosses the posted speed limit. On by
+    // default so the feature is discoverable from first launch.
+    val alertOnOverLimit: Flow<Boolean> = context.omonoDataStore.data.map { prefs ->
+        prefs[ALERT_ON_OVER_LIMIT_KEY] ?: true
+    }
+
     suspend fun setUnit(unit: SpeedUnit) {
         context.omonoDataStore.edit { it[UNIT_KEY] = unit.name }
+    }
+
+    suspend fun setAlertOnOverLimit(enabled: Boolean) {
+        context.omonoDataStore.edit { it[ALERT_ON_OVER_LIMIT_KEY] = enabled }
     }
 }

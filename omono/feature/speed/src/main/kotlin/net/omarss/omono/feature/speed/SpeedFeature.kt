@@ -4,8 +4,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onStart
 import net.omarss.omono.core.common.SpeedUnit
 import net.omarss.omono.core.service.FeatureId
@@ -58,6 +58,7 @@ class SpeedFeature @Inject constructor(
     private val speedRepository: SpeedRepository,
     private val limits: RoadSpeedLimitRepository,
     private val settings: SpeedSettingsRepository,
+    private val alertPlayer: SpeedAlertPlayer,
 ) : OmonoFeature {
 
     override val id: FeatureId = FeatureId("speed")
@@ -67,6 +68,11 @@ class SpeedFeature @Inject constructor(
         description = "Shows your current GPS speed and the road's posted limit in an always-on notification.",
         defaultEnabled = true,
     )
+
+    // Carries the previous over-limit state between emissions so we can
+    // fire the alert tone only on a rising edge, not on every sample
+    // while already over the limit.
+    private var wasOverLimit: Boolean = false
 
     override fun start(scope: CoroutineScope): Flow<FeatureState> {
         // Each new GPS sample triggers a (cached, distance-throttled)
@@ -79,7 +85,12 @@ class SpeedFeature @Inject constructor(
             }
         }
 
+        // Reset transition memory each time the feature (re)starts so a
+        // stop/start cycle doesn't suppress the first alert.
+        wasOverLimit = false
+
         return combine(locationsWithLimit, settings.unit) { (mps, limit), unit ->
+            maybeAlert(mps, limit)
             formatSpeedState(mps, unit, limit)
         }
             .onStart { emit(FeatureState.Idle("Waiting for GPS fix")) }
@@ -89,4 +100,13 @@ class SpeedFeature @Inject constructor(
     }
 
     override fun stop() = Unit
+
+    private suspend fun maybeAlert(mps: Float, limitKmh: Float?) {
+        val speedKmh = SpeedUnit.KmH.fromMetersPerSecond(mps)
+        val rising = shouldAlertOnCrossing(wasOverLimit, speedKmh, limitKmh)
+        wasOverLimit = limitKmh != null && speedKmh > limitKmh
+        if (rising && settings.alertOnOverLimit.first()) {
+            alertPlayer.alert()
+        }
+    }
 }

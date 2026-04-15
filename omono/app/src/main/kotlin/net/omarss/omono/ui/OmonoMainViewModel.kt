@@ -27,10 +27,11 @@ class OmonoMainViewModel @Inject constructor(
 
     val uiState: StateFlow<OmonoMainUiState> = combine(
         speedSettings.unit,
+        speedSettings.alertOnOverLimit,
         stateHolder.running,
         stateHolder.states,
-    ) { unit, running, states ->
-        buildUiState(unit, running, states[speedFeatureId])
+    ) { unit, alertEnabled, running, states ->
+        buildUiState(unit, alertEnabled, running, states[speedFeatureId])
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(stopTimeoutMillis = 5_000),
@@ -41,8 +42,13 @@ class OmonoMainViewModel @Inject constructor(
         viewModelScope.launch { speedSettings.setUnit(unit) }
     }
 
+    fun setAlertOnOverLimit(enabled: Boolean) {
+        viewModelScope.launch { speedSettings.setAlertOnOverLimit(enabled) }
+    }
+
     private fun buildUiState(
         unit: SpeedUnit,
+        alertOnOverLimit: Boolean,
         running: Boolean,
         speedState: FeatureState?,
     ): OmonoMainUiState {
@@ -81,6 +87,7 @@ class OmonoMainViewModel @Inject constructor(
             status = status,
             limitDisplay = limitDisplay,
             overLimit = overLimit,
+            alertOnOverLimit = alertOnOverLimit,
         )
     }
 
@@ -97,6 +104,7 @@ data class OmonoMainUiState(
     val status: Status = Status.Stopped,
     val limitDisplay: String? = null,
     val overLimit: Boolean = false,
+    val alertOnOverLimit: Boolean = true,
 )
 
 sealed interface Status {
