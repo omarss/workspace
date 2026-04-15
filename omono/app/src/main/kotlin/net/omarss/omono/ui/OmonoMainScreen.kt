@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BatteryFull
+import androidx.compose.material.icons.filled.DoNotDisturbOn
 import androidx.compose.material.icons.filled.LocationOff
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.PlayArrow
@@ -72,6 +73,7 @@ fun OmonoMainRoute(
         null
     }
     val batteryExempt by rememberBatteryOptimizationState()
+    val dndAccessGranted by rememberNotificationPolicyAccessState()
 
     OmonoMainScreen(
         contentPadding = contentPadding,
@@ -79,9 +81,11 @@ fun OmonoMainRoute(
         foregroundGranted = foreground.allPermissionsGranted,
         backgroundGranted = background?.allPermissionsGranted ?: true,
         batteryExempt = batteryExempt,
+        dndAccessGranted = dndAccessGranted,
         onRequestForeground = foreground::launchMultiplePermissionRequest,
         onRequestBackground = { background?.launchMultiplePermissionRequest() },
         onRequestBatteryExemption = { launchBatteryOptimizationDialog(context) },
+        onRequestDndAccess = { launchNotificationPolicyAccessSettings(context) },
         onUnitSelect = viewModel::setUnit,
         onAlertOnOverLimitChange = viewModel::setAlertOnOverLimit,
         onStart = { FeatureHostService.start(context) },
@@ -96,9 +100,11 @@ fun OmonoMainScreen(
     foregroundGranted: Boolean,
     backgroundGranted: Boolean,
     batteryExempt: Boolean,
+    dndAccessGranted: Boolean,
     onRequestForeground: () -> Unit,
     onRequestBackground: () -> Unit,
     onRequestBatteryExemption: () -> Unit,
+    onRequestDndAccess: () -> Unit,
     onUnitSelect: (SpeedUnit) -> Unit,
     onAlertOnOverLimitChange: (Boolean) -> Unit,
     onStart: () -> Unit,
@@ -125,6 +131,10 @@ fun OmonoMainScreen(
 
         AnimatedVisibility(visible = !batteryExempt) {
             BatteryCard(onRequest = onRequestBatteryExemption)
+        }
+
+        AnimatedVisibility(visible = state.alertOnOverLimit && !dndAccessGranted) {
+            DndAccessCard(onRequest = onRequestDndAccess)
         }
 
         Text(
@@ -347,6 +357,45 @@ private fun PermissionsCard(
                     modifier = Modifier.fillMaxWidth(),
                 ) { Text("Grant background location") }
             }
+        }
+    }
+}
+
+@Composable
+private fun DndAccessCard(onRequest: () -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+        ),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Icon(
+                imageVector = Icons.Filled.DoNotDisturbOn,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSecondaryContainer,
+            )
+            Text(
+                text = "Bypass Do Not Disturb",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSecondaryContainer,
+            )
+            Text(
+                text = "Grant Do Not Disturb access so the over-limit beep " +
+                    "stays loud even when your phone is silenced. Android " +
+                    "doesn't allow apps to bypass \"Total silence\" mode.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSecondaryContainer,
+            )
+            FilledTonalButton(
+                onClick = onRequest,
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text("Open DND access settings") }
         }
     }
 }

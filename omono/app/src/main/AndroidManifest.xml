@@ -32,6 +32,18 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
+    <!-- Temporarily raises alarm volume during the over-limit beep and
+         restores it afterwards. Normal permission, granted at install. -->
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+
+    <!-- Lets us temporarily call setInterruptionFilter(ALL) to make the
+         over-limit tone audible even in Do Not Disturb. The declaration
+         itself is a normal permission; the user still has to grant
+         "Do Not Disturb access" via system settings for it to take
+         effect — the app surfaces a card that deep-links to the right
+         page when the user has alerts enabled. -->
+    <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
+
     <!-- Declare GPS as optional hardware so devices without GPS can still install. -->
     <uses-feature
         android:name="android.hardware.location.gps"
