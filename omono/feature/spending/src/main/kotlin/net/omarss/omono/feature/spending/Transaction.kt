@@ -1,8 +1,12 @@
 package net.omarss.omono.feature.spending
 
 // One parsed financial event from a bank SMS.
-// Amount is always in Saudi Riyals (SAR); both supported banks report
-// SAR natively so no currency conversion is needed.
+//
+// `amountSar` is always in Saudi Riyals and is the value used for all
+// aggregation / budgeting. For foreign-currency transactions the
+// parser pre-converts via CurrencyConverter and stores the original
+// amount + currency alongside so the UI can surface the source value
+// (e.g. "SAR 863 (USD 230)" for Claude subscriptions).
 //
 // timestampMillis is sourced from the Android SMS inbox row
 // (Telephony.Sms.DATE) rather than any date embedded in the body —
@@ -19,7 +23,12 @@ data class Transaction(
     val bank: Bank,
     val kind: Kind,
     val merchant: String?,
+    val originalAmount: Double = amountSar,
+    val originalCurrency: String = "SAR",
 ) {
+    val isForeignCurrency: Boolean
+        get() = originalCurrency != "SAR"
+
     enum class Bank { AL_RAJHI, STC }
 
     enum class Kind {

@@ -20,7 +20,7 @@ class SmsParserTest {
         """.trimIndent()
         val parsed = SmsParser.parse("AlRajhiBank", body)
         parsed.shouldNotBeNull()
-        parsed.amountSar shouldBe 72.05
+        parsed.originalAmount shouldBe 72.05
         parsed.bank shouldBe Transaction.Bank.AL_RAJHI
         parsed.kind shouldBe Transaction.Kind.POS
         parsed.merchant shouldBe "ALDREES 4"
@@ -37,12 +37,15 @@ class SmsParserTest {
         """.trimIndent()
         val parsed = SmsParser.parse("AlRajhiBank", body)
         parsed.shouldNotBeNull()
-        parsed.amountSar shouldBe 15.0
+        parsed.originalAmount shouldBe 15.0
         parsed.merchant shouldBe "Java Time"
     }
 
     @Test
-    fun `alrajhi bill payment with SAR amount is captured`() {
+    fun `alrajhi stc pay bill payment is ignored as own account transfer`() {
+        // Regression: STC Pay top-ups previously counted as BILLER
+        // purchases. They're the user moving money between their own
+        // accounts, so they should be rejected outright.
         val body = """
             Bill Payment
             From:7131
@@ -52,15 +55,11 @@ class SmsParserTest {
             Bill:61409921865
             26/4/9 20:47
         """.trimIndent()
-        val parsed = SmsParser.parse("AlRajhiBank", body)
-        parsed.shouldNotBeNull()
-        parsed.amountSar shouldBe 1000.0
-        parsed.kind shouldBe Transaction.Kind.BILLER
+        SmsParser.parse("AlRajhiBank", body).shouldBeNull()
     }
 
     @Test
-    fun `alrajhi bill payment with SR currency abbreviation is captured`() {
-        // Real export had this: "Amount:SR 800" not "Amount:SAR 800"
+    fun `alrajhi stc pay bill payment with SR currency is ignored`() {
         val body = """
             Bill Payment
             From:7131
@@ -70,9 +69,23 @@ class SmsParserTest {
             Bill:61409921865
             26/4/11 07:06
         """.trimIndent()
+        SmsParser.parse("AlRajhiBank", body).shouldBeNull()
+    }
+
+    @Test
+    fun `alrajhi non stc pay bill payment is still captured`() {
+        val body = """
+            Bill Payment
+            From:7131
+            Amount:SAR 500
+            Biller:310
+            Service:Saudi Electricity
+            Bill:99887766
+            26/4/9 20:47
+        """.trimIndent()
         val parsed = SmsParser.parse("AlRajhiBank", body)
         parsed.shouldNotBeNull()
-        parsed.amountSar shouldBe 800.0
+        parsed.originalAmount shouldBe 500.0
         parsed.kind shouldBe Transaction.Kind.BILLER
     }
 
@@ -88,7 +101,7 @@ class SmsParserTest {
         """.trimIndent()
         val parsed = SmsParser.parse("AlRajhiBank", body)
         parsed.shouldNotBeNull()
-        parsed.amountSar shouldBe 338.0
+        parsed.originalAmount shouldBe 338.0
         parsed.kind shouldBe Transaction.Kind.GOVT_PAYMENT
     }
 
@@ -103,7 +116,7 @@ class SmsParserTest {
         """.trimIndent()
         val parsed = SmsParser.parse("AlRajhiBank", body)
         parsed.shouldNotBeNull()
-        parsed.amountSar shouldBe 200.0
+        parsed.originalAmount shouldBe 200.0
         parsed.kind shouldBe Transaction.Kind.CREDIT_CARD_PAYMENT
     }
 
@@ -118,7 +131,7 @@ class SmsParserTest {
         """.trimIndent()
         val parsed = SmsParser.parse("AlRajhiBank", body)
         parsed.shouldNotBeNull()
-        parsed.amountSar shouldBe 450.0
+        parsed.originalAmount shouldBe 450.0
         parsed.kind shouldBe Transaction.Kind.CASH_WITHDRAWAL
         parsed.merchant shouldBe "AL DEREHMIYA"
     }
@@ -137,7 +150,7 @@ class SmsParserTest {
         """.trimIndent()
         val parsed = SmsParser.parse("AlRajhiBank", body)
         parsed.shouldNotBeNull()
-        parsed.amountSar shouldBe 4969.50
+        parsed.originalAmount shouldBe 4969.50
         parsed.kind shouldBe Transaction.Kind.TRANSFER_OUT
     }
 
@@ -282,7 +295,7 @@ class SmsParserTest {
         """.trimIndent()
         val parsed = SmsParser.parse("STC Bank", body)
         parsed.shouldNotBeNull()
-        parsed.amountSar shouldBe 57.0
+        parsed.originalAmount shouldBe 57.0
         parsed.bank shouldBe Transaction.Bank.STC
         parsed.kind shouldBe Transaction.Kind.ONLINE_PURCHASE
         parsed.merchant shouldBe "Jahez"
@@ -298,8 +311,41 @@ class SmsParserTest {
         """.trimIndent()
         val parsed = SmsParser.parse("STC Bank", body)
         parsed.shouldNotBeNull()
-        parsed.amountSar shouldBe 111.75
+        parsed.originalAmount shouldBe 111.75
         parsed.merchant shouldBe "Ninja Retail Company"
+    }
+
+    @Test
+    fun `stc online purchase in USD is converted to SAR at 3_75`() {
+        // Real export: "Online Purchase Transaction Amount 230 USD / From: CLAUDE"
+        // 230 × 3.75 = 862.5 SAR. Both the converted value and the
+        // original amount should be preserved.
+        val body = """
+            Online Purchase Transaction Amount 230 USD
+            From: CLAUDE
+             Card: *6638
+            Date 01/04/26 15:40
+        """.trimIndent()
+        val parsed = SmsParser.parse("STC Bank", body)
+        parsed.shouldNotBeNull()
+        parsed.originalAmount shouldBe 230.0
+        parsed.originalCurrency shouldBe "USD"
+        parsed.kind shouldBe Transaction.Kind.ONLINE_PURCHASE
+        parsed.merchant shouldBe "CLAUDE"
+    }
+
+    @Test
+    fun `stc online purchase in USD with decimal is converted`() {
+        val body = """
+            Online Purchase Transaction Amount 13.31 USD
+            From: MIRON ENTERPRISES
+             Card: *6638
+            Date 27/02/26 22:43
+        """.trimIndent()
+        val parsed = SmsParser.parse("STC Bank", body)
+        parsed.shouldNotBeNull()
+        parsed.originalAmount shouldBe 13.31
+        parsed.originalCurrency shouldBe "USD"
     }
 
     @Test
@@ -315,7 +361,7 @@ class SmsParserTest {
         """.trimIndent()
         val parsed = SmsParser.parse("STC Bank", body)
         parsed.shouldNotBeNull()
-        parsed.amountSar shouldBe 13.0
+        parsed.originalAmount shouldBe 13.0
         parsed.kind shouldBe Transaction.Kind.POS
         parsed.merchant shouldBe "ucoffe"
     }

@@ -33,6 +33,7 @@ import javax.inject.Singleton
 @Singleton
 class SpendingRepository @Inject constructor(
     @param:ApplicationContext private val context: Context,
+    private val currencyConverter: CurrencyConverter,
 ) {
 
     fun hasReadSmsPermission(): Boolean =
@@ -87,6 +88,10 @@ class SpendingRepository @Inject constructor(
     @SuppressLint("Recycle")
     private suspend fun loadRecentTransactions(sinceMillis: Long): List<Transaction> =
         withContext(Dispatchers.IO) {
+            // Ensure live FX rates are in-memory before we start
+            // converting each foreign-currency transaction — a single
+            // fetch per day is plenty for an ECB-published table.
+            currencyConverter.refreshIfStale()
             val projection = arrayOf(
                 Telephony.Sms.ADDRESS,
                 Telephony.Sms.BODY,
@@ -116,12 +121,18 @@ class SpendingRepository @Inject constructor(
                     val body = cursor.getString(bodyIdx) ?: continue
                     val date = cursor.getLong(dateIdx)
                     val parsed = SmsParser.parse(address, body) ?: continue
+                    val amountSar = currencyConverter.toSar(
+                        parsed.originalAmount,
+                        parsed.originalCurrency,
+                    )
                     result += Transaction(
-                        amountSar = parsed.amountSar,
+                        amountSar = amountSar,
                         timestampMillis = date,
                         bank = parsed.bank,
                         kind = parsed.kind,
                         merchant = parsed.merchant,
+                        originalAmount = parsed.originalAmount,
+                        originalCurrency = parsed.originalCurrency,
                     )
                 }
             }

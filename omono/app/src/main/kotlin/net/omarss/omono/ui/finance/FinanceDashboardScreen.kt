@@ -87,8 +87,11 @@ fun FinanceDashboardRoute(
             if (state.topMerchants.isNotEmpty()) {
                 TopMerchantsCard(state.topMerchants)
             }
-            if (state.monthTransfersSar > 0) {
-                TransfersCard(state.monthTransfersSar)
+            if (state.bills.isNotEmpty()) {
+                BillsCard(state.bills)
+            }
+            if (state.transfers.isNotEmpty()) {
+                TransfersCard(state.monthTransfersSar, state.transfers)
             }
             if (state.recent.isNotEmpty()) {
                 RecentTransactionsCard(state.recent)
@@ -274,7 +277,62 @@ private fun TopMerchantsCard(rows: List<MerchantRow>) {
 }
 
 @Composable
-private fun TransfersCard(amountSar: Double) {
+private fun BillsCard(rows: List<BillRow>) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.elevatedCardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+        ),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text(
+                text = "Bills & government",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            rows.forEachIndexed { index, row ->
+                if (index > 0) {
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = row.label,
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        val subtitle = if (row.count > 1) {
+                            "${row.count} payments · ${kindLabel(row.kind)}"
+                        } else {
+                            kindLabel(row.kind)
+                        }
+                        Text(
+                            text = subtitle,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Text(
+                        text = "SAR %,.0f".format(row.amountSar),
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TransfersCard(totalSar: Double, rows: List<TransferRow>) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
@@ -285,7 +343,7 @@ private fun TransfersCard(amountSar: Double) {
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Text(
                 text = "Transfers this month",
@@ -293,7 +351,7 @@ private fun TransfersCard(amountSar: Double) {
                 color = MaterialTheme.colorScheme.onSecondaryContainer,
             )
             Text(
-                text = "SAR %,.0f".format(amountSar),
+                text = "SAR %,.0f".format(totalSar),
                 style = MaterialTheme.typography.headlineSmall,
                 color = MaterialTheme.colorScheme.onSecondaryContainer,
             )
@@ -302,9 +360,44 @@ private fun TransfersCard(amountSar: Double) {
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSecondaryContainer,
             )
+            rows.forEachIndexed { index, row ->
+                if (index > 0) {
+                    HorizontalDivider(color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.2f))
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = row.recipient,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                        )
+                        Text(
+                            text = row.date,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                        )
+                    }
+                    Text(
+                        text = formatAmount(row.amountSar, row.originalAmount, row.originalCurrency),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    )
+                }
+            }
         }
     }
 }
+
+// "SAR 863 (USD 230)" for foreign currency, "SAR 72" for SAR.
+private fun formatAmount(amountSar: Double, originalAmount: Double, originalCurrency: String): String =
+    if (originalCurrency == "SAR") {
+        "SAR %,.0f".format(amountSar)
+    } else {
+        "SAR %,.0f · %s %,.2f".format(amountSar, originalCurrency, originalAmount)
+    }
 
 @Composable
 private fun RecentTransactionsCard(rows: List<RecentRow>) {
@@ -357,7 +450,7 @@ private fun RecentTransactionsCard(rows: List<RecentRow>) {
                             MaterialTheme.colorScheme.onSurface
                         }
                         Text(
-                            text = "SAR %,.0f".format(row.amountSar),
+                            text = formatAmount(row.amountSar, row.originalAmount, row.originalCurrency),
                             style = MaterialTheme.typography.bodyMedium,
                             color = amountColor,
                         )
