@@ -74,6 +74,16 @@ class SpendingRepository @Inject constructor(
         return computeTotals(transactions, now, zone)
     }
 
+    // Public accessor for the raw parsed transactions inside the
+    // rolling window — used by the finance dashboard which needs the
+    // per-transaction list for recent activity, top merchants, etc.
+    suspend fun recentTransactions(
+        sinceMillis: Long = System.currentTimeMillis() - LOOKBACK_MILLIS,
+    ): List<Transaction> {
+        if (!hasReadSmsPermission()) return emptyList()
+        return loadRecentTransactions(sinceMillis)
+    }
+
     @SuppressLint("Recycle")
     private suspend fun loadRecentTransactions(sinceMillis: Long): List<Transaction> =
         withContext(Dispatchers.IO) {

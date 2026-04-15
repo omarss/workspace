@@ -16,6 +16,15 @@ val keystoreProps = Properties().apply {
     if (keystorePropsFile.exists()) load(keystorePropsFile.inputStream())
 }
 
+// Third-party API keys live in the gitignored local.properties at the
+// repo root. Missing keys fall back to an empty string — features that
+// need them show an empty state with a pointer to README.
+val rootLocalProps = Properties().apply {
+    rootProject.file("local.properties").takeIf { it.exists() }
+        ?.inputStream()?.use { load(it) }
+}
+val tomtomApiKey: String = rootLocalProps.getProperty("tomtom.api.key", "")
+
 android {
     namespace = "net.omarss.omono"
 
@@ -23,6 +32,8 @@ android {
         applicationId = "net.omarss.omono"
         versionCode = 12
         versionName = "0.9.0"
+
+        buildConfigField("String", "TOMTOM_API_KEY", "\"${tomtomApiKey}\"")
     }
 
     buildFeatures {
@@ -80,6 +91,8 @@ dependencies {
     implementation(projects.core.service)
     implementation(projects.feature.speed)
     implementation(projects.feature.spending)
+    implementation(projects.feature.places)
+    implementation(projects.feature.selfupdate)
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
@@ -89,6 +102,8 @@ dependencies {
     implementation(libs.androidx.compose.material.icons.extended)
     implementation(libs.hilt.navigation.compose)
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.kotlinx.coroutines.play.services)
+    implementation(libs.play.services.location)
     implementation(libs.accompanist.permissions)
     implementation(libs.timber)
 }

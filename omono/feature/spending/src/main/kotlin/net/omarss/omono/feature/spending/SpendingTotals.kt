@@ -33,7 +33,7 @@ data class SpendingTotals(
 
 // Pure totals calculation — exposed at file scope so it can be unit
 // tested without any Android / SMS plumbing.
-internal fun computeTotals(
+fun computeTotals(
     transactions: List<Transaction>,
     now: Instant,
     zone: ZoneId,

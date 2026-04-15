@@ -27,9 +27,11 @@ import androidx.compose.material.icons.filled.BatteryFull
 import androidx.compose.material.icons.filled.DoNotDisturbOn
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.LocationOff
 import androidx.compose.material.icons.filled.Message
 import androidx.compose.material.icons.filled.NotificationsActive
+import androidx.compose.material.icons.filled.PieChart
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Route
 import androidx.compose.material.icons.filled.Stop
@@ -87,6 +89,8 @@ private val smsPermissions: List<String> = listOf(
 @Composable
 fun OmonoMainRoute(
     contentPadding: PaddingValues,
+    onOpenPlaces: () -> Unit = {},
+    onOpenFinance: () -> Unit = {},
     viewModel: OmonoMainViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
@@ -130,6 +134,8 @@ fun OmonoMainRoute(
         onAlertOnOverLimitChange = viewModel::setAlertOnOverLimit,
         onBudgetChange = viewModel::setMonthlyBudget,
         onExportSms = viewModel::onExportSmsRequested,
+        onOpenPlaces = onOpenPlaces,
+        onOpenFinance = onOpenFinance,
         onStart = { FeatureHostService.start(context) },
         onStop = { FeatureHostService.stop(context) },
     )
@@ -177,6 +183,8 @@ fun OmonoMainScreen(
     onAlertOnOverLimitChange: (Boolean) -> Unit,
     onBudgetChange: (Double) -> Unit,
     onExportSms: () -> Unit,
+    onOpenPlaces: () -> Unit = {},
+    onOpenFinance: () -> Unit = {},
     onStart: () -> Unit,
     onStop: () -> Unit,
 ) {
@@ -203,7 +211,10 @@ fun OmonoMainScreen(
             .padding(horizontal = 24.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp),
     ) {
-        BrandHeader()
+        BrandHeader(
+            onOpenPlaces = onOpenPlaces,
+            onOpenFinance = onOpenFinance,
+        )
         HeroCard(state = state)
 
         AnimatedVisibility(visible = state.spending.available || !smsGranted) {
@@ -261,25 +272,42 @@ fun OmonoMainScreen(
 }
 
 @Composable
-private fun BrandHeader() {
+private fun BrandHeader(
+    onOpenPlaces: () -> Unit,
+    onOpenFinance: () -> Unit,
+) {
     Row(
         modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.Bottom,
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            text = "omono",
-            style = MaterialTheme.typography.headlineLarge,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.weight(1f),
-        )
-        // Version string is pulled from BuildConfig so every release
-        // bump via `make release` is reflected here automatically.
-        Text(
-            text = "v${BuildConfig.VERSION_NAME}",
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(bottom = 4.dp),
-        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = "omono",
+                style = MaterialTheme.typography.headlineLarge,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            // Version string is pulled from BuildConfig so every release
+            // bump via `make release` is reflected here automatically.
+            Text(
+                text = "v${BuildConfig.VERSION_NAME}",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        IconButton(onClick = onOpenFinance) {
+            Icon(
+                imageVector = Icons.Filled.PieChart,
+                contentDescription = "Finance dashboard",
+                tint = MaterialTheme.colorScheme.primary,
+            )
+        }
+        IconButton(onClick = onOpenPlaces) {
+            Icon(
+                imageVector = Icons.Filled.Explore,
+                contentDescription = "Places nearby",
+                tint = MaterialTheme.colorScheme.primary,
+            )
+        }
     }
 }
 
