@@ -12,6 +12,7 @@ import net.omarss.omono.core.service.FeatureId
 import net.omarss.omono.core.service.FeatureMetadata
 import net.omarss.omono.core.service.FeatureState
 import net.omarss.omono.core.service.OmonoFeature
+import net.omarss.omono.feature.speed.trips.TripRecorder
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -59,6 +60,7 @@ class SpeedFeature @Inject constructor(
     private val limits: RoadSpeedLimitRepository,
     private val settings: SpeedSettingsRepository,
     private val alertPlayer: SpeedAlertPlayer,
+    private val tripRecorder: TripRecorder,
 ) : OmonoFeature {
 
     override val id: FeatureId = FeatureId("speed")
@@ -76,10 +78,11 @@ class SpeedFeature @Inject constructor(
 
     override fun start(scope: CoroutineScope): Flow<FeatureState> {
         // Each new GPS sample triggers a (cached, distance-throttled)
-        // speed-limit lookup. The repository handles deduping internally
-        // so this is cheap on a moving vehicle and free when stationary.
+        // speed-limit lookup and feeds the trip recorder so trip history
+        // captures the same location stream as the notification.
         val locationsWithLimit = flow {
             speedRepository.locations().collect { snapshot ->
+                tripRecorder.onLocation(snapshot)
                 val limit = limits.limitKmh(snapshot.latitude, snapshot.longitude)
                 emit(snapshot.speedMps to limit)
             }
@@ -99,7 +102,9 @@ class SpeedFeature @Inject constructor(
             }
     }
 
-    override fun stop() = Unit
+    override fun stop() {
+        tripRecorder.finalizeCurrent()
+    }
 
     private suspend fun maybeAlert(mps: Float, limitKmh: Float?) {
         val speedKmh = SpeedUnit.KmH.fromMetersPerSecond(mps)
