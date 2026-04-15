@@ -39,6 +39,9 @@ accompanistPermissions = "0.37.3"
 # Logging facade
 timber = "5.0.1"
 
+# HTTP client (OSM Overpass speed-limit lookup)
+okhttp = "4.12.0"
+
 # Testing
 junit = "4.13.2"
 androidxTestExt = "1.2.1"
@@ -87,6 +90,9 @@ accompanist-permissions = { group = "com.google.accompanist", name = "accompanis
 
 # Logging
 timber = { group = "com.jakewharton.timber", name = "timber", version.ref = "timber" }
+
+# HTTP client
+okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
 
 # Testing
 junit = { group = "junit", name = "junit", version.ref = "junit" }

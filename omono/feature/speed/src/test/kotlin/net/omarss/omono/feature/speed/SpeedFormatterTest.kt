@@ -43,4 +43,31 @@ class SpeedFormatterTest {
         val state = formatSpeedState(mps = 12.34f, unit = SpeedUnit.Ms)
         state.summary shouldBe "12.3 m/s"
     }
+
+    @Test
+    fun `metadata always carries speed in km per hour`() {
+        val state = formatSpeedState(mps = 10f, unit = SpeedUnit.Mph)
+        state.shouldBeInstanceOf<FeatureState.Active>()
+        val meta = (state as FeatureState.Active).metadata
+        // 10 m/s == 36 km/h
+        (meta[FeatureState.META_SPEED_KMH] ?: 0.0) shouldBe 36.0
+    }
+
+    @Test
+    fun `speed limit appears in summary and metadata`() {
+        val state = formatSpeedState(mps = 16.67f, unit = SpeedUnit.KmH, limitKmh = 60f)
+        state.shouldBeInstanceOf<FeatureState.Active>()
+        // 16.67 m/s == 60 km/h, limit 60
+        state.summary shouldBe "60.0 km/h (limit 60 km/h)"
+        val meta = (state as FeatureState.Active).metadata
+        (meta[FeatureState.META_SPEED_LIMIT_KMH] ?: 0.0) shouldBe 60.0
+    }
+
+    @Test
+    fun `no limit means no suffix`() {
+        val state = formatSpeedState(mps = 16.67f, unit = SpeedUnit.KmH, limitKmh = null)
+        state.summary shouldBe "60.0 km/h"
+        val meta = (state as FeatureState.Active).metadata
+        (FeatureState.META_SPEED_LIMIT_KMH in meta) shouldBe false
+    }
 }

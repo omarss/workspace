@@ -19,7 +19,16 @@ import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
 
-// Wraps FusedLocationProviderClient as a cold Flow of speed in m/s.
+// Single GPS sample. Emitted by SpeedRepository.locations() at ~1 Hz.
+// Speed is in m/s, lat/lon in WGS84 degrees.
+data class LocationSnapshot(
+    val latitude: Double,
+    val longitude: Double,
+    val speedMps: Float,
+    val accuracyMeters: Float,
+)
+
+// Wraps FusedLocationProviderClient as a cold Flow of LocationSnapshot.
 // The underlying callback is registered on Looper.getMainLooper() because
 // FusedLocationProvider posts to whichever Looper you give it; main is
 // the safest choice for a service callback.
@@ -30,7 +39,7 @@ class SpeedRepository @Inject constructor(
     private val client by lazy { LocationServices.getFusedLocationProviderClient(context) }
 
     @SuppressLint("MissingPermission")
-    fun speedMetersPerSecond(): Flow<Float> = callbackFlow {
+    fun locations(): Flow<LocationSnapshot> = callbackFlow {
         if (!hasLocationPermission()) {
             close(SecurityException("ACCESS_FINE_LOCATION not granted"))
             return@callbackFlow
@@ -44,8 +53,14 @@ class SpeedRepository @Inject constructor(
         val callback = object : LocationCallback() {
             override fun onLocationResult(result: LocationResult) {
                 val location = result.lastLocation ?: return
-                if (!location.hasSpeed()) return
-                trySend(location.speed)
+                trySend(
+                    LocationSnapshot(
+                        latitude = location.latitude,
+                        longitude = location.longitude,
+                        speedMps = if (location.hasSpeed()) location.speed else 0f,
+                        accuracyMeters = if (location.hasAccuracy()) location.accuracy else Float.NaN,
+                    ),
+                )
             }
         }
 

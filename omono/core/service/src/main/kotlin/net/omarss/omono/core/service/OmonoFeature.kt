@@ -39,14 +39,34 @@ data class FeatureMetadata(
 // Features emit their current tracked value plus a human-readable summary
 // the notification can render directly. Keeping summary in the state avoids
 // the host needing to know anything about each feature's semantics.
+//
+// `metadata` is an opt-in escape hatch for richer UI: features can stash
+// typed values (the speed feature uses it for current m/s, current km/h,
+// and the local speed limit) and the UI layer pulls them out by key.
+// Notifications still render only `summary`, so this never leaks into
+// the host service.
 sealed interface FeatureState {
     val summary: String
 
-    data class Active(override val summary: String) : FeatureState
+    data class Active(
+        override val summary: String,
+        val metadata: Map<String, Double> = emptyMap(),
+    ) : FeatureState
 
-    data class Idle(override val summary: String = "Idle") : FeatureState
+    data class Idle(
+        override val summary: String = "Idle",
+        val metadata: Map<String, Double> = emptyMap(),
+    ) : FeatureState
 
     data class Error(val message: String) : FeatureState {
         override val summary: String get() = "Error: $message"
+    }
+
+    companion object {
+        // Well-known metadata keys for the speed feature. Other features
+        // are free to use their own; these are documented here so the UI
+        // layer doesn't string-literal them everywhere.
+        const val META_SPEED_KMH: String = "speed.kmh"
+        const val META_SPEED_LIMIT_KMH: String = "speed.limit_kmh"
     }
 }
