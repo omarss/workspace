@@ -63,10 +63,12 @@ sealed interface FeatureState {
     }
 
     companion object {
-        // Well-known metadata keys for the speed feature. Other features
-        // are free to use their own; these are documented here so the UI
-        // layer doesn't string-literal them everywhere.
+        // Well-known metadata keys. Features are free to use their own;
+        // these are documented here so the UI layer doesn't
+        // string-literal them everywhere.
         const val META_SPEED_KMH: String = "speed.kmh"
         const val META_SPEED_LIMIT_KMH: String = "speed.limit_kmh"
+        const val META_SPENT_TODAY_SAR: String = "spending.today_sar"
+        const val META_SPENT_MONTH_SAR: String = "spending.month_sar"
     }
 }
