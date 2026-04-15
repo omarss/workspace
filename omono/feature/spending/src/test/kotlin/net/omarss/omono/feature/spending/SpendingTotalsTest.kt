@@ -14,13 +14,13 @@ class SpendingTotalsTest {
     private val startOfDayMillis = Instant.parse("2026-04-14T21:00:00Z").toEpochMilli() // midnight local
     private val startOfMonthMillis = Instant.parse("2026-03-31T21:00:00Z").toEpochMilli() // 1st 00:00 local
 
-    private fun tx(amount: Double, at: Long): Transaction =
+    private fun tx(amount: Double, at: Long, merchant: String? = null): Transaction =
         Transaction(
             amountSar = amount,
             timestampMillis = at,
             bank = Transaction.Bank.AL_RAJHI,
             kind = Transaction.Kind.POS,
-            merchant = null,
+            merchant = merchant,
         )
 
     @Test
@@ -81,5 +81,23 @@ class SpendingTotalsTest {
         totals.todayCount shouldBe 2
         totals.monthSar shouldBe 100.0
         totals.monthCount shouldBe 4
+    }
+
+    @Test
+    fun `category totals aggregate within the month window`() {
+        val totals = computeTotals(
+            listOf(
+                tx(50.0, startOfMonthMillis + 1_000, merchant = "Jahez"),
+                tx(80.0, startOfMonthMillis + 2_000, merchant = "Jahez"),
+                tx(120.0, startOfMonthMillis + 3_000, merchant = "ALDREES 4"),
+                tx(200.0, startOfMonthMillis + 4_000, merchant = "Ninja Retail Company"),
+                tx(999.0, startOfMonthMillis - 1_000, merchant = "Jahez"), // last month
+            ),
+            now,
+            zone,
+        )
+        totals.monthByCategory[SpendingCategory.FOOD] shouldBe 130.0
+        totals.monthByCategory[SpendingCategory.FUEL] shouldBe 120.0
+        totals.monthByCategory[SpendingCategory.GROCERIES] shouldBe 200.0
     }
 }

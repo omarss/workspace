@@ -8,9 +8,10 @@ data class SpendingTotals(
     val monthSar: Double,
     val todayCount: Int,
     val monthCount: Int,
+    val monthByCategory: Map<SpendingCategory, Double> = emptyMap(),
 ) {
     companion object {
-        val Empty = SpendingTotals(0.0, 0.0, 0, 0)
+        val Empty = SpendingTotals(0.0, 0.0, 0, 0, emptyMap())
     }
 }
 
@@ -30,15 +31,24 @@ internal fun computeTotals(
     var todayCount = 0
     var monthSum = 0.0
     var monthCount = 0
+    val monthByCategory = mutableMapOf<SpendingCategory, Double>()
     for (tx in transactions) {
         if (tx.timestampMillis >= startOfMonth) {
             monthSum += tx.amountSar
             monthCount += 1
+            val category = MerchantCategorizer.categorize(tx.merchant)
+            monthByCategory.merge(category, tx.amountSar) { a, b -> a + b }
         }
         if (tx.timestampMillis >= startOfDay) {
             todaySum += tx.amountSar
             todayCount += 1
         }
     }
-    return SpendingTotals(todaySum, monthSum, todayCount, monthCount)
+    return SpendingTotals(
+        todaySar = todaySum,
+        monthSar = monthSum,
+        todayCount = todayCount,
+        monthCount = monthCount,
+        monthByCategory = monthByCategory,
+    )
 }

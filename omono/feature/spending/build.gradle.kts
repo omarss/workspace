@@ -14,6 +14,7 @@ android {
 
 dependencies {
     implementation(projects.core.common)
+    implementation(projects.core.data)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.timber)
 
