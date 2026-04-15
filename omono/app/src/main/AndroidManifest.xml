@@ -17,6 +17,21 @@
     <!-- Auto-start after reboot. -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
+    <!-- Defensive: the foreground service implicitly holds a partial wake
+         lock, but FusedLocationProvider can briefly need an explicit one
+         during cold-start GPS scans. -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+    <!-- Lets the app launch the system "ignore battery optimisation"
+         confirmation dialog directly so the user can whitelist us in
+         one tap. Not allowed on Play Store unless the app falls in a
+         specific category, but we sideload via Obtainium. -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+
+    <!-- Network access for the OSM Overpass speed-limit lookup. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
     <!-- Declare GPS as optional hardware so devices without GPS can still install. -->
     <uses-feature
         android:name="android.hardware.location.gps"
