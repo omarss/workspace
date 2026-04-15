@@ -1,5 +1,6 @@
 package net.omarss.omono.ui.finance
 
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -104,7 +105,7 @@ fun FinanceDashboardRoute(
 @Composable
 private fun SummaryCard(state: FinanceDashboardUiState) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().animateContentSize(),
         colors = CardDefaults.elevatedCardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
         ),
@@ -138,7 +139,7 @@ private fun SummaryCard(state: FinanceDashboardUiState) {
 private fun BudgetCard(state: FinanceDashboardUiState) {
     if (state.budgetSar <= 0) return
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().animateContentSize(),
         colors = CardDefaults.elevatedCardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
         ),
@@ -181,7 +182,7 @@ private fun BudgetCard(state: FinanceDashboardUiState) {
 @Composable
 private fun CategoryBreakdownCard(rows: List<CategoryRow>) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().animateContentSize(),
         colors = CardDefaults.elevatedCardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
         ),
@@ -229,7 +230,7 @@ private fun CategoryBreakdownCard(rows: List<CategoryRow>) {
 @Composable
 private fun TopMerchantsCard(rows: List<MerchantRow>) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().animateContentSize(),
         colors = CardDefaults.elevatedCardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
         ),
@@ -279,7 +280,7 @@ private fun TopMerchantsCard(rows: List<MerchantRow>) {
 @Composable
 private fun BillsCard(rows: List<BillRow>) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().animateContentSize(),
         colors = CardDefaults.elevatedCardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
         ),
@@ -334,7 +335,7 @@ private fun BillsCard(rows: List<BillRow>) {
 @Composable
 private fun TransfersCard(totalSar: Double, rows: List<TransferRow>) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().animateContentSize(),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.secondaryContainer,
         ),
@@ -402,7 +403,7 @@ private fun formatAmount(amountSar: Double, originalAmount: Double, originalCurr
 @Composable
 private fun RecentTransactionsCard(rows: List<RecentRow>) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().animateContentSize(),
         colors = CardDefaults.elevatedCardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
         ),

@@ -20,7 +20,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.animation.Crossfade
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -114,17 +116,19 @@ fun PlacesRoute(
             return@Column
         }
 
-        when {
-            state.loading -> LoadingState()
-            state.errorMessage != null -> EmptyState(
-                title = "Couldn't load places",
-                body = state.errorMessage.orEmpty(),
-            )
-            state.places.isEmpty() -> EmptyState(
-                title = "Nothing in that direction",
-                body = "Widen the cone or pick a different category.",
-            )
-            else -> PlaceList(places = state.places, heading = state.heading)
+        Crossfade(targetState = state, label = "places_state_transition") { currentState ->
+            when {
+                currentState.loading -> LoadingState()
+                currentState.errorMessage != null -> EmptyState(
+                    title = "Couldn't load places",
+                    body = currentState.errorMessage.orEmpty(),
+                )
+                currentState.places.isEmpty() -> EmptyState(
+                    title = "Nothing in that direction",
+                    body = "Widen the cone or pick a different category.",
+                )
+                else -> PlaceList(places = currentState.places, heading = currentState.heading)
+            }
         }
     }
 }
@@ -302,17 +306,18 @@ private fun PlaceRow(place: Place, heading: Float) {
     }
 }
 
-// Simple triangle pointing up, rotated by the angle between the
+// Navigation arrow pointing up, rotated by the angle between the
 // place's bearing and the user's current heading.
 @Composable
 private fun DirectionArrow(placeBearing: Float, heading: Float) {
     val delta = ((placeBearing - heading + 360f) % 360f)
-    Box(
+    Icon(
+        imageVector = Icons.Filled.Navigation,
+        contentDescription = null,
         modifier = Modifier
             .size(16.dp)
-            .rotate(delta)
-            .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.primary),
+            .rotate(delta),
+        tint = MaterialTheme.colorScheme.primary,
     )
 }
 
