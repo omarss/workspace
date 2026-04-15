@@ -19,8 +19,8 @@ import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
 
-// Single GPS sample. Emitted by SpeedRepository.locations() at ~1 Hz.
-// Speed is in m/s, lat/lon in WGS84 degrees.
+// Single GPS sample. Emitted by SpeedRepository.locations() at adaptive
+// rate (see ADAPTIVE constants below). Speed is in m/s, lat/lon in WGS84.
 data class LocationSnapshot(
     val latitude: Double,
     val longitude: Double,
@@ -29,9 +29,18 @@ data class LocationSnapshot(
 )
 
 // Wraps FusedLocationProviderClient as a cold Flow of LocationSnapshot.
-// The underlying callback is registered on Looper.getMainLooper() because
-// FusedLocationProvider posts to whichever Looper you give it; main is
-// the safest choice for a service callback.
+//
+// Adaptive GPS: the callback self-observes its own speed samples. When a
+// sample reports movement above MOVING_THRESHOLD_MPS, the "active" timer
+// resets. When no movement has been seen for IDLE_TIMEOUT_MS the callback
+// is silently reinstalled at SLOW_INTERVAL_MS; the next real movement
+// promotes it back to FAST_INTERVAL_MS. Net effect: the GPS radio burns
+// ~10x less battery while you're parked, with zero API-level contracts
+// (no ActivityRecognition permission, no Play Services workers).
+//
+// Callback posts to the main looper because FusedLocationProvider dispatches
+// on whichever Looper it's handed, and main is the safest choice for a
+// long-lived foreground service callback.
 @Singleton
 class SpeedRepository @Inject constructor(
     @param:ApplicationContext private val context: Context,
@@ -45,31 +54,65 @@ class SpeedRepository @Inject constructor(
             return@callbackFlow
         }
 
-        val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, UPDATE_INTERVAL_MS)
-            .setMinUpdateIntervalMillis(MIN_UPDATE_INTERVAL_MS)
-            .setWaitForAccurateLocation(false)
-            .build()
+        // Mutable state captured by the installed callback. Wrapped in
+        // single-element arrays so the inner lambdas can mutate them
+        // without Kotlin promoting them to AtomicReferences.
+        val currentIntervalMs = longArrayOf(FAST_INTERVAL_MS)
+        val lastMoveAtMs = longArrayOf(System.currentTimeMillis())
+        val installedCallback = arrayOfNulls<LocationCallback>(1)
 
-        val callback = object : LocationCallback() {
-            override fun onLocationResult(result: LocationResult) {
-                val location = result.lastLocation ?: return
-                trySend(
-                    LocationSnapshot(
+        fun install(intervalMs: Long) {
+            installedCallback[0]?.let { client.removeLocationUpdates(it) }
+            val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, intervalMs)
+                .setMinUpdateIntervalMillis(intervalMs / 2)
+                .setWaitForAccurateLocation(false)
+                .build()
+
+            val cb = object : LocationCallback() {
+                override fun onLocationResult(result: LocationResult) {
+                    val location = result.lastLocation ?: return
+                    val snapshot = LocationSnapshot(
                         latitude = location.latitude,
                         longitude = location.longitude,
                         speedMps = if (location.hasSpeed()) location.speed else 0f,
                         accuracyMeters = if (location.hasAccuracy()) location.accuracy else Float.NaN,
-                    ),
-                )
+                    )
+                    trySend(snapshot)
+
+                    val now = System.currentTimeMillis()
+                    if (snapshot.speedMps >= MOVING_THRESHOLD_MPS) {
+                        lastMoveAtMs[0] = now
+                    }
+                    val idleForMs = now - lastMoveAtMs[0]
+                    val desired = if (idleForMs > IDLE_TIMEOUT_MS) {
+                        SLOW_INTERVAL_MS
+                    } else {
+                        FAST_INTERVAL_MS
+                    }
+                    if (desired != currentIntervalMs[0]) {
+                        Timber.d(
+                            "Adaptive GPS: %dms → %dms",
+                            currentIntervalMs[0],
+                            desired,
+                        )
+                        currentIntervalMs[0] = desired
+                        install(desired)
+                    }
+                }
             }
+            installedCallback[0] = cb
+            currentIntervalMs[0] = intervalMs
+            client.requestLocationUpdates(request, cb, Looper.getMainLooper())
+            Timber.d("Requesting location updates @ %dms", intervalMs)
         }
 
-        Timber.d("Requesting location updates @ %dms", UPDATE_INTERVAL_MS)
-        client.requestLocationUpdates(request, callback, Looper.getMainLooper())
+        install(FAST_INTERVAL_MS)
 
         awaitClose {
-            Timber.d("Removing location updates")
-            client.removeLocationUpdates(callback)
+            installedCallback[0]?.let {
+                Timber.d("Removing location updates")
+                client.removeLocationUpdates(it)
+            }
         }
     }
 
@@ -80,7 +123,15 @@ class SpeedRepository @Inject constructor(
         ) == PackageManager.PERMISSION_GRANTED
 
     private companion object {
-        const val UPDATE_INTERVAL_MS: Long = 1_000L
-        const val MIN_UPDATE_INTERVAL_MS: Long = 500L
+        const val FAST_INTERVAL_MS: Long = 1_000L
+        const val SLOW_INTERVAL_MS: Long = 10_000L
+
+        // Speed threshold that resets the "moving" timer. 0.5 m/s ≈ a
+        // slow walking pace — well below noise floor for a car.
+        const val MOVING_THRESHOLD_MPS: Float = 0.5f
+
+        // No movement for this long → drop to slow mode. First real
+        // sample above the threshold promotes us back immediately.
+        const val IDLE_TIMEOUT_MS: Long = 60_000L
     }
 }
