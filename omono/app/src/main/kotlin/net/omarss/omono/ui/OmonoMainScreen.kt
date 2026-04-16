@@ -516,6 +516,7 @@ private fun SpendingCard(
 private fun RecentTripsCard(trips: List<TripUi>) {
     Card(
         modifier = Modifier.fillMaxWidth().animateContentSize(),
+        shape = MaterialTheme.shapes.medium,
         colors = CardDefaults.elevatedCardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
         ),
@@ -619,24 +620,26 @@ private fun SpendingStat(label: String, value: String) {
         Text(
             text = label,
             style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = MaterialTheme.colorScheme.onSecondaryContainer,
         )
         Text(
             text = value,
             style = MaterialTheme.typography.headlineSmall,
-            color = MaterialTheme.colorScheme.onSurface,
+            color = MaterialTheme.colorScheme.onSecondaryContainer,
         )
     }
 }
 
 @Composable
 private fun StatusDot(state: OmonoMainUiState) {
+    // The dot sits on a gradient background so we use high-contrast
+    // colors that stay visible on both indigo and violet.
     val color by animateColorAsState(
         targetValue = when (state.status) {
-            is Status.Tracking -> MaterialTheme.colorScheme.primary
-            is Status.Waiting -> MaterialTheme.colorScheme.tertiary
+            is Status.Tracking -> Color(0xFF4ADE80) // green-400
+            is Status.Waiting -> Color.White.copy(alpha = 0.6f)
             is Status.Error -> MaterialTheme.colorScheme.error
-            Status.Stopped -> MaterialTheme.colorScheme.outlineVariant
+            Status.Stopped -> Color.White.copy(alpha = 0.3f)
         },
         label = "statusDot",
     )

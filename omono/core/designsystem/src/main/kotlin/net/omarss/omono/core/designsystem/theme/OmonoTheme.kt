@@ -2,18 +2,26 @@ package net.omarss.omono.core.designsystem.theme
 
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Shapes
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 
+private val OmonoShapes = Shapes(
+    small = RoundedCornerShape(12.dp),
+    medium = RoundedCornerShape(20.dp),
+    large = RoundedCornerShape(28.dp),
+)
+
 @Composable
 fun OmonoTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    // Material You. On by default on Android 12+; off falls back to the
-    // brand palette so the app looks consistent on every device.
+    // Material You. Off by default so the curated brand palette is
+    // always enforced. Set to true to follow the device wallpaper.
     dynamicColor: Boolean = false,
     content: @Composable () -> Unit,
 ) {
@@ -25,11 +33,6 @@ fun OmonoTheme(
         darkTheme -> OmonoDarkColors
         else -> OmonoLightColors
     }
-
-    val OmonoShapes = androidx.compose.material3.Shapes(
-        medium = androidx.compose.foundation.shape.RoundedCornerShape(24.dp),
-        large = androidx.compose.foundation.shape.RoundedCornerShape(32.dp)
-    )
 
     MaterialTheme(
         colorScheme = colors,
