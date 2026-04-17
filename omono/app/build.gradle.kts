@@ -24,6 +24,11 @@ val rootLocalProps = Properties().apply {
         ?.inputStream()?.use { load(it) }
 }
 val tomtomApiKey: String = rootLocalProps.getProperty("tomtom.api.key", "")
+// Self-hosted Google Places proxy (gplaces_parser backend). When both
+// URL and key are present, DI uses this instead of TomTom for POI
+// lookups. Both default to empty so a fresh clone still builds.
+val gplacesApiUrl: String = rootLocalProps.getProperty("gplaces.api.url", "")
+val gplacesApiKey: String = rootLocalProps.getProperty("gplaces.api.key", "")
 
 android {
     namespace = "net.omarss.omono"
@@ -34,6 +39,8 @@ android {
         versionName = "0.15.2"
 
         buildConfigField("String", "TOMTOM_API_KEY", "\"${tomtomApiKey}\"")
+        buildConfigField("String", "GPLACES_API_URL", "\"${gplacesApiUrl}\"")
+        buildConfigField("String", "GPLACES_API_KEY", "\"${gplacesApiKey}\"")
     }
 
     buildFeatures {

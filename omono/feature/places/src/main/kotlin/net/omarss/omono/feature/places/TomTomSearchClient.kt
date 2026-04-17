@@ -27,7 +27,7 @@ import kotlin.math.sqrt
 @Singleton
 class TomTomSearchClient @Inject constructor(
     @param:Named("tomtomApiKey") private val apiKey: String,
-) {
+) : PlacesSource {
 
     private val client = OkHttpClient.Builder()
         .callTimeout(10, TimeUnit.SECONDS)
@@ -35,14 +35,14 @@ class TomTomSearchClient @Inject constructor(
         .readTimeout(10, TimeUnit.SECONDS)
         .build()
 
-    val isConfigured: Boolean get() = apiKey.isNotBlank()
+    override val isConfigured: Boolean get() = apiKey.isNotBlank()
 
-    suspend fun nearbySearch(
+    override suspend fun nearbySearch(
         latitude: Double,
         longitude: Double,
         radiusMeters: Int,
         category: PlaceCategory,
-        limit: Int = MAX_RESULTS,
+        limit: Int,
     ): List<Place> = withContext(Dispatchers.IO) {
         if (apiKey.isBlank()) {
             Timber.d("TomTom API key not configured — skipping nearby search")

@@ -4,22 +4,24 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.abs
 
-// Domain-facing API for the places feature. Wraps TomTomSearchClient
-// and provides derived helpers (direction-cone filter, etc.) so the
-// ViewModel doesn't need to know about TomTom specifics.
+// Domain-facing API for the places feature. Wraps whichever
+// PlacesSource the DI module selects (self-hosted GPlaces proxy by
+// default, TomTom as fallback) and provides derived helpers
+// (direction-cone filter, etc.) so the ViewModel doesn't need to know
+// about backend specifics.
 @Singleton
 class PlacesRepository @Inject constructor(
-    private val client: TomTomSearchClient,
+    private val source: PlacesSource,
 ) {
 
-    val isConfigured: Boolean get() = client.isConfigured
+    val isConfigured: Boolean get() = source.isConfigured
 
     suspend fun nearby(
         latitude: Double,
         longitude: Double,
         category: PlaceCategory,
         radiusMeters: Int,
-    ): List<Place> = client.nearbySearch(
+    ): List<Place> = source.nearbySearch(
         latitude = latitude,
         longitude = longitude,
         radiusMeters = radiusMeters,
