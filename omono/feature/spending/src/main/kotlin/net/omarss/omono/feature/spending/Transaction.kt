@@ -44,7 +44,10 @@ data class Transaction(
         /** Cash pulled from an ATM — counted as spending. */
         CASH_WITHDRAWAL,
 
-        /** Payment toward a credit card balance. */
+        /**
+         * Payment from the debit account toward a credit card balance
+         * (an Al Rajhi card top-up). Not a purchase — see isPurchase.
+         */
         CREDIT_CARD_PAYMENT,
 
         /** Government / MOI payment (traffic fines, passports, etc.). */
@@ -67,8 +70,14 @@ data class Transaction(
     }
 }
 
-// True when the transaction drives the purchase total up; refunds and
-// transfers are tracked on their own ledger instead. Refunds reduce the
-// purchase total via a separate net calculation — they do not inflate it.
+// True when the transaction drives the purchase total up. Everything
+// else (refunds, transfers, credit-card balance top-ups) is tracked on
+// its own ledger. Credit-card payments in particular look like "money
+// out" but are actually an own-account move: the debit account pays
+// the card, and the spending that earned the balance was already
+// captured at the POS/online transaction via the card. Counting the
+// payment as well would double-book the amount.
 val Transaction.Kind.isPurchase: Boolean
-    get() = this != Transaction.Kind.TRANSFER_OUT && this != Transaction.Kind.REFUND
+    get() = this != Transaction.Kind.TRANSFER_OUT &&
+        this != Transaction.Kind.REFUND &&
+        this != Transaction.Kind.CREDIT_CARD_PAYMENT

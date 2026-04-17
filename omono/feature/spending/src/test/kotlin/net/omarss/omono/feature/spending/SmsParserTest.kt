@@ -155,14 +155,14 @@ class SmsParserTest {
     }
 
     @Test
-    fun `transfer_out and refund kinds are NOT purchases`() {
+    fun `transfer refund and credit card payment kinds are NOT purchases`() {
         Transaction.Kind.TRANSFER_OUT.isPurchase shouldBe false
         Transaction.Kind.REFUND.isPurchase shouldBe false
+        Transaction.Kind.CREDIT_CARD_PAYMENT.isPurchase shouldBe false
         Transaction.Kind.POS.isPurchase shouldBe true
         Transaction.Kind.ONLINE_PURCHASE.isPurchase shouldBe true
         Transaction.Kind.BILLER.isPurchase shouldBe true
         Transaction.Kind.CASH_WITHDRAWAL.isPurchase shouldBe true
-        Transaction.Kind.CREDIT_CARD_PAYMENT.isPurchase shouldBe true
         Transaction.Kind.GOVT_PAYMENT.isPurchase shouldBe true
     }
 
