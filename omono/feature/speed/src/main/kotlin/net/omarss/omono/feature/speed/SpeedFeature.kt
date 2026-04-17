@@ -83,7 +83,13 @@ class SpeedFeature @Inject constructor(
         val locationsWithLimit = flow {
             speedRepository.locations().collect { snapshot ->
                 tripRecorder.onLocation(snapshot)
-                val limit = limits.limitKmh(snapshot.latitude, snapshot.longitude)
+                val limit = limits.limitKmh(
+                    lat = snapshot.latitude,
+                    lon = snapshot.longitude,
+                    bearingDeg = snapshot.bearingDeg,
+                    bearingAccuracyDeg = snapshot.bearingAccuracyDeg,
+                    speedMps = snapshot.speedMps,
+                )
                 emit(snapshot.speedMps to limit)
             }
         }

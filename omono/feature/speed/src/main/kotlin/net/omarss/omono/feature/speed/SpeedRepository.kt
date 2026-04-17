@@ -20,12 +20,16 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 // Single GPS sample. Emitted by SpeedRepository.locations() at adaptive
-// rate (see ADAPTIVE constants below). Speed is in m/s, lat/lon in WGS84.
+// rate (see ADAPTIVE constants below). Speed is in m/s, lat/lon in WGS84,
+// bearing in degrees clockwise from true north (null when FusedLocation
+// can't infer direction of travel — typically while stationary).
 data class LocationSnapshot(
     val latitude: Double,
     val longitude: Double,
     val speedMps: Float,
     val accuracyMeters: Float,
+    val bearingDeg: Float? = null,
+    val bearingAccuracyDeg: Float? = null,
 )
 
 // Wraps FusedLocationProviderClient as a cold Flow of LocationSnapshot.
@@ -76,6 +80,10 @@ class SpeedRepository @Inject constructor(
                         longitude = location.longitude,
                         speedMps = if (location.hasSpeed()) location.speed else 0f,
                         accuracyMeters = if (location.hasAccuracy()) location.accuracy else Float.NaN,
+                        bearingDeg = if (location.hasBearing()) location.bearing else null,
+                        // bearingAccuracyDegrees added in API 26 — minSdk 26.
+                        bearingAccuracyDeg =
+                            if (location.hasBearingAccuracy()) location.bearingAccuracyDegrees else null,
                     )
                     trySend(snapshot)
 
