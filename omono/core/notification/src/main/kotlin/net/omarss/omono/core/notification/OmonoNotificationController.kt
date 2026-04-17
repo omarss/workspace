@@ -36,6 +36,12 @@ class OmonoNotificationController @Inject constructor() {
             enableVibration(false)
             enableLights(false)
             setSound(null, null)
+            // Show the speed + spending detail on the lock screen instead
+            // of the generic "omono has a notification" redacted view.
+            // Channel-level visibility can only be set at creation time;
+            // the per-notification setVisibility(PUBLIC) below is ignored
+            // if the channel itself is PRIVATE.
+            lockscreenVisibility = Notification.VISIBILITY_PUBLIC
         }
         manager.createNotificationChannel(channel)
     }

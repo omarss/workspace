@@ -30,22 +30,23 @@ object SmsParser {
     // ── AlRajhi ──────────────────────────────────────────────────────────
     //
     // What we capture (with the first-line keyword that identifies each):
-    //   "PoS"                    → Kind.POS
-    //   "Bill Payment" (Biller:) → Kind.BILLER
-    //   "MOI Payments"           → Kind.GOVT_PAYMENT
-    //   "Credit Card:Payment"    → Kind.CREDIT_CARD_PAYMENT
-    //   "Withdrawal:ATM"         → Kind.CASH_WITHDRAWAL
-    //   "International Transfer" → Kind.TRANSFER_OUT (money to someone else)
+    //   "PoS"                     → Kind.POS
+    //   "Bill Payment" (Biller:)  → Kind.BILLER
+    //   "MOI Payments"            → Kind.GOVT_PAYMENT
+    //   "Credit Card:Payment"     → Kind.CREDIT_CARD_PAYMENT
+    //   "Withdrawal:ATM"          → Kind.CASH_WITHDRAWAL
+    //   "International Transfer"  → Kind.TRANSFER_OUT
+    //   "Debit Internal Transfer" → Kind.TRANSFER_OUT (P2P within Al Rajhi)
     //
     // What we reject outright:
     //   OTP Code / One Time Password (auth)
     //   Transaction Declined / Notification : Declined (failed)
     //   Selling Gold (income)
-    //   Debit Internal Transfer (own-account)
     //   Transfer Between Your Accounts (own-account)
-    //   Rajhi Transfer (OTP-like, and duplicated by other messages)
+    //   Rajhi Transfer (OTP-like — "Reason:Rajhi Transfer" on OTPs)
     //   Credit Transfer Local (incoming credit — salary / deposit)
-    //   Credit Card:transfer (duplicate of Credit Card:Payment)
+    //   Credit Card:transfer (own card → own account, duplicates Credit
+    //     Card:Payment accounting)
     //   Deposit:* (incoming)
     //   Dear (Customer|customer) (marketing)
     //   Your card ... MadaPay (admin, no amount)
@@ -60,9 +61,11 @@ object SmsParser {
         if (body.containsIgnoreCase("One Time Password")) return null
         if (body.containsIgnoreCase("Declined")) return null
         if (body.containsIgnoreCase("Selling Gold")) return null
-        if (body.containsIgnoreCase("Debit Internal Transfer")) return null
         if (body.containsIgnoreCase("Transfer Between Your Accounts")) return null
-        if (body.containsIgnoreCase("Rajhi Transfer")) return null
+        // "Reason:Rajhi Transfer - Mobile App" appears on OTP messages
+        // (already caught by "OTP Code" above), but the text also shows
+        // up standalone on some auth notifications — keep it as a guard.
+        if (body.containsIgnoreCase("Reason:Rajhi Transfer")) return null
         if (body.containsIgnoreCase("Credit Transfer")) return null
         if (body.containsIgnoreCase("Credit Card:transfer")) return null
         if (body.containsIgnoreCase("Deposit:")) return null
@@ -90,6 +93,7 @@ object SmsParser {
             body.containsIgnoreCase("Credit Card:Payment") -> Kind.CREDIT_CARD_PAYMENT
             body.containsIgnoreCase("Withdrawal:ATM") -> Kind.CASH_WITHDRAWAL
             body.containsIgnoreCase("International Transfer") -> Kind.TRANSFER_OUT
+            body.containsIgnoreCase("Debit Internal Transfer") -> Kind.TRANSFER_OUT
             body.contains("Biller:", ignoreCase = true) -> Kind.BILLER
             body.containsIgnoreCase("Online Purchase") -> Kind.ONLINE_PURCHASE
             body.containsIgnoreCase("PoS") -> Kind.POS
@@ -115,15 +119,27 @@ object SmsParser {
     //   "Online Purchase Transaction Amount 57 SAR From: Jahez ..."
     //   "Online Purchase Transaction Amount 111.75 From: Ninja Retail ..."
     //   "Local Purchase Card: *6066; mada Pay Amount: 13 SAR At: ucoffe ..."
+    //   "Internal outward transfer Amount:150.00SAR To:AJMAL ANWAR ..."
+    //   "Notification: Refund Transaction: ATM Cashwithdrawal ..."
     //
     // Shapes we skip:
     //   OTPs (both "… is your OTP" and "Please use one time password")
-    //   "The transaction is not allowed…"
+    //   "The transaction is not allowed…" (declined)
+    //   "Adding money to account" (incoming own-account top-up)
+    //   "Pre-Auth" / "Pre-Auth void"  (temporary hold + reversal pair)
     private fun parseStcBank(body: String): ParsedSms? {
         if (body.containsIgnoreCase("is your OTP")) return null
         if (body.containsIgnoreCase("one time password")) return null
         if (body.containsIgnoreCase("not allowed")) return null
         if (body.containsIgnoreCase("Do not share")) return null
+        // Own-account credit (user sent cash from Al Rajhi). Noise, not
+        // spending; the outgoing leg is already rejected on the Al Rajhi
+        // side via "STC PAY".
+        if (body.containsIgnoreCase("Adding money to account")) return null
+        // Pre-authorisation holds (e.g. parking, fuel pump) are
+        // reversed automatically. Skipping both the auth and the void
+        // keeps the ledger consistent without a net-zero pair.
+        if (body.containsIgnoreCase("Pre-Auth")) return null
 
         val kind = when {
             body.containsIgnoreCase("Online Purchase Transaction") -> Kind.ONLINE_PURCHASE
@@ -136,13 +152,22 @@ object SmsParser {
             // physical — in practice VISA Purchase through an app or
             // subscription service is always "online".
             body.containsIgnoreCase("VISA Purchase") -> Kind.ONLINE_PURCHASE
+            body.containsIgnoreCase("Internal outward transfer") -> Kind.TRANSFER_OUT
+            body.containsIgnoreCase("Notification: Refund") -> Kind.REFUND
             else -> return null
         }
 
         val extracted = extractStcAmount(body) ?: return null
         val (originalAmount, rawCurrency) = extracted
         val originalCurrency = canonicalizeCurrency(rawCurrency)
-        val merchant = STC_FROM_RE.find(body)?.groupValues?.get(1)?.trim()
+        // Transfers use "To:<recipient name>"; refunds identify the
+        // reversed transaction with "Transaction:<kind>". Everything
+        // else uses From:/At:.
+        val merchant = when (kind) {
+            Kind.TRANSFER_OUT -> STC_TO_RE.find(body)?.groupValues?.get(1)?.trim()
+            Kind.REFUND -> STC_TRANSACTION_RE.find(body)?.groupValues?.get(1)?.trim()
+            else -> null
+        } ?: STC_FROM_RE.find(body)?.groupValues?.get(1)?.trim()
             ?: STC_AT_RE.find(body)?.groupValues?.get(1)?.trim()
         return ParsedSms(
             bank = Bank.STC,
@@ -212,8 +237,12 @@ object SmsParser {
     //   group 2 = currency code (empty when the SMS omitted it — STC
     //              occasionally sends "Amount 111.75" with no suffix;
     //              callers default that to SAR).
+    //
+    // Separator class `[:\s]+` covers every STC variant seen in the
+    // wild: "Amount 57 SAR", "Amount: 13 SAR", and the transfer
+    // shape's space-less "Amount:150.00SAR".
     private val STC_AMOUNT_RE = Regex(
-        """Amount\s*:?\s+([\d,]+(?:\.\d+)?)\s*([A-Z]{2,4})?""",
+        """Amount[:\s]+([\d,]+(?:\.\d+)?)\s*([A-Z]{2,4})?""",
         RegexOption.IGNORE_CASE,
     )
     private val AL_RAJHI_MERCHANT_RE = Regex(
@@ -243,6 +272,19 @@ object SmsParser {
     )
     private val STC_AT_RE = Regex(
         """At\s*:\s*([^\r\n]+)""",
+        RegexOption.IGNORE_CASE,
+    )
+    // Transfer recipient name. "Acc:xxxx*" lines follow and must not
+    // win — negative lookahead excludes the all-digits variant.
+    private val STC_TO_RE = Regex(
+        """To\s*:\s*(?!\d+\s*$)([^\r\n]+)""",
+        RegexOption.IGNORE_CASE,
+    )
+    // Refund shape carries "Transaction:ATM Cashwithdrawal" (or
+    // similar) to describe what was reversed — surface it as the
+    // "merchant" so the UI can render a sensible label.
+    private val STC_TRANSACTION_RE = Regex(
+        """Transaction\s*:\s*([^\r\n]+)""",
         RegexOption.IGNORE_CASE,
     )
 }

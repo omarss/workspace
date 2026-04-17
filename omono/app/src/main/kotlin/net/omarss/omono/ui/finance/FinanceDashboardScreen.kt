@@ -502,13 +502,14 @@ private fun RecentTransactionsCard(rows: List<RecentRow>) {
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
-                        val amountColor = if (row.kind == Transaction.Kind.TRANSFER_OUT) {
-                            MaterialTheme.colorScheme.secondary
-                        } else {
-                            MaterialTheme.colorScheme.onSurface
+                        val amountColor = when (row.kind) {
+                            Transaction.Kind.TRANSFER_OUT -> MaterialTheme.colorScheme.secondary
+                            Transaction.Kind.REFUND -> Color(0xFF10B981) // emerald — money back in
+                            else -> MaterialTheme.colorScheme.onSurface
                         }
+                        val amountText = formatAmount(row.amountSar, row.originalAmount, row.originalCurrency)
                         Text(
-                            text = formatAmount(row.amountSar, row.originalAmount, row.originalCurrency),
+                            text = if (row.kind == Transaction.Kind.REFUND) "+$amountText" else amountText,
                             style = MaterialTheme.typography.bodyMedium,
                             color = amountColor,
                         )
@@ -527,6 +528,7 @@ private fun kindLabel(kind: Transaction.Kind): String = when (kind) {
     Transaction.Kind.CREDIT_CARD_PAYMENT -> "Credit card payment"
     Transaction.Kind.GOVT_PAYMENT -> "Government payment"
     Transaction.Kind.TRANSFER_OUT -> "Transfer out"
+    Transaction.Kind.REFUND -> "Refund"
 }
 
 private fun bankLabel(bank: Transaction.Bank): String = when (bank) {

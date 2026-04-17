@@ -15,8 +15,26 @@ import javax.inject.Singleton
 // Pure formatter for the notification summary line. Lives at file
 // scope so tests can lock in the exact wording without spinning up
 // the feature's Android dependencies.
-internal fun formatSpendingSummary(totals: SpendingTotals): String =
-    "Today SAR %,.0f · Month SAR %,.0f".format(totals.todaySar, totals.monthSar)
+//
+// Renders a ▲ / ▼ glyph next to each headline when we have a benchmark
+// to compare against (today vs. rolling daily average, month vs. last
+// month through the same day-of-month). No glyph when the benchmark is
+// zero — early-month or first-time users shouldn't see misleading
+// signals from an empty history.
+internal fun formatSpendingSummary(totals: SpendingTotals): String {
+    val todayMark = trendGlyph(totals.todaySar, totals.dailyAverageSar)
+    val monthMark = trendGlyph(totals.monthSar, totals.lastMonthToDateSar)
+    return "Today SAR %,.0f%s · Month SAR %,.0f%s".format(
+        totals.todaySar, todayMark,
+        totals.monthSar, monthMark,
+    )
+}
+
+private fun trendGlyph(actual: Double, benchmark: Double): String = when {
+    benchmark <= 0.0 -> ""
+    actual > benchmark -> " ▲"
+    else -> " ▼"
+}
 
 @Singleton
 class SpendingFeature @Inject constructor(

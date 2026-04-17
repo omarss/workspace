@@ -155,14 +155,45 @@ class SmsParserTest {
     }
 
     @Test
-    fun `transfer_out kind is NOT a purchase`() {
+    fun `transfer_out and refund kinds are NOT purchases`() {
         Transaction.Kind.TRANSFER_OUT.isPurchase shouldBe false
+        Transaction.Kind.REFUND.isPurchase shouldBe false
         Transaction.Kind.POS.isPurchase shouldBe true
         Transaction.Kind.ONLINE_PURCHASE.isPurchase shouldBe true
         Transaction.Kind.BILLER.isPurchase shouldBe true
         Transaction.Kind.CASH_WITHDRAWAL.isPurchase shouldBe true
         Transaction.Kind.CREDIT_CARD_PAYMENT.isPurchase shouldBe true
         Transaction.Kind.GOVT_PAYMENT.isPurchase shouldBe true
+    }
+
+    @Test
+    fun `alrajhi debit internal transfer is captured as transfer_out with recipient`() {
+        // These are genuine P2P transfers to another person within the
+        // same bank — the recipient name is the identifying field.
+        // Previously hard-rejected as if they were own-account moves.
+        val body = """
+            Debit Internal Transfer
+            From:7131
+            Amount:SR 1000
+            To:MOHMMAD OSEMI
+            To:8567
+            26/4/17 11:11
+        """.trimIndent()
+        val parsed = SmsParser.parse("AlRajhiBank", body)
+        parsed.shouldNotBeNull()
+        parsed.kind shouldBe Transaction.Kind.TRANSFER_OUT
+        parsed.originalAmount shouldBe 1000.0
+        parsed.merchant shouldBe "MOHMMAD OSEMI"
+    }
+
+    @Test
+    fun `alrajhi rajhi transfer otp is ignored`() {
+        val body = """
+            OTP Code:4705
+            Reason:Rajhi Transfer - Mobile App
+            Amount:1,000.00 SAR
+        """.trimIndent()
+        SmsParser.parse("AlRajhiBank", body).shouldBeNull()
     }
 
     // ── AlRajhi: rejects ───────────────────────────────────────────────
@@ -205,16 +236,6 @@ class SmsParserTest {
             Amount:SAR 11284.24
             To:5344
             13/4/26 09:18
-        """.trimIndent()
-        SmsParser.parse("AlRajhiBank", body).shouldBeNull()
-    }
-
-    @Test
-    fun `alrajhi internal transfer is ignored`() {
-        val body = """
-            Debit Internal Transfer
-            From:7131
-            Amount:SAR 3000
         """.trimIndent()
         SmsParser.parse("AlRajhiBank", body).shouldBeNull()
     }
@@ -366,6 +387,41 @@ class SmsParserTest {
         parsed.merchant shouldBe "ucoffe"
     }
 
+    @Test
+    fun `stc internal outward transfer is captured as transfer_out`() {
+        // "Amount:150.00SAR" has no space between the colon and digits —
+        // the amount regex must handle that despite every other shape
+        // having either a space or a separate line.
+        val body = """
+            Internal outward transfer
+            Amount:150.00SAR
+            To:AJMAL ANWAR
+            Acc:0723*
+            At:18/03/26 01:57
+        """.trimIndent()
+        val parsed = SmsParser.parse("STC Bank", body)
+        parsed.shouldNotBeNull()
+        parsed.kind shouldBe Transaction.Kind.TRANSFER_OUT
+        parsed.originalAmount shouldBe 150.0
+        parsed.merchant shouldBe "AJMAL ANWAR"
+    }
+
+    @Test
+    fun `stc notification refund is captured as refund`() {
+        val body = """
+            Notification: Refund
+            Transaction: ATM Cashwithdrawal
+            Card: ***6066
+            Amount: 1 SAR
+            Date: 25/02/26 16:36
+        """.trimIndent()
+        val parsed = SmsParser.parse("STC Bank", body)
+        parsed.shouldNotBeNull()
+        parsed.kind shouldBe Transaction.Kind.REFUND
+        parsed.originalAmount shouldBe 1.0
+        parsed.merchant shouldBe "ATM Cashwithdrawal"
+    }
+
     // ── STC Bank: rejects ──────────────────────────────────────────────
 
     @Test
@@ -396,6 +452,45 @@ class SmsParserTest {
             "STC Bank",
             "The transaction is not allowed. You can change the card setting through the app.",
         ).shouldBeNull()
+    }
+
+    @Test
+    fun `stc adding money to account is ignored as own account credit`() {
+        // This is the inbound leg of a user-initiated top-up from their
+        // Al Rajhi account. The outgoing leg is already filtered on the
+        // Al Rajhi side (Service:STC PAY); keeping the inbound out
+        // prevents it from looking like spending.
+        val body = """
+            Adding money to account
+            Amount: 800.00 SAR
+            Via: *1865
+            At: 11/04/26 07:06
+        """.trimIndent()
+        SmsParser.parse("STC Bank", body).shouldBeNull()
+    }
+
+    @Test
+    fun `stc pos pre-auth is ignored`() {
+        val body = """
+            POS Pre-Auth Transaction
+            Amount: 1 SAR
+            At: Jenny
+            mada card ***6066 (Mada)
+            24/02/26 04:40
+        """.trimIndent()
+        SmsParser.parse("STC Bank", body).shouldBeNull()
+    }
+
+    @Test
+    fun `stc online pre-auth void is ignored`() {
+        val body = """
+            Online Pre-Auth void
+            Amount: 1.00 SAR
+            At: Jenny
+            mada card ***6066 (Mada)
+            24/02/26 04:40
+        """.trimIndent()
+        SmsParser.parse("STC Bank", body).shouldBeNull()
     }
 
     // ── Unknown senders ────────────────────────────────────────────────

@@ -17,6 +17,11 @@ data class SpendingTotals(
     // headline.
     val monthTransfersSar: Double = 0.0,
     val monthTransfersCount: Int = 0,
+    // Refund totals — money reversed back into the account. Tracked
+    // alongside purchases so the UI can show net spending without
+    // polluting the per-category breakdown.
+    val monthRefundsSar: Double = 0.0,
+    val monthRefundsCount: Int = 0,
     // Benchmarks used to drive the pace indicators on the dashboard.
     //   lastMonthToDateSar — purchases from last month's 1st through the
     //     same day-of-month as today (capped at last month's length).
@@ -39,6 +44,8 @@ data class SpendingTotals(
             monthByCategory = emptyMap(),
             monthTransfersSar = 0.0,
             monthTransfersCount = 0,
+            monthRefundsSar = 0.0,
+            monthRefundsCount = 0,
             lastMonthToDateSar = 0.0,
             dailyAverageSar = 0.0,
         )
@@ -79,6 +86,8 @@ fun computeTotals(
     var monthCount = 0
     var monthTransferSum = 0.0
     var monthTransferCount = 0
+    var monthRefundSum = 0.0
+    var monthRefundCount = 0
     var lastMonthToDateSum = 0.0
     var rolling30Sum = 0.0
     val monthByCategory = mutableMapOf<SpendingCategory, Double>()
@@ -104,6 +113,11 @@ fun computeTotals(
                     todayCount += 1
                 }
             }
+        } else if (tx.kind == Transaction.Kind.REFUND) {
+            if (inMonth) {
+                monthRefundSum += tx.amountSar
+                monthRefundCount += 1
+            }
         } else if (inMonth) {
             monthTransferSum += tx.amountSar
             monthTransferCount += 1
@@ -117,6 +131,8 @@ fun computeTotals(
         monthByCategory = monthByCategory,
         monthTransfersSar = monthTransferSum,
         monthTransfersCount = monthTransferCount,
+        monthRefundsSar = monthRefundSum,
+        monthRefundsCount = monthRefundCount,
         lastMonthToDateSar = lastMonthToDateSum,
         dailyAverageSar = rolling30Sum / 30.0,
     )

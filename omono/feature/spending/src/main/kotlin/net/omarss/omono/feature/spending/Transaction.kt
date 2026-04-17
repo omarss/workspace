@@ -56,9 +56,19 @@ data class Transaction(
          * inflate the "spending" headline.
          */
         TRANSFER_OUT,
+
+        /**
+         * Refund / reversal posted back to the account. Subtracted
+         * from the month's purchase total so the headline reflects
+         * the net outflow, and surfaced in its own UI row so the
+         * user can see where the money came back from.
+         */
+        REFUND,
     }
 }
 
-// Everything except outgoing transfers counts toward the purchase total.
+// True when the transaction drives the purchase total up; refunds and
+// transfers are tracked on their own ledger instead. Refunds reduce the
+// purchase total via a separate net calculation — they do not inflate it.
 val Transaction.Kind.isPurchase: Boolean
-    get() = this != Transaction.Kind.TRANSFER_OUT
+    get() = this != Transaction.Kind.TRANSFER_OUT && this != Transaction.Kind.REFUND
