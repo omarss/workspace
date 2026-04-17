@@ -62,6 +62,7 @@ class FinanceDashboardViewModel @Inject constructor(
 
     private suspend fun render() {
         val budget = settings.monthlyBudgetSar.first()
+        val categoryBudgets = settings.categoryBudgets.first()
         val current = YearMonth.now(zone)
         val isCurrent = selectedMonth == current
         val totals = if (isCurrent) {
@@ -70,6 +71,7 @@ class FinanceDashboardViewModel @Inject constructor(
             computeTotalsForMonth(transactionsCache, selectedMonth, zone)
         }
         val inSelectedMonth = transactionsCache.filterIn(selectedMonth, zone)
+        val projectedMonthSar = if (isCurrent) projectMonthEnd(totals.monthSar) else 0.0
 
         _uiState.value = FinanceDashboardUiState(
             ready = true,
@@ -78,18 +80,40 @@ class FinanceDashboardViewModel @Inject constructor(
             isCurrentMonth = isCurrent,
             todaySar = totals.todaySar,
             monthSar = totals.monthSar,
+            projectedMonthSar = projectedMonthSar,
             monthTransfersSar = totals.monthTransfersSar,
             monthRefundsSar = totals.monthRefundsSar,
             monthCount = totals.monthCount,
             lastMonthToDateSar = totals.lastMonthToDateSar,
             dailyAverageSar = totals.dailyAverageSar,
             budgetSar = budget,
-            categoryBreakdown = buildCategoryRows(totals.monthByCategory, totals.monthSar),
+            categoryBreakdown = buildCategoryRows(
+                totals.monthByCategory, totals.monthSar, categoryBudgets,
+            ),
             topMerchants = buildTopMerchants(inSelectedMonth),
             bills = buildBills(inSelectedMonth),
             transfers = buildTransfers(inSelectedMonth),
             recent = buildRecent(transactionsCache),
         )
+    }
+
+    fun setCategoryBudget(category: SpendingCategory, valueSar: Double) {
+        viewModelScope.launch {
+            settings.setCategoryBudget(category, valueSar)
+            render()
+        }
+    }
+
+    // Linear projection: extrapolate today's accumulated spend to the
+    // end of the month assuming the same daily rate. Refuses to project
+    // in the first two days because a single day's spending biases the
+    // number into the absurd (one Jahez lunch × 30 is not a forecast).
+    private fun projectMonthEnd(monthSar: Double): Double {
+        val today = java.time.LocalDate.now(zone)
+        val dayOfMonth = today.dayOfMonth
+        val daysInMonth = today.lengthOfMonth()
+        if (dayOfMonth < 2 || monthSar <= 0.0) return 0.0
+        return monthSar * daysInMonth / dayOfMonth
     }
 
     // A fixed six-month rolling window ending at the current month. The
@@ -101,15 +125,23 @@ class FinanceDashboardViewModel @Inject constructor(
     private fun buildCategoryRows(
         byCategory: Map<SpendingCategory, Double>,
         monthSar: Double,
-    ): List<CategoryRow> = byCategory.entries
-        .sortedByDescending { it.value }
-        .map { (category, amount) ->
+        categoryBudgets: Map<SpendingCategory, Double>,
+    ): List<CategoryRow> {
+        // Show every category that has spending OR a configured budget,
+        // so a budgeted-but-unspent category still appears (with zero
+        // spend) as a reminder that the budget exists.
+        val categories = byCategory.keys + categoryBudgets.keys
+        return categories.map { category ->
+            val amount = byCategory[category] ?: 0.0
+            val budget = categoryBudgets[category] ?: 0.0
             CategoryRow(
                 category = category,
                 amountSar = amount,
+                budgetSar = budget,
                 share = if (monthSar > 0) (amount / monthSar).toFloat() else 0f,
             )
-        }
+        }.sortedByDescending { it.amountSar }
+    }
 
     private fun buildTopMerchants(thisMonth: List<Transaction>): List<MerchantRow> {
         val purchases = thisMonth.filter { it.kind.isPurchaseForUi() }
@@ -234,6 +266,7 @@ data class FinanceDashboardUiState(
     val isCurrentMonth: Boolean = true,
     val todaySar: Double = 0.0,
     val monthSar: Double = 0.0,
+    val projectedMonthSar: Double = 0.0,
     val monthTransfersSar: Double = 0.0,
     val monthRefundsSar: Double = 0.0,
     val monthCount: Int = 0,
@@ -288,8 +321,21 @@ enum class SpendTrend {
 data class CategoryRow(
     val category: SpendingCategory,
     val amountSar: Double,
+    val budgetSar: Double,
     val share: Float,
-)
+) {
+    // Fraction 0..1 for the budget progress bar; 0 when no budget is
+    // set. >1.0 (over-budget) is clamped before rendering.
+    val budgetProgress: Float
+        get() = if (budgetSar > 0.0) {
+            (amountSar / budgetSar).toFloat().coerceIn(0f, 1f)
+        } else 0f
+
+    val overBudget: Boolean
+        get() = budgetSar > 0.0 && amountSar > budgetSar
+
+    val hasBudget: Boolean get() = budgetSar > 0.0
+}
 
 data class MerchantRow(
     val merchant: String,

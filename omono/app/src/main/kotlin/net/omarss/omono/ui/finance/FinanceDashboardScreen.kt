@@ -2,6 +2,7 @@ package net.omarss.omono.ui.finance
 
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -20,6 +21,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -28,10 +30,15 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -39,6 +46,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import net.omarss.omono.feature.spending.SpendingCategory
 import net.omarss.omono.feature.spending.Transaction
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
@@ -52,6 +60,22 @@ fun FinanceDashboardRoute(
     viewModel: FinanceDashboardViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    var editingBudget by remember { mutableStateOf<SpendingCategory?>(null) }
+
+    editingBudget?.let { category ->
+        val existing = state.categoryBreakdown
+            .firstOrNull { it.category == category }
+            ?.budgetSar ?: 0.0
+        CategoryBudgetDialog(
+            category = category,
+            currentSar = existing,
+            onSave = { amount ->
+                viewModel.setCategoryBudget(category, amount)
+                editingBudget = null
+            },
+            onDismiss = { editingBudget = null },
+        )
+    }
 
     Column(
         modifier = Modifier
@@ -99,7 +123,10 @@ fun FinanceDashboardRoute(
             SummaryCard(state)
             BudgetCard(state)
             if (state.categoryBreakdown.isNotEmpty()) {
-                CategoryBreakdownCard(state.categoryBreakdown)
+                CategoryBreakdownCard(
+                    rows = state.categoryBreakdown,
+                    onEditBudget = { editingBudget = it },
+                )
             }
             if (state.topMerchants.isNotEmpty()) {
                 TopMerchantsCard(state.topMerchants)
@@ -155,6 +182,50 @@ private fun MonthChipRow(
 
 private val MONTH_CHIP_FMT: DateTimeFormatter =
     DateTimeFormatter.ofPattern("MMM yyyy", Locale.getDefault())
+
+// Per-category budget editor. An empty amount clears the budget so
+// the row falls back to share-only display.
+@Composable
+private fun CategoryBudgetDialog(
+    category: SpendingCategory,
+    currentSar: Double,
+    onSave: (Double) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var text by remember {
+        mutableStateOf(if (currentSar > 0.0) "%.0f".format(currentSar) else "")
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Budget for ${category.label}") },
+        text = {
+            Column {
+                Text(
+                    "Monthly limit in SAR for this category. " +
+                        "Leave empty to remove the budget.",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Spacer(Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = text,
+                    onValueChange = { new ->
+                        text = new.filter { it.isDigit() || it == '.' }
+                    },
+                    label = { Text("SAR") },
+                    singleLine = true,
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onSave(text.toDoubleOrNull() ?: 0.0) }) {
+                Text("Save")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        },
+    )
+}
 
 @Composable
 private fun SummaryCard(state: FinanceDashboardUiState) {
@@ -212,6 +283,13 @@ private fun SummaryCard(state: FinanceDashboardUiState) {
                         modifier = Modifier.padding(start = 8.dp),
                     )
                 }
+            }
+            if (state.projectedMonthSar > 0.0) {
+                Text(
+                    text = "On pace for SAR %,.0f by month-end".format(state.projectedMonthSar),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.White.copy(alpha = 0.85f),
+                )
             }
             if (state.monthRefundsSar > 0.0) {
                 Text(
@@ -300,7 +378,10 @@ private fun BudgetCard(state: FinanceDashboardUiState) {
 }
 
 @Composable
-private fun CategoryBreakdownCard(rows: List<CategoryRow>) {
+private fun CategoryBreakdownCard(
+    rows: List<CategoryRow>,
+    onEditBudget: (SpendingCategory) -> Unit,
+) {
     Card(
         modifier = Modifier.fillMaxWidth().animateContentSize(),
         colors = CardDefaults.elevatedCardColors(
@@ -314,12 +395,18 @@ private fun CategoryBreakdownCard(rows: List<CategoryRow>) {
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(
-                text = "By category",
+                text = "By category · tap to set budget",
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             rows.forEach { row ->
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onEditBudget(row.category) }
+                        .padding(vertical = 2.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
@@ -329,18 +416,42 @@ private fun CategoryBreakdownCard(rows: List<CategoryRow>) {
                             style = MaterialTheme.typography.bodyMedium,
                             modifier = Modifier.weight(1f),
                         )
+                        val amountColor = when {
+                            row.overBudget -> MaterialTheme.colorScheme.error
+                            else -> MaterialTheme.colorScheme.onSurface
+                        }
+                        val amountText = if (row.hasBudget) {
+                            "SAR %,.0f / %,.0f".format(row.amountSar, row.budgetSar)
+                        } else {
+                            "SAR %,.0f".format(row.amountSar)
+                        }
                         Text(
-                            text = "SAR %,.0f".format(row.amountSar),
+                            text = amountText,
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurface,
+                            color = amountColor,
                         )
                     }
+                    // Share-of-month bar stays the same — this is the
+                    // "how big a slice of the month is this category"
+                    // signal. Budget tracking gets its own bar below.
                     LinearProgressIndicator(
                         progress = { row.share },
                         modifier = Modifier.fillMaxWidth(),
                         color = MaterialTheme.colorScheme.primary,
                         trackColor = MaterialTheme.colorScheme.surfaceVariant,
                     )
+                    if (row.hasBudget) {
+                        LinearProgressIndicator(
+                            progress = { row.budgetProgress },
+                            modifier = Modifier.fillMaxWidth(),
+                            color = if (row.overBudget) {
+                                MaterialTheme.colorScheme.error
+                            } else {
+                                Color(0xFF10B981) // emerald — distinct from the share bar
+                            },
+                            trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                        )
+                    }
                 }
             }
         }
