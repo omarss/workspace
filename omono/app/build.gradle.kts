@@ -30,8 +30,8 @@ android {
 
     defaultConfig {
         applicationId = "net.omarss.omono"
-        versionCode = 19
-        versionName = "0.14.1"
+        versionCode = 20
+        versionName = "0.15.0"
 
         buildConfigField("String", "TOMTOM_API_KEY", "\"${tomtomApiKey}\"")
     }
