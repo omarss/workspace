@@ -122,6 +122,9 @@ fun FinanceDashboardRoute(
             )
             SummaryCard(state)
             BudgetCard(state)
+            if (state.subscriptions.isNotEmpty()) {
+                SubscriptionsCard(state.subscriptions)
+            }
             if (state.categoryBreakdown.isNotEmpty()) {
                 CategoryBreakdownCard(
                     rows = state.categoryBreakdown,
@@ -182,6 +185,69 @@ private fun MonthChipRow(
 
 private val MONTH_CHIP_FMT: DateTimeFormatter =
     DateTimeFormatter.ofPattern("MMM yyyy", Locale.getDefault())
+
+// Lists detected recurring-merchant subscriptions with the next
+// expected renewal date and a running monthly total. Sorted by
+// soonest renewal, which is usually what the user cares about when
+// scanning for "what's about to hit my account".
+@Composable
+private fun SubscriptionsCard(rows: List<SubscriptionRow>) {
+    Card(
+        modifier = Modifier.fillMaxWidth().animateContentSize(),
+        colors = CardDefaults.elevatedCardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+        ),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            val total = rows.sumOf { it.amountSar }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "Subscriptions",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f),
+                )
+                Text(
+                    text = "SAR %,.0f / mo".format(total),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+            }
+            rows.forEachIndexed { index, row ->
+                if (index > 0) {
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = row.merchant,
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        Text(
+                            text = row.renewalLabel,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Text(
+                        text = "SAR %,.0f".format(row.amountSar),
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                }
+            }
+        }
+    }
+}
 
 // Per-category budget editor. An empty amount clears the budget so
 // the row falls back to share-only display.

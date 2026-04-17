@@ -12,9 +12,11 @@ import net.omarss.omono.feature.spending.MerchantCategorizer
 import net.omarss.omono.feature.spending.SpendingCategory
 import net.omarss.omono.feature.spending.SpendingRepository
 import net.omarss.omono.feature.spending.SpendingSettingsRepository
+import net.omarss.omono.feature.spending.Subscription
 import net.omarss.omono.feature.spending.Transaction
 import net.omarss.omono.feature.spending.computeTotals
 import net.omarss.omono.feature.spending.computeTotalsForMonth
+import net.omarss.omono.feature.spending.detectSubscriptions
 import java.text.SimpleDateFormat
 import java.time.Instant
 import java.time.YearMonth
@@ -72,6 +74,11 @@ class FinanceDashboardViewModel @Inject constructor(
         }
         val inSelectedMonth = transactionsCache.filterIn(selectedMonth, zone)
         val projectedMonthSar = if (isCurrent) projectMonthEnd(totals.monthSar) else 0.0
+        val subscriptions = if (isCurrent) {
+            buildSubscriptionRows(transactionsCache)
+        } else {
+            emptyList()
+        }
 
         _uiState.value = FinanceDashboardUiState(
             ready = true,
@@ -90,6 +97,7 @@ class FinanceDashboardViewModel @Inject constructor(
             categoryBreakdown = buildCategoryRows(
                 totals.monthByCategory, totals.monthSar, categoryBudgets,
             ),
+            subscriptions = subscriptions,
             topMerchants = buildTopMerchants(inSelectedMonth),
             bills = buildBills(inSelectedMonth),
             transfers = buildTransfers(inSelectedMonth),
@@ -141,6 +149,35 @@ class FinanceDashboardViewModel @Inject constructor(
                 share = if (monthSar > 0) (amount / monthSar).toFloat() else 0f,
             )
         }.sortedByDescending { it.amountSar }
+    }
+
+    // Turns detected subscriptions into UI-ready rows. The merchant
+    // key comes out of the detector already lowercased + trimmed —
+    // title-case it for display so "jahez" reads as "Jahez".
+    private fun buildSubscriptionRows(transactions: List<Transaction>): List<SubscriptionRow> {
+        val nowMs = System.currentTimeMillis()
+        val detected = detectSubscriptions(transactions, nowMs)
+        return detected.map { sub ->
+            SubscriptionRow(
+                merchant = sub.merchant.titleCase(),
+                amountSar = sub.amountSar,
+                renewalLabel = renewalLabel(sub, nowMs),
+            )
+        }
+    }
+
+    private fun renewalLabel(sub: Subscription, nowMs: Long): String {
+        val days = ((sub.nextRenewalAtMillis - nowMs) / (24L * 60 * 60 * 1000)).toInt()
+        return when {
+            days <= 0 -> "Renews today"
+            days == 1 -> "Renews tomorrow"
+            days < 7 -> "Renews in $days days"
+            else -> "Renews in ~${days / 7} wk"
+        }
+    }
+
+    private fun String.titleCase(): String = split(' ').joinToString(" ") { word ->
+        if (word.isEmpty()) word else word.replaceFirstChar(Char::uppercaseChar)
     }
 
     private fun buildTopMerchants(thisMonth: List<Transaction>): List<MerchantRow> {
@@ -274,6 +311,7 @@ data class FinanceDashboardUiState(
     val dailyAverageSar: Double = 0.0,
     val budgetSar: Double = 0.0,
     val categoryBreakdown: List<CategoryRow> = emptyList(),
+    val subscriptions: List<SubscriptionRow> = emptyList(),
     val topMerchants: List<MerchantRow> = emptyList(),
     val bills: List<BillRow> = emptyList(),
     val transfers: List<TransferRow> = emptyList(),
@@ -341,6 +379,12 @@ data class MerchantRow(
     val merchant: String,
     val amountSar: Double,
     val category: SpendingCategory,
+)
+
+data class SubscriptionRow(
+    val merchant: String,
+    val amountSar: Double,
+    val renewalLabel: String,
 )
 
 data class BillRow(
