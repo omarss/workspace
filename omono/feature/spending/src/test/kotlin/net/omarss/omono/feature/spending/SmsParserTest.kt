@@ -106,7 +106,12 @@ class SmsParserTest {
     }
 
     @Test
-    fun `alrajhi credit card payment is captured`() {
+    fun `alrajhi credit card payment is ignored as bank echo`() {
+        // Paired shape: every credit-card purchase arrives as a
+        // "Credit Card:Payment" SMS (bank auto-settling debit → card)
+        // immediately followed by a "PoS purchase" SMS at the merchant.
+        // Capturing both would show the user two lines for one real
+        // transaction — we keep the PoS purchase and drop this.
         val body = """
             Credit Card:Payment
             Card:Visa 4527
@@ -114,10 +119,26 @@ class SmsParserTest {
             Balance:220.1 SAR
             18/3/26 1:49
         """.trimIndent()
+        SmsParser.parse("AlRajhiBank", body).shouldBeNull()
+    }
+
+    @Test
+    fun `alrajhi pos purchase from credit card is still captured`() {
+        // The merchant-bearing sibling of the above pair — this is the
+        // real expense, complete with merchant name and amount.
+        val body = """
+            PoS purchase
+            Card:4527 ;Visa
+            At: Jahez
+            Amount:50 SAR
+            Balance: 0.3 SAR
+            17/4/26 14:25
+        """.trimIndent()
         val parsed = SmsParser.parse("AlRajhiBank", body)
         parsed.shouldNotBeNull()
-        parsed.originalAmount shouldBe 200.0
-        parsed.kind shouldBe Transaction.Kind.CREDIT_CARD_PAYMENT
+        parsed.kind shouldBe Transaction.Kind.POS
+        parsed.originalAmount shouldBe 50.0
+        parsed.merchant shouldBe "Jahez"
     }
 
     @Test
@@ -155,10 +176,9 @@ class SmsParserTest {
     }
 
     @Test
-    fun `transfer refund and credit card payment kinds are NOT purchases`() {
+    fun `transfer and refund kinds are NOT purchases`() {
         Transaction.Kind.TRANSFER_OUT.isPurchase shouldBe false
         Transaction.Kind.REFUND.isPurchase shouldBe false
-        Transaction.Kind.CREDIT_CARD_PAYMENT.isPurchase shouldBe false
         Transaction.Kind.POS.isPurchase shouldBe true
         Transaction.Kind.ONLINE_PURCHASE.isPurchase shouldBe true
         Transaction.Kind.BILLER.isPurchase shouldBe true

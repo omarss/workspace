@@ -149,22 +149,13 @@ class FinanceDashboardViewModel @Inject constructor(
 
     private fun buildTransfers(thisMonth: List<Transaction>): List<TransferRow> {
         val fmt = SimpleDateFormat("d MMM", Locale.getDefault())
-        // Both outgoing P2P transfers and own-card top-ups belong here:
-        // neither inflates the purchase headline, and both are "money
-        // out of the debit account" the user wants to see.
-        val kinds = setOf(Transaction.Kind.TRANSFER_OUT, Transaction.Kind.CREDIT_CARD_PAYMENT)
         return thisMonth
-            .filter { it.kind in kinds }
+            .filter { it.kind == Transaction.Kind.TRANSFER_OUT }
             .sortedByDescending { it.timestampMillis }
             .map { tx ->
-                val label = when (tx.kind) {
-                    Transaction.Kind.CREDIT_CARD_PAYMENT ->
-                        "Credit card top-up" + (tx.merchant?.let { " · $it" } ?: "")
-                    else -> tx.merchant ?: "Unknown recipient"
-                }
                 TransferRow(
                     id = "${tx.bank}-${tx.timestampMillis}-${tx.amountSar}",
-                    recipient = label,
+                    recipient = tx.merchant ?: "Unknown recipient",
                     date = fmt.format(tx.timestampMillis),
                     amountSar = tx.amountSar,
                     originalAmount = tx.originalAmount,
@@ -205,7 +196,6 @@ private fun List<Transaction>.filterIn(ym: YearMonth, zone: ZoneId): List<Transa
 // domain rule ever changes.
 private fun Transaction.Kind.isPurchaseForUi(): Boolean = when (this) {
     Transaction.Kind.TRANSFER_OUT,
-    Transaction.Kind.CREDIT_CARD_PAYMENT,
     Transaction.Kind.REFUND -> false
     else -> true
 }

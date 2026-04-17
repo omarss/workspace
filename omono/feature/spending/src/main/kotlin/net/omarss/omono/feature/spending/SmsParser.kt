@@ -33,7 +33,6 @@ object SmsParser {
     //   "PoS"                     → Kind.POS
     //   "Bill Payment" (Biller:)  → Kind.BILLER
     //   "MOI Payments"            → Kind.GOVT_PAYMENT
-    //   "Credit Card:Payment"     → Kind.CREDIT_CARD_PAYMENT
     //   "Withdrawal:ATM"          → Kind.CASH_WITHDRAWAL
     //   "International Transfer"  → Kind.TRANSFER_OUT
     //   "Debit Internal Transfer" → Kind.TRANSFER_OUT (P2P within Al Rajhi)
@@ -45,8 +44,14 @@ object SmsParser {
     //   Transfer Between Your Accounts (own-account)
     //   Rajhi Transfer (OTP-like — "Reason:Rajhi Transfer" on OTPs)
     //   Credit Transfer Local (incoming credit — salary / deposit)
-    //   Credit Card:transfer (own card → own account, duplicates Credit
-    //     Card:Payment accounting)
+    //   Credit Card:Payment (bank's echo of a PoS purchase — the same
+    //     money is already captured on the following "PoS purchase"
+    //     SMS a few seconds later; counting both would double-book,
+    //     surfacing only the Credit Card:Payment loses the merchant.
+    //     Edge case — an unmatched payment without a sibling PoS —
+    //     has always been immediately reversed by a Credit Card:transfer
+    //     in the observed data, so net zero either way.)
+    //   Credit Card:transfer (own card → own account reversal)
     //   Deposit:* (incoming)
     //   Dear (Customer|customer) (marketing)
     //   Your card ... MadaPay (admin, no amount)
@@ -69,6 +74,13 @@ object SmsParser {
         if (body.containsIgnoreCase("Credit Transfer")) return null
         if (body.containsIgnoreCase("Credit Card:transfer")) return null
         if (body.containsIgnoreCase("Deposit:")) return null
+        // Credit-card purchases arrive as a pair: a "Credit Card:Payment"
+        // SMS reporting the bank's auto-settle from checking → card,
+        // immediately followed by a "PoS purchase" SMS with the merchant
+        // and amount. The latter is the canonical expense; dropping the
+        // former removes the duplicate from Recent + Transfers without
+        // changing the headline total.
+        if (body.containsIgnoreCase("Credit Card:Payment")) return null
         if (body.containsIgnoreCase("Dear customer") || body.containsIgnoreCase("Dear Customer")) return null
         if (body.containsIgnoreCase("Your card") && body.containsIgnoreCase("MadaPay")) return null
         if (body.containsIgnoreCase("verification code")) return null
@@ -90,7 +102,6 @@ object SmsParser {
         // PoS ..." style text elsewhere.
         val kind = when {
             body.containsIgnoreCase("MOI Payments") -> Kind.GOVT_PAYMENT
-            body.containsIgnoreCase("Credit Card:Payment") -> Kind.CREDIT_CARD_PAYMENT
             body.containsIgnoreCase("Withdrawal:ATM") -> Kind.CASH_WITHDRAWAL
             body.containsIgnoreCase("International Transfer") -> Kind.TRANSFER_OUT
             body.containsIgnoreCase("Debit Internal Transfer") -> Kind.TRANSFER_OUT
@@ -199,10 +210,19 @@ object SmsParser {
     // so the caller (parseAlRajhi / parseStcBank) decides how to
     // convert into SAR and what to store as the "original" amount.
     private fun extractAlRajhiAmount(body: String): Pair<Double, String>? {
-        val match = AL_RAJHI_AMOUNT_RE.find(body) ?: return null
-        val currency = match.groupValues[1]
-        val amount = match.groupValues[2].replace(",", "").toDoubleOrNull() ?: return null
-        return amount to currency
+        AL_RAJHI_AMOUNT_CURR_FIRST.find(body)?.let { match ->
+            val currency = match.groupValues[1]
+            val amount = match.groupValues[2].replace(",", "").toDoubleOrNull()
+                ?: return null
+            return amount to currency
+        }
+        AL_RAJHI_AMOUNT_AMT_FIRST.find(body)?.let { match ->
+            val amount = match.groupValues[1].replace(",", "").toDoubleOrNull()
+                ?: return null
+            val currency = match.groupValues[2]
+            return amount to currency
+        }
+        return null
     }
 
     private fun extractStcAmount(body: String): Pair<Double, String>? {
@@ -224,11 +244,18 @@ object SmsParser {
         contains("STC Bank", ignoreCase = true) ||
             contains("STCBank", ignoreCase = true)
 
-    // AlRajhi shape: currency token precedes the number.
-    //   group 1 = currency code (SAR | SR | USD | EUR | …)
-    //   group 2 = numeric amount
-    private val AL_RAJHI_AMOUNT_RE = Regex(
+    // Al Rajhi has two amount shapes in the wild:
+    //   * debit/MOI/biller: "Amount:SAR 17"  — currency first
+    //   * credit-card PoS : "Amount:50 SAR" — amount first
+    // The extractor tries currency-first first; amount-first is the
+    // fallback so we don't accidentally match "Amount:SAR 17" as
+    // "17 [no currency]" with a leftover "SAR" elsewhere.
+    private val AL_RAJHI_AMOUNT_CURR_FIRST = Regex(
         """Amount\s*:\s*([A-Z]{2,4})\s+([\d,]+(?:\.\d+)?)""",
+        RegexOption.IGNORE_CASE,
+    )
+    private val AL_RAJHI_AMOUNT_AMT_FIRST = Regex(
+        """Amount\s*:\s*([\d,]+(?:\.\d+)?)\s+([A-Z]{2,4})""",
         RegexOption.IGNORE_CASE,
     )
 

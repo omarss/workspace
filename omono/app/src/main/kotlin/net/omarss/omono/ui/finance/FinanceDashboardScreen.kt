@@ -588,7 +588,6 @@ private fun kindLabel(kind: Transaction.Kind): String = when (kind) {
     Transaction.Kind.ONLINE_PURCHASE -> "Online purchase"
     Transaction.Kind.BILLER -> "Bill payment"
     Transaction.Kind.CASH_WITHDRAWAL -> "Cash withdrawal"
-    Transaction.Kind.CREDIT_CARD_PAYMENT -> "Credit card payment"
     Transaction.Kind.GOVT_PAYMENT -> "Government payment"
     Transaction.Kind.TRANSFER_OUT -> "Transfer out"
     Transaction.Kind.REFUND -> "Refund"
