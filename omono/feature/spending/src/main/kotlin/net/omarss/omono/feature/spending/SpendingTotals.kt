@@ -1,6 +1,7 @@
 package net.omarss.omono.feature.spending
 
 import java.time.Instant
+import java.time.YearMonth
 import java.time.ZoneId
 
 data class SpendingTotals(
@@ -135,5 +136,59 @@ fun computeTotals(
         monthRefundsCount = monthRefundCount,
         lastMonthToDateSar = lastMonthToDateSum,
         dailyAverageSar = rolling30Sum / 30.0,
+    )
+}
+
+// Aggregates purchases / transfers / refunds for an arbitrary calendar
+// month. The today-scoped and pace-benchmark fields don't apply to
+// historic months, so this variant leaves them at zero — the UI hides
+// the pace pill accordingly.
+fun computeTotalsForMonth(
+    transactions: List<Transaction>,
+    yearMonth: YearMonth,
+    zone: ZoneId,
+): SpendingTotals {
+    val startOfMonth = yearMonth.atDay(1).atStartOfDay(zone).toInstant().toEpochMilli()
+    val endExclusive = yearMonth.plusMonths(1).atDay(1)
+        .atStartOfDay(zone).toInstant().toEpochMilli()
+
+    var monthSum = 0.0
+    var monthCount = 0
+    var monthTransferSum = 0.0
+    var monthTransferCount = 0
+    var monthRefundSum = 0.0
+    var monthRefundCount = 0
+    val monthByCategory = mutableMapOf<SpendingCategory, Double>()
+    for (tx in transactions) {
+        if (tx.timestampMillis !in startOfMonth until endExclusive) continue
+        when {
+            tx.kind.isPurchase -> {
+                monthSum += tx.amountSar
+                monthCount += 1
+                val category = MerchantCategorizer.categorize(tx.merchant)
+                monthByCategory.merge(category, tx.amountSar) { a, b -> a + b }
+            }
+            tx.kind == Transaction.Kind.REFUND -> {
+                monthRefundSum += tx.amountSar
+                monthRefundCount += 1
+            }
+            else -> {
+                monthTransferSum += tx.amountSar
+                monthTransferCount += 1
+            }
+        }
+    }
+    return SpendingTotals(
+        todaySar = 0.0,
+        monthSar = monthSum,
+        todayCount = 0,
+        monthCount = monthCount,
+        monthByCategory = monthByCategory,
+        monthTransfersSar = monthTransferSum,
+        monthTransfersCount = monthTransferCount,
+        monthRefundsSar = monthRefundSum,
+        monthRefundsCount = monthRefundCount,
+        lastMonthToDateSar = 0.0,
+        dailyAverageSar = 0.0,
     )
 }

@@ -2,6 +2,7 @@ package net.omarss.omono.ui.finance
 
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,14 +13,16 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -37,6 +40,9 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import net.omarss.omono.feature.spending.Transaction
+import java.time.YearMonth
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -85,6 +91,11 @@ fun FinanceDashboardRoute(
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
+            MonthChipRow(
+                months = state.availableMonths,
+                selected = state.selectedMonth,
+                onSelect = viewModel::selectMonth,
+            )
             SummaryCard(state)
             BudgetCard(state)
             if (state.categoryBreakdown.isNotEmpty()) {
@@ -107,6 +118,44 @@ fun FinanceDashboardRoute(
     }
 }
 
+// Horizontal chip row listing the last N months, newest on the left.
+// Tapping a month re-aggregates totals against that window. Current
+// month shows an extra marker so the user can eyeball which row drives
+// today/daily-average/pace-vs-last-month — pace pills disappear when a
+// non-current month is selected.
+@Composable
+private fun MonthChipRow(
+    months: List<YearMonth>,
+    selected: YearMonth,
+    onSelect: (YearMonth) -> Unit,
+) {
+    if (months.isEmpty()) return
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        val current = YearMonth.now()
+        months.forEach { ym ->
+            val label = when (ym) {
+                current -> "This month"
+                current.minusMonths(1) -> "Last month"
+                else -> ym.format(MONTH_CHIP_FMT)
+            }
+            FilterChip(
+                selected = ym == selected,
+                onClick = { onSelect(ym) },
+                label = { Text(label) },
+                colors = FilterChipDefaults.filterChipColors(),
+            )
+        }
+    }
+}
+
+private val MONTH_CHIP_FMT: DateTimeFormatter =
+    DateTimeFormatter.ofPattern("MMM yyyy", Locale.getDefault())
+
 @Composable
 private fun SummaryCard(state: FinanceDashboardUiState) {
     val gradientColors = listOf(
@@ -127,7 +176,7 @@ private fun SummaryCard(state: FinanceDashboardUiState) {
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Text(
-                text = "This month",
+                text = if (state.isCurrentMonth) "This month" else state.selectedMonth.format(MONTH_CHIP_FMT),
                 style = MaterialTheme.typography.labelLarge,
                 color = Color.White.copy(alpha = 0.8f),
             )
@@ -145,16 +194,30 @@ private fun SummaryCard(state: FinanceDashboardUiState) {
                 )
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
+                val subtitle = if (state.isCurrentMonth) {
+                    "${state.monthCount} purchases · Today SAR %,.0f".format(state.todaySar)
+                } else {
+                    "${state.monthCount} purchases"
+                }
                 Text(
-                    text = "${state.monthCount} purchases · Today SAR %,.0f".format(state.todaySar),
+                    text = subtitle,
                     style = MaterialTheme.typography.bodyMedium,
                     color = Color.White.copy(alpha = 0.8f),
                 )
-                TrendPill(
-                    trend = state.dayTrend,
-                    actual = state.todaySar,
-                    benchmark = state.dailyAverageSar,
-                    modifier = Modifier.padding(start = 8.dp),
+                if (state.isCurrentMonth) {
+                    TrendPill(
+                        trend = state.dayTrend,
+                        actual = state.todaySar,
+                        benchmark = state.dailyAverageSar,
+                        modifier = Modifier.padding(start = 8.dp),
+                    )
+                }
+            }
+            if (state.monthRefundsSar > 0.0) {
+                Text(
+                    text = "+ SAR %,.0f refunded".format(state.monthRefundsSar),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color(0xFFA7F3D0), // emerald 200 — reads on indigo→violet gradient
                 )
             }
         }

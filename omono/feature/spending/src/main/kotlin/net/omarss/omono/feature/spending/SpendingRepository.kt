@@ -140,9 +140,9 @@ class SpendingRepository @Inject constructor(
         }
 
     private companion object {
-        // ~70 days covers the worst case for the "same day last month"
-        // benchmark — if today is the 31st of a 31-day month, last
-        // month's 1st is ~61 days ago. 70 leaves a small margin.
-        const val LOOKBACK_MILLIS: Long = 70L * 24 * 60 * 60 * 1000
+        // ~6 months of history so the finance dashboard can offer a
+        // month picker for comparison. SMS inbox queries are cheap and
+        // even 6 months of transactions parse in ≈10 ms on-device.
+        const val LOOKBACK_MILLIS: Long = 180L * 24 * 60 * 60 * 1000
     }
 }

@@ -14,8 +14,10 @@ import net.omarss.omono.feature.spending.SpendingRepository
 import net.omarss.omono.feature.spending.SpendingSettingsRepository
 import net.omarss.omono.feature.spending.Transaction
 import net.omarss.omono.feature.spending.computeTotals
+import net.omarss.omono.feature.spending.computeTotalsForMonth
 import java.text.SimpleDateFormat
 import java.time.Instant
+import java.time.YearMonth
 import java.time.ZoneId
 import java.util.Locale
 import javax.inject.Inject
@@ -25,6 +27,14 @@ class FinanceDashboardViewModel @Inject constructor(
     private val repository: SpendingRepository,
     private val settings: SpendingSettingsRepository,
 ) : ViewModel() {
+
+    private val zone = ZoneId.systemDefault()
+
+    // Cached raw transactions so switching months doesn't need to
+    // re-query the SMS inbox — a month toggle just re-aggregates the
+    // in-memory list.
+    private var transactionsCache: List<Transaction> = emptyList()
+    private var selectedMonth: YearMonth = YearMonth.now(zone)
 
     private val _uiState = MutableStateFlow(FinanceDashboardUiState())
     val uiState: StateFlow<FinanceDashboardUiState> = _uiState.asStateFlow()
@@ -39,32 +49,54 @@ class FinanceDashboardViewModel @Inject constructor(
                 _uiState.value = FinanceDashboardUiState(error = "SMS access needed")
                 return@launch
             }
-            val transactions = repository.recentTransactions()
-            val totals = computeTotals(
-                transactions = transactions,
-                now = Instant.now(),
-                zone = ZoneId.systemDefault(),
-            )
-            val budget = settings.monthlyBudgetSar.first()
-            val thisMonth = transactions.filterInThisMonth()
-
-            _uiState.value = FinanceDashboardUiState(
-                ready = true,
-                todaySar = totals.todaySar,
-                monthSar = totals.monthSar,
-                monthTransfersSar = totals.monthTransfersSar,
-                monthCount = totals.monthCount,
-                lastMonthToDateSar = totals.lastMonthToDateSar,
-                dailyAverageSar = totals.dailyAverageSar,
-                budgetSar = budget,
-                categoryBreakdown = buildCategoryRows(totals.monthByCategory, totals.monthSar),
-                topMerchants = buildTopMerchants(thisMonth),
-                bills = buildBills(thisMonth),
-                transfers = buildTransfers(thisMonth),
-                recent = buildRecent(transactions),
-            )
+            transactionsCache = repository.recentTransactions()
+            render()
         }
     }
+
+    fun selectMonth(month: YearMonth) {
+        if (month == selectedMonth) return
+        selectedMonth = month
+        viewModelScope.launch { render() }
+    }
+
+    private suspend fun render() {
+        val budget = settings.monthlyBudgetSar.first()
+        val current = YearMonth.now(zone)
+        val isCurrent = selectedMonth == current
+        val totals = if (isCurrent) {
+            computeTotals(transactionsCache, Instant.now(), zone)
+        } else {
+            computeTotalsForMonth(transactionsCache, selectedMonth, zone)
+        }
+        val inSelectedMonth = transactionsCache.filterIn(selectedMonth, zone)
+
+        _uiState.value = FinanceDashboardUiState(
+            ready = true,
+            selectedMonth = selectedMonth,
+            availableMonths = buildAvailableMonths(current),
+            isCurrentMonth = isCurrent,
+            todaySar = totals.todaySar,
+            monthSar = totals.monthSar,
+            monthTransfersSar = totals.monthTransfersSar,
+            monthRefundsSar = totals.monthRefundsSar,
+            monthCount = totals.monthCount,
+            lastMonthToDateSar = totals.lastMonthToDateSar,
+            dailyAverageSar = totals.dailyAverageSar,
+            budgetSar = budget,
+            categoryBreakdown = buildCategoryRows(totals.monthByCategory, totals.monthSar),
+            topMerchants = buildTopMerchants(inSelectedMonth),
+            bills = buildBills(inSelectedMonth),
+            transfers = buildTransfers(inSelectedMonth),
+            recent = buildRecent(transactionsCache),
+        )
+    }
+
+    // A fixed six-month rolling window ending at the current month. The
+    // underlying SMS store only holds ~180 days of history, so anything
+    // older just renders as empty totals rather than going missing.
+    private fun buildAvailableMonths(current: YearMonth): List<YearMonth> =
+        (0 until 6).map { current.minusMonths(it.toLong()) }
 
     private fun buildCategoryRows(
         byCategory: Map<SpendingCategory, Double>,
@@ -80,7 +112,7 @@ class FinanceDashboardViewModel @Inject constructor(
         }
 
     private fun buildTopMerchants(thisMonth: List<Transaction>): List<MerchantRow> {
-        val purchases = thisMonth.filter { it.kind != Transaction.Kind.TRANSFER_OUT }
+        val purchases = thisMonth.filter { it.kind.isPurchaseForUi() }
         val bucketed = purchases
             .groupBy { (it.merchant ?: "Unknown").trim() }
             .mapValues { (_, list) -> list.sumOf { it.amountSar } }
@@ -117,13 +149,22 @@ class FinanceDashboardViewModel @Inject constructor(
 
     private fun buildTransfers(thisMonth: List<Transaction>): List<TransferRow> {
         val fmt = SimpleDateFormat("d MMM", Locale.getDefault())
+        // Both outgoing P2P transfers and own-card top-ups belong here:
+        // neither inflates the purchase headline, and both are "money
+        // out of the debit account" the user wants to see.
+        val kinds = setOf(Transaction.Kind.TRANSFER_OUT, Transaction.Kind.CREDIT_CARD_PAYMENT)
         return thisMonth
-            .filter { it.kind == Transaction.Kind.TRANSFER_OUT }
+            .filter { it.kind in kinds }
             .sortedByDescending { it.timestampMillis }
             .map { tx ->
+                val label = when (tx.kind) {
+                    Transaction.Kind.CREDIT_CARD_PAYMENT ->
+                        "Credit card top-up" + (tx.merchant?.let { " · $it" } ?: "")
+                    else -> tx.merchant ?: "Unknown recipient"
+                }
                 TransferRow(
-                    id = "${tx.bank}-${tx.timestampMillis}",
-                    recipient = tx.merchant ?: "Unknown recipient",
+                    id = "${tx.bank}-${tx.timestampMillis}-${tx.amountSar}",
+                    recipient = label,
                     date = fmt.format(tx.timestampMillis),
                     amountSar = tx.amountSar,
                     originalAmount = tx.originalAmount,
@@ -152,12 +193,21 @@ class FinanceDashboardViewModel @Inject constructor(
     }
 }
 
-private fun List<Transaction>.filterInThisMonth(): List<Transaction> {
-    val startOfMonth = Instant.now().atZone(ZoneId.systemDefault())
-        .toLocalDate().withDayOfMonth(1)
-        .atStartOfDay(ZoneId.systemDefault())
-        .toInstant().toEpochMilli()
-    return filter { it.timestampMillis >= startOfMonth }
+private fun List<Transaction>.filterIn(ym: YearMonth, zone: ZoneId): List<Transaction> {
+    val start = ym.atDay(1).atStartOfDay(zone).toInstant().toEpochMilli()
+    val end = ym.plusMonths(1).atDay(1).atStartOfDay(zone).toInstant().toEpochMilli()
+    return filter { it.timestampMillis in start until end }
+}
+
+// Transfers and refunds are not purchases for the "top merchants"
+// screen — the same filter as `isPurchase` at the domain level but
+// spelled out here so the UI logic doesn't accidentally widen if the
+// domain rule ever changes.
+private fun Transaction.Kind.isPurchaseForUi(): Boolean = when (this) {
+    Transaction.Kind.TRANSFER_OUT,
+    Transaction.Kind.CREDIT_CARD_PAYMENT,
+    Transaction.Kind.REFUND -> false
+    else -> true
 }
 
 // Human-friendly name for a bill row. Prefers the merchant/service
@@ -189,9 +239,13 @@ private fun billLabel(tx: Transaction): String {
 
 data class FinanceDashboardUiState(
     val ready: Boolean = false,
+    val selectedMonth: YearMonth = YearMonth.now(),
+    val availableMonths: List<YearMonth> = emptyList(),
+    val isCurrentMonth: Boolean = true,
     val todaySar: Double = 0.0,
     val monthSar: Double = 0.0,
     val monthTransfersSar: Double = 0.0,
+    val monthRefundsSar: Double = 0.0,
     val monthCount: Int = 0,
     val lastMonthToDateSar: Double = 0.0,
     val dailyAverageSar: Double = 0.0,
@@ -210,15 +264,23 @@ data class FinanceDashboardUiState(
         get() = budgetSar > 0 && monthSar > budgetSar
 
     // Pace vs last month through the same day-of-month. `None` while we
-    // don't have a comparable window of history (first month of use, or
-    // last month had zero purchases).
+    // don't have a comparable window of history, or when the user is
+    // browsing a historic month where the benchmark doesn't apply.
     val monthTrend: SpendTrend
-        get() = SpendTrend.compare(monthSar, lastMonthToDateSar)
+        get() = if (isCurrentMonth) {
+            SpendTrend.compare(monthSar, lastMonthToDateSar)
+        } else {
+            SpendTrend.None
+        }
 
-    // Pace vs rolling 30-day daily average. `None` when the average is
-    // zero (not enough history yet).
+    // Pace vs rolling 30-day daily average. Only meaningful for the
+    // current month — "today's pace" in a historic month is meaningless.
     val dayTrend: SpendTrend
-        get() = SpendTrend.compare(todaySar, dailyAverageSar)
+        get() = if (isCurrentMonth) {
+            SpendTrend.compare(todaySar, dailyAverageSar)
+        } else {
+            SpendTrend.None
+        }
 }
 
 enum class SpendTrend {
