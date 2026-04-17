@@ -84,6 +84,46 @@ class SpeedAlertPlayer @Inject constructor(
         playTone(ToneGenerator.TONE_CDMA_PIP, TRAFFIC_TONE_DURATION_MS)
     }
 
+    // Looping "put the phone down" tone for the distraction guard.
+    // Fires every BEEP_INTERVAL_MS until stopBeeping() is called. Uses
+    // a separate code path from playTone because that path is
+    // throttled by MIN_INTERVAL_MS — looping beeps intentionally want
+    // to fire faster than the post-alert cool-down allows.
+    fun startBeeping() {
+        val tg = toneGenerator ?: return
+        // Cancel any pending post-alert restore so the looper can
+        // keep the stream volume raised without it being pulled back
+        // mid-beep.
+        handler.removeCallbacks(restoreRunnable)
+        snapshotAndBypass()
+        handler.removeCallbacks(beepRunnable)
+        handler.post(beepRunnable)
+        Unit // ensure single-expression body type
+        // Warm the ToneGenerator — first call after idle can be slow.
+        runCatching { tg.stopTone() }
+    }
+
+    fun stopBeeping() {
+        handler.removeCallbacks(beepRunnable)
+        runCatching { toneGenerator?.stopTone() }
+        // Schedule restore the same way a one-shot alert would.
+        handler.postDelayed(restoreRunnable, RESTORE_MARGIN_MS)
+    }
+
+    // Private loop body — posts itself back on the handler after each
+    // tone so the cadence is driven by the handler's clock, not by a
+    // coroutine scope that might be cancelled out from under us.
+    private val beepRunnable = object : Runnable {
+        override fun run() {
+            val tg = toneGenerator ?: return
+            runCatching {
+                tg.stopTone()
+                tg.startTone(ToneGenerator.TONE_CDMA_ABBR_ALERT, BEEP_TONE_DURATION_MS)
+            }.onFailure { Timber.w(it, "beep loop tone failed") }
+            handler.postDelayed(this, BEEP_INTERVAL_MS)
+        }
+    }
+
     private fun playTone(toneType: Int, durationMs: Int) {
         val tg = toneGenerator ?: return
         val now = System.currentTimeMillis()
@@ -151,6 +191,8 @@ class SpeedAlertPlayer @Inject constructor(
         const val MIN_INTERVAL_MS = 3_000L
         const val TONE_DURATION_MS = 1_200
         const val TRAFFIC_TONE_DURATION_MS = 800
+        const val BEEP_TONE_DURATION_MS = 400
+        const val BEEP_INTERVAL_MS = 900L
         const val RESTORE_MARGIN_MS = 300L
     }
 }

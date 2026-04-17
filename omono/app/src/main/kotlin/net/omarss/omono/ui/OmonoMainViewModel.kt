@@ -48,8 +48,11 @@ class OmonoMainViewModel @Inject constructor(
             speedSettings.unit,
             speedSettings.alertOnOverLimit,
             speedSettings.alertOnTrafficAhead,
+            speedSettings.alertOnPhoneUseWhileDriving,
             spendingSettings.monthlyBudgetSar,
-        ) { unit, alert, trafficAlert, budget -> Settings(unit, alert, trafficAlert, budget) },
+        ) { unit, alertOverLimit, alertTraffic, alertPhoneUse, budget ->
+            Settings(unit, alertOverLimit, alertTraffic, alertPhoneUse, budget)
+        },
         stateHolder.running,
         stateHolder.states,
         tripDao.observeTop5(),
@@ -79,6 +82,10 @@ class OmonoMainViewModel @Inject constructor(
         viewModelScope.launch { speedSettings.setAlertOnTrafficAhead(enabled) }
     }
 
+    fun setAlertOnPhoneUseWhileDriving(enabled: Boolean) {
+        viewModelScope.launch { speedSettings.setAlertOnPhoneUseWhileDriving(enabled) }
+    }
+
     fun setMonthlyBudget(budgetSar: Double) {
         viewModelScope.launch { spendingSettings.setMonthlyBudgetSar(budgetSar) }
     }
@@ -106,6 +113,7 @@ class OmonoMainViewModel @Inject constructor(
         val unit: SpeedUnit,
         val alertOnOverLimit: Boolean,
         val alertOnTrafficAhead: Boolean,
+        val alertOnPhoneUseWhileDriving: Boolean,
         val monthlyBudgetSar: Double,
     )
 
@@ -153,6 +161,7 @@ class OmonoMainViewModel @Inject constructor(
             overLimit = overLimit,
             alertOnOverLimit = settings.alertOnOverLimit,
             alertOnTrafficAhead = settings.alertOnTrafficAhead,
+            alertOnPhoneUseWhileDriving = settings.alertOnPhoneUseWhileDriving,
             spending = spending,
             recentTrips = recentTrips,
         )
@@ -217,6 +226,7 @@ data class OmonoMainUiState(
     val overLimit: Boolean = false,
     val alertOnOverLimit: Boolean = true,
     val alertOnTrafficAhead: Boolean = false,
+    val alertOnPhoneUseWhileDriving: Boolean = false,
     val spending: SpendingUi = SpendingUi(),
     val recentTrips: List<TripUi> = emptyList(),
 )

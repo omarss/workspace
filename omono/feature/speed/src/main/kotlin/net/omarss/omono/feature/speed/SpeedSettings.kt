@@ -18,6 +18,8 @@ import javax.inject.Singleton
 private val UNIT_KEY = stringPreferencesKey("speed.unit")
 private val ALERT_ON_OVER_LIMIT_KEY = booleanPreferencesKey("speed.alert_on_over_limit")
 private val ALERT_ON_TRAFFIC_AHEAD_KEY = booleanPreferencesKey("speed.alert_on_traffic_ahead")
+private val ALERT_ON_PHONE_USE_WHILE_DRIVING_KEY =
+    booleanPreferencesKey("speed.alert_on_phone_use_while_driving")
 
 @Singleton
 class SpeedSettingsRepository @Inject constructor(
@@ -41,6 +43,13 @@ class SpeedSettingsRepository @Inject constructor(
         prefs[ALERT_ON_TRAFFIC_AHEAD_KEY] ?: false
     }
 
+    // Loops a loud beep whenever the screen turns on while the app
+    // thinks the user is driving. Off by default — opt-in because it
+    // intentionally makes the phone unpleasant to pick up mid-drive.
+    val alertOnPhoneUseWhileDriving: Flow<Boolean> = context.omonoDataStore.data.map { prefs ->
+        prefs[ALERT_ON_PHONE_USE_WHILE_DRIVING_KEY] ?: false
+    }
+
     suspend fun setUnit(unit: SpeedUnit) {
         context.omonoDataStore.edit { it[UNIT_KEY] = unit.name }
     }
@@ -51,5 +60,9 @@ class SpeedSettingsRepository @Inject constructor(
 
     suspend fun setAlertOnTrafficAhead(enabled: Boolean) {
         context.omonoDataStore.edit { it[ALERT_ON_TRAFFIC_AHEAD_KEY] = enabled }
+    }
+
+    suspend fun setAlertOnPhoneUseWhileDriving(enabled: Boolean) {
+        context.omonoDataStore.edit { it[ALERT_ON_PHONE_USE_WHILE_DRIVING_KEY] = enabled }
     }
 }

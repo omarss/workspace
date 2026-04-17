@@ -64,6 +64,8 @@ class SpeedFeature @Inject constructor(
     private val alertPlayer: SpeedAlertPlayer,
     private val tripRecorder: TripRecorder,
     private val trafficWatcher: TrafficAheadWatcher,
+    private val drivingDetector: DrivingModeDetector,
+    private val distractionGuard: DistractionGuard,
 ) : OmonoFeature {
 
     override val id: FeatureId = FeatureId("speed")
@@ -86,6 +88,7 @@ class SpeedFeature @Inject constructor(
         val locationsWithLimit = flow {
             speedRepository.locations().collect { snapshot ->
                 tripRecorder.onLocation(snapshot)
+                drivingDetector.onSample(snapshot.speedMps, System.currentTimeMillis())
                 // Fire-and-forget so a slow TomTom round-trip never
                 // blocks the speedometer UI. The watcher owns its own
                 // throttle + dedupe state.
@@ -110,6 +113,11 @@ class SpeedFeature @Inject constructor(
         // Reset transition memory each time the feature (re)starts so a
         // stop/start cycle doesn't suppress the first alert.
         wasOverLimit = false
+        drivingDetector.reset()
+        // Distraction guard runs alongside the main location stream —
+        // it owns its own combine of driving × screen × setting and
+        // drives the looping beep when all three line up.
+        distractionGuard.attach(scope)
 
         return combine(locationsWithLimit, settings.unit) { (mps, limit), unit ->
             maybeAlert(mps, limit)
@@ -123,6 +131,8 @@ class SpeedFeature @Inject constructor(
 
     override fun stop() {
         tripRecorder.finalizeCurrent()
+        drivingDetector.reset()
+        alertPlayer.stopBeeping()
     }
 
     private suspend fun maybeAlert(mps: Float, limitKmh: Float?) {

@@ -149,6 +149,7 @@ fun OmonoMainRoute(
         onUnitSelect = viewModel::setUnit,
         onAlertOnOverLimitChange = viewModel::setAlertOnOverLimit,
         onAlertOnTrafficAheadChange = viewModel::setAlertOnTrafficAhead,
+        onAlertOnPhoneUseWhileDrivingChange = viewModel::setAlertOnPhoneUseWhileDriving,
         onBudgetChange = viewModel::setMonthlyBudget,
         onExportSms = viewModel::onExportSmsRequested,
         onOpenPlaces = onOpenPlaces,
@@ -204,6 +205,7 @@ fun OmonoMainScreen(
     onUnitSelect: (SpeedUnit) -> Unit,
     onAlertOnOverLimitChange: (Boolean) -> Unit,
     onAlertOnTrafficAheadChange: (Boolean) -> Unit,
+    onAlertOnPhoneUseWhileDrivingChange: (Boolean) -> Unit,
     onBudgetChange: (Double) -> Unit,
     onExportSms: () -> Unit,
     onOpenPlaces: () -> Unit = {},
@@ -301,6 +303,11 @@ fun OmonoMainScreen(
         TrafficAlertSettingRow(
             enabled = state.alertOnTrafficAhead,
             onChange = onAlertOnTrafficAheadChange,
+        )
+
+        PhoneUseAlertSettingRow(
+            enabled = state.alertOnPhoneUseWhileDriving,
+            onChange = onAlertOnPhoneUseWhileDrivingChange,
         )
 
         Spacer(Modifier.height(4.dp))
@@ -745,6 +752,32 @@ private fun TrafficAlertSettingRow(
             )
             Text(
                 text = "Heads-up tone when the road ~500 m ahead is jammed",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Switch(checked = enabled, onCheckedChange = onChange)
+    }
+}
+
+@Composable
+private fun PhoneUseAlertSettingRow(
+    enabled: Boolean,
+    onChange: (Boolean) -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = "No phone while driving",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Text(
+                text = "Continuous beep the whole time the screen is on once the app decides you're driving. " +
+                    "Stops the moment you lock the phone.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
