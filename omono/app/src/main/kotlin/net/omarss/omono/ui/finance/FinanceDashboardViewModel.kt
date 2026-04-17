@@ -54,6 +54,8 @@ class FinanceDashboardViewModel @Inject constructor(
                 monthSar = totals.monthSar,
                 monthTransfersSar = totals.monthTransfersSar,
                 monthCount = totals.monthCount,
+                lastMonthToDateSar = totals.lastMonthToDateSar,
+                dailyAverageSar = totals.dailyAverageSar,
                 budgetSar = budget,
                 categoryBreakdown = buildCategoryRows(totals.monthByCategory, totals.monthSar),
                 topMerchants = buildTopMerchants(thisMonth),
@@ -191,6 +193,8 @@ data class FinanceDashboardUiState(
     val monthSar: Double = 0.0,
     val monthTransfersSar: Double = 0.0,
     val monthCount: Int = 0,
+    val lastMonthToDateSar: Double = 0.0,
+    val dailyAverageSar: Double = 0.0,
     val budgetSar: Double = 0.0,
     val categoryBreakdown: List<CategoryRow> = emptyList(),
     val topMerchants: List<MerchantRow> = emptyList(),
@@ -204,6 +208,29 @@ data class FinanceDashboardUiState(
 
     val overBudget: Boolean
         get() = budgetSar > 0 && monthSar > budgetSar
+
+    // Pace vs last month through the same day-of-month. `None` while we
+    // don't have a comparable window of history (first month of use, or
+    // last month had zero purchases).
+    val monthTrend: SpendTrend
+        get() = SpendTrend.compare(monthSar, lastMonthToDateSar)
+
+    // Pace vs rolling 30-day daily average. `None` when the average is
+    // zero (not enough history yet).
+    val dayTrend: SpendTrend
+        get() = SpendTrend.compare(todaySar, dailyAverageSar)
+}
+
+enum class SpendTrend {
+    Below, Above, None;
+
+    companion object {
+        fun compare(actual: Double, benchmark: Double): SpendTrend = when {
+            benchmark <= 0.0 -> None
+            actual > benchmark -> Above
+            else -> Below
+        }
+    }
 }
 
 data class CategoryRow(

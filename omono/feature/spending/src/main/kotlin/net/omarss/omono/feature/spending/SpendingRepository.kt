@@ -140,8 +140,9 @@ class SpendingRepository @Inject constructor(
         }
 
     private companion object {
-        // ~40 days of history is enough for a "this month" calculation
-        // even if the user opens the app on the 1st.
-        const val LOOKBACK_MILLIS: Long = 40L * 24 * 60 * 60 * 1000
+        // ~70 days covers the worst case for the "same day last month"
+        // benchmark — if today is the 31st of a 31-day month, last
+        // month's 1st is ~61 days ago. 70 leaves a small margin.
+        const val LOOKBACK_MILLIS: Long = 70L * 24 * 60 * 60 * 1000
     }
 }

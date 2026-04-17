@@ -3,6 +3,7 @@ package net.omarss.omono.ui.finance
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -11,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -129,17 +131,64 @@ private fun SummaryCard(state: FinanceDashboardUiState) {
                 style = MaterialTheme.typography.labelLarge,
                 color = Color.White.copy(alpha = 0.8f),
             )
-            Text(
-                text = "SAR %,.0f".format(state.monthSar),
-                style = MaterialTheme.typography.displaySmall,
-                color = Color.White,
-            )
-            Text(
-                text = "${state.monthCount} purchases · Today SAR %,.0f".format(state.todaySar),
-                style = MaterialTheme.typography.bodyMedium,
-                color = Color.White.copy(alpha = 0.8f),
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "SAR %,.0f".format(state.monthSar),
+                    style = MaterialTheme.typography.displaySmall,
+                    color = Color.White,
+                )
+                TrendPill(
+                    trend = state.monthTrend,
+                    actual = state.monthSar,
+                    benchmark = state.lastMonthToDateSar,
+                    modifier = Modifier.padding(start = 12.dp),
+                )
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "${state.monthCount} purchases · Today SAR %,.0f".format(state.todaySar),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.White.copy(alpha = 0.8f),
+                )
+                TrendPill(
+                    trend = state.dayTrend,
+                    actual = state.todaySar,
+                    benchmark = state.dailyAverageSar,
+                    modifier = Modifier.padding(start = 8.dp),
+                )
+            }
         }
+    }
+}
+
+// Small arrow + delta chip indicating whether the headline number is
+// pacing below or above its benchmark. Rendered inline next to the
+// total it qualifies. Hidden when the benchmark is zero (no history).
+@Composable
+private fun TrendPill(
+    trend: SpendTrend,
+    actual: Double,
+    benchmark: Double,
+    modifier: Modifier = Modifier,
+) {
+    if (trend == SpendTrend.None || benchmark <= 0.0) return
+    val bg = when (trend) {
+        SpendTrend.Below -> Color(0xFF10B981) // emerald 500
+        SpendTrend.Above -> Color(0xFFDC2626) // red 600
+        SpendTrend.None -> Color.Transparent
+    }
+    val arrow = if (trend == SpendTrend.Below) "▼" else "▲"
+    val deltaPct = ((actual - benchmark) / benchmark * 100.0)
+    Box(
+        modifier = modifier
+            .background(bg, RoundedCornerShape(50))
+            .padding(horizontal = 10.dp, vertical = 4.dp),
+    ) {
+        Text(
+            text = "%s %+.0f%%".format(arrow, deltaPct),
+            style = MaterialTheme.typography.labelMedium,
+            color = Color.White,
+        )
     }
 }
 
