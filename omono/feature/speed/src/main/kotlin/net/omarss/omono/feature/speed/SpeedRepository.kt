@@ -23,6 +23,13 @@ import javax.inject.Singleton
 // rate (see ADAPTIVE constants below). Speed is in m/s, lat/lon in WGS84,
 // bearing in degrees clockwise from true north (null when FusedLocation
 // can't infer direction of travel — typically while stationary).
+//
+// `speedMps` is post-filtered: GPS ghosts at rest (which can report
+// 30 m/s while parked under an overpass) are clamped to 0 inside the
+// repository so every downstream consumer — notification, trip
+// recorder, traffic watcher — sees a clean signal. The raw reading
+// is kept around as `rawSpeedMps` for diagnostics but never surfaced
+// in the UI directly.
 data class LocationSnapshot(
     val latitude: Double,
     val longitude: Double,
@@ -30,7 +37,47 @@ data class LocationSnapshot(
     val accuracyMeters: Float,
     val bearingDeg: Float? = null,
     val bearingAccuracyDeg: Float? = null,
+    val speedAccuracyMps: Float? = null,
+    val rawSpeedMps: Float = speedMps,
 )
+
+// Filter decision — pure and unit-testable. Returns the speed we want
+// to show the user, which is `rawSpeed` when the GPS fix passes every
+// quality gate and 0 otherwise. Logic:
+//
+//  * hasSpeed must be true. Some fixes (e.g. cell-tower fallback) have
+//    no speed at all — they should read as stationary, not garbage.
+//  * If the provider told us how confident it is in the speed reading
+//    (API 26+), require `speedAccuracy` ≤ SPEED_ACCURACY_MAX_MPS. This
+//    is the single most reliable filter — a 120 km/h ghost will come
+//    with a ±15 m/s uncertainty that pass-through code ignores.
+//  * If we only have position accuracy, require ≤ POSITION_ACCURACY_MAX_M
+//    AND that the reported speed is above a very small positive floor.
+//    A flat 0 m/s reading with any accuracy is always trusted (the
+//    provider is correctly saying "stationary"), but a non-zero speed
+//    paired with a 50 m accuracy halo is GPS jitter we'd rather drop.
+internal fun filterSpeed(
+    hasSpeed: Boolean,
+    rawSpeedMps: Float,
+    hasAccuracy: Boolean,
+    accuracyMeters: Float,
+    hasSpeedAccuracy: Boolean,
+    speedAccuracyMps: Float,
+): Float {
+    if (!hasSpeed) return 0f
+    if (rawSpeedMps <= 0f) return 0f
+    if (hasSpeedAccuracy) {
+        return if (speedAccuracyMps <= SPEED_ACCURACY_MAX_MPS) rawSpeedMps else 0f
+    }
+    if (!hasAccuracy || accuracyMeters > POSITION_ACCURACY_MAX_M) return 0f
+    return rawSpeedMps
+}
+
+// Filter thresholds live at file scope so the test can exercise
+// boundary behaviour against the same constants the production path
+// uses — no magic-number drift between the two.
+internal const val SPEED_ACCURACY_MAX_MPS: Float = 2.0f
+internal const val POSITION_ACCURACY_MAX_M: Float = 20.0f
 
 // Wraps FusedLocationProviderClient as a cold Flow of LocationSnapshot.
 //
@@ -75,15 +122,27 @@ class SpeedRepository @Inject constructor(
             val cb = object : LocationCallback() {
                 override fun onLocationResult(result: LocationResult) {
                     val location = result.lastLocation ?: return
+                    val rawSpeed = if (location.hasSpeed()) location.speed else 0f
+                    val trustedSpeed = filterSpeed(
+                        hasSpeed = location.hasSpeed(),
+                        rawSpeedMps = rawSpeed,
+                        hasAccuracy = location.hasAccuracy(),
+                        accuracyMeters = location.accuracy,
+                        hasSpeedAccuracy = location.hasSpeedAccuracy(),
+                        speedAccuracyMps = location.speedAccuracyMetersPerSecond,
+                    )
                     val snapshot = LocationSnapshot(
                         latitude = location.latitude,
                         longitude = location.longitude,
-                        speedMps = if (location.hasSpeed()) location.speed else 0f,
+                        speedMps = trustedSpeed,
                         accuracyMeters = if (location.hasAccuracy()) location.accuracy else Float.NaN,
                         bearingDeg = if (location.hasBearing()) location.bearing else null,
                         // bearingAccuracyDegrees added in API 26 — minSdk 26.
                         bearingAccuracyDeg =
                             if (location.hasBearingAccuracy()) location.bearingAccuracyDegrees else null,
+                        speedAccuracyMps =
+                            if (location.hasSpeedAccuracy()) location.speedAccuracyMetersPerSecond else null,
+                        rawSpeedMps = rawSpeed,
                     )
                     trySend(snapshot)
 
