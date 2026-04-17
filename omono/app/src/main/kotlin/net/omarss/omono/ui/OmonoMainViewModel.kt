@@ -47,8 +47,9 @@ class OmonoMainViewModel @Inject constructor(
         combine(
             speedSettings.unit,
             speedSettings.alertOnOverLimit,
+            speedSettings.alertOnTrafficAhead,
             spendingSettings.monthlyBudgetSar,
-        ) { unit, alert, budget -> Settings(unit, alert, budget) },
+        ) { unit, alert, trafficAlert, budget -> Settings(unit, alert, trafficAlert, budget) },
         stateHolder.running,
         stateHolder.states,
         tripDao.observeTop5(),
@@ -72,6 +73,10 @@ class OmonoMainViewModel @Inject constructor(
 
     fun setAlertOnOverLimit(enabled: Boolean) {
         viewModelScope.launch { speedSettings.setAlertOnOverLimit(enabled) }
+    }
+
+    fun setAlertOnTrafficAhead(enabled: Boolean) {
+        viewModelScope.launch { speedSettings.setAlertOnTrafficAhead(enabled) }
     }
 
     fun setMonthlyBudget(budgetSar: Double) {
@@ -100,6 +105,7 @@ class OmonoMainViewModel @Inject constructor(
     private data class Settings(
         val unit: SpeedUnit,
         val alertOnOverLimit: Boolean,
+        val alertOnTrafficAhead: Boolean,
         val monthlyBudgetSar: Double,
     )
 
@@ -146,6 +152,7 @@ class OmonoMainViewModel @Inject constructor(
             limitDisplay = limitDisplay,
             overLimit = overLimit,
             alertOnOverLimit = settings.alertOnOverLimit,
+            alertOnTrafficAhead = settings.alertOnTrafficAhead,
             spending = spending,
             recentTrips = recentTrips,
         )
@@ -209,6 +216,7 @@ data class OmonoMainUiState(
     val limitDisplay: String? = null,
     val overLimit: Boolean = false,
     val alertOnOverLimit: Boolean = true,
+    val alertOnTrafficAhead: Boolean = false,
     val spending: SpendingUi = SpendingUi(),
     val recentTrips: List<TripUi> = emptyList(),
 )

@@ -7,6 +7,8 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.onStart
+import kotlinx.coroutines.launch
+import timber.log.Timber
 import net.omarss.omono.core.common.SpeedUnit
 import net.omarss.omono.core.service.FeatureId
 import net.omarss.omono.core.service.FeatureMetadata
@@ -61,6 +63,7 @@ class SpeedFeature @Inject constructor(
     private val settings: SpeedSettingsRepository,
     private val alertPlayer: SpeedAlertPlayer,
     private val tripRecorder: TripRecorder,
+    private val trafficWatcher: TrafficAheadWatcher,
 ) : OmonoFeature {
 
     override val id: FeatureId = FeatureId("speed")
@@ -83,6 +86,16 @@ class SpeedFeature @Inject constructor(
         val locationsWithLimit = flow {
             speedRepository.locations().collect { snapshot ->
                 tripRecorder.onLocation(snapshot)
+                // Fire-and-forget so a slow TomTom round-trip never
+                // blocks the speedometer UI. The watcher owns its own
+                // throttle + dedupe state.
+                scope.launch {
+                    if (!settings.alertOnTrafficAhead.first()) return@launch
+                    runCatching { trafficWatcher.onLocation(snapshot) }
+                        .onFailure { Timber.w(it, "traffic watcher failed") }
+                        .getOrNull()
+                        ?.let { alertPlayer.alertTrafficAhead() }
+                }
                 val limit = limits.limitKmh(
                     lat = snapshot.latitude,
                     lon = snapshot.longitude,

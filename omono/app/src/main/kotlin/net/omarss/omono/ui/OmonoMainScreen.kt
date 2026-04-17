@@ -148,6 +148,7 @@ fun OmonoMainRoute(
         onRequestDndAccess = { launchNotificationPolicyAccessSettings(context) },
         onUnitSelect = viewModel::setUnit,
         onAlertOnOverLimitChange = viewModel::setAlertOnOverLimit,
+        onAlertOnTrafficAheadChange = viewModel::setAlertOnTrafficAhead,
         onBudgetChange = viewModel::setMonthlyBudget,
         onExportSms = viewModel::onExportSmsRequested,
         onOpenPlaces = onOpenPlaces,
@@ -202,6 +203,7 @@ fun OmonoMainScreen(
     onRequestDndAccess: () -> Unit,
     onUnitSelect: (SpeedUnit) -> Unit,
     onAlertOnOverLimitChange: (Boolean) -> Unit,
+    onAlertOnTrafficAheadChange: (Boolean) -> Unit,
     onBudgetChange: (Double) -> Unit,
     onExportSms: () -> Unit,
     onOpenPlaces: () -> Unit = {},
@@ -294,6 +296,11 @@ fun OmonoMainScreen(
         AlertSettingRow(
             enabled = state.alertOnOverLimit,
             onChange = onAlertOnOverLimitChange,
+        )
+
+        TrafficAlertSettingRow(
+            enabled = state.alertOnTrafficAhead,
+            onChange = onAlertOnTrafficAheadChange,
         )
 
         Spacer(Modifier.height(4.dp))
@@ -713,6 +720,31 @@ private fun AlertSettingRow(
             )
             Text(
                 text = "Loud beep the moment you cross a posted speed limit",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Switch(checked = enabled, onCheckedChange = onChange)
+    }
+}
+
+@Composable
+private fun TrafficAlertSettingRow(
+    enabled: Boolean,
+    onChange: (Boolean) -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = "Traffic ahead",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Text(
+                text = "Heads-up tone when the road ~500 m ahead is jammed",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

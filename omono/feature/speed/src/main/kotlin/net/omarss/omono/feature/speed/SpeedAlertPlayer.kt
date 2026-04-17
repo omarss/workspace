@@ -75,6 +75,16 @@ class SpeedAlertPlayer @Inject constructor(
     private val restoreRunnable = Runnable { restoreState() }
 
     fun alert() {
+        playTone(ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD, TONE_DURATION_MS)
+    }
+
+    // Distinct two-beep tone used for the traffic-ahead heads-up so the
+    // user can distinguish it from the over-limit alert.
+    fun alertTrafficAhead() {
+        playTone(ToneGenerator.TONE_CDMA_PIP, TRAFFIC_TONE_DURATION_MS)
+    }
+
+    private fun playTone(toneType: Int, durationMs: Int) {
         val tg = toneGenerator ?: return
         val now = System.currentTimeMillis()
         if (now - lastAlertAtMillis < MIN_INTERVAL_MS) return
@@ -88,10 +98,10 @@ class SpeedAlertPlayer @Inject constructor(
 
         runCatching {
             tg.stopTone()
-            tg.startTone(ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD, TONE_DURATION_MS)
+            tg.startTone(toneType, durationMs)
         }.onFailure { Timber.w(it, "ToneGenerator play failed") }
 
-        handler.postDelayed(restoreRunnable, TONE_DURATION_MS + RESTORE_MARGIN_MS)
+        handler.postDelayed(restoreRunnable, durationMs + RESTORE_MARGIN_MS)
     }
 
     private fun snapshotAndBypass() {
@@ -140,6 +150,7 @@ class SpeedAlertPlayer @Inject constructor(
         const val MAX_VOLUME = 100
         const val MIN_INTERVAL_MS = 3_000L
         const val TONE_DURATION_MS = 1_200
+        const val TRAFFIC_TONE_DURATION_MS = 800
         const val RESTORE_MARGIN_MS = 300L
     }
 }
