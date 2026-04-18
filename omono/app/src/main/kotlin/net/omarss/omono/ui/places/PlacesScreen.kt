@@ -125,7 +125,38 @@ fun PlacesRoute(
             onChange = viewModel::setQualityFilter,
         )
 
-        HeadingStrip(heading = state.heading)
+        val compassMarkers = buildList {
+            add(
+                CompassMarker(
+                    bearingDeg = 0f,
+                    color = Color(0xFFEF4444), // red — true north
+                    label = "North",
+                ),
+            )
+            state.qiblaBearing?.let {
+                add(
+                    CompassMarker(
+                        bearingDeg = it,
+                        color = Color(0xFFF59E0B), // amber — Kaaba / Qibla
+                        label = "Mecca",
+                    ),
+                )
+            }
+            state.nearestMosque?.let { mosque ->
+                add(
+                    CompassMarker(
+                        bearingDeg = mosque.bearingDegrees,
+                        color = Color(0xFF10B981), // emerald — nearest mosque
+                        label = "Mosque · ${formatDistance(mosque.distanceMeters)}",
+                    ),
+                )
+            }
+        }
+        CompassRose(
+            headingDeg = state.heading,
+            markers = compassMarkers,
+            modifier = Modifier.padding(vertical = 8.dp),
+        )
 
         if (!state.configured) {
             EmptyState(
@@ -311,16 +342,6 @@ private fun RadiusPicker(
             }
         }
     }
-}
-
-@Composable
-private fun HeadingStrip(heading: Float) {
-    Text(
-        text = "Facing ${heading.toInt()}° · ${compassLabel(heading)}",
-        style = MaterialTheme.typography.labelSmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-    )
 }
 
 @Composable
@@ -598,21 +619,6 @@ private fun launchDialer(context: Context, phone: String) {
         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     }
     runCatching { context.startActivity(intent) }
-}
-
-private fun compassLabel(heading: Float): String {
-    val normalized = ((heading + 360f) % 360f).toInt()
-    return when (normalized) {
-        in 338..360, in 0..22 -> "N"
-        in 23..67 -> "NE"
-        in 68..112 -> "E"
-        in 113..157 -> "SE"
-        in 158..202 -> "S"
-        in 203..247 -> "SW"
-        in 248..292 -> "W"
-        in 293..337 -> "NW"
-        else -> "?"
-    }
 }
 
 private fun formatDistance(meters: Double): String = when {
