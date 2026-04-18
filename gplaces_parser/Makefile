@@ -59,7 +59,7 @@ k8s-apply:
 	  || kubectl apply -f ../homelab/apps/api-places/
 
 k8s-status:
-	kubectl -n api-places get deploy,pod,svc -o wide
+	sudo k3s kubectl -n api-places get deploy,pod,svc -o wide
 
 .venv/bin/python:
 	python3 -m venv .venv
@@ -153,10 +153,14 @@ deploy:
 	@echo ">> rolling out api-places pod"
 	# set-image is a no-op when TAG is :latest (same reference), so we
 	# always follow it with `rollout restart` to force a new ReplicaSet
-	# regardless of whether the tag actually changed.
-	kubectl -n api-places set image deployment/api-places api=localhost/gplaces/api:$(TAG)
-	kubectl -n api-places rollout restart deployment/api-places
-	kubectl -n api-places rollout status deployment/api-places --timeout=120s
+	# regardless of whether the tag actually changed. We call kubectl
+	# via `sudo k3s kubectl` because k3s stashes the admin kubeconfig at
+	# /etc/rancher/k3s/k3s.yaml (root-owned) and the user-shell fallback
+	# to localhost:8080 doesn't resolve the API server. `k3s kubectl`
+	# bakes the right config path in.
+	sudo k3s kubectl -n api-places set image deployment/api-places api=localhost/gplaces/api:$(TAG)
+	sudo k3s kubectl -n api-places rollout restart deployment/api-places
+	sudo k3s kubectl -n api-places rollout status deployment/api-places --timeout=120s
 	@echo
 	@echo ">> nginx vhost was reset to the pre-certbot template. Re-run:"
 	@echo "   sudo certbot --nginx -d api.omarss.net"
