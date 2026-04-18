@@ -42,6 +42,10 @@ class Road(BaseModel):
     speed_source: str | None = None
     lanes: int | None = None
     oneway: bool | None = None
+    # Bearing of the road's long axis in degrees, 0=N, 90=E, 180=S, 270=W.
+    # Normalised to [0, 360); since a road is symmetric, clients pairing
+    # against a GPS heading should match either `h` or `(h + 180) % 360`.
+    heading_deg: float | None = None
 
 
 class RoadsResponse(BaseModel):

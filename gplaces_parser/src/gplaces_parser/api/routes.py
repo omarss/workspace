@@ -126,6 +126,7 @@ async def roads(
             speed_source=r["speed_source"],
             lanes=r["lanes"],
             oneway=r["oneway"],
+            heading_deg=r.get("heading_deg"),
         )
         for r in rows
     ]

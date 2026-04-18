@@ -14,6 +14,7 @@ Client decides which to surface.
 
 from __future__ import annotations
 
+import math
 from typing import Any
 
 from psycopg import Connection
@@ -61,9 +62,45 @@ def at_point(conn: Connection, *, lat: float, lon: float, limit: int) -> list[di
         except Exception:  # noqa: BLE001
             continue
         if poly.contains(pt) or poly.touches(pt):
+            row["heading_deg"] = _polygon_heading_deg(poly, lat)
             hits.append(row)
 
     # Rank: motorway first, then by polygon area (smaller = more specific
     # lane, so the local slip-road beats the huge trunk it's next to).
     hits.sort(key=lambda r: (_HIGHWAY_RANK.get(r["highway"], 99), r["bbox_area"]))
     return hits[:limit]
+
+
+def _polygon_heading_deg(poly: Any, center_lat: float) -> float | None:
+    """Compass bearing (0=N, 90=E) of the polygon's long axis.
+
+    The polygon is stored in WGS84 (lon,lat), so a naive atan2 on raw
+    coordinate deltas skews by cos(latitude). We project to local metres
+    first (equirectangular), compute the axis there, then convert back
+    to a bearing. Accurate enough for per-road heading (±1°) across the
+    whole Riyadh bbox.
+    """
+    try:
+        mrr = poly.minimum_rotated_rectangle
+        xs, ys = mrr.exterior.coords.xy
+    except Exception:  # noqa: BLE001
+        return None
+    if len(xs) < 3:
+        return None
+    # minimum_rotated_rectangle returns a closed ring with 5 points.
+    # Edge 0→1 and 1→2 are perpendicular; the longer one is the road axis.
+    cos_lat = math.cos(math.radians(center_lat))
+    metres_per_deg_lat = 111_320.0
+    dx1 = (xs[1] - xs[0]) * cos_lat * metres_per_deg_lat
+    dy1 = (ys[1] - ys[0]) * metres_per_deg_lat
+    dx2 = (xs[2] - xs[1]) * cos_lat * metres_per_deg_lat
+    dy2 = (ys[2] - ys[1]) * metres_per_deg_lat
+    if dx1 * dx1 + dy1 * dy1 >= dx2 * dx2 + dy2 * dy2:
+        dx, dy = dx1, dy1
+    else:
+        dx, dy = dx2, dy2
+    # atan2(dx, dy) returns the angle east of north — a compass bearing.
+    bearing = math.degrees(math.atan2(dx, dy))
+    if bearing < 0:
+        bearing += 360.0
+    return round(bearing, 1)
