@@ -30,3 +30,24 @@ class NearbyResponse(BaseModel):
 
 class Error(BaseModel):
     error: str
+
+
+class Road(BaseModel):
+    osm_id: int
+    name: str | None = None
+    name_en: str | None = None
+    highway: str
+    ref: str | None = None
+    maxspeed_kmh: int
+    speed_source: str | None = None
+    lanes: int | None = None
+    oneway: bool | None = None
+
+
+class RoadsResponse(BaseModel):
+    # Multiple matches are returned when the point sits at an intersection
+    # (two polygons overlap). The client picks: highest-class, highest
+    # maxspeed, whichever best matches its direction of travel, etc.
+    roads: list[Road]
+    source: str = "gplaces"
+    generated_at: datetime = Field(default_factory=lambda: datetime.utcnow())

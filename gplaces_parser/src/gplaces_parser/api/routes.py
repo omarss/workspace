@@ -10,9 +10,9 @@ from fastapi import APIRouter, HTTPException, Query, status
 from ..categories import ALLOWED_SLUGS
 from ..config import settings
 from ..db import connection
-from . import queries
+from . import queries, roads_queries
 from .deps import AuthDep
-from .schemas import NearbyResponse, NearbyResult
+from .schemas import NearbyResponse, NearbyResult, Road, RoadsResponse
 
 router = APIRouter(prefix="/v1")
 
@@ -90,6 +90,47 @@ async def nearby(
 
     return NearbyResponse(
         results=results,
+        source="gplaces",
+        generated_at=datetime.now(UTC),
+    )
+
+
+@router.get(
+    "/roads",
+    response_model=RoadsResponse,
+    responses={401: {}, 400: {}},
+)
+async def roads(
+    _: AuthDep,
+    lat: Annotated[float, Query(ge=-90.0, le=90.0)],
+    lon: Annotated[float, Query(ge=-180.0, le=180.0)],
+    limit: Annotated[int, Query(ge=1, le=20)] = 5,
+) -> RoadsResponse:
+    """Return every road polygon that contains (lat, lon).
+
+    Multiple roads come back at intersections / overlapping carriageways;
+    the client picks. Primary ranking is by highway class (motorway first)
+    then by polygon area ascending, so the most specific / smallest road
+    a point belongs to appears first within its class.
+    """
+    with connection() as conn:
+        rows = roads_queries.at_point(conn, lat=lat, lon=lon, limit=limit)
+    results = [
+        Road(
+            osm_id=r["osm_id"],
+            name=r["name"],
+            name_en=r["name_en"],
+            highway=r["highway"],
+            ref=r["ref"],
+            maxspeed_kmh=r["maxspeed_kmh"],
+            speed_source=r["speed_source"],
+            lanes=r["lanes"],
+            oneway=r["oneway"],
+        )
+        for r in rows
+    ]
+    return RoadsResponse(
+        roads=results,
         source="gplaces",
         generated_at=datetime.now(UTC),
     )
