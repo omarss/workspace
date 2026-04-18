@@ -838,11 +838,20 @@ private fun RecentTransactionsCard(
                             else -> MaterialTheme.colorScheme.onSurface
                         }
                         val amountText = formatAmount(row.amountSar, row.originalAmount, row.originalCurrency)
-                        Text(
-                            text = if (row.kind == Transaction.Kind.REFUND) "+$amountText" else amountText,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = amountColor,
-                        )
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text(
+                                text = if (row.kind == Transaction.Kind.REFUND) "+$amountText" else amountText,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = amountColor,
+                            )
+                            if (row.fxFailed) {
+                                Text(
+                                    text = "FX unavailable",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.error,
+                                )
+                            }
+                        }
                     }
                 }
             }

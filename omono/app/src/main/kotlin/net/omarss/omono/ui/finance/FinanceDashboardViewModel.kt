@@ -279,6 +279,7 @@ class FinanceDashboardViewModel @Inject constructor(
                     amountSar = tx.amountSar,
                     originalAmount = tx.originalAmount,
                     originalCurrency = tx.originalCurrency,
+                    fxFailed = tx.fxFailed,
                     kind = tx.kind,
                     bank = tx.bank,
                 )
@@ -449,6 +450,7 @@ data class RecentRow(
     val amountSar: Double,
     val originalAmount: Double,
     val originalCurrency: String,
+    val fxFailed: Boolean = false,
     val kind: Transaction.Kind,
     val bank: Transaction.Bank,
 ) {

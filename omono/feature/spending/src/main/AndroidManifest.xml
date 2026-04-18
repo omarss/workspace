@@ -2,13 +2,12 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <!--
-      Reading bank transaction SMSes. Both are dangerous permissions
-      that require runtime grant. RECEIVE_SMS lets a manifest receiver
-      react to new SMS without an observer; for now the feature just
-      uses READ_SMS + a ContentObserver, so RECEIVE_SMS is declared
-      for future use but not wired to any receiver yet.
+      Reading bank transaction SMSes. Only READ_SMS is needed — the
+      feature watches for new SMSes via a ContentObserver on
+      Telephony.Sms.CONTENT_URI, which doesn't need the dangerous
+      RECEIVE_SMS permission that a manifest-registered BroadcastReceiver
+      would.
     -->
     <uses-permission android:name="android.permission.READ_SMS" />
-    <uses-permission android:name="android.permission.RECEIVE_SMS" />
 
 </manifest>

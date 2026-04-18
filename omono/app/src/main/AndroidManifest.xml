@@ -68,8 +68,10 @@
          dangerous runtime permissions — the main screen guides the
          user through granting them, and the feature emits an error
          state when they aren't. -->
+    <!-- RECEIVE_SMS was removed 2026-04 — the spending feature watches
+         the inbox via a ContentObserver on Telephony.Sms.CONTENT_URI,
+         which doesn't need the dangerous RECEIVE_SMS permission. -->
     <uses-permission android:name="android.permission.READ_SMS" />
-    <uses-permission android:name="android.permission.RECEIVE_SMS" />
 
     <!-- Android 11+ package visibility: lets us probe whether the
          Shizuku manager app is installed (for the "Disable internet

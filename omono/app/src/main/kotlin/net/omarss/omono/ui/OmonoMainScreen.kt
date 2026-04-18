@@ -89,7 +89,6 @@ private val foregroundPermissions: List<String> = buildList {
 
 private val smsPermissions: List<String> = listOf(
     Manifest.permission.READ_SMS,
-    Manifest.permission.RECEIVE_SMS,
 )
 
 @OptIn(ExperimentalPermissionsApi::class)

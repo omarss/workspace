@@ -25,6 +25,13 @@ data class Transaction(
     val merchant: String?,
     val originalAmount: Double = amountSar,
     val originalCurrency: String = "SAR",
+    // True when the currency converter had no live / static rate for
+    // this transaction's `originalCurrency`, so `amountSar` is an
+    // equal-units fallback rather than a real SAR conversion. The
+    // totals still add the fallback value (better under-count than
+    // silent drop), but the Recent activity row can surface a badge
+    // so the user knows the number isn't quite right.
+    val fxFailed: Boolean = false,
 ) {
     val isForeignCurrency: Boolean
         get() = originalCurrency != "SAR"

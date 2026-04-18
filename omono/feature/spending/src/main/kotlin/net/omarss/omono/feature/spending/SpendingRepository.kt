@@ -121,18 +121,19 @@ class SpendingRepository @Inject constructor(
                     val body = cursor.getString(bodyIdx) ?: continue
                     val date = cursor.getLong(dateIdx)
                     val parsed = SmsParser.parse(address, body) ?: continue
-                    val amountSar = currencyConverter.toSar(
+                    val conversion = currencyConverter.convert(
                         parsed.originalAmount,
                         parsed.originalCurrency,
                     )
                     result += Transaction(
-                        amountSar = amountSar,
+                        amountSar = conversion.amountSar,
                         timestampMillis = date,
                         bank = parsed.bank,
                         kind = parsed.kind,
                         merchant = parsed.merchant,
                         originalAmount = parsed.originalAmount,
                         originalCurrency = parsed.originalCurrency,
+                        fxFailed = !conversion.fxAvailable,
                     )
                 }
             }

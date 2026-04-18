@@ -63,11 +63,20 @@ class CurrencyConverter @Inject constructor() {
     // Returns the SAR equivalent for the given foreign amount. Falls
     // back to the original amount if the currency isn't recognised —
     // better to under-count than to silently drop a row.
-    fun toSar(amount: Double, currency: String): Double {
+    fun toSar(amount: Double, currency: String): Double = convert(amount, currency).amountSar
+
+    // Same conversion with a flag indicating whether we had a real
+    // rate available. Callers that want to surface "FX unavailable"
+    // to the user (repository → Transaction.fxFailed) use this;
+    // the plain toSar() above stays for back-compat with tests.
+    fun convert(amount: Double, currency: String): Conversion {
         val code = canonicalize(currency)
-        val rate = cachedRates[code] ?: return amount
-        return amount * rate
+        if (code == "SAR") return Conversion(amount, fxAvailable = true)
+        val rate = cachedRates[code] ?: return Conversion(amount, fxAvailable = false)
+        return Conversion(amount * rate, fxAvailable = true)
     }
+
+    data class Conversion(val amountSar: Double, val fxAvailable: Boolean)
 
     fun canonicalize(currency: String): String {
         val upper = currency.uppercase()
