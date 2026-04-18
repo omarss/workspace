@@ -31,8 +31,15 @@ import javax.inject.Singleton
 //   4. None of the silence conditions hold:
 //        - Proximity sensor covered (phone face-down / in pocket).
 //        - Device is on a call (AudioManager mode in IN_CALL / IN_COMMUNICATION).
-//        - Phone is resting on a surface (accelerometer variance below
-//          the stillness threshold for the rolling window).
+//
+// NOTE: We used to also gate on an accelerometer-variance "phone in
+// hand" signal, but in practice it gave too many false negatives —
+// a dashboard-mounted phone being tap-scrolled with a thumb barely
+// moves the whole device, so variance stayed below the stillness
+// threshold and the alert silently never fired. The driver-safe
+// conservative default is to alert whenever the screen is on while
+// moving and let the proximity / nav-app / call gates handle the
+// legitimate "phone isn't being used" cases.
 //
 // After armed=true the loop waits out GRACE_MS before the first beep so
 // a notification that briefly wakes the screen or a misfire doesn't
@@ -60,12 +67,18 @@ class DistractionGuard @Inject constructor(
             // Group the "something silences us" signals into a single
             // boolean so the top-level combine stays under Kotlin's 5-
             // flow overload. Any one of these being true = silenced.
+            //
+            // The accelerometer-variance "phone in hand" signal used
+            // to live here too; it was dropped because it reported
+            // "not in hand" for dashboard-mounted phones (where the
+            // whole device barely moves even while the user scrolls),
+            // which silently suppressed the alert in exactly the
+            // situation we want it for. See the class-level comment.
             val silencedFlow: Flow<Boolean> = combine(
                 context.proximityCoveredFlow(),
                 context.inCallFlow(),
-                context.phoneInHandFlow(),
-            ) { proxCovered, inCall, inHand ->
-                proxCovered || inCall || !inHand
+            ) { proxCovered, inCall ->
+                proxCovered || inCall
             }
 
             combine(
