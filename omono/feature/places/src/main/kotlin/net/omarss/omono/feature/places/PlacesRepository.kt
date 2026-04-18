@@ -28,13 +28,17 @@ class PlacesRepository @Inject constructor(
         radiusMeters: Int,
         minRating: Float? = null,
         minReviews: Int? = null,
+        limit: Int = 25,
+        offset: Int = 0,
     ): List<Place> = source.nearbySearch(
         latitude = latitude,
         longitude = longitude,
         radiusMeters = radiusMeters,
         category = category,
+        limit = limit,
         minRating = minRating,
         minReviews = minReviews,
+        offset = offset,
     )
 
     suspend fun search(
@@ -42,11 +46,15 @@ class PlacesRepository @Inject constructor(
         latitude: Double,
         longitude: Double,
         radiusMeters: Int,
+        limit: Int = 25,
+        offset: Int = 0,
     ): List<Place> = source.search(
         query = query,
         latitude = latitude,
         longitude = longitude,
         radiusMeters = radiusMeters,
+        limit = limit,
+        offset = offset,
     )
 }
 

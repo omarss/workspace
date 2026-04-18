@@ -62,6 +62,12 @@ class PlacesViewModel @Inject constructor(
     private val qualityFilter = MutableStateFlow(true)
     private val rawPlaces = MutableStateFlow<List<Place>>(emptyList())
     private val loading = MutableStateFlow(false)
+    private val loadingMore = MutableStateFlow(false)
+    // Set to false once a pagination attempt returns nothing new —
+    // either the server doesn't yet support offset (FEEDBACK.md §9.9)
+    // or we've truly reached the end. Either way: stop firing more
+    // scroll-triggered fetches until the query key changes.
+    private val canLoadMore = MutableStateFlow(true)
     private val error = MutableStateFlow<String?>(null)
 
     private val heading: StateFlow<Float> = headingSensor.headings()
@@ -72,8 +78,22 @@ class PlacesViewModel @Inject constructor(
         coneDegrees,
         radiusMeters,
         rawPlaces,
-        combine(searchQuery, qualityFilter, heading, loading, error) { q, qf, h, l, e ->
-            CombinedExtras(q, qf, h, l, e)
+        combine(
+            searchQuery,
+            qualityFilter,
+            heading,
+            loading,
+            combine(error, loadingMore, canLoadMore) { e, lm, cm -> Triple(e, lm, cm) },
+        ) { q, qf, h, l, trio ->
+            CombinedExtras(
+                searchQuery = q,
+                qualityFilter = qf,
+                heading = h,
+                loading = l,
+                error = trio.first,
+                loadingMore = trio.second,
+                canLoadMore = trio.third,
+            )
         },
     ) { category, cone, radius, places, extras ->
         val directionFiltered = filterByDirection(places, extras.heading, cone)
@@ -90,6 +110,8 @@ class PlacesViewModel @Inject constructor(
             searchQuery = extras.searchQuery,
             qualityFilter = extras.qualityFilter,
             loading = extras.loading,
+            loadingMore = extras.loadingMore,
+            canLoadMore = extras.canLoadMore,
             errorMessage = extras.error,
             configured = repository.isConfigured,
         )
@@ -105,6 +127,8 @@ class PlacesViewModel @Inject constructor(
         val heading: Float,
         val loading: Boolean,
         val error: String?,
+        val loadingMore: Boolean,
+        val canLoadMore: Boolean,
     )
 
     fun selectCategory(category: PlaceCategory?) {
@@ -223,38 +247,11 @@ class PlacesViewModel @Inject constructor(
             loading.value = true
             error.value = null
             runCatching {
-                if (query.isNotEmpty()) {
-                    // Typed query → hit the server-side full-text
-                    // endpoint, which matches against name, address,
-                    // and the review snippet Google supplies.
-                    // Results come back in relevance order.
-                    //
-                    // `/v1/search` accepts `min_rating` + `min_reviews`
-                    // params but, as of 2026-04-18, silently ignores
-                    // them — verified with curl (see FEEDBACK.md
-                    // §9.4-bug). Apply the same gate client-side so
-                    // the search list honours the quality toggle.
-                    val raw = repository.search(
-                        query = query,
-                        latitude = location.first,
-                        longitude = location.second,
-                        radiusMeters = radiusMeters.value,
-                    )
-                    if (qualityFilter.value) raw.filter(::passesQualityGate) else raw
-                } else {
-                    // `category=null` here → gplaces `category=all`,
-                    // one HTTP call for the union. Quality filter is
-                    // server-side so the payload is already trimmed
-                    // to 4★ / 100 reviews when the toggle is on.
-                    repository.nearby(
-                        latitude = location.first,
-                        longitude = location.second,
-                        category = selectedCategory.value,
-                        radiusMeters = radiusMeters.value,
-                        minRating = if (qualityFilter.value) MIN_RATING else null,
-                        minReviews = if (qualityFilter.value) MIN_REVIEW_COUNT else null,
-                    )
-                }
+                fetchPage(
+                    query = query,
+                    location = location,
+                    offset = 0,
+                )
             }
                 .onSuccess { places ->
                     rawPlaces.value = places
@@ -262,12 +259,89 @@ class PlacesViewModel @Inject constructor(
                     lastFetchKey = key
                     lastFetchAtMs = now
                     lastFetchLocation = location
+                    // Reset pagination — a fresh query starts from 0.
+                    // Assume more is available; the first loadMore call
+                    // will flip the flag once it sees no new rows.
+                    canLoadMore.value = places.isNotEmpty() && places.size >= PAGE_SIZE
                 }
                 .onFailure {
                     Timber.w(it, "Places lookup failed")
                     error.value = it.message ?: "Lookup failed"
                 }
             loading.value = false
+        }
+    }
+
+    // Called when the user scrolls near the end of the LazyColumn.
+    // Appends the next page's results to `rawPlaces`. Deduplicates by
+    // place id so a server that doesn't yet honour the offset param
+    // (FEEDBACK.md §9.9) can't create duplicate rows — and if the
+    // server returns no new rows we flip `canLoadMore` off so scroll
+    // stops asking for more.
+    fun loadMore() {
+        if (!canLoadMore.value) return
+        if (loadingMore.value || loading.value) return
+        val existing = rawPlaces.value
+        if (existing.isEmpty()) return
+        viewModelScope.launch {
+            val location = lastFetchLocation ?: fetchLocation() ?: return@launch
+            val query = searchQuery.value.trim()
+            loadingMore.value = true
+            val result = runCatching {
+                fetchPage(
+                    query = query,
+                    location = location,
+                    offset = existing.size,
+                )
+            }.onFailure {
+                Timber.w(it, "Places load-more failed")
+            }.getOrNull().orEmpty()
+            val existingIds = existing.mapTo(HashSet()) { it.id }
+            val newOnes = result.filter { it.id !in existingIds }
+            if (newOnes.isEmpty()) {
+                // Server didn't advance the cursor (likely the pagination
+                // ask in FEEDBACK.md §9.9 isn't live yet) or we hit the
+                // real end. Either way, stop pulling.
+                canLoadMore.value = false
+            } else {
+                rawPlaces.value = existing + newOnes
+                canLoadMore.value = newOnes.size >= PAGE_SIZE
+            }
+            loadingMore.value = false
+        }
+    }
+
+    // Single server round-trip shared by the initial load and the
+    // load-more path. `/v1/search` now honours `min_rating` +
+    // `min_reviews` server-side (FEEDBACK.md §9.4-bug, verified live
+    // 2026-04-18) so the old client-side fallback is gone. `PAGE_SIZE`
+    // equals the backend's current hard cap of 50 so we pull as much
+    // as possible per call.
+    private suspend fun fetchPage(
+        query: String,
+        location: Pair<Double, Double>,
+        offset: Int,
+    ): List<Place> {
+        return if (query.isNotEmpty()) {
+            repository.search(
+                query = query,
+                latitude = location.first,
+                longitude = location.second,
+                radiusMeters = radiusMeters.value,
+                limit = PAGE_SIZE,
+                offset = offset,
+            )
+        } else {
+            repository.nearby(
+                latitude = location.first,
+                longitude = location.second,
+                category = selectedCategory.value,
+                radiusMeters = radiusMeters.value,
+                minRating = if (qualityFilter.value) MIN_RATING else null,
+                minReviews = if (qualityFilter.value) MIN_REVIEW_COUNT else null,
+                limit = PAGE_SIZE,
+                offset = offset,
+            )
         }
     }
 
@@ -292,6 +366,12 @@ class PlacesViewModel @Inject constructor(
         // wander at a stoplight, small enough that walking past a
         // block re-lists the places around you.
         const val LOCATION_REFRESH_M: Double = 150.0
+
+        // Page size for each backend call. The gplaces server caps at
+        // 50 per response (see FEEDBACK.md §9.1 / §9.9), so we request
+        // the full cap per page and lean on offset pagination — once
+        // the server supports it — for anything beyond that.
+        const val PAGE_SIZE: Int = 50
     }
 
     // Client-side mirror of the backend's `min_rating` + `min_reviews`
@@ -349,6 +429,11 @@ data class PlacesUiState(
     val searchQuery: String = "",
     val qualityFilter: Boolean = true,
     val loading: Boolean = false,
+    // True while the endless-scroll path is fetching the next page.
+    // Distinct from `loading` (first load / query change) so the UI
+    // can show a spinner below the list without hiding existing rows.
+    val loadingMore: Boolean = false,
+    val canLoadMore: Boolean = false,
     val errorMessage: String? = null,
     val configured: Boolean = false,
 )

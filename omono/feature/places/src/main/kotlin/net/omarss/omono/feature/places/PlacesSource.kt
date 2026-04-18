@@ -30,6 +30,13 @@ interface PlacesSource {
         limit: Int = 25,
         minRating: Float? = null,
         minReviews: Int? = null,
+        // Offset into the ordered result set for pagination (see
+        // omono's FEEDBACK.md §9.9). Today the server doesn't yet
+        // honour it; it simply returns the same page each time. The
+        // ViewModel uses response equality as a terminator so "endless
+        // scroll" gracefully stops at the 50-result server cap until
+        // pagination ships. Safe to pass in every request.
+        offset: Int = 0,
     ): List<Place>
 
     // Full-text search across every category within the radius.
@@ -43,5 +50,6 @@ interface PlacesSource {
         longitude: Double,
         radiusMeters: Int,
         limit: Int = 25,
+        offset: Int = 0,
     ): List<Place>
 }

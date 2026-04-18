@@ -52,4 +52,5 @@ enum class PlaceCategory(val label: String, val icon: String) {
     POST_OFFICE("Post", "📮"),
     LIBRARY("Library", "📚"),
     TRANSIT("Transit", "🚌"),
+    JUICE("Juice", "🥤"),
 }

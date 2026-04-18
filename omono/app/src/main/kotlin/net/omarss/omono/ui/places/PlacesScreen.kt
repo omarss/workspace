@@ -21,10 +21,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material.icons.filled.Refresh
@@ -51,6 +54,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -168,8 +172,11 @@ fun PlacesRoute(
         PlaceList(
             places = state.places,
             heading = state.heading,
+            loadingMore = state.loadingMore,
+            canLoadMore = state.canLoadMore,
             onOpenMap = { place -> launchMapsFor(context, place) },
             onCall = { phone -> launchDialer(context, phone) },
+            onLoadMore = viewModel::loadMore,
         )
     }
 }
@@ -193,14 +200,30 @@ private fun CategoryChips(
         FilterChip(
             selected = selected == null,
             onClick = { onSelect(null) },
-            label = { Text("✨ All") },
+            label = { Text("All") },
+            leadingIcon = {
+                Icon(
+                    Icons.Filled.AutoAwesome,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                )
+            },
             colors = FilterChipDefaults.filterChipColors(),
         )
         PlaceCategory.entries.forEach { category ->
+            val visual = category.visual()
             FilterChip(
                 selected = category == selected,
                 onClick = { onSelect(category) },
-                label = { Text("${category.icon} ${category.label}") },
+                label = { Text(category.label) },
+                leadingIcon = {
+                    Icon(
+                        visual.icon,
+                        contentDescription = null,
+                        tint = visual.tint,
+                        modifier = Modifier.size(16.dp),
+                    )
+                },
                 colors = FilterChipDefaults.filterChipColors(),
             )
         }
@@ -350,10 +373,32 @@ private fun EmptyState(title: String, body: String) {
 private fun PlaceList(
     places: List<Place>,
     heading: Float,
+    loadingMore: Boolean,
+    canLoadMore: Boolean,
     onOpenMap: (Place) -> Unit,
     onCall: (String) -> Unit,
+    onLoadMore: () -> Unit,
 ) {
+    val listState = rememberLazyListState()
+    // Triggers a next-page fetch when the user scrolls within
+    // LOAD_MORE_THRESHOLD of the end of the list. derivedStateOf
+    // means we re-evaluate only when the scroll position changes,
+    // not on every recomposition, so it's cheap even on a long list.
+    val shouldLoadMore by remember {
+        derivedStateOf {
+            val layout = listState.layoutInfo
+            val total = layout.totalItemsCount
+            if (total == 0) return@derivedStateOf false
+            val lastVisible = layout.visibleItemsInfo.lastOrNull()?.index ?: return@derivedStateOf false
+            lastVisible >= total - LOAD_MORE_THRESHOLD
+        }
+    }
+    LaunchedEffect(shouldLoadMore, canLoadMore, loadingMore) {
+        if (shouldLoadMore && canLoadMore && !loadingMore) onLoadMore()
+    }
+
     LazyColumn(
+        state = listState,
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -366,8 +411,45 @@ private fun PlaceList(
                 onCall = { place.phone?.let(onCall) },
             )
         }
+        if (loadingMore) {
+            item {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 16.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(24.dp),
+                        strokeWidth = 2.dp,
+                    )
+                }
+            }
+        } else if (!canLoadMore && places.isNotEmpty()) {
+            // Quiet end-of-list marker so users know there isn't more
+            // content hiding below a pull-to-refresh. Only shown once
+            // the list has at least one row so it doesn't appear in
+            // the "empty" state above.
+            item {
+                Text(
+                    text = "End of results",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 16.dp),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                )
+            }
+        }
     }
 }
+
+// Start requesting the next page when we're within 5 items of the end
+// of the list. Small enough that the user keeps flicking past the old
+// end without ever seeing a stall, large enough to ride out typical
+// network latency (~200 ms).
+private const val LOAD_MORE_THRESHOLD: Int = 5
 
 // Elevated card variant of the old row. Tapping anywhere on the card
 // drops the user into their default maps app on the place's coords;
@@ -512,22 +594,26 @@ private fun formatReviewCount(n: Int): String = when {
     else -> "${n / 1_000_000}M"
 }
 
-// Colored circular badge that holds the category emoji. Uses the
-// primary container tint so it reads cleanly on both light and dark
-// surfaces without needing a per-category palette.
+// Coloured circular badge carrying the category's Material icon.
+// Background is a 14 % alpha tint of the category's accent colour, so
+// each badge picks up its own identity while staying legible against
+// both light and dark surfaces. Matches the pattern used by the
+// finance dashboard's CategoryBadge for visual consistency.
 @Composable
 private fun CategoryBadge(category: PlaceCategory) {
+    val visual = category.visual()
     Box(
         modifier = Modifier
             .size(44.dp)
             .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.primaryContainer),
+            .background(visual.tint.copy(alpha = 0.14f)),
         contentAlignment = Alignment.Center,
     ) {
-        Text(
-            text = category.icon,
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onPrimaryContainer,
+        Icon(
+            imageVector = visual.icon,
+            contentDescription = category.label,
+            tint = visual.tint,
+            modifier = Modifier.size(22.dp),
         )
     }
 }

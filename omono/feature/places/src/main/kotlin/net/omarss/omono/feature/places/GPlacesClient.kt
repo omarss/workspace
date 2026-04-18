@@ -42,6 +42,7 @@ class GPlacesClient @Inject constructor(
         limit: Int,
         minRating: Float?,
         minReviews: Int?,
+        offset: Int,
     ): List<Place> = withContext(Dispatchers.IO) {
         if (!isConfigured) return@withContext emptyList()
 
@@ -59,6 +60,10 @@ class GPlacesClient @Inject constructor(
                 if (minReviews != null && minReviews > 0) {
                     addQueryParameter("min_reviews", minReviews.toString())
                 }
+                // Pagination is pending backend work (FEEDBACK.md §9.9).
+                // We send the param anyway so once it lights up no
+                // client change is needed; today the server ignores it.
+                if (offset > 0) addQueryParameter("offset", offset.toString())
             }
             .build()
 
@@ -89,6 +94,7 @@ class GPlacesClient @Inject constructor(
         longitude: Double,
         radiusMeters: Int,
         limit: Int,
+        offset: Int,
     ): List<Place> = withContext(Dispatchers.IO) {
         if (!isConfigured || query.isBlank()) return@withContext emptyList()
 
@@ -99,6 +105,12 @@ class GPlacesClient @Inject constructor(
             .addQueryParameter("radius", radiusMeters.toString())
             .addQueryParameter("q", query)
             .addQueryParameter("limit", limit.toString())
+            .apply {
+                // Same pagination story as /v1/places — parameter is
+                // sent ahead of the server supporting it (FEEDBACK.md
+                // §9.9), harmless until then.
+                if (offset > 0) addQueryParameter("offset", offset.toString())
+            }
             .build()
 
         val request = Request.Builder()
@@ -235,4 +247,5 @@ val PlaceCategory.slug: String
         PlaceCategory.POST_OFFICE -> "post_office"
         PlaceCategory.LIBRARY -> "library"
         PlaceCategory.TRANSIT -> "transit"
+        PlaceCategory.JUICE -> "juice"
     }
