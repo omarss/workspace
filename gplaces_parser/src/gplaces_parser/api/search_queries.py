@@ -22,6 +22,8 @@ from typing import Any
 from psycopg import Connection
 from psycopg.rows import dict_row
 
+from . import search_synonyms
+
 # Same metres-per-degree constant as the /v1/places query; keep duplicated
 # to avoid cross-module imports for a pair of one-liners.
 _M_PER_DEG_LAT = 111_320.0
@@ -30,8 +32,11 @@ _M_PER_DEG_LAT = 111_320.0
 SEARCH_SQL = """
 WITH q AS (
     SELECT
-      websearch_to_tsquery('simple', %(q)s) AS tsq,
-      %(q)s                                 AS raw_q
+      -- Pre-expanded tsquery (synonyms + ar normalisation) comes from Python.
+      -- `to_tsquery('simple', ...)` with `|` / `&` / `()` operators.
+      to_tsquery('simple', %(tsq)s)         AS tsq,
+      -- Raw Arabic-normalised user input for trigram fuzzy on the names.
+      ar_normalize(%(raw_q)s)               AS raw_q
 ),
 cand AS (
     SELECT
@@ -40,12 +45,16 @@ cand AS (
       p.website, p.business_status, p.open_now,
       ts_rank(p.search_tsv, q.tsq)                     AS fts_rank,
       GREATEST(
-        similarity(COALESCE(p.name,    ''), q.raw_q),
-        similarity(COALESCE(p.name_en, ''), q.raw_q)
+        similarity(ar_normalize(COALESCE(p.name,    '')), q.raw_q),
+        similarity(ar_normalize(COALESCE(p.name_en, '')), q.raw_q)
       )                                                AS trgm_score
     FROM places p, q
     WHERE
-      (p.search_tsv @@ q.tsq OR p.name %% q.raw_q OR p.name_en %% q.raw_q)
+      (
+        p.search_tsv @@ q.tsq
+        OR ar_normalize(p.name)    %% q.raw_q
+        OR ar_normalize(p.name_en) %% q.raw_q
+      )
       AND (%(category)s::text IS NULL OR p.category = %(category)s)
       AND (
         %(has_geo)s = false OR (
@@ -79,8 +88,11 @@ def search(
     else:
         lat_pad = lon_pad = 0.0
 
+    # `tsq` is the synonym-expanded tsquery string; `raw_q` is the
+    # ar-normalised original for trigram fuzzy ranking (score + match).
     params = {
-        "q": q.strip(),
+        "tsq": search_synonyms.build_tsquery(q),
+        "raw_q": q.strip(),
         "category": category,
         "lat": lat or 0.0,
         "lon": lon or 0.0,

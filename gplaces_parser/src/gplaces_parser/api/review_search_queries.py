@@ -16,11 +16,13 @@ from typing import Any
 from psycopg import Connection
 from psycopg.rows import dict_row
 
+from . import search_synonyms
+
 SEARCH_SQL = """
 WITH q AS (
     SELECT
-      websearch_to_tsquery('simple', %(q)s) AS tsq,
-      %(q)s AS raw_q
+      to_tsquery('simple', %(tsq)s)   AS tsq,
+      ar_normalize(%(raw_q)s)          AS raw_q
 )
 SELECT
   r.review_id,
@@ -65,7 +67,8 @@ def search(
     limit: int = 20,
 ) -> list[dict[str, Any]]:
     params = {
-        "q": q.strip(),
+        "tsq": search_synonyms.build_tsquery(q),
+        "raw_q": q.strip(),
         "categories": categories,
         "place_id": place_id,
         "min_review_rating": min_review_rating,

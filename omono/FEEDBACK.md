@@ -357,6 +357,30 @@ it even if it's two blocks away.
 Lower priority than 9.1–9.3; the client-side filter is acceptable for
 now.
 
+### 9.8 Arabic-aware search — normalisation + synonyms (2026-04-18)
+
+**Status:** ✅ shipped (pending `make deploy`). Applies to both
+`/v1/search` and `/v1/reviews/search` with no API change — just
+smarter matching:
+
+- **Normalization (SQL `ar_normalize`):**
+  - strips harakat, tatweel (U+0640), and superscript alef
+  - folds Alef variants `أ إ آ ٱ` → `ا`
+  - folds alef-maqsura `ى` → `ي`
+  - folds ta-marbuta `ة` → `ه` (so colloquial `قهوه` matches formal `قهوة`)
+- **Synonyms (app layer):** query tokens that appear in a known group
+  OR-expand to every member of the group before `to_tsquery`. Groups
+  currently defined for coffee, restaurant, fast food, bakery,
+  grocery, mall, fuel, EV charger, car wash, pharmacy, hospital, gym,
+  park, bank, ATM, mosque, salon, laundry, post office, library —
+  each with both Arabic and English variants plus common transliterations.
+- **Applies equally to reviews search.** `قهوه` finds English-text
+  reviews that mention `coffee`; `مكتبة` finds reviews mentioning
+  `books` or `library`.
+
+No omono-side change. The existing `q=<text>` parameter just starts
+returning better results.
+
 ### 9.7 `GET /v1/reviews/search` — keyword search in review bodies (2026-04-18)
 
 **Status:** ✅ shipped (pending `make deploy`). Works over ~2k reviews
