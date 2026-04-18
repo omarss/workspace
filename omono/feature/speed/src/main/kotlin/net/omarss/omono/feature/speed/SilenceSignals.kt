@@ -65,4 +65,68 @@ fun Context.inCallFlow(): Flow<Boolean> = flow {
     }
 }
 
+// "Is someone actively holding / handling the phone right now?" —
+// derived from the variance of the accelerometer magnitude over a
+// short rolling window.
+//
+// Rationale: a phone in a driver's hand picks up continuous micro-
+// movements from hand tremor + scrolling + typing (variance > 0.5
+// m²/s⁴). A phone resting on a dashboard or seat only shows road
+// vibration, which at highway speeds lands well below that floor
+// (typical 0.05–0.15). Thresholding the variance cleanly
+// distinguishes "in hand" from "at rest" without any FFT gymnastics.
+//
+// Emits only on state transitions (not on every 20 Hz sample) so the
+// downstream combine doesn't thrash. Defaults to `true` (in-hand) on
+// devices without an accelerometer so the guard behaves as before.
+fun Context.phoneInHandFlow(): Flow<Boolean> = callbackFlow {
+    val sensorManager = getSystemService<android.hardware.SensorManager>()
+    val accel = sensorManager?.getDefaultSensor(android.hardware.Sensor.TYPE_ACCELEROMETER)
+    if (sensorManager == null || accel == null) {
+        trySend(true) // no sensor — never silence on "not held"
+        awaitClose { }
+        return@callbackFlow
+    }
+    trySend(true) // initial assumption: held, until we've sampled
+
+    val window = ArrayDeque<Float>()
+    var lastEmitted: Boolean? = null
+
+    val listener = object : android.hardware.SensorEventListener {
+        override fun onSensorChanged(event: android.hardware.SensorEvent) {
+            val v = event.values
+            if (v.size < 3) return
+            val magnitude = kotlin.math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2])
+            window.addLast(magnitude)
+            while (window.size > WINDOW_SIZE) window.removeFirst()
+            if (window.size < WINDOW_SIZE) return
+            // Population variance is fine — the window is fixed-size.
+            val mean = window.sum() / window.size
+            var ss = 0.0
+            window.forEach { ss += (it - mean) * (it - mean) }
+            val variance = ss / window.size
+            val inHand = variance > STILL_VARIANCE_THRESHOLD
+            if (inHand != lastEmitted) {
+                lastEmitted = inHand
+                trySend(inHand)
+            }
+        }
+        override fun onAccuracyChanged(s: android.hardware.Sensor?, a: Int) = Unit
+    }
+    // SENSOR_DELAY_UI is ~60 ms — roughly 16 Hz, plenty for a 1 s
+    // window and cheap on power compared to GAME or FASTEST.
+    sensorManager.registerListener(listener, accel, android.hardware.SensorManager.SENSOR_DELAY_UI)
+    awaitClose { runCatching { sensorManager.unregisterListener(listener) } }
+}
+
 private const val IN_CALL_POLL_MS: Long = 2_000L
+
+// ~1 s of samples at SENSOR_DELAY_UI. Long enough to average out a
+// single bump, short enough that picking up the phone registers
+// within one second.
+private const val WINDOW_SIZE: Int = 16
+
+// Empirically chosen boundary: resting phone ≈ 0.05–0.15 m²/s⁴;
+// handheld phone ≈ 0.5+ even when sitting still. 0.25 gives a
+// comfortable margin for road vibration on rough surfaces.
+private const val STILL_VARIANCE_THRESHOLD: Double = 0.25

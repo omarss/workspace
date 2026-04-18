@@ -84,6 +84,12 @@ class SpeedFeature @Inject constructor(
     // while already over the limit.
     private var wasOverLimit: Boolean = false
 
+    // Counts consecutive over-limit samples so we can require more than
+    // one before firing. A single noisy sample doesn't cross the
+    // threshold — two consecutive ones at 1 Hz (≈2 s of real over-
+    // limit) reliably do.
+    private var consecutiveOverSamples: Int = 0
+
     override fun start(scope: CoroutineScope): Flow<FeatureState> {
         // Each new GPS sample triggers a (cached, distance-throttled)
         // speed-limit lookup and feeds the trip recorder so trip history
@@ -109,6 +115,7 @@ class SpeedFeature @Inject constructor(
         // Reset transition memory each time the feature (re)starts so a
         // stop/start cycle doesn't suppress the first alert.
         wasOverLimit = false
+        consecutiveOverSamples = 0
         drivingDetector.reset()
         // Distraction guard runs alongside the main location stream —
         // it owns its own combine of driving × screen × setting and
@@ -150,12 +157,28 @@ class SpeedFeature @Inject constructor(
         Dispatchers.IO + SupervisorJob(),
     )
 
+    // Fires the alert only after the user has been over the limit for
+    // MIN_CONSECUTIVE_OVER_SAMPLES in a row — prevents a single GPS
+    // spike on the highway triggering a phantom "Slow down". The
+    // rising-edge check still applies so a sustained over-limit run
+    // plays exactly one alert at the moment the threshold was crossed
+    // for real.
     private suspend fun maybeAlert(mps: Float, limitKmh: Float?) {
         val speedKmh = SpeedUnit.KmH.fromMetersPerSecond(mps)
+        val isOverNow = limitKmh != null && speedKmh > limitKmh
+        consecutiveOverSamples = if (isOverNow) consecutiveOverSamples + 1 else 0
+        val debouncedOverLimit = consecutiveOverSamples >= MIN_CONSECUTIVE_OVER_SAMPLES
         val rising = shouldAlertOnCrossing(wasOverLimit, speedKmh, limitKmh)
-        wasOverLimit = limitKmh != null && speedKmh > limitKmh
-        if (rising && settings.alertOnOverLimit.first()) {
+        wasOverLimit = debouncedOverLimit
+        // Fire on the rising edge, but only if the debounced state
+        // agrees the user is *really* over — otherwise a 1-sample
+        // spike's rising edge alone would trigger the tone.
+        if (rising && debouncedOverLimit && settings.alertOnOverLimit.first()) {
             alertPlayer.alert()
         }
+    }
+
+    private companion object {
+        const val MIN_CONSECUTIVE_OVER_SAMPLES = 2
     }
 }

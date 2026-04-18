@@ -14,6 +14,9 @@ import com.google.android.gms.location.Priority
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.callbackFlow
 import timber.log.Timber
 import javax.inject.Inject
@@ -98,6 +101,20 @@ class SpeedRepository @Inject constructor(
 ) {
     private val client by lazy { LocationServices.getFusedLocationProviderClient(context) }
 
+    // Live speed in m/s, updated on every accepted GPS fix. Exposed as a
+    // StateFlow so downstream consumers (DistractionGuard's "is moving
+    // right now?" gate) don't have to spawn a second GPS subscription.
+    // Stays at 0 while no one is collecting `locations()` — the callback
+    // that writes to it only runs during active tracking, which is
+    // exactly when the "moving" signal matters.
+    private val _currentSpeedMps = MutableStateFlow(0f)
+    val currentSpeedMps: StateFlow<Float> = _currentSpeedMps.asStateFlow()
+
+    // Last accepted speed for single-sample spike rejection. Kept
+    // out of the pure `filterSpeed` helper (which must stay stateless
+    // for unit tests) but applied in the callback below.
+    @Volatile private var lastAcceptedMps: Float = 0f
+
     @SuppressLint("MissingPermission")
     fun locations(): Flow<LocationSnapshot> = callbackFlow {
         if (!hasLocationPermission()) {
@@ -123,7 +140,7 @@ class SpeedRepository @Inject constructor(
                 override fun onLocationResult(result: LocationResult) {
                     val location = result.lastLocation ?: return
                     val rawSpeed = if (location.hasSpeed()) location.speed else 0f
-                    val trustedSpeed = filterSpeed(
+                    val filteredSpeed = filterSpeed(
                         hasSpeed = location.hasSpeed(),
                         rawSpeedMps = rawSpeed,
                         hasAccuracy = location.hasAccuracy(),
@@ -131,6 +148,27 @@ class SpeedRepository @Inject constructor(
                         hasSpeedAccuracy = location.hasSpeedAccuracy(),
                         speedAccuracyMps = location.speedAccuracyMetersPerSecond,
                     )
+                    // Spike rejection: if this sample claims a delta
+                    // bigger than any physically-plausible car can
+                    // deliver in one second (~36 km/h of change), treat
+                    // it as GPS noise and hold the previous value. A
+                    // true hard-brake / launch event still passes
+                    // because it takes several samples to ramp up.
+                    val prev = lastAcceptedMps
+                    val trustedSpeed = if (
+                        filteredSpeed > 0f &&
+                        kotlin.math.abs(filteredSpeed - prev) > MAX_SPEED_JUMP_MPS
+                    ) {
+                        Timber.d(
+                            "Rejecting speed spike: %.1f → %.1f m/s",
+                            prev, filteredSpeed,
+                        )
+                        prev
+                    } else {
+                        filteredSpeed
+                    }
+                    lastAcceptedMps = trustedSpeed
+                    _currentSpeedMps.value = trustedSpeed
                     val snapshot = LocationSnapshot(
                         latitude = location.latitude,
                         longitude = location.longitude,
@@ -200,5 +238,13 @@ class SpeedRepository @Inject constructor(
         // No movement for this long → drop to slow mode. First real
         // sample above the threshold promotes us back immediately.
         const val IDLE_TIMEOUT_MS: Long = 60_000L
+
+        // Largest speed delta one sample-to-the-next we'll accept.
+        // Chosen above what any street-legal car can physically produce
+        // in one second (~36 km/h of change in 1 s = 10 m/s²), so real
+        // hard-brakes and hard launches still pass, but a GPS ghost
+        // that flashes 30 m/s under an overpass gets clamped to the
+        // previous value.
+        const val MAX_SPEED_JUMP_MPS: Float = 10f
     }
 }

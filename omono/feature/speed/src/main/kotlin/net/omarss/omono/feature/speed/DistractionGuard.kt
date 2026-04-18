@@ -6,8 +6,10 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 import timber.log.Timber
 import javax.inject.Inject
@@ -16,29 +18,38 @@ import javax.inject.Singleton
 // Beeps when the user is actively using the phone for something other
 // than navigation while driving.
 //
-// The previous version treated "screen on" as proof of use — that
-// over-fired on notifications that briefly wake the screen, and
-// misfired on drivers legitimately using Google Maps / Waze. This
-// version adds two checks:
+// Armed only when ALL of these align — any one flipping stops the
+// beep loop within one combine tick:
 //
-//   * Grace window (GRACE_MS). The screen must stay on continuously
-//     for this long before the loop starts. Catches pocket-unlocks
-//     and notification wakes that settle back to screen-off.
-//   * Navigation-app whitelist via UsageStatsManager. If the
-//     foreground app is a recognised driver navigation app, beeping
-//     pauses. When the user flips back to non-nav (or home screen),
-//     beeping resumes.
+//   1. Feature is enabled (the setting toggle).
+//   2. Device is currently moving. Uses a deliberately short-lived
+//      "moving" gate (1 m/s threshold with a 4 s grace) rather than
+//      DrivingModeDetector's 2-minute sticky state, because the user
+//      expects the beep to stop the moment they slow down — not two
+//      minutes later at a red light.
+//   3. Screen is on.
+//   4. None of the silence conditions hold:
+//        - Proximity sensor covered (phone face-down / in pocket).
+//        - Device is on a call (AudioManager mode in IN_CALL / IN_COMMUNICATION).
+//        - Phone is resting on a surface (accelerometer variance below
+//          the stillness threshold for the rolling window).
+//
+// After armed=true the loop waits out GRACE_MS before the first beep so
+// a notification that briefly wakes the screen or a misfire doesn't
+// trigger. While armed, every POLL_INTERVAL_MS it checks the current
+// foreground app and pauses beeping when it's a recognised navigation
+// app — "eyes on Google Maps" is the whole point of letting you drive
+// with the phone mounted in the first place.
 //
 // UsageStats permission is optional; without it the detector reports
-// null foreground and the guard treats "non-nav" conservatively (the
-// old screen-on-only behaviour). The settings UI surfaces the
-// permission status so the user can grant it in one tap.
+// null foreground and the guard treats that conservatively (beep). The
+// settings UI surfaces the permission state so the user can grant it.
 @Singleton
 class DistractionGuard @Inject constructor(
     @param:ApplicationContext private val context: Context,
     private val settings: SpeedSettingsRepository,
     private val alertPlayer: SpeedAlertPlayer,
-    private val driving: DrivingModeDetector,
+    private val speedRepository: SpeedRepository,
     private val foregroundApp: ForegroundAppDetector,
 ) {
 
@@ -46,19 +57,24 @@ class DistractionGuard @Inject constructor(
 
     fun attach(scope: CoroutineScope) {
         scope.launch {
-            // Five signals × combine(): driving, screen on, setting
-            // enabled, proximity uncovered (phone not face-down / in
-            // pocket), not currently on a call. Armed only when all
-            // align — any one of them tipping false stops the loop
-            // immediately via distinctUntilChanged + the else branch.
-            combine(
-                driving.isDriving,
-                context.screenOnFlow(),
-                settings.alertOnPhoneUseWhileDriving,
+            // Group the "something silences us" signals into a single
+            // boolean so the top-level combine stays under Kotlin's 5-
+            // flow overload. Any one of these being true = silenced.
+            val silencedFlow: Flow<Boolean> = combine(
                 context.proximityCoveredFlow(),
                 context.inCallFlow(),
-            ) { isDriving, screenOn, enabled, proxCovered, inCall ->
-                enabled && isDriving && screenOn && !proxCovered && !inCall
+                context.phoneInHandFlow(),
+            ) { proxCovered, inCall, inHand ->
+                proxCovered || inCall || !inHand
+            }
+
+            combine(
+                movingNowFlow(),
+                context.screenOnFlow(),
+                settings.alertOnPhoneUseWhileDriving,
+                silencedFlow,
+            ) { moving, screenOn, enabled, silenced ->
+                enabled && moving && screenOn && !silenced
             }
                 .distinctUntilChanged()
                 .collect { armed ->
@@ -72,6 +88,26 @@ class DistractionGuard @Inject constructor(
                     }
                 }
         }
+    }
+
+    // Emits `true` while the device has registered speed above
+    // MOVING_MPS within the last MOVING_GRACE_MS, `false` otherwise.
+    // Driven by a 500 ms ticker combined with the speed StateFlow so a
+    // stopped car still transitions to `false` promptly — we can't
+    // rely on the GPS callback firing when speed is zero.
+    private fun movingNowFlow(): Flow<Boolean> {
+        val ticker: Flow<Unit> = flow {
+            while (true) {
+                emit(Unit)
+                delay(TICK_MS)
+            }
+        }
+        var lastMovingMs = Long.MIN_VALUE / 2
+        return combine(speedRepository.currentSpeedMps, ticker) { s, _ ->
+            val now = System.currentTimeMillis()
+            if (s >= MOVING_MPS) lastMovingMs = now
+            now - lastMovingMs < MOVING_GRACE_MS
+        }.distinctUntilChanged()
     }
 
     // While armed: wait out the grace window, then every POLL_INTERVAL_MS
@@ -113,5 +149,21 @@ class DistractionGuard @Inject constructor(
         // enough that flipping to nav feels instant without hammering
         // UsageStats.
         const val POLL_INTERVAL_MS = 2_000L
+
+        // Speed threshold for "the car is actually moving". 1 m/s is
+        // ~3.6 km/h — below that is GPS jitter at a stand-still.
+        const val MOVING_MPS = 1.0f
+
+        // How long after the last above-threshold sample we still call
+        // "moving". 4 s is long enough to absorb a momentary slowdown
+        // (ducking into a turn lane, a bump in the road) and short
+        // enough that a genuine stop at a red light releases the alert
+        // quickly.
+        const val MOVING_GRACE_MS = 4_000L
+
+        // Tick cadence for the movingNow emitter. Fast enough that the
+        // "we just slowed to a stop" transition fires within half a
+        // second; slow enough to be negligible on battery.
+        const val TICK_MS = 500L
     }
 }
