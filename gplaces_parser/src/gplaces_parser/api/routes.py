@@ -197,6 +197,8 @@ async def search(
     radius: Annotated[int | None, Query(ge=1, le=50_000)] = None,
     limit: Annotated[int, Query(ge=1, le=50)] = 20,
     lang: Annotated[str, Query(pattern="^(ar|en)$")] = "en",
+    min_rating: Annotated[float, Query(ge=0.0, le=5.0)] = 0.0,
+    min_reviews: Annotated[int, Query(ge=0)] = 0,
 ) -> SearchResponse:
     """Keyword + fuzzy search over places.
 
@@ -233,6 +235,8 @@ async def search(
             lon=lon,
             radius_m=radius,
             limit=limit,
+            min_rating=min_rating,
+            min_reviews=min_reviews,
         )
 
     def pick_name(row: dict) -> tuple[str, str | None]:
