@@ -53,23 +53,40 @@ async def nearby(
             limit=effective_limit,
         )
 
-    results = [
-        NearbyResult(
-            id=r["place_id"],
-            name=r["name"],
-            name_ar=r["name"],  # scraped in ar; omono's parser tolerates both = same
-            category=r["category"],
-            lat=r["latitude"],
-            lon=r["longitude"],
-            address=r["full_address"],
-            phone=r["phone"],
-            rating=float(r["rating"]) if r["rating"] is not None else None,
-            review_count=r["reviews_count"],
-            open_now=None,  # derived from working_hours — not yet parsed
-            website=r["website"],
+    # Per FEEDBACK §3 the JSON `name` field is English and `name_ar` is
+    # Arabic. If the caller asked for `lang=ar` and only an Arabic name
+    # is known, we fall back to it for the English slot too so the
+    # client always has something to render.
+    def pick_name(row):
+        ar, en = row["name"], row["name_en"]
+        if lang == "ar":
+            return (ar or en, ar or en)
+        return (en or ar, ar or en)
+
+    def pick_addr(row):
+        if lang == "ar":
+            return row["full_address"] or row["full_address_en"]
+        return row["full_address_en"] or row["full_address"]
+
+    results = []
+    for r in rows:
+        name_primary, name_ar = pick_name(r)
+        results.append(
+            NearbyResult(
+                id=r["place_id"],
+                name=name_primary,
+                name_ar=name_ar,
+                category=r["category"],
+                lat=r["latitude"],
+                lon=r["longitude"],
+                address=pick_addr(r),
+                phone=r["phone"],
+                rating=float(r["rating"]) if r["rating"] is not None else None,
+                review_count=r["reviews_count"],
+                open_now=None,
+                website=r["website"],
+            )
         )
-        for r in rows
-    ]
 
     return NearbyResponse(
         results=results,

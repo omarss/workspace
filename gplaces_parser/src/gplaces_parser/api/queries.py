@@ -38,9 +38,11 @@ WITH
     SELECT
       c.place_id,
       c.name,
+      c.name_en,
       c.latitude,
       c.longitude,
       c.full_address,
+      c.full_address_en,
       c.phone,
       c.rating,
       c.reviews_count,

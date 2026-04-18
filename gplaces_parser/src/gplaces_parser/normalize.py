@@ -53,18 +53,27 @@ def normalize_place(
     query: str,
     tile_lat: float,
     tile_lng: float,
+    lang: str = "ar",
 ) -> dict[str, Any] | None:
     place_id = _first(rec, "place_id", "placeId")
     name = _first(rec, "name", "title")
     if not place_id or not name:
         return None
 
+    # Route the localised fields by language so a single place can carry
+    # both `name` / `name_ar`-flavoured columns and `name_en` populated
+    # from separate hl=en searches. Pass 1 only produces the name; pass
+    # 2's detail extraction can later add addresses per language.
+    addr = _first(rec, "full_address", "address")
+
     return {
         "place_id": str(place_id),
         "google_id": _first(rec, "google_id", "googleId"),
         "cid": _first(rec, "cid"),
-        "name": str(name),
-        "full_address": _first(rec, "full_address", "address"),
+        "name": str(name) if lang == "ar" else None,
+        "name_en": str(name) if lang == "en" else None,
+        "full_address": addr if lang == "ar" else None,
+        "full_address_en": addr if lang == "en" else None,
         "borough": _first(rec, "borough"),
         "street": _first(rec, "street"),
         "city": _first(rec, "city"),

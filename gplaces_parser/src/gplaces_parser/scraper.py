@@ -71,6 +71,12 @@ class PlaywrightScraper:
             timezone_id="Asia/Riyadh",
             args=["--disable-blink-features=AutomationControlled"],
         )
+        # Let Google see our spoofed coordinates as "user location" in
+        # addition to whatever we put in the URL viewport. Without this,
+        # the "nearby to you" ranking signal still uses the real IP's
+        # geolocation and we'd under-surface places physically far from
+        # home base.
+        self.ctx.grant_permissions(["geolocation"], origin="https://www.google.com")
         self.page: Page = self.ctx.pages[0] if self.ctx.pages else self.ctx.new_page()
         self.page.set_default_timeout(settings.scraper_page_timeout_ms)
 
@@ -107,13 +113,24 @@ class PlaywrightScraper:
 
     # -- places search -------------------------------------------------------
 
-    def search_places(self, query: str, lat: float, lng: float, zoom: int = 15) -> list[dict[str, Any]]:
+    def search_places(
+        self,
+        query: str,
+        lat: float,
+        lng: float,
+        zoom: int = 15,
+        hl: str | None = None,
+    ) -> list[dict[str, Any]]:
+        # Spoof the browser's geolocation API response to the district
+        # centroid so Google sees us as physically there, not at the
+        # host's ISP-resolved location.
+        self.ctx.set_geolocation({"latitude": lat, "longitude": lng, "accuracy": 30})
         url = SEARCH_URL_TMPL.format(
             q=quote(query),
             lat=f"{lat:.6f}",
             lng=f"{lng:.6f}",
             zoom=zoom,
-            lang=settings.language,
+            lang=hl or settings.language,
             region=settings.region,
         )
         self.page.goto(url, wait_until="domcontentloaded")
@@ -179,8 +196,16 @@ class PlaywrightScraper:
     # -- place detail + reviews ---------------------------------------------
 
     def fetch_place(
-        self, place_url: str, reviews_limit: int, sort: str = "newest"
+        self,
+        place_url: str,
+        reviews_limit: int,
+        sort: str = "newest",
+        geolocation: tuple[float, float] | None = None,
     ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+        if geolocation is not None:
+            self.ctx.set_geolocation(
+                {"latitude": geolocation[0], "longitude": geolocation[1], "accuracy": 30}
+            )
         self.page.goto(place_url, wait_until="domcontentloaded")
         self._await_human_if_blocked()
         main = self.page.locator('div[role="main"]').first

@@ -160,11 +160,21 @@ def _pending_count(conn, kind: str) -> int:
 # ---- workers --------------------------------------------------------------
 
 
+# Quick-and-reliable: any Arabic-script codepoint → treat as ar. Works for
+# every query in categories.py because they're either pure Arabic or pure
+# ASCII English.
+def _lang_of(query: str) -> str:
+    return "ar" if any("\u0600" <= ch <= "\u06ff" for ch in query) else "en"
+
+
 def _process_place_job(scraper: PlaywrightScraper, job: _JobRow) -> None:
     assert job.category and job.tile_lat is not None and job.tile_lng is not None
     assert job.query, f"job {job.id} has no query; re-seed with newer schema"
     query = job.query
-    cards = scraper.search_places(query=query, lat=job.tile_lat, lng=job.tile_lng)
+    hl = _lang_of(query)
+    cards = scraper.search_places(
+        query=query, lat=job.tile_lat, lng=job.tile_lng, hl=hl
+    )
 
     rows: list[dict[str, Any]] = []
     for rec in cards:
@@ -174,6 +184,7 @@ def _process_place_job(scraper: PlaywrightScraper, job: _JobRow) -> None:
             query=query,
             tile_lat=job.tile_lat,
             tile_lng=job.tile_lng,
+            lang=hl,
         )
         if row:
             rows.append(row)
@@ -201,10 +212,15 @@ def _process_review_job(scraper: PlaywrightScraper, job: _JobRow) -> None:
         return
     place_url: str = row[0]
 
+    # Use the place's own coordinates as the spoofed browser location —
+    # that's the most honest "I am at this place" signal for the review
+    # fetch, and it keeps Google's ranking consistent across the run.
+    geo = _place_geo(job.place_id)
     detail, review_records = scraper.fetch_place(
         place_url=place_url,
         reviews_limit=settings.reviews_per_place,
         sort=settings.reviews_sort,
+        geolocation=geo,
     )
 
     # Update the place row with the detail fields (keeps category + tile intact).
@@ -238,6 +254,15 @@ def _fetch_place_category(place_id: str) -> str:
         cur.execute("SELECT category FROM places WHERE place_id=%s", (place_id,))
         r = cur.fetchone()
         return r[0] if r and r[0] else ""
+
+
+def _place_geo(place_id: str) -> tuple[float, float] | None:
+    with connection() as conn, conn.cursor() as cur:
+        cur.execute("SELECT latitude, longitude FROM places WHERE place_id=%s", (place_id,))
+        r = cur.fetchone()
+    if r and r[0] is not None and r[1] is not None:
+        return (float(r[0]), float(r[1]))
+    return None
 
 
 def _update_place_detail(conn, place_id: str, row: dict[str, Any]) -> None:
