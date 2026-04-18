@@ -14,7 +14,7 @@ import org.robolectric.annotation.Config
 class GPlacesClientTest {
 
     private val client = GPlacesClient(
-        baseUrl = "https://api-places.omarss.net",
+        baseUrl = "https://api.omarss.net",
         apiKey = "test-key",
     )
 
