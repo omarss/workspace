@@ -10,11 +10,14 @@ from fastapi import APIRouter, HTTPException, Query, status
 from ..categories import ALLOWED_SLUGS
 from ..config import settings
 from ..db import connection
-from . import queries, roads_queries, search_queries
+from . import queries, review_search_queries, roads_queries, search_queries
 from .deps import AuthDep
 from .schemas import (
     NearbyResponse,
     NearbyResult,
+    ReviewHit,
+    ReviewPlace,
+    ReviewSearchResponse,
     Road,
     RoadsResponse,
     SearchResponse,
@@ -265,6 +268,87 @@ async def search(
         )
 
     return SearchResponse(
+        results=results,
+        query=q,
+        source="gplaces",
+        generated_at=datetime.now(UTC),
+    )
+
+
+@router.get(
+    "/reviews/search",
+    response_model=ReviewSearchResponse,
+    responses={401: {}, 400: {}},
+)
+async def reviews_search(
+    _: AuthDep,
+    q: Annotated[str, Query(min_length=1, max_length=200)],
+    category: Annotated[str | None, Query(description="slug, 'all', or comma-separated list")] = None,
+    place_id: Annotated[str | None, Query()] = None,
+    min_rating: Annotated[int, Query(ge=1, le=5)] = 0,
+    limit: Annotated[int, Query(ge=1, le=50)] = 20,
+    lang: Annotated[str, Query(pattern="^(ar|en)$")] = "en",
+) -> ReviewSearchResponse:
+    """Full-text search over review bodies.
+
+    Joins each match to its parent place so the response carries name,
+    category, and coordinates. `snippet` wraps matched tokens in
+    `<b>…</b>` for UI highlighting.
+    """
+    categories: list[str] | None = None
+    if category is not None:
+        raw = category.strip().lower()
+        if raw != "all":
+            slugs = [s.strip() for s in raw.split(",") if s.strip()]
+            unknown = [s for s in slugs if s not in ALLOWED_SLUGS]
+            if unknown:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"unknown category: {','.join(unknown)}",
+                )
+            categories = slugs
+
+    with connection() as conn:
+        rows = review_search_queries.search(
+            conn,
+            q=q,
+            categories=categories,
+            place_id=place_id,
+            min_review_rating=min_rating,
+            limit=limit,
+        )
+
+    def place_name(ar: str | None, en: str | None) -> tuple[str, str | None]:
+        if lang == "ar":
+            return (ar or en or "", ar)
+        return (en or ar or "", ar)
+
+    results: list[ReviewHit] = []
+    for r in rows:
+        primary, ar_name = place_name(r["place_name"], r["place_name_en"])
+        results.append(
+            ReviewHit(
+                review_id=r["review_id"],
+                rating=r["review_rating"],
+                text=r["review_text"],
+                snippet=r["snippet"],
+                published_at=r["published_at"],
+                author=r["author"],
+                likes=r["likes"],
+                place=ReviewPlace(
+                    id=r["place_id"],
+                    name=primary,
+                    name_ar=ar_name,
+                    category=r["place_category"],
+                    lat=r["place_lat"],
+                    lon=r["place_lon"],
+                    rating=float(r["place_rating"]) if r["place_rating"] is not None else None,
+                ),
+                score=round(float(r["score"]), 4),
+            )
+        )
+
+    return ReviewSearchResponse(
         results=results,
         query=q,
         source="gplaces",

@@ -357,6 +357,59 @@ it even if it's two blocks away.
 Lower priority than 9.1–9.3; the client-side filter is acceptable for
 now.
 
+### 9.7 `GET /v1/reviews/search` — keyword search in review bodies (2026-04-18)
+
+**Status:** ✅ shipped (pending `make deploy`). Works over ~2k reviews
+today, will grow as pass 2 drains in the background.
+
+```
+GET /v1/reviews/search?q=<text>&category=<opt>&place_id=<opt>&min_rating=<1..5>&limit=<default 20, max 50>&lang=ar|en
+X-Api-Key: <same key>
+```
+
+Response:
+```json
+{
+  "results": [
+    {
+      "review_id": "...",
+      "rating": 5,
+      "text": "...",
+      "snippet": "Delicious <b>coffee</b>. Beautiful place...",
+      "published_at": "2026-03-12T...",
+      "author": "Bsmh A",
+      "likes": 3,
+      "place": {
+        "id": "0x…:0x…",
+        "name": "Joe Barrel Coffee",
+        "name_ar": "جو برل",
+        "category": "coffee",
+        "lat": 24.72,
+        "lon": 46.68,
+        "rating": 4.5
+      },
+      "score": 0.0987
+    }
+  ],
+  "query": "coffee",
+  "source": "gplaces",
+  "generated_at": "..."
+}
+```
+
+- **`snippet`** wraps matched tokens in `<b>…</b>` (use directly in
+  HTML; strip tags for plain-text rendering).
+- **`category`** accepts the same `all` / comma-separated grammar as
+  `/v1/places` (§9.1). Filters reviews whose *parent place* falls in
+  those categories.
+- **`place_id`** narrows to a single place's reviews.
+- **`min_rating`** = only reviews whose star rating is `≥` this (1–5).
+- Ranking: `ts_rank` descending, ties on `likes` then `published_at`.
+
+Arabic + English both supported; the `simple` tsconfig tokenises on
+whitespace + case-folds without stemming, which is what Arabic needs
+(no stemmer shipped) and English tolerates.
+
 ### 9.6 New category — `library` (2026-04-18)
 
 **Status:** ✅ added server-side. 120 new scrape jobs seeded (~2 h to

@@ -88,3 +88,35 @@ class SearchResponse(BaseModel):
     query: str
     source: str = "gplaces"
     generated_at: datetime = Field(default_factory=lambda: datetime.utcnow())
+
+
+class ReviewPlace(BaseModel):
+    id: str
+    name: str
+    name_ar: str | None = None
+    category: str
+    lat: float
+    lon: float
+    rating: float | None = None
+
+
+class ReviewHit(BaseModel):
+    review_id: str
+    rating: int | None = None
+    text: str | None = None
+    # `snippet` wraps matched tokens in `<b>...</b>` so a UI can
+    # highlight them directly. Clients not doing highlighting should
+    # strip the tags and fall back to `text`.
+    snippet: str | None = None
+    published_at: datetime | None = None
+    author: str | None = None
+    likes: int | None = None
+    place: ReviewPlace
+    score: float
+
+
+class ReviewSearchResponse(BaseModel):
+    results: list[ReviewHit]
+    query: str
+    source: str = "gplaces"
+    generated_at: datetime = Field(default_factory=lambda: datetime.utcnow())
