@@ -36,6 +36,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -84,7 +85,7 @@ fun PlacesRoute(
                 }
             },
             actions = {
-                IconButton(onClick = viewModel::refresh) {
+                IconButton(onClick = { viewModel.refresh(force = true) }) {
                     Icon(Icons.Filled.Refresh, contentDescription = "Refresh")
                 }
             },
@@ -125,10 +126,15 @@ fun PlacesRoute(
             return@Column
         }
 
+        // When we already have results, keep showing them during a
+        // refresh instead of swapping to a spinner — that swap was
+        // the "flicker" the user saw every time they opened the
+        // places screen. A thin indeterminate bar along the top is
+        // enough to signal "still fetching".
         Crossfade(targetState = state, label = "places_state_transition") { currentState ->
             when {
-                currentState.loading -> LoadingState()
-                currentState.errorMessage != null -> EmptyState(
+                currentState.loading && currentState.places.isEmpty() -> LoadingState()
+                currentState.errorMessage != null && currentState.places.isEmpty() -> EmptyState(
                     title = "Couldn't load places",
                     body = currentState.errorMessage.orEmpty(),
                 )
@@ -136,12 +142,21 @@ fun PlacesRoute(
                     title = "Nothing in that direction",
                     body = "Widen the cone or pick a different category.",
                 )
-                else -> PlaceList(
-                    places = currentState.places,
-                    heading = currentState.heading,
-                    onOpenMap = { place -> launchMapsFor(context, place) },
-                    onCall = { phone -> launchDialer(context, phone) },
-                )
+                else -> Column {
+                    if (currentState.loading) {
+                        LinearProgressIndicator(
+                            modifier = Modifier.fillMaxWidth(),
+                            color = MaterialTheme.colorScheme.primary,
+                            trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                        )
+                    }
+                    PlaceList(
+                        places = currentState.places,
+                        heading = currentState.heading,
+                        onOpenMap = { place -> launchMapsFor(context, place) },
+                        onCall = { phone -> launchDialer(context, phone) },
+                    )
+                }
             }
         }
     }
