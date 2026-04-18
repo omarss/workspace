@@ -134,12 +134,12 @@ def mark_reviews_scraped(conn: Connection, place_id: str) -> None:
 
 
 def ensure_places_jobs(
-    conn: Connection, combos: Iterable[tuple[str, float, float]]
+    conn: Connection, combos: Iterable[tuple[str, float, float, str]]
 ) -> int:
-    """Seed pending scrape_jobs for every (category, tile) not yet recorded."""
+    """Seed pending scrape_jobs for every (category, tile, query) not yet recorded."""
     sql = (
-        "INSERT INTO scrape_jobs (kind, category, tile_lat, tile_lng, status) "
-        "VALUES ('places', %s, %s, %s, 'pending') "
+        "INSERT INTO scrape_jobs (kind, category, tile_lat, tile_lng, query, status) "
+        "VALUES ('places', %s, %s, %s, %s, 'pending') "
         "ON CONFLICT DO NOTHING"
     )
     with conn.cursor() as cur:
@@ -186,7 +186,7 @@ def claim_pending_jobs(
         FOR UPDATE SKIP LOCKED
         LIMIT %s
     )
-    RETURNING id, kind, category, tile_lat, tile_lng, place_id
+    RETURNING id, kind, category, tile_lat, tile_lng, place_id, query
     """
     with conn.cursor(row_factory=dict_row) as cur:
         cur.execute(sql, (kind, batch_size))

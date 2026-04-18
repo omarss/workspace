@@ -51,13 +51,7 @@ class _JobRow:
     tile_lat: float | None
     tile_lng: float | None
     place_id: str | None
-
-
-def _category_query(slug: str) -> str:
-    for s, q in CATEGORIES:
-        if s == slug:
-            return q
-    raise KeyError(f"unknown category slug: {slug}")
+    query: str | None
 
 
 def _active_categories() -> list[tuple[str, str]]:
@@ -76,13 +70,16 @@ def seed_places_jobs() -> int:
         settings.tile_km,
     )
     cats = _active_categories()
-    combos = [(slug, t.lat, t.lng) for slug, _ in cats for t in tiles]
+    # One job per (slug, tile, query) — CATEGORIES is already flattened so
+    # each slug appears twice (Arabic + English query).
+    combos = [(slug, t.lat, t.lng, query) for slug, query in cats for t in tiles]
     with connection() as conn:
         n = repo.ensure_places_jobs(conn, combos)
         conn.commit()
+    unique_slugs = len({s for s, _ in cats})
     console.print(
         f"[bold]places jobs:[/] {len(combos)} combos "
-        f"({len(cats)} categories × {len(tiles)} tiles), {n} newly seeded"
+        f"({unique_slugs} slugs × 2 languages × {len(tiles)} tiles), {n} newly seeded"
     )
     return n
 
@@ -159,7 +156,8 @@ def _pending_count(conn, kind: str) -> int:
 
 def _process_place_job(scraper: PlaywrightScraper, job: _JobRow) -> None:
     assert job.category and job.tile_lat is not None and job.tile_lng is not None
-    query = _category_query(job.category)
+    assert job.query, f"job {job.id} has no query; re-seed with newer schema"
+    query = job.query
     cards = scraper.search_places(query=query, lat=job.tile_lat, lng=job.tile_lng)
 
     rows: list[dict[str, Any]] = []

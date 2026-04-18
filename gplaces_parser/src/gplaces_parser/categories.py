@@ -1,35 +1,41 @@
-"""Arabic search categories — slugs kept in lockstep with FEEDBACK.md.
+"""Bilingual search categories — slugs match FEEDBACK.md §4.
 
-The 19 entries below are the exact slug enum the omono client sends
-(`PlaceCategory.slug`). They're used both as the scraper's `category`
-column on `places` and as the `category` query-parameter the API takes.
-Keeping slugs identical on both sides means `/v1/nearby?category=coffee`
-maps to `WHERE category='coffee'` with no translation layer.
+Each slug is crawled with *both* an Arabic and an English query so the
+feed surfaces places that Google ranks differently per language — an
+Arabic-only tea house shows up on "مقاهي" but not "coffee shops", and
+an international chain like Starbucks ranks better on the English side.
 
-Each pair is (slug, arabic_query). Arabic queries match the hints in
-FEEDBACK.md §4.
+`CATEGORIES` is flattened (one row per slug × query pair) so the seed
+pass can do a straightforward Cartesian product with the tile grid.
 """
 
-CATEGORIES: list[tuple[str, str]] = [
-    ("coffee",      "مقاهي"),
-    ("restaurant",  "مطاعم"),
-    ("fast_food",   "وجبات سريعة"),
-    ("bakery",      "مخبز"),
-    ("grocery",     "سوبر ماركت"),
-    ("mall",        "مول"),
-    ("fuel",        "محطة وقود"),
-    ("ev_charger",  "شاحن سيارة كهربائية"),
-    ("car_wash",    "غسيل سيارات"),
-    ("pharmacy",    "صيدلية"),
-    ("hospital",    "مستشفى"),
-    ("gym",         "نادي رياضي"),
-    ("park",        "حديقة"),
-    ("bank",        "بنك"),
-    ("atm",         "صراف آلي"),
-    ("mosque",      "مسجد"),
-    ("salon",       "حلاق"),
-    ("laundry",     "مغسلة"),
-    ("post_office", "مكتب بريد"),
+# (slug, arabic_query, english_query) — the slug is what we persist on
+# `places.category` and what the omono client sends.
+_SLUG_QUERIES: list[tuple[str, str, str]] = [
+    ("coffee",      "مقاهي",                  "coffee shops"),
+    ("restaurant",  "مطاعم",                   "restaurants"),
+    ("fast_food",   "وجبات سريعة",             "fast food"),
+    ("bakery",      "مخبز",                    "bakery"),
+    ("grocery",     "سوبر ماركت",              "supermarket"),
+    ("mall",        "مول",                     "shopping mall"),
+    ("fuel",        "محطة وقود",               "gas station"),
+    ("ev_charger",  "شاحن سيارة كهربائية",     "ev charging station"),
+    ("car_wash",    "غسيل سيارات",             "car wash"),
+    ("pharmacy",    "صيدلية",                  "pharmacy"),
+    ("hospital",    "مستشفى",                  "hospital"),
+    ("gym",         "نادي رياضي",              "gym"),
+    ("park",        "حديقة",                   "park"),
+    ("bank",        "بنك",                     "bank"),
+    ("atm",         "صراف آلي",                "atm"),
+    ("mosque",      "مسجد",                    "mosque"),
+    ("salon",       "حلاق",                    "barber shop"),
+    ("laundry",     "مغسلة",                   "laundry"),
+    ("post_office", "مكتب بريد",               "post office"),
 ]
 
-ALLOWED_SLUGS: frozenset[str] = frozenset(slug for slug, _ in CATEGORIES)
+
+CATEGORIES: list[tuple[str, str]] = [
+    pair for slug, ar, en in _SLUG_QUERIES for pair in ((slug, ar), (slug, en))
+]
+
+ALLOWED_SLUGS: frozenset[str] = frozenset(slug for slug, _, _ in _SLUG_QUERIES)
