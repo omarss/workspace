@@ -61,6 +61,15 @@
     <uses-permission android:name="android.permission.READ_SMS" />
     <uses-permission android:name="android.permission.RECEIVE_SMS" />
 
+    <!-- Android 11+ package visibility: lets us probe whether the
+         Shizuku manager app is installed (for the "Disable internet
+         while driving" feature). The Shizuku library contributes its
+         own <uses-permission> and <provider> via manifest merge; we
+         only need to declare the visibility query here. -->
+    <queries>
+        <package android:name="moe.shizuku.privileged.api" />
+    </queries>
+
     <!-- Declare GPS as optional hardware so devices without GPS can still install. -->
     <uses-feature
         android:name="android.hardware.location.gps"

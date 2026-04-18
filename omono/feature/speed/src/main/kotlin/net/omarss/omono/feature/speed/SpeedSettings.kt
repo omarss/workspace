@@ -20,6 +20,8 @@ private val ALERT_ON_OVER_LIMIT_KEY = booleanPreferencesKey("speed.alert_on_over
 private val ALERT_ON_TRAFFIC_AHEAD_KEY = booleanPreferencesKey("speed.alert_on_traffic_ahead")
 private val ALERT_ON_PHONE_USE_WHILE_DRIVING_KEY =
     booleanPreferencesKey("speed.alert_on_phone_use_while_driving")
+private val DISABLE_INTERNET_WHILE_DRIVING_KEY =
+    booleanPreferencesKey("speed.disable_internet_while_driving")
 
 @Singleton
 class SpeedSettingsRepository @Inject constructor(
@@ -50,6 +52,14 @@ class SpeedSettingsRepository @Inject constructor(
         prefs[ALERT_ON_PHONE_USE_WHILE_DRIVING_KEY] ?: false
     }
 
+    // Turns Wi-Fi + mobile data off when the user starts driving, back
+    // on when the trip ends. Requires Shizuku (grants ADB-level
+    // perms without root). Off by default. The setting being on with
+    // Shizuku not ready is a no-op — the governor silently refuses.
+    val disableInternetWhileDriving: Flow<Boolean> = context.omonoDataStore.data.map { prefs ->
+        prefs[DISABLE_INTERNET_WHILE_DRIVING_KEY] ?: false
+    }
+
     suspend fun setUnit(unit: SpeedUnit) {
         context.omonoDataStore.edit { it[UNIT_KEY] = unit.name }
     }
@@ -64,5 +74,9 @@ class SpeedSettingsRepository @Inject constructor(
 
     suspend fun setAlertOnPhoneUseWhileDriving(enabled: Boolean) {
         context.omonoDataStore.edit { it[ALERT_ON_PHONE_USE_WHILE_DRIVING_KEY] = enabled }
+    }
+
+    suspend fun setDisableInternetWhileDriving(enabled: Boolean) {
+        context.omonoDataStore.edit { it[DISABLE_INTERNET_WHILE_DRIVING_KEY] = enabled }
     }
 }

@@ -1,6 +1,8 @@
 package net.omarss.omono.feature.speed
 
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
@@ -66,6 +68,7 @@ class SpeedFeature @Inject constructor(
     private val trafficWatcher: TrafficAheadWatcher,
     private val drivingDetector: DrivingModeDetector,
     private val distractionGuard: DistractionGuard,
+    private val driveInternetGate: DriveInternetGate,
 ) : OmonoFeature {
 
     override val id: FeatureId = FeatureId("speed")
@@ -118,6 +121,10 @@ class SpeedFeature @Inject constructor(
         // it owns its own combine of driving × screen × setting and
         // drives the looping beep when all three line up.
         distractionGuard.attach(scope)
+        // Internet governor works the same shape: observe driving ×
+        // setting and shell out through Shizuku to disable / re-enable
+        // Wi-Fi + mobile data at the drive boundaries.
+        driveInternetGate.attach(scope)
 
         return combine(locationsWithLimit, settings.unit) { (mps, limit), unit ->
             maybeAlert(mps, limit)
@@ -133,7 +140,21 @@ class SpeedFeature @Inject constructor(
         tripRecorder.finalizeCurrent()
         drivingDetector.reset()
         alertPlayer.stopBeeping()
+        // Fire-and-forget — OmonoFeature.stop() is non-suspending and
+        // we must not leave the user offline if they tapped Stop
+        // mid-drive. Uses a private IO scope (rather than GlobalScope)
+        // so lint doesn't complain and so cancellation is contained.
+        cleanupScope.launch {
+            runCatching { driveInternetGate.ensureEnabledOnStop() }
+                .onFailure { Timber.w(it, "drive internet gate cleanup failed") }
+        }
     }
+
+    // Dedicated scope for the stop() cleanup. SupervisorJob so a failed
+    // cleanup doesn't cancel any future stop invocations.
+    private val cleanupScope = kotlinx.coroutines.CoroutineScope(
+        Dispatchers.IO + SupervisorJob(),
+    )
 
     private suspend fun maybeAlert(mps: Float, limitKmh: Float?) {
         val speedKmh = SpeedUnit.KmH.fromMetersPerSecond(mps)

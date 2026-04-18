@@ -57,6 +57,7 @@ import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import net.omarss.omono.feature.speed.InternetGovernor
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -150,6 +151,8 @@ fun OmonoMainRoute(
         onAlertOnOverLimitChange = viewModel::setAlertOnOverLimit,
         onAlertOnTrafficAheadChange = viewModel::setAlertOnTrafficAhead,
         onAlertOnPhoneUseWhileDrivingChange = viewModel::setAlertOnPhoneUseWhileDriving,
+        onDisableInternetWhileDrivingChange = viewModel::setDisableInternetWhileDriving,
+        onRequestShizukuPermission = viewModel::requestShizukuPermission,
         onBudgetChange = viewModel::setMonthlyBudget,
         onExportSms = viewModel::onExportSmsRequested,
         onOpenPlaces = onOpenPlaces,
@@ -206,6 +209,8 @@ fun OmonoMainScreen(
     onAlertOnOverLimitChange: (Boolean) -> Unit,
     onAlertOnTrafficAheadChange: (Boolean) -> Unit,
     onAlertOnPhoneUseWhileDrivingChange: (Boolean) -> Unit,
+    onDisableInternetWhileDrivingChange: (Boolean) -> Unit,
+    onRequestShizukuPermission: () -> Unit,
     onBudgetChange: (Double) -> Unit,
     onExportSms: () -> Unit,
     onOpenPlaces: () -> Unit = {},
@@ -308,6 +313,13 @@ fun OmonoMainScreen(
         PhoneUseAlertSettingRow(
             enabled = state.alertOnPhoneUseWhileDriving,
             onChange = onAlertOnPhoneUseWhileDrivingChange,
+        )
+
+        DisableInternetSettingRow(
+            enabled = state.disableInternetWhileDriving,
+            readiness = state.shizukuReadiness,
+            onChange = onDisableInternetWhileDrivingChange,
+            onRequestPermission = onRequestShizukuPermission,
         )
 
         Spacer(Modifier.height(4.dp))
@@ -783,6 +795,73 @@ private fun PhoneUseAlertSettingRow(
             )
         }
         Switch(checked = enabled, onCheckedChange = onChange)
+    }
+}
+
+// Toggle for the Shizuku-backed internet kill-switch. Surfaces
+// readiness inline so the user can see exactly what the obstacle is
+// (Shizuku not installed / not running / no permission) and tap to
+// resolve where possible.
+@Composable
+private fun DisableInternetSettingRow(
+    enabled: Boolean,
+    readiness: InternetGovernor.Readiness,
+    onChange: (Boolean) -> Unit,
+    onRequestPermission: () -> Unit,
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Disable internet while driving",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    text = "Wi-Fi + mobile data turn off when a drive starts and back on when it ends. " +
+                        "Requires Shizuku for the elevation hop.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Switch(checked = enabled, onCheckedChange = onChange)
+        }
+        // Inline readiness hint shown only while the toggle is on but
+        // Shizuku isn't actually able to flip the radios — silent
+        // failure would be the worst UX so we surface every blocker.
+        if (enabled && readiness != InternetGovernor.Readiness.Ready) {
+            ShizukuReadinessHint(readiness, onRequestPermission)
+        }
+    }
+}
+
+@Composable
+private fun ShizukuReadinessHint(
+    readiness: InternetGovernor.Readiness,
+    onRequestPermission: () -> Unit,
+) {
+    val message = when (readiness) {
+        InternetGovernor.Readiness.NotInstalled ->
+            "Shizuku app isn't installed. Install it from F-Droid or Play, then come back."
+        InternetGovernor.Readiness.NotRunning ->
+            "Shizuku is installed but the service isn't running. Open Shizuku and start it via the ADB pair flow."
+        InternetGovernor.Readiness.NoPermission ->
+            "Shizuku is running but omono hasn't been granted permission. Tap below to request."
+        InternetGovernor.Readiness.Unknown ->
+            "Checking Shizuku status…"
+        InternetGovernor.Readiness.Ready -> return
+    }
+    Spacer(Modifier.height(6.dp))
+    Text(
+        text = message,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.error,
+    )
+    if (readiness == InternetGovernor.Readiness.NoPermission) {
+        Spacer(Modifier.height(6.dp))
+        TextButton(onClick = onRequestPermission) {
+            Text("Grant Shizuku permission")
+        }
     }
 }
 

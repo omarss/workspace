@@ -5,6 +5,14 @@ plugins {
 android {
     namespace = "net.omarss.omono.feature.speed"
 
+    // AIDL is off by default in AGP 8+. Re-enabled here for the
+    // Shizuku InternetUserService binding — the stub + proxy the
+    // IInternetService.aidl file compiles into is how the main
+    // process talks to the user-service process over binder.
+    buildFeatures {
+        aidl = true
+    }
+
     testOptions {
         unitTests {
             isIncludeAndroidResources = true
@@ -21,6 +29,8 @@ dependencies {
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
+    implementation(libs.shizuku.api)
+    implementation(libs.shizuku.provider)
     implementation(libs.timber)
 
     testImplementation(libs.junit)
