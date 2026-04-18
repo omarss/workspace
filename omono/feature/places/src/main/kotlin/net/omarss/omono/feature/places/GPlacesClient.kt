@@ -43,7 +43,7 @@ class GPlacesClient @Inject constructor(
     ): List<Place> = withContext(Dispatchers.IO) {
         if (!isConfigured) return@withContext emptyList()
 
-        val url = baseUrl.trimEnd('/').let { "$it/v1/nearby" }.toHttpUrl()
+        val url = baseUrl.trimEnd('/').let { "$it/v1/places" }.toHttpUrl()
             .newBuilder()
             .addQueryParameter("lat", latitude.toString())
             .addQueryParameter("lon", longitude.toString())
