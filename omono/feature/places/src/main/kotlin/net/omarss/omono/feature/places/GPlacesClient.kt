@@ -234,4 +234,5 @@ val PlaceCategory.slug: String
         PlaceCategory.LAUNDRY -> "laundry"
         PlaceCategory.POST_OFFICE -> "post_office"
         PlaceCategory.LIBRARY -> "library"
+        PlaceCategory.TRANSIT -> "transit"
     }

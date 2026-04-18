@@ -146,9 +146,13 @@ class CompassViewModel @Inject constructor(
     private companion object {
         // Re-identify the nearest mosque once the user's moved this
         // far. Smaller = more lookups, bigger = a stale identity if
-        // the user passes a closer mosque. 150 m covers "drove a
-        // block" without thrashing the on-disk asset.
-        const val MOSQUE_REFRESH_M = 150.0
+        // the user passes a closer mosque. 50 m is tight enough that
+        // driving past one mosque flips the arrow to the next before
+        // you've gone a block; the on-disk lookup is ~1 ms so extra
+        // calls are cheap. Combined with the 30 m grid-bucket debounce
+        // above, a stationary phone won't thrash the asset on GPS
+        // wander near a bucket boundary.
+        const val MOSQUE_REFRESH_M = 50.0
     }
 }
 
