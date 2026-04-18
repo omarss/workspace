@@ -672,14 +672,19 @@ private fun TransfersCard(totalSar: Double, rows: List<TransferRow>) {
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSecondaryContainer,
                         )
+                        val subtitle = if (row.count > 1) {
+                            "${row.count} transfers · last ${row.lastDate}"
+                        } else {
+                            row.lastDate
+                        }
                         Text(
-                            text = row.date,
+                            text = subtitle,
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSecondaryContainer,
                         )
                     }
                     Text(
-                        text = formatAmount(row.amountSar, row.originalAmount, row.originalCurrency),
+                        text = "SAR %,.0f".format(row.amountSar),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSecondaryContainer,
                     )

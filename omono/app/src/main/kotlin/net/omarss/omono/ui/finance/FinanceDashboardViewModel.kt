@@ -216,21 +216,33 @@ class FinanceDashboardViewModel @Inject constructor(
             .sortedByDescending { it.amountSar }
     }
 
+    // Groups outgoing transfers by recipient — someone you sent money
+    // to three times in a month should show as one row with the total,
+    // not three noisy lines. Sort by total descending so the biggest
+    // recipients stick to the top. Single transfers still render;
+    // they just show "1 transfer".
     private fun buildTransfers(thisMonth: List<Transaction>): List<TransferRow> {
         val fmt = SimpleDateFormat("d MMM", Locale.getDefault())
-        return thisMonth
-            .filter { it.kind == Transaction.Kind.TRANSFER_OUT }
-            .sortedByDescending { it.timestampMillis }
-            .map { tx ->
+        val transfers = thisMonth.filter { it.kind == Transaction.Kind.TRANSFER_OUT }
+        return transfers
+            .groupBy { (it.merchant ?: "Unknown recipient").trim() }
+            .map { (recipient, group) ->
+                val total = group.sumOf { it.amountSar }
+                val lastTx = group.maxBy { it.timestampMillis }
                 TransferRow(
-                    id = "${tx.bank}-${tx.timestampMillis}-${tx.amountSar}",
-                    recipient = tx.merchant ?: "Unknown recipient",
-                    date = fmt.format(tx.timestampMillis),
-                    amountSar = tx.amountSar,
-                    originalAmount = tx.originalAmount,
-                    originalCurrency = tx.originalCurrency,
+                    id = "transfer-group-${recipient.hashCode()}",
+                    recipient = recipient,
+                    lastDate = fmt.format(lastTx.timestampMillis),
+                    count = group.size,
+                    amountSar = total,
+                    // When every transfer in the group was SAR, show
+                    // only SAR. If any was foreign, we lose the per-
+                    // transfer original amounts in aggregation — the
+                    // user can still drill down via Recent activity.
+                    originalCurrency = if (group.all { it.originalCurrency == "SAR" }) "SAR" else "—",
                 )
             }
+            .sortedByDescending { it.amountSar }
     }
 
     private fun buildRecent(transactions: List<Transaction>): List<RecentRow> {
@@ -397,9 +409,9 @@ data class BillRow(
 data class TransferRow(
     val id: String,
     val recipient: String,
-    val date: String,
+    val lastDate: String,
+    val count: Int,
     val amountSar: Double,
-    val originalAmount: Double,
     val originalCurrency: String,
 )
 
