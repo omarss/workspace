@@ -107,7 +107,83 @@ the scrape just hasn't reached that slug yet and I'll prioritise it.
 
 ---
 
-## 6. Lockstep rules (from FEEDBACK.md §7)
+## 6. `GET /v1/roads` — new endpoint (2026-04-18)
+
+Same host, same API key, but **point-in-polygon** lookup against the
+Riyadh road network (109,231 polygons loaded from `../maps/roads.json`).
+Useful for: "what's the speed limit where I am right now" and "which
+road am I on", keyed off the user's current GPS fix.
+
+### Request
+
+```
+GET /v1/roads?lat=<float>&lon=<float>&limit=<int, default 5, max 20>
+X-Api-Key: <same key as /v1/places>
+```
+
+### Response — `200 OK`
+
+```json
+{
+  "roads": [
+    {
+      "osm_id": 1303644082,
+      "name": "طريق العروبة",
+      "name_en": "Al Uaroba Road",
+      "highway": "primary",
+      "ref": null,
+      "maxspeed_kmh": 90,
+      "speed_source": "osm:maxspeed",
+      "lanes": 6,
+      "oneway": true,
+      "heading_deg": 65.5
+    }
+  ],
+  "source": "gplaces",
+  "generated_at": "2026-04-18T14:16:43.187196Z"
+}
+```
+
+Zero matches (point outside every road polygon) → `200 {"roads": []}`.
+
+### Field notes
+
+- **`roads` is always a list** because a point at an intersection genuinely
+  belongs to multiple roads. The list is ordered by highway class first
+  (motorway → trunk → primary → secondary → …) and then by polygon area
+  ascending, so the most specific road within the top class is `roads[0]`.
+- **`heading_deg`** — bearing of the road's long axis, 0 = north,
+  90 = east, range `[0, 360)`. The road is symmetric, so when comparing
+  against the user's GPS heading `h_gps`, match either `heading_deg` or
+  `(heading_deg + 180) % 360`, whichever is closer. Useful for picking
+  the correct carriageway of a divided highway.
+- **`speed_source`** — `osm:maxspeed` (explicit posted sign tagged in
+  OSM) is the most trustworthy; `inferred:*` is a default by highway
+  class. Low-confidence values are still returned; the client can
+  decide whether to surface the number or just "unknown".
+- **`maxspeed_kmh`** is always present (required in schema); it'll
+  be the KSA class default if no posted value is known.
+
+### Performance note
+
+The endpoint does a bbox prefilter in SQL (index-backed) then a Shapely
+`Polygon.contains(Point)` test on 5–20 candidates. Typical call is
+~20–40 ms. A 12-second nginx read timeout is in place for the rare case
+Shapely trips on a degenerate polygon.
+
+### When omono might call it
+
+- On each GPS tick while driving (rate-limit to ~1 Hz on the client).
+- Prefer to cache the last result and only re-query when:
+  1. The new point is no longer inside the cached polygon (`.contains`
+     in local JTS is trivially computable from the `osm_id` + a cached
+     polygon), OR
+  2. The user has moved > 100 m since the last call.
+- Treat 401/429/5xx identically to the `/v1/places` behaviour.
+
+---
+
+## 7. Lockstep rules (from FEEDBACK.md §7)
 
 Any schema change on either side → update `gplaces_parser/FEEDBACK.md`
 **before** the code change, and drop a note here too so whoever picks
