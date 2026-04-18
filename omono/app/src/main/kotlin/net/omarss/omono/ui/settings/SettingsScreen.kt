@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.provider.Settings
 import android.widget.Toast
+import androidx.core.content.FileProvider
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -88,6 +89,20 @@ fun SettingsRoute(
         }
     }
 
+    LaunchedEffect(Unit) {
+        viewModel.diagnosticsEvents.collect { event ->
+            when (event) {
+                is DiagnosticsShareEvent.Success -> launchDiagnosticsShare(context, event.file)
+                is DiagnosticsShareEvent.Failure ->
+                    Toast.makeText(
+                        context,
+                        "Couldn't share diagnostics: ${event.message}",
+                        Toast.LENGTH_LONG,
+                    ).show()
+            }
+        }
+    }
+
     if (showBudgetDialog) {
         BudgetDialog(
             currentBudget = state.monthlyBudgetSar,
@@ -156,9 +171,41 @@ fun SettingsRoute(
                 )
             }
 
+            SectionCard(title = "Diagnostics") {
+                SettingsActionRow(
+                    title = "Share diagnostics log",
+                    subtitle = "Rotated log of warnings + errors from recent runs. " +
+                        "Handy when a drive, SMS parse, or Shizuku hop misbehaves.",
+                    onClick = viewModel::onShareDiagnosticsRequested,
+                )
+            }
+
             Spacer(Modifier.height(8.dp))
         }
     }
+}
+
+// Share the concatenated rolling log via the system chooser. Uses the
+// same FileProvider authority as the SMS export so no new manifest
+// wiring is needed — both files live under cacheDir.
+private fun launchDiagnosticsShare(context: Context, file: java.io.File) {
+    val uri = FileProvider.getUriForFile(
+        context,
+        "${context.packageName}.fileprovider",
+        file,
+    )
+    val send = Intent(Intent.ACTION_SEND).apply {
+        type = "text/plain"
+        putExtra(Intent.EXTRA_STREAM, uri)
+        putExtra(Intent.EXTRA_SUBJECT, "Omono diagnostics log")
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    }
+    context.startActivity(
+        Intent.createChooser(send, "Share diagnostics").apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        },
+    )
 }
 
 // Container for a named settings group. Keeps each section visually

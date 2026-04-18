@@ -2,6 +2,7 @@ package net.omarss.omono
 
 import android.app.Application
 import dagger.hilt.android.HiltAndroidApp
+import net.omarss.omono.diagnostics.DiagnosticsLogger
 import net.omarss.omono.feature.speed.InternetGovernor
 import timber.log.Timber
 import javax.inject.Inject
@@ -16,11 +17,17 @@ class OmonoApp : Application() {
     // listener set against the Shizuku service.
     @Inject lateinit var internetGovernor: InternetGovernor
 
+    // File-backed Timber tree. Planted in every build (not just DEBUG)
+    // so a user hitting a weird bank-SMS parse or a GPS glitch on real
+    // hardware can share the log from Settings → Share diagnostics.
+    @Inject lateinit var diagnosticsLogger: DiagnosticsLogger
+
     override fun onCreate() {
         super.onCreate()
         if (BuildConfig.DEBUG) {
             Timber.plant(Timber.DebugTree())
         }
+        Timber.plant(diagnosticsLogger)
         internetGovernor.start()
     }
 }

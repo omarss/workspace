@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import net.omarss.omono.core.common.SpeedUnit
+import net.omarss.omono.diagnostics.DiagnosticsLogger
 import net.omarss.omono.feature.speed.ForegroundAppDetector
 import net.omarss.omono.feature.speed.InternetGovernor
 import net.omarss.omono.feature.speed.SpeedSettingsRepository
@@ -21,6 +22,7 @@ import net.omarss.omono.feature.spending.SmsExporter
 import net.omarss.omono.feature.spending.SpendingSettingsRepository
 import net.omarss.omono.ui.ExportEvent
 import timber.log.Timber
+import java.io.File
 import javax.inject.Inject
 
 // Concentrates every user-visible preference + setup action into a
@@ -39,6 +41,7 @@ class SettingsViewModel @Inject constructor(
     private val smsExporter: SmsExporter,
     private val internetGovernor: InternetGovernor,
     private val foregroundApp: ForegroundAppDetector,
+    private val diagnosticsLogger: DiagnosticsLogger,
 ) : ViewModel() {
 
     // Shizuku governor lifecycle is managed at the Application level —
@@ -94,6 +97,11 @@ class SettingsViewModel @Inject constructor(
     private val _exportEvents = Channel<ExportEvent>(Channel.BUFFERED)
     val exportEvents: Flow<ExportEvent> = _exportEvents.receiveAsFlow()
 
+    // Separate channel for diagnostics so the UI can give it its own
+    // subject line / chooser label without branching on a generic event.
+    private val _diagnosticsEvents = Channel<DiagnosticsShareEvent>(Channel.BUFFERED)
+    val diagnosticsEvents: Flow<DiagnosticsShareEvent> = _diagnosticsEvents.receiveAsFlow()
+
     fun setUnit(unit: SpeedUnit) {
         viewModelScope.launch { speedSettings.setUnit(unit) }
     }
@@ -131,6 +139,21 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    // Concatenates the rolling Timber log file into the app cache and
+    // hands it off to the UI for FileProvider sharing.
+    fun onShareDiagnosticsRequested() {
+        viewModelScope.launch {
+            runCatching { diagnosticsLogger.buildSharePayload() }
+                .onSuccess { file -> _diagnosticsEvents.send(DiagnosticsShareEvent.Success(file)) }
+                .onFailure { error ->
+                    Timber.w(error, "Diagnostics share failed")
+                    _diagnosticsEvents.send(
+                        DiagnosticsShareEvent.Failure(error.message ?: "Could not prepare log"),
+                    )
+                }
+        }
+    }
+
     private data class BaseSettings(
         val unit: SpeedUnit,
         val alertOnOverLimit: Boolean,
@@ -158,3 +181,8 @@ data class SettingsUiState(
     val shizukuReadiness: InternetGovernor.Readiness = InternetGovernor.Readiness.Unknown,
     val monthlyBudgetSar: Double = 0.0,
 )
+
+sealed interface DiagnosticsShareEvent {
+    data class Success(val file: File) : DiagnosticsShareEvent
+    data class Failure(val message: String) : DiagnosticsShareEvent
+}
