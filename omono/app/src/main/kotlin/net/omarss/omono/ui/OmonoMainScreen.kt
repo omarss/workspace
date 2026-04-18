@@ -59,6 +59,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import net.omarss.omono.feature.speed.InternetGovernor
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -69,16 +70,25 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
 import net.omarss.omono.BuildConfig
 import net.omarss.omono.core.common.SpeedUnit
 import net.omarss.omono.core.service.FeatureHostService
+import net.omarss.omono.permissions.TrackedPermission
 import net.omarss.omono.ui.update.SelfUpdateBanner
 import net.omarss.omono.ui.update.SelfUpdateUiState
 import net.omarss.omono.ui.update.SelfUpdateViewModel
+import android.app.AppOpsManager
+import android.content.pm.PackageManager
+import android.os.Process
+import androidx.core.content.getSystemService
 
 private val foregroundPermissions: List<String> = buildList {
     add(Manifest.permission.ACCESS_FINE_LOCATION)
@@ -119,6 +129,40 @@ fun OmonoMainRoute(
     val batteryExempt by rememberBatteryOptimizationState()
     val dndAccessGranted by rememberNotificationPolicyAccessState()
 
+    // Every time the user resumes the app (often: returning from system
+    // Settings after toggling a permission), re-read the actual runtime
+    // state and hand it to the VM so the "previously granted, now lost"
+    // card can appear or clear without the user having to pull-to-
+    // refresh. Accompanist's state object already updates automatically,
+    // but usage-stats + POST_NOTIFICATIONS need explicit re-checks.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val currentStates = remember(
+        foreground.allPermissionsGranted,
+        sms.allPermissionsGranted,
+    ) {
+        resolveCurrentPermissions(
+            context = context,
+            foregroundGranted = foreground.allPermissionsGranted,
+            smsGranted = sms.allPermissionsGranted,
+        )
+    }
+    LaunchedEffect(currentStates) { viewModel.reportCurrentPermissions(currentStates) }
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                viewModel.reportCurrentPermissions(
+                    resolveCurrentPermissions(
+                        context = context,
+                        foregroundGranted = foreground.allPermissionsGranted,
+                        smsGranted = sms.allPermissionsGranted,
+                    ),
+                )
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
     OmonoMainScreen(
         contentPadding = contentPadding,
         state = state,
@@ -133,6 +177,14 @@ fun OmonoMainRoute(
         onRequestSms = sms::launchMultiplePermissionRequest,
         onRequestBatteryExemption = { launchBatteryOptimizationDialog(context) },
         onRequestDndAccess = { launchNotificationPolicyAccessSettings(context) },
+        onResolveLostPermission = { perm ->
+            when (perm) {
+                TrackedPermission.SMS -> sms.launchMultiplePermissionRequest()
+                TrackedPermission.LOCATION -> foreground.launchMultiplePermissionRequest()
+                TrackedPermission.NOTIFICATIONS -> foreground.launchMultiplePermissionRequest()
+                TrackedPermission.USAGE_STATS -> launchUsageAccessSettings(context)
+            }
+        },
         onDownloadUpdate = updateViewModel::startDownload,
         onInstallUpdate = updateViewModel::installNow,
         onGrantInstallPermission = updateViewModel::grantInstallPermission,
@@ -140,6 +192,60 @@ fun OmonoMainRoute(
         onStart = { FeatureHostService.start(context) },
         onStop = { FeatureHostService.stop(context) },
     )
+}
+
+// Resolve the four permissions the baseline tracker cares about into a
+// concrete snapshot. Usage-stats is checked via AppOps (not a runtime
+// permission); POST_NOTIFICATIONS is only a runtime permission on API
+// 33+, so pre-Tiramisu we report it as granted (it always is at install
+// time). Location is tracked as the foreground group's aggregate so a
+// revoked "background" but still-granted "foreground" doesn't show up
+// as "location lost" — the UI would mislead.
+private fun resolveCurrentPermissions(
+    context: android.content.Context,
+    foregroundGranted: Boolean,
+    smsGranted: Boolean,
+): Map<TrackedPermission, Boolean> {
+    val notificationsGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.POST_NOTIFICATIONS,
+        ) == PackageManager.PERMISSION_GRANTED
+    } else {
+        true
+    }
+    val usageStatsGranted = hasUsageStatsOp(context)
+    return mapOf(
+        TrackedPermission.SMS to smsGranted,
+        TrackedPermission.LOCATION to foregroundGranted,
+        TrackedPermission.NOTIFICATIONS to notificationsGranted,
+        TrackedPermission.USAGE_STATS to usageStatsGranted,
+    )
+}
+
+private fun launchUsageAccessSettings(context: android.content.Context) {
+    val intent = Intent(android.provider.Settings.ACTION_USAGE_ACCESS_SETTINGS)
+        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    runCatching { context.startActivity(intent) }
+}
+
+// AppOps-based check for PACKAGE_USAGE_STATS — plain checkPermission
+// always returns denied for this special-access permission. Duplicates
+// the logic from ForegroundAppDetector here because this helper runs
+// without Hilt (composable-scoped) and the alternative (manually
+// constructing the detector) would skip DI. See comment there for the
+// API-29 deprecation note.
+@Suppress("DEPRECATION")
+private fun hasUsageStatsOp(context: android.content.Context): Boolean {
+    val appOps = context.getSystemService<AppOpsManager>() ?: return false
+    val mode = runCatching {
+        appOps.checkOpNoThrow(
+            AppOpsManager.OPSTR_GET_USAGE_STATS,
+            Process.myUid(),
+            context.packageName,
+        )
+    }.getOrNull() ?: return false
+    return mode == AppOpsManager.MODE_ALLOWED
 }
 
 internal fun launchSmsExportShare(
@@ -181,6 +287,7 @@ fun OmonoMainScreen(
     onRequestSms: () -> Unit,
     onRequestBatteryExemption: () -> Unit,
     onRequestDndAccess: () -> Unit,
+    onResolveLostPermission: (TrackedPermission) -> Unit = {},
     onDownloadUpdate: () -> Unit = {},
     onInstallUpdate: () -> Unit = {},
     onGrantInstallPermission: () -> Unit = {},
@@ -200,6 +307,13 @@ fun OmonoMainScreen(
         verticalArrangement = Arrangement.spacedBy(20.dp),
     ) {
         BrandHeader()
+
+        AnimatedVisibility(visible = state.lostPermissions.isNotEmpty()) {
+            PermissionLostCard(
+                lost = state.lostPermissions,
+                onResolve = onResolveLostPermission,
+            )
+        }
 
         AnimatedVisibility(visible = updateState.showBanner) {
             SelfUpdateBanner(
@@ -544,6 +658,59 @@ private fun LimitChip(text: String, overLimit: Boolean) {
             color = onContainer,
         )
     }
+}
+
+@Composable
+private fun PermissionLostCard(
+    lost: Set<TrackedPermission>,
+    onResolve: (TrackedPermission) -> Unit,
+) {
+    val sorted = remember(lost) { lost.sortedBy { it.ordinal } }
+    Card(
+        modifier = Modifier.fillMaxWidth().animateContentSize(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.errorContainer,
+        ),
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text(
+                text = if (sorted.size == 1) {
+                    "Permission was revoked"
+                } else {
+                    "Permissions were revoked"
+                },
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onErrorContainer,
+            )
+            Text(
+                text = lostPermissionsSubtitle(sorted),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onErrorContainer,
+            )
+            sorted.forEach { perm ->
+                FilledTonalButton(
+                    onClick = { onResolve(perm) },
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text("Restore ${perm.label}") }
+            }
+        }
+    }
+}
+
+private fun lostPermissionsSubtitle(lost: List<TrackedPermission>): String {
+    val impacts = lost.map { perm ->
+        when (perm) {
+            TrackedPermission.SMS -> "spending won't update"
+            TrackedPermission.LOCATION -> "speed tracking won't run"
+            TrackedPermission.NOTIFICATIONS -> "you won't see alerts"
+            TrackedPermission.USAGE_STATS -> "phone-use detection will over-fire"
+        }
+    }
+    val joined = impacts.joinToString(separator = "; ")
+    return "Android auto-revoked or the user turned off a permission that omono had — $joined. Tap to grant again."
 }
 
 @Composable

@@ -4,10 +4,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import net.omarss.omono.core.common.SpeedUnit
 import net.omarss.omono.core.service.FeatureHostStateHolder
 import net.omarss.omono.core.service.FeatureId
@@ -16,6 +18,9 @@ import net.omarss.omono.feature.speed.SpeedSettingsRepository
 import net.omarss.omono.feature.speed.trips.TripDao
 import net.omarss.omono.feature.speed.trips.TripEntity
 import net.omarss.omono.feature.spending.SpendingSettingsRepository
+import net.omarss.omono.permissions.PermissionBaselineTracker
+import net.omarss.omono.permissions.TrackedPermission
+import timber.log.Timber
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -32,10 +37,60 @@ class OmonoMainViewModel @Inject constructor(
     spendingSettings: SpendingSettingsRepository,
     stateHolder: FeatureHostStateHolder,
     tripDao: TripDao,
+    private val permissionBaselines: PermissionBaselineTracker,
 ) : ViewModel() {
 
     private val speedFeatureId = FeatureId("speed")
     private val spendingFeatureId = FeatureId("spending")
+
+    // Current runtime permission state, pushed in by the Compose
+    // lifecycle observer. Seeded with an "unknown/all true" map so the
+    // first comparison against the persisted baseline can't report
+    // a regression before the UI has reported anything.
+    private val currentPermissions: MutableStateFlow<Map<TrackedPermission, Boolean>> =
+        MutableStateFlow(TrackedPermission.entries.associateWith { true })
+
+    // Lost = previously granted AND not currently granted. Derived so a
+    // newly-granted permission clears automatically on the next resume
+    // without having to mutate a second store.
+    private val lostPermissions: StateFlow<Set<TrackedPermission>> = combine(
+        permissionBaselines.everGranted,
+        currentPermissions,
+    ) { baselines, current ->
+        TrackedPermission.entries
+            .filter { baselines[it] == true && current[it] == false }
+            .toSet()
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(stopTimeoutMillis = 5_000),
+        initialValue = emptySet(),
+    )
+
+    // Called from OmonoMainRoute on every lifecycle resume with the
+    // current grant state. Updates the baseline (for any newly-granted
+    // permission) and the "current" flow that feeds the lost set. Logs
+    // a warning the first time a regression is observed so the
+    // rotated diagnostics file captures it for post-hoc support.
+    fun reportCurrentPermissions(states: Map<TrackedPermission, Boolean>) {
+        val previouslyLost = lostPermissions.value
+        currentPermissions.value = states
+        viewModelScope.launch {
+            runCatching { permissionBaselines.recordCurrent(states) }
+                .onFailure { Timber.w(it, "permission baseline write failed") }
+        }
+        // Spot new regressions vs the *previous* lost set so we log
+        // each revocation once, not on every resume that sees the same
+        // missing permission.
+        states.forEach { (perm, granted) ->
+            if (!granted && perm !in previouslyLost) {
+                // No-op unless the baseline already has it as granted —
+                // logged only when the derived flow ends up marking it
+                // lost on the next emission. `Timber.w` on every
+                // resume-with-missing-permission would be too chatty.
+                Timber.d("permission baseline: current=%s granted=%s", perm.name, false)
+            }
+        }
+    }
 
     private val settings = combine(
         speedSettings.unit,
@@ -50,13 +105,15 @@ class OmonoMainViewModel @Inject constructor(
         stateHolder.running,
         stateHolder.states,
         tripDao.observeTop5(),
-    ) { s, running, states, trips ->
+        lostPermissions,
+    ) { s, running, states, trips, lost ->
         buildUiState(
             settings = s,
             running = running,
             speedState = states[speedFeatureId],
             spendingState = states[spendingFeatureId],
             trips = trips,
+            lostPermissions = lost,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -76,6 +133,7 @@ class OmonoMainViewModel @Inject constructor(
         speedState: FeatureState?,
         spendingState: FeatureState?,
         trips: List<TripEntity>,
+        lostPermissions: Set<TrackedPermission>,
     ): OmonoMainUiState {
         val speedMetadata = metadataOf(speedState)
         val speedKmh = speedMetadata[FeatureState.META_SPEED_KMH]?.toFloat()
@@ -115,6 +173,7 @@ class OmonoMainViewModel @Inject constructor(
             alertOnOverLimit = settings.alertOnOverLimit,
             spending = spending,
             recentTrips = recentTrips,
+            lostPermissions = lostPermissions,
         )
     }
 
@@ -178,6 +237,7 @@ data class OmonoMainUiState(
     val alertOnOverLimit: Boolean = true,
     val spending: SpendingUi = SpendingUi(),
     val recentTrips: List<TripUi> = emptyList(),
+    val lostPermissions: Set<TrackedPermission> = emptySet(),
 )
 
 data class SpendingUi(
