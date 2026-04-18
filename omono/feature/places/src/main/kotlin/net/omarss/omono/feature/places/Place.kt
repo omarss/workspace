@@ -4,6 +4,10 @@ package net.omarss.omono.feature.places
 // bearing from the user's current position are filled in by the
 // repository before the UI sees it — keeping the pure coordinates on
 // the model means the UI layer never needs a reference point.
+//
+// rating / reviewCount / openNow come from the gplaces backend when
+// scraped Google data has them. TomTom fallback doesn't populate these
+// so the UI treats them as optional.
 data class Place(
     val id: String,
     val name: String,
@@ -14,6 +18,9 @@ data class Place(
     val bearingDegrees: Float,
     val address: String?,
     val phone: String?,
+    val rating: Float? = null,
+    val reviewCount: Int? = null,
+    val openNow: Boolean? = null,
 )
 
 // User-facing categories with the TomTom POI category IDs each one

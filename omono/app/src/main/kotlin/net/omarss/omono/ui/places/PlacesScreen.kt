@@ -3,9 +3,9 @@ package net.omarss.omono.ui.places
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -50,6 +50,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
@@ -126,39 +127,43 @@ fun PlacesRoute(
             return@Column
         }
 
-        // When we already have results, keep showing them during a
-        // refresh instead of swapping to a spinner — that swap was
-        // the "flicker" the user saw every time they opened the
-        // places screen. A thin indeterminate bar along the top is
-        // enough to signal "still fetching".
-        Crossfade(targetState = state, label = "places_state_transition") { currentState ->
-            when {
-                currentState.loading && currentState.places.isEmpty() -> LoadingState()
-                currentState.errorMessage != null && currentState.places.isEmpty() -> EmptyState(
-                    title = "Couldn't load places",
-                    body = currentState.errorMessage.orEmpty(),
-                )
-                currentState.places.isEmpty() -> EmptyState(
-                    title = "Nothing in that direction",
-                    body = "Widen the cone or pick a different category.",
-                )
-                else -> Column {
-                    if (currentState.loading) {
-                        LinearProgressIndicator(
-                            modifier = Modifier.fillMaxWidth(),
-                            color = MaterialTheme.colorScheme.primary,
-                            trackColor = MaterialTheme.colorScheme.surfaceVariant,
-                        )
-                    }
-                    PlaceList(
-                        places = currentState.places,
-                        heading = currentState.heading,
-                        onOpenMap = { place -> launchMapsFor(context, place) },
-                        onCall = { phone -> launchDialer(context, phone) },
-                    )
-                }
-            }
+        // No Crossfade — the animated swap between LoadingState and
+        // PlaceList reads as flicker when the backend returns in
+        // <200 ms. Straight if/else, renders instantly in whatever
+        // state we're in. A thin top bar signals "still fetching"
+        // without hiding existing results.
+        if (state.loading && state.places.isEmpty()) {
+            LoadingState()
+            return@Column
         }
+        if (state.errorMessage != null && state.places.isEmpty()) {
+            EmptyState(
+                title = "Couldn't load places",
+                body = state.errorMessage.orEmpty(),
+            )
+            return@Column
+        }
+        if (state.places.isEmpty()) {
+            EmptyState(
+                title = "Nothing in that direction",
+                body = "Widen the cone or pick a different category.",
+            )
+            return@Column
+        }
+
+        if (state.loading) {
+            LinearProgressIndicator(
+                modifier = Modifier.fillMaxWidth(),
+                color = MaterialTheme.colorScheme.primary,
+                trackColor = MaterialTheme.colorScheme.surfaceVariant,
+            )
+        }
+        PlaceList(
+            places = state.places,
+            heading = state.heading,
+            onOpenMap = { place -> launchMapsFor(context, place) },
+            onCall = { phone -> launchDialer(context, phone) },
+        )
     }
 }
 
@@ -334,12 +339,25 @@ private fun PlaceCard(
             CategoryBadge(place.category)
             Spacer(Modifier.size(12.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = place.name,
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 2,
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = place.name,
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 2,
+                        modifier = Modifier.weight(1f, fill = false),
+                    )
+                    if (place.openNow == true) {
+                        Spacer(Modifier.size(6.dp))
+                        OpenChip()
+                    }
+                }
+                // Rating line only appears when we actually have one.
+                // GPlaces fills it in; TomTom fallback omits it.
+                place.rating?.let { rating ->
+                    Spacer(Modifier.height(2.dp))
+                    RatingLine(rating = rating, reviewCount = place.reviewCount)
+                }
                 val address = place.address
                 if (!address.isNullOrBlank()) {
                     Spacer(Modifier.height(2.dp))
@@ -372,6 +390,48 @@ private fun PlaceCard(
             }
         }
     }
+}
+
+// "★ 4.6 · 1.8K" — compact rating line shown when the backend
+// provides a rating. Review count formatted with "K" suffix over a
+// thousand because four-digit review counts are uninteresting to
+// eyeball at a glance.
+@Composable
+private fun RatingLine(rating: Float, reviewCount: Int?) {
+    val label = buildString {
+        append("★ %.1f".format(rating))
+        if (reviewCount != null && reviewCount > 0) {
+            append(" · ")
+            append(formatReviewCount(reviewCount))
+        }
+    }
+    Text(
+        text = label,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+}
+
+@Composable
+private fun OpenChip() {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(50))
+            .background(Color(0xFF10B981)) // emerald
+            .padding(horizontal = 6.dp, vertical = 2.dp),
+    ) {
+        Text(
+            text = "Open",
+            style = MaterialTheme.typography.labelSmall,
+            color = Color.White,
+        )
+    }
+}
+
+private fun formatReviewCount(n: Int): String = when {
+    n < 1_000 -> n.toString()
+    n < 10_000 -> "%.1fK".format(n / 1000f).removeSuffix(".0K") + "K"
+    else -> "${n / 1000}K"
 }
 
 // Colored circular badge that holds the category emoji. Uses the

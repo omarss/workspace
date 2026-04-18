@@ -97,6 +97,15 @@ class GPlacesClient @Inject constructor(
 
             val address = item.optString("address").takeIf { it.isNotBlank() }
             val phone = item.optString("phone").takeIf { it.isNotBlank() }
+            val rating = if (item.has("rating") && !item.isNull("rating")) {
+                item.optDouble("rating", Double.NaN).toFloat().takeIf { !it.isNaN() }
+            } else null
+            val reviewCount = if (item.has("review_count") && !item.isNull("review_count")) {
+                item.optInt("review_count", -1).takeIf { it >= 0 }
+            } else null
+            val openNow = if (item.has("open_now") && !item.isNull("open_now")) {
+                item.optBoolean("open_now", false)
+            } else null
             val distance = haversineMeters(userLat, userLon, lat, lon)
             val bearing = bearingDegrees(userLat, userLon, lat, lon)
 
@@ -110,6 +119,9 @@ class GPlacesClient @Inject constructor(
                 bearingDegrees = bearing,
                 address = address,
                 phone = phone,
+                rating = rating,
+                reviewCount = reviewCount,
+                openNow = openNow,
             )
         }
         return out.sortedBy { it.distanceMeters }
