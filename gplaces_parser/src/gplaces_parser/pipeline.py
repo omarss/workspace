@@ -191,6 +191,7 @@ def _process_place_job(scraper: PlaywrightScraper, job: _JobRow) -> None:
 
     with connection() as conn:
         n = repo.upsert_places(conn, rows)
+        repo.append_history(conn, rows)
         repo.complete_job(conn, job.id, n)
         conn.commit()
 
@@ -243,6 +244,9 @@ def _process_review_job(scraper: PlaywrightScraper, job: _JobRow) -> None:
             # Preserve original category/tile/query from pass 1 — we only update
             # the fields that came back from the detail page.
             _update_place_detail(conn, job.place_id, detail_row)
+            # History: pass 2 gives us the most accurate rating + working_hours,
+            # so capture a history row keyed to right-now regardless of pass 1's.
+            repo.append_history(conn, [{"place_id": job.place_id, **detail_row}])
         n = repo.upsert_reviews(conn, review_rows)
         repo.mark_reviews_scraped(conn, job.place_id)
         repo.complete_job(conn, job.id, n)
@@ -282,6 +286,10 @@ def _update_place_detail(conn, place_id: str, row: dict[str, Any]) -> None:
         "subcategories",
         "bounds",
         "service_area",
+        "business_status",
+        "open_now",
+        "hours_snippet",
+        "working_hours",
     ]
     from psycopg.types.json import Jsonb
 

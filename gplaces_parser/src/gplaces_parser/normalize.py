@@ -97,6 +97,8 @@ def normalize_place(
         "service_area": _first(rec, "service_area", "service_areas", "area_service"),
         "verified": _first(rec, "verified"),
         "business_status": _first(rec, "business_status", "status"),
+        "open_now": _first(rec, "open_now"),
+        "hours_snippet": _first(rec, "hours_snippet"),
         "google_url": _first(rec, "google_url", "location_link", "url"),
         "query": query,
         "tile_lat": tile_lat,

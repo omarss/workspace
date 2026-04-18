@@ -42,8 +42,10 @@ PLACE_COLS = (
     "plus_code",
     "bounds",
     "service_area",
-    "verified",
     "business_status",
+    "open_now",
+    "hours_snippet",
+    "verified",
     "google_url",
     "query",
     "tile_lat",
@@ -141,6 +143,48 @@ def upsert_reviews(conn: Connection, rows: list[dict[str, Any]]) -> int:
     with conn.cursor() as cur:
         cur.executemany(sql, norm)
     return len(rows)
+
+
+def append_history(conn: Connection, rows: list[dict[str, Any]]) -> None:
+    """Append one rating_history + status_history row per scraped place.
+
+    We always append (not upsert) so the tables become an exact timeline:
+    the same place scraped again next month adds two more rows, and you
+    can `ORDER BY captured_at` to see every observed value. Rows with no
+    rating / no status data are skipped so the tables stay meaningful.
+    """
+    if not rows:
+        return
+    rating_sql = (
+        "INSERT INTO rating_history (place_id, rating, reviews_count) "
+        "VALUES (%s, %s, %s)"
+    )
+    status_sql = (
+        "INSERT INTO status_history "
+        "(place_id, business_status, open_now, hours_snippet, working_hours) "
+        "VALUES (%s, %s, %s, %s, %s)"
+    )
+    rating_params = [
+        (r["place_id"], r.get("rating"), r.get("reviews_count"))
+        for r in rows
+        if r.get("rating") is not None or r.get("reviews_count") is not None
+    ]
+    status_params = [
+        (
+            r["place_id"],
+            r.get("business_status"),
+            r.get("open_now"),
+            r.get("hours_snippet"),
+            Jsonb(r["working_hours"]) if r.get("working_hours") else None,
+        )
+        for r in rows
+        if any(r.get(k) is not None for k in ("business_status", "open_now", "hours_snippet", "working_hours"))
+    ]
+    with conn.cursor() as cur:
+        if rating_params:
+            cur.executemany(rating_sql, rating_params)
+        if status_params:
+            cur.executemany(status_sql, status_params)
 
 
 def mark_reviews_scraped(conn: Connection, place_id: str) -> None:

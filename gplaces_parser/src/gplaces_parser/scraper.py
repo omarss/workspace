@@ -56,6 +56,46 @@ _NUM_RE = re.compile(r"-?\d[\d,]*\.?\d*")
 # Matches the "(1,234)" review-count marker that follows the rating on feed cards.
 _REVIEW_COUNT_RE = re.compile(r"\((\d[\d,]*)\)")
 
+# Markers Google uses on feed cards for business status + open/closed info.
+# Each regex is intentionally permissive — Arabic / English variants and the
+# small formatting differences Google sprinkles in over time (unicode dashes,
+# trailing punctuation) all need to match the same bucket.
+_CLOSED_PERM_RE = re.compile(
+    r"Permanently\s+closed|مغلق\s*نهائ(يًا|يا)|أغلق\s*نهائ(يًا|يا)",
+    re.IGNORECASE,
+)
+_CLOSED_TEMP_RE = re.compile(
+    r"Temporarily\s+closed|مغلق\s*مؤقت(ًا|ا)",
+    re.IGNORECASE,
+)
+_OPENS_RE = re.compile(
+    r"Opens?\s+(?P<t>[0-9][^\n·]{0,30})|يفتح\s+(?P<t2>[^\n·]{1,30})",
+    re.IGNORECASE,
+)
+_CLOSES_RE = re.compile(
+    r"Closes?\s+(?P<t>[0-9][^\n·]{0,30})|يغلق\s+(?P<t2>[^\n·]{1,30})",
+    re.IGNORECASE,
+)
+
+
+def _infer_status(card_text: str) -> tuple[str | None, bool | None, str | None]:
+    """Return (business_status, open_now, hours_snippet) from card text."""
+    if _CLOSED_PERM_RE.search(card_text):
+        return "CLOSED_PERMANENTLY", False, None
+    if _CLOSED_TEMP_RE.search(card_text):
+        return "CLOSED_TEMPORARILY", False, None
+    # "Closes 10 PM" → open now, snippet = "Closes 10 PM"
+    m = _CLOSES_RE.search(card_text)
+    if m:
+        snippet = (m.group("t") or m.group("t2") or "").strip()
+        return "OPERATIONAL", True, f"Closes {snippet}" if snippet else None
+    # "Opens 8 AM Tue" → closed now, snippet = "Opens 8 AM Tue"
+    m = _OPENS_RE.search(card_text)
+    if m:
+        snippet = (m.group("t") or m.group("t2") or "").strip()
+        return "OPERATIONAL", False, f"Opens {snippet}" if snippet else None
+    return None, None, None
+
 
 # -- CAPTCHA handling ---------------------------------------------------------
 
@@ -236,6 +276,15 @@ class PlaywrightScraper:
                             # Last part tends to be the address snippet.
                             extras["full_address"] = parts[-1]
                     break
+
+            # Business-status + open/closed inference from card text.
+            status, open_now, hours_snippet = _infer_status(text)
+            if status:
+                extras["business_status"] = status
+            if open_now is not None:
+                extras["open_now"] = open_now
+            if hours_snippet:
+                extras["hours_snippet"] = hours_snippet
         return extras
 
     # -- place detail + reviews ---------------------------------------------
@@ -274,6 +323,8 @@ class PlaywrightScraper:
                 return None
 
         name = txt(main.locator("h1"))
+        # Expand the hours dropdown so the weekly schedule is in the DOM.
+        working_hours = self._expand_and_extract_hours(main)
         rating = _to_float(txt(main.locator('div.fontDisplayLarge, div[role="img"][aria-label*="stars"]')))
         reviews_count = _to_int(
             txt(main.locator('button[aria-label*="reviews" i], button:has-text("مراجعة"), button:has-text("تقييم")'))
@@ -287,6 +338,13 @@ class PlaywrightScraper:
 
         cid = _cid_from(self.page.url)
         lat, lng = _latlng_from(self.page.url)
+        # Business status from detail page header (e.g. "Temporarily closed" banner).
+        header_text = ""
+        try:
+            header_text = main.inner_text(timeout=1_000)[:1000]
+        except Exception:  # noqa: BLE001
+            header_text = ""
+        status, open_now, hours_snippet = _infer_status(_strip_icons(header_text) or "")
         return {
             "place_id": cid,
             "name": name,
@@ -301,7 +359,36 @@ class PlaywrightScraper:
             "latitude": lat,
             "longitude": lng,
             "google_url": self.page.url,
+            "working_hours": working_hours,
+            "business_status": status,
+            "open_now": open_now,
+            "hours_snippet": hours_snippet,
         }
+
+    def _expand_and_extract_hours(self, main: Locator) -> dict[str, str] | None:
+        """Click the collapsed hours row to reveal the weekly table, then
+        parse it into `{"Monday": "7 AM–10 PM", ...}`. Returns None if the
+        place has no hours button (happens on parks, ATMs, etc)."""
+        btn = main.locator('button[data-item-id="oh"]')
+        if btn.count() == 0:
+            return None
+        with contextlib.suppress(Exception):
+            btn.first.click(timeout=2_000)
+            self.page.wait_for_timeout(500)
+        rows = main.locator('table tr').all() if main.locator('table').count() else []
+        out: dict[str, str] = {}
+        for tr in rows:
+            cells = tr.locator("td, th").all()
+            if len(cells) < 2:
+                continue
+            try:
+                day = (cells[0].inner_text(timeout=400) or "").strip()
+                hrs = (cells[1].inner_text(timeout=400) or "").strip()
+            except Exception:  # noqa: BLE001
+                continue
+            if day and hrs:
+                out[day] = _strip_icons(hrs) or hrs
+        return out or None
 
     def _extract_reviews(self, reviews_limit: int, sort: str) -> list[dict[str, Any]]:
         tab = self.page.locator(
