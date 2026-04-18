@@ -8,7 +8,7 @@ DB_ROLE := gplaces
 DB_PASS := gplaces
 DB_NAME := gplaces
 
-.PHONY: help install install-browser db-create db-drop migrate revision scrape-places scrape-reviews status psql lint clean
+.PHONY: help install install-browser db-create db-drop migrate revision scrape-places scrape-reviews status psql lint clean release
 
 help:
 	@echo "Setup"
@@ -23,11 +23,12 @@ help:
 	@echo "  scrape-reviews    fetch reviews for places without reviews"
 	@echo "  status            show scrape progress"
 	@echo "API"
-	@echo "  serve             run the FastAPI /v1/nearby service locally"
+	@echo "  serve             run the FastAPI /v1/places service locally"
 	@echo "  image-build       build Docker image gplaces/api:latest"
 	@echo "  image-load        import the image into the host k3s containerd"
 	@echo "  k8s-apply         kubectl apply the homelab manifests"
 	@echo "  k8s-status        show deploy/pod/svc for api-places"
+	@echo "  release           bump + commit + tag + image + rollout + push"
 	@echo "Dev"
 	@echo "  psql              open psql shell against the project db"
 	@echo "  lint              ruff check"
@@ -98,3 +99,38 @@ lint:
 
 clean:
 	rm -rf .venv .ruff_cache .pytest_cache **/__pycache__
+
+# One-shot release:
+#   1. Abort if the working tree is dirty
+#   2. Bump pyproject.toml version (patch|minor|major inferred from commits,
+#      override with BUMP=minor make release)
+#   3. Commit the bump as `release gplaces vX.Y.Z`
+#   4. Tag `gplaces/vX.Y.Z`
+#   5. Build the container image under BOTH gplaces/api:vX.Y.Z and :latest
+#   6. Save to /tmp/gplaces-api.tar so the user can `sudo k3s ctr images import`
+#   7. Push main + tag (respects --no-verify-never-set policy)
+#
+# k3s rollout + image-import require sudo, which is not automatable here, so
+# the target prints the two commands to run after it finishes. They're idempotent.
+release:
+	@test -z "$$(git -C .. status --porcelain gplaces_parser/)" \
+	  || (echo "working tree has uncommitted changes under gplaces_parser/"; exit 1)
+	@echo ">> bumping version"
+	$(eval NEW_VERSION := $(shell ./scripts/bump-version.sh))
+	@test -n "$(NEW_VERSION)" || (echo "bump-version.sh did not return a version"; exit 2)
+	@echo ">> new version = $(NEW_VERSION)"
+	@./scripts/changelog.sh | sed 's/^/  /'
+	git -C .. add gplaces_parser/pyproject.toml
+	git -C .. commit -m "release gplaces v$(NEW_VERSION)"
+	git -C .. tag "gplaces/v$(NEW_VERSION)"
+	@echo ">> building image gplaces/api:v$(NEW_VERSION) + :latest"
+	docker build -t $(IMAGE) -t gplaces/api:v$(NEW_VERSION) .
+	docker save gplaces/api:v$(NEW_VERSION) -o /tmp/gplaces-api.tar
+	@echo
+	@echo "run these two as root to roll the deployment over:"
+	@echo "  sudo k3s ctr images import /tmp/gplaces-api.tar"
+	@echo "  kubectl -n api-places set image deployment/api-places api=localhost/gplaces/api:v$(NEW_VERSION)"
+	@echo
+	git -C .. push origin main
+	git -C .. push origin "gplaces/v$(NEW_VERSION)"
+	@echo ">> released gplaces v$(NEW_VERSION)"
