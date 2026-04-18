@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
@@ -30,8 +31,13 @@ import net.omarss.omono.feature.places.Place
 import net.omarss.omono.feature.places.PlaceCategory
 import net.omarss.omono.feature.places.PlacesRepository
 import net.omarss.omono.feature.places.filterByDirection
+import net.omarss.omono.location.AppLocationStream
 import timber.log.Timber
 import javax.inject.Inject
+import kotlin.math.atan2
+import kotlin.math.cos
+import kotlin.math.sin
+import kotlin.math.sqrt
 
 @OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
 @HiltViewModel
@@ -39,6 +45,7 @@ class PlacesViewModel @Inject constructor(
     @param:ApplicationContext private val context: Context,
     private val repository: PlacesRepository,
     headingSensor: HeadingSensor,
+    private val locationStream: AppLocationStream,
 ) : ViewModel() {
 
     // `null` means "All categories" — the repository fans out in
@@ -153,7 +160,26 @@ class PlacesViewModel @Inject constructor(
             .debounce(300)
             .onEach { refresh() }
             .launchIn(viewModelScope)
+
+        // Follow the shared location stream. When the user moves
+        // LOCATION_REFRESH_M since the last fetch, kick off a fresh
+        // nearby/search query so the list tracks movement instead of
+        // showing stale "places near where I opened the tab" results.
+        locationStream.updates()
+            .catch { Timber.w(it, "Places location stream failed") }
+            .onEach { fix ->
+                val last = lastFetchLocation
+                val shouldRefresh = last == null ||
+                    haversineMeters(
+                        last.first, last.second,
+                        fix.latitude, fix.longitude,
+                    ) >= LOCATION_REFRESH_M
+                if (shouldRefresh) refresh()
+            }
+            .launchIn(viewModelScope)
     }
+
+    @Volatile private var lastFetchLocation: Pair<Double, Double>? = null
 
     private var lastFetchKey: FetchKey? = null
     private var lastFetchAtMs: Long = 0L
@@ -223,6 +249,7 @@ class PlacesViewModel @Inject constructor(
                     error.value = null
                     lastFetchKey = key
                     lastFetchAtMs = now
+                    lastFetchLocation = location
                 }
                 .onFailure {
                     Timber.w(it, "Places lookup failed")
@@ -247,6 +274,12 @@ class PlacesViewModel @Inject constructor(
         // reviewed kiosks and closed venues.
         const val MIN_RATING: Float = 4.0f
         const val MIN_REVIEW_COUNT: Int = 100
+
+        // Re-fetch once the user has moved this far from wherever we
+        // last pulled results. 150 m is big enough to ignore GPS
+        // wander at a stoplight, small enough that walking past a
+        // block re-lists the places around you.
+        const val LOCATION_REFRESH_M: Double = 150.0
     }
 
     private fun hasLocationPermission(): Boolean =
@@ -265,6 +298,23 @@ class PlacesViewModel @Inject constructor(
         return loc?.let { Pair(it.latitude, it.longitude) }
     }
 
+}
+
+// Great-circle distance. Kept private to this file because the
+// ViewModel only needs it for the "did we move enough to re-fetch"
+// check — unrelated to the repository's own filter geometry.
+private fun haversineMeters(
+    lat1: Double, lon1: Double,
+    lat2: Double, lon2: Double,
+): Double {
+    val r = 6_371_000.0
+    val dLat = Math.toRadians(lat2 - lat1)
+    val dLon = Math.toRadians(lon2 - lon1)
+    val a = sin(dLat / 2).let { it * it } +
+        cos(Math.toRadians(lat1)) * cos(Math.toRadians(lat2)) *
+        sin(dLon / 2).let { it * it }
+    val c = 2 * atan2(sqrt(a), sqrt(1 - a))
+    return r * c
 }
 
 data class PlacesUiState(
