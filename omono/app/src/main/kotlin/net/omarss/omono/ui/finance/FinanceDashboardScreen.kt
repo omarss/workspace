@@ -56,7 +56,6 @@ import java.util.Locale
 @Composable
 fun FinanceDashboardRoute(
     contentPadding: PaddingValues,
-    onBack: () -> Unit,
     viewModel: FinanceDashboardViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -82,14 +81,7 @@ fun FinanceDashboardRoute(
             .fillMaxSize()
             .padding(contentPadding),
     ) {
-        TopAppBar(
-            title = { Text("Finance") },
-            navigationIcon = {
-                IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                }
-            },
-        )
+        TopAppBar(title = { Text("Finance") })
 
         if (state.error != null) {
             Column(
@@ -121,7 +113,6 @@ fun FinanceDashboardRoute(
                 onSelect = viewModel::selectMonth,
             )
             SummaryCard(state)
-            BudgetCard(state)
             if (state.subscriptions.isNotEmpty()) {
                 SubscriptionsCard(state.subscriptions)
             }
@@ -364,6 +355,41 @@ private fun SummaryCard(state: FinanceDashboardUiState) {
                     color = Color(0xFFA7F3D0), // emerald 200 — reads on indigo→violet gradient
                 )
             }
+
+            // Budget line lives on the summary card (instead of a
+            // separate card repeating the month total). The bar stays
+            // clamped to 0..1 so it doesn't overflow visually; the
+            // text alongside shows the uncapped percentage.
+            if (state.budgetSar > 0.0) {
+                Spacer(Modifier.height(6.dp))
+                val barColor = if (state.overBudget) {
+                    Color(0xFFF87171) // red 400 — reads on gradient
+                } else {
+                    Color.White.copy(alpha = 0.9f)
+                }
+                LinearProgressIndicator(
+                    progress = { state.budgetProgress },
+                    modifier = Modifier.fillMaxWidth(),
+                    color = barColor,
+                    trackColor = Color.White.copy(alpha = 0.2f),
+                )
+                val actualPercent = state.monthSar / state.budgetSar * 100.0
+                val label = buildString {
+                    append("Budget SAR %,.0f  ·  %.0f%%".format(state.budgetSar, actualPercent))
+                    if (state.overBudget) {
+                        append("  ·  over by SAR %,.0f".format(state.monthSar - state.budgetSar))
+                    }
+                }
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (state.overBudget) {
+                        Color(0xFFFECACA) // red 200 on gradient
+                    } else {
+                        Color.White.copy(alpha = 0.8f)
+                    },
+                )
+            }
         }
     }
 }
@@ -396,67 +422,6 @@ private fun TrendPill(
             style = MaterialTheme.typography.labelMedium,
             color = Color.White,
         )
-    }
-}
-
-@Composable
-private fun BudgetCard(state: FinanceDashboardUiState) {
-    if (state.budgetSar <= 0) return
-    Card(
-        modifier = Modifier.fillMaxWidth().animateContentSize(),
-        colors = CardDefaults.elevatedCardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-        ),
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            Text(
-                text = "Monthly budget",
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            val progressColor = if (state.overBudget) {
-                MaterialTheme.colorScheme.error
-            } else {
-                MaterialTheme.colorScheme.primary
-            }
-            // budgetProgress is coerced 0..1 so the visual bar never
-            // overflows; the text below shows the uncapped percentage
-            // so a 182% over-budget month reads as "182%" not "100%".
-            LinearProgressIndicator(
-                progress = { state.budgetProgress },
-                modifier = Modifier.fillMaxWidth(),
-                color = progressColor,
-                trackColor = MaterialTheme.colorScheme.surfaceVariant,
-            )
-            val actualPercent = if (state.budgetSar > 0) {
-                (state.monthSar / state.budgetSar * 100.0)
-            } else 0.0
-            Text(
-                text = "SAR %,.0f / SAR %,.0f · %.0f%%".format(
-                    state.monthSar,
-                    state.budgetSar,
-                    actualPercent,
-                ),
-                style = MaterialTheme.typography.bodyMedium,
-                color = if (state.overBudget) {
-                    MaterialTheme.colorScheme.error
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                },
-            )
-            if (state.overBudget) {
-                Text(
-                    text = "Over by SAR %,.0f".format(state.monthSar - state.budgetSar),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.error,
-                )
-            }
-        }
     }
 }
 

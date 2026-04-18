@@ -25,7 +25,6 @@ class DriveInternetGate @Inject constructor(
 ) {
 
     fun attach(scope: CoroutineScope) {
-        governor.start()
         scope.launch {
             var wasDisabling = false
             combine(
@@ -55,6 +54,5 @@ class DriveInternetGate @Inject constructor(
     // we never leave the user offline after a manual stop.
     suspend fun ensureEnabledOnStop() {
         governor.enableInternet()
-        governor.stop()
     }
 }

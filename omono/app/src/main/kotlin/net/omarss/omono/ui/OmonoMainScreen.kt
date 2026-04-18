@@ -96,8 +96,6 @@ private val smsPermissions: List<String> = listOf(
 @Composable
 fun OmonoMainRoute(
     contentPadding: PaddingValues,
-    onOpenPlaces: () -> Unit = {},
-    onOpenFinance: () -> Unit = {},
     viewModel: OmonoMainViewModel = hiltViewModel(),
     updateViewModel: SelfUpdateViewModel = hiltViewModel(),
 ) {
@@ -112,19 +110,6 @@ fun OmonoMainRoute(
         updateViewModel.refreshPermission()
     }
 
-    // Re-read Usage access perm on every resume so coming back from
-    // Settings → Usage access immediately reflects the new state.
-    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
-    androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
-        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
-            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
-                viewModel.refreshUsageStatsPermission()
-            }
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
-    }
-
     val foreground = rememberMultiplePermissionsState(foregroundPermissions)
     val background = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
         rememberMultiplePermissionsState(listOf(Manifest.permission.ACCESS_BACKGROUND_LOCATION))
@@ -134,17 +119,6 @@ fun OmonoMainRoute(
     val sms = rememberMultiplePermissionsState(smsPermissions)
     val batteryExempt by rememberBatteryOptimizationState()
     val dndAccessGranted by rememberNotificationPolicyAccessState()
-
-    // Turn one-shot export events into FileProvider ACTION_SEND intents.
-    LaunchedEffect(Unit) {
-        viewModel.exportEvents.collect { event ->
-            when (event) {
-                is ExportEvent.Success -> launchSmsExportShare(context, event)
-                is ExportEvent.Failure ->
-                    Toast.makeText(context, "Export failed: ${event.message}", Toast.LENGTH_LONG).show()
-            }
-        }
-    }
 
     OmonoMainScreen(
         contentPadding = contentPadding,
@@ -160,16 +134,6 @@ fun OmonoMainRoute(
         onRequestSms = sms::launchMultiplePermissionRequest,
         onRequestBatteryExemption = { launchBatteryOptimizationDialog(context) },
         onRequestDndAccess = { launchNotificationPolicyAccessSettings(context) },
-        onUnitSelect = viewModel::setUnit,
-        onAlertOnOverLimitChange = viewModel::setAlertOnOverLimit,
-        onAlertOnPhoneUseWhileDrivingChange = viewModel::setAlertOnPhoneUseWhileDriving,
-        onRequestUsageStats = { launchUsageStatsSettings(context) },
-        onDisableInternetWhileDrivingChange = viewModel::setDisableInternetWhileDriving,
-        onRequestShizukuPermission = viewModel::requestShizukuPermission,
-        onBudgetChange = viewModel::setMonthlyBudget,
-        onExportSms = viewModel::onExportSmsRequested,
-        onOpenPlaces = onOpenPlaces,
-        onOpenFinance = onOpenFinance,
         onDownloadUpdate = updateViewModel::startDownload,
         onInstallUpdate = updateViewModel::installNow,
         onGrantInstallPermission = updateViewModel::grantInstallPermission,
@@ -179,7 +143,7 @@ fun OmonoMainRoute(
     )
 }
 
-private fun launchSmsExportShare(
+internal fun launchSmsExportShare(
     context: android.content.Context,
     event: ExportEvent.Success,
 ) {
@@ -218,16 +182,6 @@ fun OmonoMainScreen(
     onRequestSms: () -> Unit,
     onRequestBatteryExemption: () -> Unit,
     onRequestDndAccess: () -> Unit,
-    onUnitSelect: (SpeedUnit) -> Unit,
-    onAlertOnOverLimitChange: (Boolean) -> Unit,
-    onAlertOnPhoneUseWhileDrivingChange: (Boolean) -> Unit,
-    onRequestUsageStats: () -> Unit,
-    onDisableInternetWhileDrivingChange: (Boolean) -> Unit,
-    onRequestShizukuPermission: () -> Unit,
-    onBudgetChange: (Double) -> Unit,
-    onExportSms: () -> Unit,
-    onOpenPlaces: () -> Unit = {},
-    onOpenFinance: () -> Unit = {},
     onDownloadUpdate: () -> Unit = {},
     onInstallUpdate: () -> Unit = {},
     onGrantInstallPermission: () -> Unit = {},
@@ -235,21 +189,9 @@ fun OmonoMainScreen(
     onStart: () -> Unit,
     onStop: () -> Unit,
 ) {
-    var showBudgetDialog by remember { mutableStateOf(false) }
-    if (showBudgetDialog) {
-        BudgetDialog(
-            currentBudget = state.spending.budgetSar,
-            onDismiss = { showBudgetDialog = false },
-            onConfirm = { value ->
-                onBudgetChange(value)
-                showBudgetDialog = false
-            },
-        )
-    }
-
     // Root Column scrolls because on smaller devices the stack of
-    // permission / battery / DND / spending cards can easily exceed
-    // the viewport height before any of them are dismissed.
+    // permission / battery / DND cards can easily exceed the viewport
+    // before any of them are dismissed.
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -258,10 +200,7 @@ fun OmonoMainScreen(
             .padding(horizontal = 24.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp),
     ) {
-        BrandHeader(
-            onOpenPlaces = onOpenPlaces,
-            onOpenFinance = onOpenFinance,
-        )
+        BrandHeader()
 
         AnimatedVisibility(visible = updateState.showBanner) {
             SelfUpdateBanner(
@@ -280,8 +219,6 @@ fun OmonoMainScreen(
                 spending = state.spending,
                 smsGranted = smsGranted,
                 onRequestSms = onRequestSms,
-                onEditBudget = { showBudgetDialog = true },
-                onExportSms = onExportSms,
             )
         }
 
@@ -306,32 +243,6 @@ fun OmonoMainScreen(
             DndAccessCard(onRequest = onRequestDndAccess)
         }
 
-        Text(
-            text = "Unit",
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        UnitPicker(current = state.unit, onSelect = onUnitSelect)
-
-        AlertSettingRow(
-            enabled = state.alertOnOverLimit,
-            onChange = onAlertOnOverLimitChange,
-        )
-
-        PhoneUseAlertSettingRow(
-            enabled = state.alertOnPhoneUseWhileDriving,
-            usageStatsGranted = state.usageStatsGranted,
-            onChange = onAlertOnPhoneUseWhileDrivingChange,
-            onRequestUsageStats = onRequestUsageStats,
-        )
-
-        DisableInternetSettingRow(
-            enabled = state.disableInternetWhileDriving,
-            readiness = state.shizukuReadiness,
-            onChange = onDisableInternetWhileDrivingChange,
-            onRequestPermission = onRequestShizukuPermission,
-        )
-
         Spacer(Modifier.height(4.dp))
 
         PrimaryAction(
@@ -344,42 +255,20 @@ fun OmonoMainScreen(
 }
 
 @Composable
-private fun BrandHeader(
-    onOpenPlaces: () -> Unit,
-    onOpenFinance: () -> Unit,
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = "omono",
-                style = MaterialTheme.typography.headlineLarge,
-                color = MaterialTheme.colorScheme.primary,
-            )
-            // Version string is pulled from BuildConfig so every release
-            // bump via `make release` is reflected here automatically.
-            Text(
-                text = "v${BuildConfig.VERSION_NAME}",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        IconButton(onClick = onOpenFinance) {
-            Icon(
-                imageVector = Icons.Filled.PieChart,
-                contentDescription = "Finance dashboard",
-                tint = MaterialTheme.colorScheme.primary,
-            )
-        }
-        IconButton(onClick = onOpenPlaces) {
-            Icon(
-                imageVector = Icons.Filled.Explore,
-                contentDescription = "Places nearby",
-                tint = MaterialTheme.colorScheme.primary,
-            )
-        }
+private fun BrandHeader() {
+    Column {
+        Text(
+            text = "omono",
+            style = MaterialTheme.typography.headlineLarge,
+            color = MaterialTheme.colorScheme.primary,
+        )
+        // Version string is pulled from BuildConfig so every release
+        // bump via `make release` is reflected here automatically.
+        Text(
+            text = "v${BuildConfig.VERSION_NAME}",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
@@ -450,8 +339,6 @@ private fun SpendingCard(
     spending: SpendingUi,
     smsGranted: Boolean,
     onRequestSms: () -> Unit,
-    onEditBudget: () -> Unit,
-    onExportSms: () -> Unit,
 ) {
     val walletGradient = listOf(
         MaterialTheme.colorScheme.secondaryContainer,
@@ -521,36 +408,11 @@ private fun SpendingCard(
                         color = progressColor,
                         trackColor = MaterialTheme.colorScheme.surfaceVariant,
                     )
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            text = "Budget SAR ${spending.budgetDisplay}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.weight(1f),
-                        )
-                        IconButton(onClick = onEditBudget) {
-                            Icon(
-                                Icons.Filled.Edit,
-                                contentDescription = "Edit budget",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
-                }
-
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                TextButton(
-                    onClick = onExportSms,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Icon(Icons.Filled.Download, contentDescription = null)
-                    Spacer(Modifier.size(8.dp))
-                    Text("Share SMS for analysis")
+                    Text(
+                        text = "Budget SAR ${spending.budgetDisplay}  ·  edit in Settings",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
         }
@@ -623,43 +485,6 @@ private fun RecentTripsCard(trips: List<TripUi>) {
 }
 
 @Composable
-private fun BudgetDialog(
-    currentBudget: Double,
-    onDismiss: () -> Unit,
-    onConfirm: (Double) -> Unit,
-) {
-    var text by remember { mutableStateOf("%.0f".format(currentBudget)) }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Monthly budget") },
-        text = {
-            Column {
-                Text(
-                    "Set the SAR amount you want to stay under each month. " +
-                        "The progress bar on the spending card turns red if you go over.",
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-                Spacer(Modifier.height(12.dp))
-                OutlinedTextField(
-                    value = text,
-                    onValueChange = { new -> text = new.filter { it.isDigit() || it == '.' } },
-                    label = { Text("SAR") },
-                    singleLine = true,
-                )
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = { onConfirm(text.toDoubleOrNull() ?: 0.0) }) {
-                Text("Save")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
-        },
-    )
-}
-
-@Composable
 private fun SpendingStat(label: String, value: String) {
     Column {
         Text(
@@ -719,166 +544,6 @@ private fun LimitChip(text: String, overLimit: Boolean) {
             style = MaterialTheme.typography.labelLarge,
             color = onContainer,
         )
-    }
-}
-
-@Composable
-private fun UnitPicker(
-    current: SpeedUnit,
-    onSelect: (SpeedUnit) -> Unit,
-) {
-    val options = SpeedUnit.entries
-    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-        options.forEachIndexed { index, option ->
-            SegmentedButton(
-                selected = option == current,
-                onClick = { onSelect(option) },
-                shape = SegmentedButtonDefaults.itemShape(index = index, count = options.size),
-            ) {
-                Text(option.label)
-            }
-        }
-    }
-}
-
-@Composable
-private fun AlertSettingRow(
-    enabled: Boolean,
-    onChange: (Boolean) -> Unit,
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = "Alert over limit",
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-            Text(
-                text = "Loud beep the moment you cross a posted speed limit",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        Switch(checked = enabled, onCheckedChange = onChange)
-    }
-}
-
-@Composable
-private fun PhoneUseAlertSettingRow(
-    enabled: Boolean,
-    usageStatsGranted: Boolean,
-    onChange: (Boolean) -> Unit,
-    onRequestUsageStats: () -> Unit,
-) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "No phone while driving",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                Text(
-                    text = "Loud beep once you've been using the phone for 5+ seconds while driving. " +
-                        "Pauses automatically when Google Maps / Waze is foreground.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            Switch(checked = enabled, onCheckedChange = onChange)
-        }
-        if (enabled && !usageStatsGranted) {
-            Spacer(Modifier.height(6.dp))
-            Text(
-                text = "Navigation-app detection needs Usage access — without it the beep fires " +
-                    "whenever the screen is on (including when you're just using Maps).",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error,
-            )
-            Spacer(Modifier.height(4.dp))
-            TextButton(onClick = onRequestUsageStats) {
-                Text("Grant Usage access")
-            }
-        }
-    }
-}
-
-// Opens Settings → Apps → Special access → Usage access. The user
-// still has to flip the toggle for omono themselves; Android doesn't
-// expose an in-app grant path for PACKAGE_USAGE_STATS.
-private fun launchUsageStatsSettings(context: android.content.Context) {
-    val intent = android.content.Intent(android.provider.Settings.ACTION_USAGE_ACCESS_SETTINGS)
-        .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-    kotlin.runCatching { context.startActivity(intent) }
-}
-
-// Toggle for the Shizuku-backed internet kill-switch. Surfaces
-// readiness inline so the user can see exactly what the obstacle is
-// (Shizuku not installed / not running / no permission) and tap to
-// resolve where possible.
-@Composable
-private fun DisableInternetSettingRow(
-    enabled: Boolean,
-    readiness: InternetGovernor.Readiness,
-    onChange: (Boolean) -> Unit,
-    onRequestPermission: () -> Unit,
-) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "Disable internet while driving",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                Text(
-                    text = "Wi-Fi + mobile data turn off when a drive starts and back on when it ends. " +
-                        "Requires Shizuku for the elevation hop.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            Switch(checked = enabled, onCheckedChange = onChange)
-        }
-        // Inline readiness hint shown only while the toggle is on but
-        // Shizuku isn't actually able to flip the radios — silent
-        // failure would be the worst UX so we surface every blocker.
-        if (enabled && readiness != InternetGovernor.Readiness.Ready) {
-            ShizukuReadinessHint(readiness, onRequestPermission)
-        }
-    }
-}
-
-@Composable
-private fun ShizukuReadinessHint(
-    readiness: InternetGovernor.Readiness,
-    onRequestPermission: () -> Unit,
-) {
-    val message = when (readiness) {
-        InternetGovernor.Readiness.NotInstalled ->
-            "Shizuku app isn't installed. Install it from F-Droid or Play, then come back."
-        InternetGovernor.Readiness.NotRunning ->
-            "Shizuku is installed but the service isn't running. Open Shizuku and start it via the ADB pair flow."
-        InternetGovernor.Readiness.NoPermission ->
-            "Shizuku is running but omono hasn't been granted permission. Tap below to request."
-        InternetGovernor.Readiness.Unknown ->
-            "Checking Shizuku status…"
-        InternetGovernor.Readiness.Ready -> return
-    }
-    Spacer(Modifier.height(6.dp))
-    Text(
-        text = message,
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.error,
-    )
-    if (readiness == InternetGovernor.Readiness.NoPermission) {
-        Spacer(Modifier.height(6.dp))
-        TextButton(onClick = onRequestPermission) {
-            Text("Grant Shizuku permission")
-        }
     }
 }
 

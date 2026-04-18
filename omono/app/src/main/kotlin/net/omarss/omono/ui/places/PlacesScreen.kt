@@ -63,7 +63,6 @@ import net.omarss.omono.feature.places.PlaceCategory
 @Composable
 fun PlacesRoute(
     contentPadding: PaddingValues,
-    onBack: () -> Unit,
     viewModel: PlacesViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -80,11 +79,6 @@ fun PlacesRoute(
     ) {
         TopAppBar(
             title = { Text("Places nearby") },
-            navigationIcon = {
-                IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                }
-            },
             actions = {
                 IconButton(onClick = { viewModel.refresh(force = true) }) {
                     Icon(Icons.Filled.Refresh, contentDescription = "Refresh")
