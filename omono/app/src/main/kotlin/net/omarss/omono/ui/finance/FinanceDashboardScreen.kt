@@ -140,7 +140,9 @@ fun FinanceDashboardRoute(
             MonthChipRow(
                 months = state.availableMonths,
                 selected = state.selectedMonth,
+                isAllTime = state.isAllTime,
                 onSelect = viewModel::selectMonth,
+                onSelectAllTime = viewModel::selectAllTime,
             )
             SummaryCard(state)
             if (state.subscriptions.isNotEmpty()) {
@@ -183,7 +185,9 @@ fun FinanceDashboardRoute(
 private fun MonthChipRow(
     months: List<YearMonth>,
     selected: YearMonth,
+    isAllTime: Boolean,
     onSelect: (YearMonth) -> Unit,
+    onSelectAllTime: () -> Unit,
 ) {
     if (months.isEmpty()) return
     Row(
@@ -200,12 +204,22 @@ private fun MonthChipRow(
                 else -> ym.format(MONTH_CHIP_FMT)
             }
             FilterChip(
-                selected = ym == selected,
+                selected = !isAllTime && ym == selected,
                 onClick = { onSelect(ym) },
                 label = { Text(label) },
                 colors = FilterChipDefaults.filterChipColors(),
             )
         }
+        // Trailing "All time" chip — bypasses the month scoping so the
+        // headline / top merchants / bills / transfers aggregate across
+        // every transaction in the SMS cache. Pace pills hide in this
+        // view, same as for historic months.
+        FilterChip(
+            selected = isAllTime,
+            onClick = onSelectAllTime,
+            label = { Text("All time") },
+            colors = FilterChipDefaults.filterChipColors(),
+        )
     }
 }
 
@@ -394,7 +408,11 @@ private fun SummaryCard(state: FinanceDashboardUiState) {
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Text(
-                text = if (state.isCurrentMonth) "This month" else state.selectedMonth.format(MONTH_CHIP_FMT),
+                text = when {
+                    state.isAllTime -> "All time"
+                    state.isCurrentMonth -> "This month"
+                    else -> state.selectedMonth.format(MONTH_CHIP_FMT)
+                },
                 style = MaterialTheme.typography.labelLarge,
                 color = Color.White.copy(alpha = 0.8f),
             )

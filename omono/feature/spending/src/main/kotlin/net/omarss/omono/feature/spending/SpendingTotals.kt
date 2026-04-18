@@ -142,6 +142,56 @@ fun computeTotals(
     )
 }
 
+// Aggregates purchases / transfers / refunds across every transaction
+// in the list, without any date scoping. Used for the "All time"
+// dashboard tab — the today-scoped and pace fields don't apply so we
+// leave them at zero (the UI hides the pace pill for this view). The
+// `monthSar` field is reused as the grand-total lifetime spend so the
+// UI doesn't need a parallel set of fields.
+fun computeTotalsAllTime(
+    transactions: List<Transaction>,
+    overrides: Map<String, SpendingCategory> = emptyMap(),
+): SpendingTotals {
+    var purchaseSum = 0.0
+    var purchaseCount = 0
+    var transferSum = 0.0
+    var transferCount = 0
+    var refundSum = 0.0
+    var refundCount = 0
+    val byCategory = mutableMapOf<SpendingCategory, Double>()
+    for (tx in transactions) {
+        when {
+            tx.kind.isPurchase -> {
+                purchaseSum += tx.amountSar
+                purchaseCount += 1
+                val category = MerchantCategorizer.categorize(tx.merchant, overrides)
+                byCategory.merge(category, tx.amountSar) { a, b -> a + b }
+            }
+            tx.kind == Transaction.Kind.REFUND -> {
+                refundSum += tx.amountSar
+                refundCount += 1
+            }
+            else -> {
+                transferSum += tx.amountSar
+                transferCount += 1
+            }
+        }
+    }
+    return SpendingTotals(
+        todaySar = 0.0,
+        monthSar = purchaseSum,
+        todayCount = 0,
+        monthCount = purchaseCount,
+        monthByCategory = byCategory,
+        monthTransfersSar = transferSum,
+        monthTransfersCount = transferCount,
+        monthRefundsSar = refundSum,
+        monthRefundsCount = refundCount,
+        lastMonthToDateSar = 0.0,
+        dailyAverageSar = 0.0,
+    )
+}
+
 // Aggregates purchases / transfers / refunds for an arbitrary calendar
 // month. The today-scoped and pace-benchmark fields don't apply to
 // historic months, so this variant leaves them at zero — the UI hides

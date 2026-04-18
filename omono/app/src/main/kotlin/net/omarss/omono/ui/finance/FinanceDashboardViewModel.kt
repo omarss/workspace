@@ -16,6 +16,7 @@ import net.omarss.omono.feature.spending.SpendingSettingsRepository
 import net.omarss.omono.feature.spending.Subscription
 import net.omarss.omono.feature.spending.Transaction
 import net.omarss.omono.feature.spending.computeTotals
+import net.omarss.omono.feature.spending.computeTotalsAllTime
 import net.omarss.omono.feature.spending.computeTotalsForMonth
 import net.omarss.omono.feature.spending.detectSubscriptions
 import java.text.SimpleDateFormat
@@ -38,6 +39,12 @@ class FinanceDashboardViewModel @Inject constructor(
     // in-memory list.
     private var transactionsCache: List<Transaction> = emptyList()
     private var selectedMonth: YearMonth = YearMonth.now(zone)
+    // "All time" is surfaced as an extra chip beside the month list.
+    // When enabled we bypass the YearMonth scoping entirely so the
+    // dashboard aggregates every transaction in the SMS cache (the
+    // underlying store caps history at ~180 days, so this is really
+    // "all we can see" rather than forever).
+    private var selectedAllTime: Boolean = false
 
     private val _uiState = MutableStateFlow(FinanceDashboardUiState())
     val uiState: StateFlow<FinanceDashboardUiState> = _uiState.asStateFlow()
@@ -58,8 +65,15 @@ class FinanceDashboardViewModel @Inject constructor(
     }
 
     fun selectMonth(month: YearMonth) {
-        if (month == selectedMonth) return
+        if (!selectedAllTime && month == selectedMonth) return
         selectedMonth = month
+        selectedAllTime = false
+        viewModelScope.launch { render() }
+    }
+
+    fun selectAllTime() {
+        if (selectedAllTime) return
+        selectedAllTime = true
         viewModelScope.launch { render() }
     }
 
@@ -68,13 +82,20 @@ class FinanceDashboardViewModel @Inject constructor(
         val categoryBudgets = settings.categoryBudgets.first()
         val overrides = settings.categoryOverrides.first()
         val current = YearMonth.now(zone)
-        val isCurrent = selectedMonth == current
-        val totals = if (isCurrent) {
-            computeTotals(transactionsCache, Instant.now(), zone, overrides)
-        } else {
-            computeTotalsForMonth(transactionsCache, selectedMonth, zone, overrides)
+        val isCurrent = !selectedAllTime && selectedMonth == current
+        val totals = when {
+            selectedAllTime -> computeTotalsAllTime(transactionsCache, overrides)
+            isCurrent -> computeTotals(transactionsCache, Instant.now(), zone, overrides)
+            else -> computeTotalsForMonth(transactionsCache, selectedMonth, zone, overrides)
         }
-        val inSelectedMonth = transactionsCache.filterIn(selectedMonth, zone)
+        // For all-time the "scope" is everything; otherwise we narrow to
+        // the selected month so the top-merchant / bill / transfer cards
+        // only reflect that window.
+        val inScope = if (selectedAllTime) {
+            transactionsCache
+        } else {
+            transactionsCache.filterIn(selectedMonth, zone)
+        }
         val projectedMonthSar = if (isCurrent) projectMonthEnd(totals.monthSar) else 0.0
         val subscriptions = if (isCurrent) {
             buildSubscriptionRows(transactionsCache)
@@ -85,6 +106,7 @@ class FinanceDashboardViewModel @Inject constructor(
         _uiState.value = FinanceDashboardUiState(
             ready = true,
             selectedMonth = selectedMonth,
+            isAllTime = selectedAllTime,
             availableMonths = buildAvailableMonths(current),
             isCurrentMonth = isCurrent,
             todaySar = totals.todaySar,
@@ -100,10 +122,16 @@ class FinanceDashboardViewModel @Inject constructor(
                 totals.monthByCategory, totals.monthSar, categoryBudgets,
             ),
             subscriptions = subscriptions,
-            topMerchants = buildTopMerchants(inSelectedMonth, overrides),
-            bills = buildBills(inSelectedMonth),
-            transfers = buildTransfers(inSelectedMonth),
-            recent = buildRecent(transactionsCache, overrides),
+            topMerchants = buildTopMerchants(inScope, overrides),
+            bills = buildBills(inScope),
+            transfers = buildTransfers(inScope),
+            // Recent activity follows the selected scope so that chipping
+            // to an older month actually reshuffles this list. The earlier
+            // bug was passing the full cache here, which pinned the list
+            // to the newest 20 transactions regardless of what the user
+            // had picked — except when "All time" is selected, where that
+            // behaviour is actually what the user wants.
+            recent = buildRecent(inScope, overrides),
         )
     }
 
@@ -333,6 +361,7 @@ private fun billLabel(tx: Transaction): String {
 data class FinanceDashboardUiState(
     val ready: Boolean = false,
     val selectedMonth: YearMonth = YearMonth.now(),
+    val isAllTime: Boolean = false,
     val availableMonths: List<YearMonth> = emptyList(),
     val isCurrentMonth: Boolean = true,
     val todaySar: Double = 0.0,
