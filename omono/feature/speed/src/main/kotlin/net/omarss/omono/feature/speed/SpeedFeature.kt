@@ -68,6 +68,7 @@ class SpeedFeature @Inject constructor(
     private val drivingDetector: DrivingModeDetector,
     private val distractionGuard: DistractionGuard,
     private val driveInternetGate: DriveInternetGate,
+    private val streetNameResolver: StreetNameResolver,
 ) : OmonoFeature {
 
     override val id: FeatureId = FeatureId("speed")
@@ -91,6 +92,9 @@ class SpeedFeature @Inject constructor(
             speedRepository.locations().collect { snapshot ->
                 tripRecorder.onLocation(snapshot)
                 drivingDetector.onSample(snapshot.speedMps, System.currentTimeMillis())
+                // Non-blocking: the resolver rate-limits internally and
+                // dispatches geocoding off the main thread.
+                streetNameResolver.onLocation(snapshot)
                 val limit = limits.limitKmh(
                     lat = snapshot.latitude,
                     lon = snapshot.longitude,
@@ -129,6 +133,7 @@ class SpeedFeature @Inject constructor(
         tripRecorder.finalizeCurrent()
         drivingDetector.reset()
         alertPlayer.stopBeeping()
+        streetNameResolver.reset()
         // Fire-and-forget — OmonoFeature.stop() is non-suspending and
         // we must not leave the user offline if they tapped Stop
         // mid-drive. Uses a private IO scope (rather than GlobalScope)

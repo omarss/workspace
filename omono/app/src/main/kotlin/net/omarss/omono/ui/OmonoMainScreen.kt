@@ -439,6 +439,14 @@ private fun HeroCard(state: OmonoMainUiState) {
                 style = MaterialTheme.typography.labelLarge,
                 color = Color.White.copy(alpha = 0.9f),
             )
+            if (state.streetName != null) {
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = "on ${state.streetName}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.White.copy(alpha = 0.9f),
+                )
+            }
             if (state.limitDisplay != null) {
                 Spacer(Modifier.height(12.dp))
                 LimitChip(text = "Limit ${state.limitDisplay}", overLimit = state.overLimit)

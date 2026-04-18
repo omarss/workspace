@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -15,6 +16,7 @@ import net.omarss.omono.core.service.FeatureHostStateHolder
 import net.omarss.omono.core.service.FeatureId
 import net.omarss.omono.core.service.FeatureState
 import net.omarss.omono.feature.speed.SpeedSettingsRepository
+import net.omarss.omono.feature.speed.StreetNameResolver
 import net.omarss.omono.feature.speed.trips.TripDao
 import net.omarss.omono.feature.speed.trips.TripEntity
 import net.omarss.omono.feature.spending.SpendingSettingsRepository
@@ -37,6 +39,7 @@ class OmonoMainViewModel @Inject constructor(
     spendingSettings: SpendingSettingsRepository,
     stateHolder: FeatureHostStateHolder,
     tripDao: TripDao,
+    streetNameResolver: StreetNameResolver,
     private val permissionBaselines: PermissionBaselineTracker,
 ) : ViewModel() {
 
@@ -100,25 +103,39 @@ class OmonoMainViewModel @Inject constructor(
         Settings(unit, alertOverLimit, budget)
     }
 
+    // Grouped so the top-level combine stays under Kotlin's 5-arg
+    // overload — adding a 6th flow inline would force the vararg form
+    // and lose type safety.
+    private val metaFlow: Flow<Meta> = combine(
+        lostPermissions,
+        streetNameResolver.street,
+    ) { lost, street -> Meta(lost, street) }
+
     val uiState: StateFlow<OmonoMainUiState> = combine(
         settings,
         stateHolder.running,
         stateHolder.states,
         tripDao.observeTop5(),
-        lostPermissions,
-    ) { s, running, states, trips, lost ->
+        metaFlow,
+    ) { s, running, states, trips, meta ->
         buildUiState(
             settings = s,
             running = running,
             speedState = states[speedFeatureId],
             spendingState = states[spendingFeatureId],
             trips = trips,
-            lostPermissions = lost,
+            lostPermissions = meta.lostPermissions,
+            streetName = meta.streetName,
         )
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(stopTimeoutMillis = 5_000),
         initialValue = OmonoMainUiState(),
+    )
+
+    private data class Meta(
+        val lostPermissions: Set<TrackedPermission>,
+        val streetName: String?,
     )
 
     private data class Settings(
@@ -134,6 +151,7 @@ class OmonoMainViewModel @Inject constructor(
         spendingState: FeatureState?,
         trips: List<TripEntity>,
         lostPermissions: Set<TrackedPermission>,
+        streetName: String?,
     ): OmonoMainUiState {
         val speedMetadata = metadataOf(speedState)
         val speedKmh = speedMetadata[FeatureState.META_SPEED_KMH]?.toFloat()
@@ -174,6 +192,10 @@ class OmonoMainViewModel @Inject constructor(
             spending = spending,
             recentTrips = recentTrips,
             lostPermissions = lostPermissions,
+            // Only show the street when actively tracking AND moving —
+            // a stale street name on a stopped car is noisier than
+            // nothing.
+            streetName = streetName?.takeIf { running && isMoving },
         )
     }
 
@@ -238,6 +260,7 @@ data class OmonoMainUiState(
     val spending: SpendingUi = SpendingUi(),
     val recentTrips: List<TripUi> = emptyList(),
     val lostPermissions: Set<TrackedPermission> = emptySet(),
+    val streetName: String? = null,
 )
 
 data class SpendingUi(
