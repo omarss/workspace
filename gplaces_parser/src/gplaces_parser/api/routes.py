@@ -360,6 +360,47 @@ async def reviews_search(
     )
 
 
+@router.get("/admin/usage", include_in_schema=False)
+async def admin_usage(_: AuthDep) -> dict:
+    """Aggregated API-usage counters per (key_prefix, endpoint, status).
+
+    Authed with the same X-Api-Key (there's only one key right now, so
+    a dedicated admin key would be ceremony without benefit). Returns a
+    list of rows sorted by total count descending — the caller can
+    format as a table however they like.
+    """
+    sql = """
+    SELECT key_prefix,
+           endpoint,
+           status_bucket,
+           SUM(count)::bigint AS total,
+           MIN(day)           AS first_day,
+           MAX(last_seen)     AS last_seen
+    FROM api_usage
+    GROUP BY key_prefix, endpoint, status_bucket
+    ORDER BY total DESC
+    """
+    from psycopg.rows import dict_row
+    with connection() as conn, conn.cursor(row_factory=dict_row) as cur:
+        cur.execute(sql)
+        rows = list(cur.fetchall())
+    return {
+        "rows": [
+            {
+                "key_prefix": r["key_prefix"],
+                "endpoint": r["endpoint"],
+                "status": r["status_bucket"],
+                "count": int(r["total"]),
+                "first_day": r["first_day"].isoformat() if r["first_day"] else None,
+                "last_seen": r["last_seen"].isoformat() if r["last_seen"] else None,
+            }
+            for r in rows
+        ],
+        "source": "gplaces",
+        "generated_at": datetime.now(UTC),
+    }
+
+
 @router.get("/health", include_in_schema=False)
 async def health() -> dict[str, str]:
     # No auth — used by k8s liveness/readiness probes.

@@ -14,6 +14,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from ..config import settings
 from .routes import router
+from .usage import ApiUsageMiddleware
 
 
 def create_app() -> FastAPI:
@@ -41,6 +42,7 @@ def create_app() -> FastAPI:
             content={"error": f"{loc}: {msg}" if loc else msg},
         )
 
+    app.add_middleware(ApiUsageMiddleware)
     app.include_router(router)
     return app
 

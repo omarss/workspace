@@ -344,6 +344,242 @@
       ],
       "highway": ["primary", "primary_link", "secondary", "secondary_link", "tertiary", "tertiary_link"],
       "maxspeed_kmh": 80
+    },
+
+    {
+      "label": "Riyadh–Makkah Expwy (intercity motorway)",
+      "name_contains": [
+        "Riyadh-Makkah",
+        "Riyadh Makkah",
+        "Makkah-Riyadh",
+        "طريق الرياض - مكة",
+        "طريق مكة - الرياض"
+      ],
+      "highway": ["motorway", "motorway_link"],
+      "maxspeed_kmh": 120
+    },
+    {
+      "label": "Riyadh–Medina Expwy (intercity motorway)",
+      "name_contains": [
+        "Riyadh-Medina",
+        "Riyadh Medina",
+        "Medina Road",
+        "Madinah Road",
+        "طريق الرياض - المدينة",
+        "طريق المدينة"
+      ],
+      "highway": ["motorway", "motorway_link"],
+      "maxspeed_kmh": 120
+    },
+    {
+      "label": "Riyadh–Qassim Expwy (Road 65)",
+      "name_contains": [
+        "Riyadh-Qassim",
+        "Qassim Road",
+        "Qassim Expressway",
+        "Buraidah Road",
+        "طريق القصيم",
+        "طريق الرياض - القصيم",
+        "طريق بريدة"
+      ],
+      "highway": ["motorway", "motorway_link"],
+      "maxspeed_kmh": 120
+    },
+    {
+      "label": "Riyadh–Al Hofuf / Al Ahsa Expwy",
+      "name_contains": [
+        "Hofuf Road",
+        "Hofuf Expressway",
+        "Al Ahsa Road",
+        "Al-Ahsa Road",
+        "Ahsa Road",
+        "طريق الأحساء",
+        "طريق الهفوف"
+      ],
+      "highway": ["motorway", "motorway_link"],
+      "maxspeed_kmh": 120
+    },
+    {
+      "label": "Riyadh–Al Kharj Rd",
+      "name_contains": [
+        "Al Kharj Road",
+        "Al-Kharj Road",
+        "Kharj Road",
+        "طريق الخرج"
+      ],
+      "highway": ["motorway", "motorway_link", "trunk", "trunk_link"],
+      "maxspeed_kmh": 120
+    },
+    {
+      "label": "Riyadh–Hafr Al Batin (Road 65 north)",
+      "name_contains": [
+        "Hafr Al Batin",
+        "Hafr Al-Batin",
+        "طريق حفر الباطن",
+        "حفر الباطن"
+      ],
+      "highway": ["motorway", "motorway_link"],
+      "maxspeed_kmh": 120
+    },
+    {
+      "label": "Makkah–Madinah Hijaz Expwy (Road 15)",
+      "name_contains": [
+        "Hijaz Expressway",
+        "Hejaz Expressway",
+        "Makkah-Madinah",
+        "Mecca-Medina",
+        "Makkah Medina",
+        "طريق الحجاز السريع",
+        "طريق مكة - المدينة",
+        "طريق مكة المدينة المنورة"
+      ],
+      "highway": ["motorway", "motorway_link"],
+      "maxspeed_kmh": 120
+    },
+    {
+      "label": "Jeddah–Makkah Expwy (Road 40 west)",
+      "name_contains": [
+        "Jeddah-Makkah",
+        "Jeddah Makkah",
+        "Makkah-Jeddah",
+        "Haramain Road",
+        "طريق جدة - مكة",
+        "طريق مكة - جدة",
+        "طريق الحرمين"
+      ],
+      "highway": ["motorway", "motorway_link"],
+      "maxspeed_kmh": 120
+    },
+    {
+      "label": "Jeddah–Madinah Coastal Expwy (Road 5)",
+      "name_contains": [
+        "Jeddah-Madinah",
+        "Jeddah Madinah",
+        "Madinah-Jeddah",
+        "طريق جدة - المدينة",
+        "طريق المدينة - جدة"
+      ],
+      "highway": ["motorway", "motorway_link"],
+      "maxspeed_kmh": 120
+    },
+    {
+      "label": "Jeddah–Taif Al Hada Rd (mountain descent)",
+      "name_contains": [
+        "Al Hada Road",
+        "Taif-Jeddah",
+        "Jeddah-Taif",
+        "طريق الهدا",
+        "طريق الطائف - جدة"
+      ],
+      "highway": ["motorway", "motorway_link", "trunk", "trunk_link"],
+      "maxspeed_kmh": 80
+    },
+    {
+      "label": "Riyadh–Taif Expwy",
+      "name_contains": [
+        "Riyadh-Taif",
+        "Taif-Riyadh",
+        "طريق الطائف - الرياض",
+        "طريق الرياض - الطائف"
+      ],
+      "highway": ["motorway", "motorway_link"],
+      "maxspeed_kmh": 120
+    },
+    {
+      "label": "Taif–Abha Escarpment Expwy",
+      "name_contains": [
+        "Taif-Abha",
+        "Abha-Taif",
+        "Baha Road",
+        "طريق الطائف - أبها",
+        "طريق أبها"
+      ],
+      "highway": ["motorway", "motorway_link", "trunk", "trunk_link"],
+      "maxspeed_kmh": 100
+    },
+    {
+      "label": "Abha–Jazan Coastal Expwy",
+      "name_contains": [
+        "Jazan Road",
+        "Jizan Road",
+        "Abha-Jazan",
+        "طريق جازان",
+        "طريق جيزان"
+      ],
+      "highway": ["motorway", "motorway_link", "trunk", "trunk_link"],
+      "maxspeed_kmh": 120
+    },
+    {
+      "label": "Madinah–Tabuk Expwy",
+      "name_contains": [
+        "Madinah-Tabuk",
+        "Tabuk Road",
+        "Tabuk Expressway",
+        "طريق تبوك",
+        "طريق المدينة - تبوك"
+      ],
+      "highway": ["motorway", "motorway_link"],
+      "maxspeed_kmh": 120
+    },
+    {
+      "label": "Tabuk–Haql Red Sea Coastal Rd",
+      "name_contains": [
+        "Haql Road",
+        "Tabuk-Haql",
+        "طريق حقل",
+        "طريق تبوك - حقل",
+        "طريق الساحل"
+      ],
+      "highway": ["motorway", "motorway_link", "trunk", "trunk_link"],
+      "maxspeed_kmh": 120
+    },
+    {
+      "label": "Dammam–Al Khobar–Dhahran Expwy",
+      "name_contains": [
+        "Dhahran Expressway",
+        "Dhahran-Khobar",
+        "Khobar-Dhahran",
+        "طريق الظهران",
+        "طريق الخبر"
+      ],
+      "highway": ["motorway", "motorway_link"],
+      "maxspeed_kmh": 100
+    },
+    {
+      "label": "Dammam–Jubail Coastal Expwy",
+      "name_contains": [
+        "Dammam-Jubail",
+        "Jubail Road",
+        "Jubail Expressway",
+        "طريق الجبيل",
+        "طريق الدمام - الجبيل"
+      ],
+      "highway": ["motorway", "motorway_link"],
+      "maxspeed_kmh": 120
+    },
+    {
+      "label": "Dammam–Kuwait Border Expwy (Road 95)",
+      "name_contains": [
+        "Kuwait-Dammam",
+        "Kuwait Road",
+        "Road 95",
+        "طريق الكويت",
+        "طريق الدمام - الكويت"
+      ],
+      "highway": ["motorway", "motorway_link"],
+      "maxspeed_kmh": 120
+    },
+    {
+      "label": "Al Ahsa–UAE Border Expwy",
+      "name_contains": [
+        "Al Ahsa-UAE",
+        "UAE Road",
+        "Al Batha Road",
+        "طريق الأمارات",
+        "طريق البطحاء"
+      ],
+      "highway": ["motorway", "motorway_link"],
+      "maxspeed_kmh": 120
     }
   ]
 }

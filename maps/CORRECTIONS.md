@@ -207,6 +207,47 @@ the rule:
 | Neighbourhood-scale                   | `secondary`, `tertiary` |
 | Intercity (Riyadh-Dammam, Makkah, …)  | `motorway`, `motorway_link`, `trunk` |
 
+## Segmented speeds — intercity vs urban, school zones
+
+A single named road often has different posted speeds on different
+stretches. Makkah Rd is ~100 km/h as it enters Riyadh's trunk class
+and ~120 km/h once it hits the open motorway, and the inherited
+`maxspeed_kmh` can't describe both. Two options that work today:
+
+1. **Scope by `highway` class.** Most speed changes coincide with a
+   class change in OSM — urban arterials are tagged `primary`/`trunk`
+   while the intercity link is tagged `motorway`. Split the rule:
+
+   ```jsonc
+   { "label": "Makkah Rd (urban)",     "name_contains": [...],
+     "highway": ["primary","trunk"],   "maxspeed_kmh": 100 }
+   { "label": "Makkah Rd (intercity)", "name_contains": [...],
+     "highway": ["motorway","motorway_link"], "maxspeed_kmh": 120 }
+   ```
+
+   This is what the `KSA INTERCITY` block at the bottom of the file
+   does for every major city-to-city route — motorway-class only, 120.
+
+2. **Optional `bbox` scope** *(future, unimplemented in build_roads.py
+   as of writing)*. When the same class covers two speed zones the
+   natural way is geographic. A rule can carry a bounding box and only
+   apply to matching segments whose centroid falls inside it:
+
+   ```jsonc
+   {
+     "label": "Makkah Rd — inside metro Riyadh (100 km/h)",
+     "name_contains": ["..."],
+     "highway": ["motorway","motorway_link"],
+     "bbox": { "min_lat": 24.50, "max_lat": 25.05,
+               "min_lon": 46.45, "max_lon": 47.10 },
+     "maxspeed_kmh": 100
+   }
+   ```
+
+   Suggested loader semantics: if `bbox` is present on a rule, a
+   candidate segment matches only when its centroid falls inside the
+   box. Rules without `bbox` behave as today. Opt-in, back-compat.
+
 ## Why you might see `inferred` beat `osm` on accuracy
 
 The per-source scorecard will sometimes show `inferred` with a
