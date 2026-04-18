@@ -195,3 +195,109 @@ The omono-side contract lives in:
 - `omono/feature/places/src/main/kotlin/net/omarss/omono/feature/places/GPlacesClient.kt` — HTTP + parser
 - `omono/feature/places/src/test/kotlin/net/omarss/omono/feature/places/GPlacesClientTest.kt` — parser tests doubling as response-shape examples
 - `omono/feature/places/src/main/kotlin/net/omarss/omono/feature/places/Place.kt` — the domain model we deserialise into
+
+---
+
+## 8. 2026-04-18 — asks raised by omono, verification of status
+
+omono/FEEDBACK.md §9 asked for five backend changes. The doc on the
+omono side was updated acknowledging them, but a live curl probe of
+`https://api.omarss.net` on **2026-04-18 15:36 UTC** shows none of them
+are actually implemented on the server yet. Evidence below; please
+land each change **and re-probe with curl** before marking done so we
+don't loop on "said addressed, still broken".
+
+Key used: the same `X-Api-Key` the omono client is pinned to.
+
+### 8.1 `category=all` / comma-list — NOT IMPLEMENTED
+
+```
+$ curl -H "X-Api-Key: ..." \
+    'https://api.omarss.net/v1/places?lat=24.7136&lon=46.6753&radius=2000&category=all&limit=5'
+{"error":"unknown category: all"}                            # HTTP 400
+
+$ curl ... '.../v1/places?...&category=coffee,restaurant&limit=5'
+{"error":"unknown category: coffee,restaurant"}              # HTTP 400
+```
+
+Expected: `200` with a union, deduped by `id`, as specced in
+`omono/FEEDBACK.md §9.1`. This one is a ship-blocker — omono currently
+fans out 19 parallel GETs (one per `PlaceCategory`) to build its
+default "All" view, which is wasteful on both sides.
+
+### 8.2 `min_rating` + `min_reviews` — ACCEPTED BUT IGNORED
+
+Server doesn't reject the params (no 400), but the response body is
+identical with or without them:
+
+```
+$ curl ... '.../v1/places?lat=24.7136&lon=46.6753&radius=2000&category=restaurant&limit=20'
+# 20 results, first five are rating=3.2/reviews=6, rating=None,
+# rating=None, rating=None, rating=1.0/reviews=1
+
+$ curl ... '.../v1/places?...&category=restaurant&min_rating=4&min_reviews=100&limit=20'
+# same 20 results in the same order, same unrated / low-rated entries
+```
+
+Expected: drop everything with `rating < min_rating` OR
+`review_count < min_reviews` (and drop null-rated / null-reviewed
+places when either threshold is > 0). See §9.2 of the omono doc.
+
+### 8.3 `cid` field in response — NOT ADDED
+
+Current single-result shape:
+
+```json
+{
+  "id": "0x3e2f0306b560991b:0x72677b2c41fb4f9c",
+  "name": "C SQUARE Speciality Cafe",
+  ...
+  // no "cid" key
+}
+```
+
+Expected: add `cid` (decimal string, since u64 overflows JSON number)
+sibling to `id`. The client needs it for the Google Maps deep link
+(`maps.google.com/?cid=<n>`). Parsing works today but fails on edge
+cases — see `parseCidFromFtid` in the omono `PlacesScreen.kt`.
+
+### 8.4 Text search (`q` param or `/v1/places/search`) — NOT IMPLEMENTED
+
+```
+$ curl ... '.../v1/places?lat=...&lon=...&radius=5000&q=starbucks&limit=5'
+{"error":"category: Field required"}                         # HTTP 400
+
+$ curl ... '.../v1/places/search?lat=...&q=starbucks&limit=5'
+{"error":"Not Found"}                                        # HTTP 404
+```
+
+Expected: either `q=<str>` on `/v1/places` (category optional when `q`
+is present, fuzzy-match on `name`+`address`) OR a new
+`/v1/places/search` with the same response shape.
+
+### 8.5 `snap_m` on `/v1/roads` — ACCEPTED BUT IGNORED
+
+Off-polygon point, no `snap_m`:
+
+```
+$ curl ... '.../v1/roads?lat=24.80000&lon=46.60000'
+{"roads":[],"source":"gplaces","generated_at":"..."}
+```
+
+Same point with `snap_m=200`:
+
+```
+$ curl ... '.../v1/roads?lat=24.80000&lon=46.60000&snap_m=200'
+{"roads":[],"source":"gplaces","generated_at":"..."}
+```
+
+Expected: when `snap_m > 0` and no polygon contains the point, return
+the nearest road whose polygon is within `snap_m` metres, with
+`snapped: true` and `snap_distance_m: <float>` on the result.
+
+### Verification protocol going forward
+
+When a change lands, please run the exact curl from §9 of
+`omono/FEEDBACK.md` (or the sections here) and paste the output as
+evidence of implementation. That way we don't need a second round
+of confirmation.
