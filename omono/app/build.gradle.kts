@@ -35,8 +35,8 @@ android {
 
     defaultConfig {
         applicationId = "net.omarss.omono"
-        versionCode = 25
-        versionName = "0.18.0"
+        versionCode = 26
+        versionName = "0.19.0"
 
         buildConfigField("String", "TOMTOM_API_KEY", "\"${tomtomApiKey}\"")
         buildConfigField("String", "GPLACES_API_URL", "\"${gplacesApiUrl}\"")
