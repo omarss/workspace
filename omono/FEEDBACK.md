@@ -210,3 +210,118 @@ schema changes know who they'll affect.
   is ~1 lookup per 5 s of driving.
 - **omono ≥ v0.23** — `/v1/places` is the only source for the Places
   tab. No fallback.
+
+---
+
+## 9. Backend asks from omono (ordered by impact)
+
+These would let omono drop client-side workarounds. Items marked
+**ship-blocker** affect a feature currently in production; the rest
+are quality-of-life.
+
+### 9.1 `/v1/places` — "all categories" mode  *(ship-blocker)*
+
+**Why:** The Places tab's default view is now "All", not a single
+category. To build that list omono fans out **19 parallel GET calls**,
+one per `PlaceCategory`, and merges the responses. That's bad on three
+axes: wasted RPS on the backend, burns the user's data plan
+(especially while the internet-kill-switch is about to disable the
+connection mid-drive), and the first open is ~500 ms of waterfall
+latency per category at best.
+
+**Ask:** Accept `category` as either a comma-separated list or a
+special value:
+
+```
+GET /v1/places?lat=...&lon=...&radius=5000&category=all&limit=50
+GET /v1/places?lat=...&lon=...&radius=5000&category=coffee,restaurant,bakery&limit=50
+```
+
+- `category=all` returns everything within `radius` (already deduped
+  server-side by `id`), capped at `limit`.
+- Comma-separated picks a specific union.
+- Current single-category behaviour must keep working unchanged.
+
+Response JSON shape stays the same — `results: [...]` — so the Kotlin
+parser is a no-op change. Add a field per result (already kind-of
+present via `category`) so mixed-category responses still carry the
+per-place category.
+
+### 9.2 `/v1/places` — server-side quality filter
+
+**Why:** omono's default view hides places with `rating < 4` OR
+`review_count < 100`. Today that gate runs client-side, so the backend
+still ships the noise and the client discards it. On the all-category
+view this can be 70 %+ of the payload.
+
+**Ask:** Two optional numeric query params, applied server-side
+*before* the `limit` cap so the list doesn't get emptied by the gate:
+
+```
+GET /v1/places?...&min_rating=4&min_reviews=100
+```
+
+Defaults: `0` (no filter), i.e. current behaviour when the params are
+omitted. Places missing either field (the backend has no rating or
+review_count at all for some entries) should be **dropped** when
+either threshold is > 0 — matching omono's current client-side logic.
+
+### 9.3 `/v1/places` — canonical CID in response
+
+**Why:** The current `id` shape `"0x<fid_hex>:0x<cid_hex>"` works, but
+it forces the client to parse it before building the
+`https://www.google.com/maps?cid=<n>` deep link that lands the user
+on a place's review page. Two places have already broken parsing once
+in testing (length > 16 chars, leading zeros). See `parseCidFromFtid`
+in `omono/app/src/main/kotlin/net/omarss/omono/ui/places/PlacesScreen.kt`.
+
+**Ask:** Add a sibling field carrying the decimal CID directly:
+
+```json
+{
+  "id": "0x3e2f03001ea03a6f:0x555a69b1d55e7a4b",   // unchanged
+  "cid": "6149989055815169611",                     // NEW — decimal string
+  ...
+}
+```
+
+String (not int) because `u64` overflows `i64` / JS `number`.
+
+### 9.4 `/v1/places` — text search
+
+**Why:** The new search field in omono filters the already-fetched
+list by substring. Works, but limited to whatever the backend chose
+to return for the given category/radius. A user searching for
+"Urth Caffe" that isn't among the top 50 returned results won't find
+it even if it's two blocks away.
+
+**Ask:** Either:
+- Accept a `q=<str>` param on `/v1/places` that fuzzy-matches on
+  `name` + `address` server-side, OR
+- Add a dedicated `/v1/places/search?q=<str>&lat=...&lon=...&radius=...`
+  that returns the same JSON shape.
+
+Lower priority than 9.1–9.3; the client-side filter is acceptable for
+now.
+
+### 9.5 `/v1/roads` — name fallback when polygon is missed
+
+**Why:** Tight road polygons mean a fix a few metres off the
+centerline returns `roads: []` even on major streets. See the test
+runs I captured against `24.7136,46.6753` (hit Al Uaroba) vs the
++0.0001 offset (empty). On real drives this surfaces as "road name
+disappears" whenever the fix drifts. omono currently shows stale-last
+name via its own cache, but a server-side nearest-road fallback
+(e.g. snap within 20 m of any polygon edge) would feel much better.
+
+**Ask:** Optional `snap_m=<int>` param, default `0` (current
+exact-contains behaviour). When > 0 and no polygon contains the point,
+return the closest road whose polygon is within `snap_m` metres, with
+an added flag:
+
+```json
+{"roads":[{..., "snapped": true, "snap_distance_m": 14.3}]}
+```
+
+Client uses `snapped` to skip trusting the speed limit (display "~90
+km/h" instead of "90 km/h") while still surfacing the road name.
