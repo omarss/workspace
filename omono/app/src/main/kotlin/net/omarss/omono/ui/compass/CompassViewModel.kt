@@ -15,6 +15,9 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import net.omarss.omono.feature.places.HeadingSensor
+import net.omarss.omono.feature.places.Place
+import net.omarss.omono.feature.places.PlaceCategory
+import net.omarss.omono.feature.places.PlacesRepository
 import net.omarss.omono.location.AppLocationStream
 import timber.log.Timber
 import kotlin.math.atan2
@@ -37,6 +40,7 @@ class CompassViewModel @Inject constructor(
     headingSensor: HeadingSensor,
     private val locationStream: AppLocationStream,
     private val mosqueDirectory: MosqueDirectory,
+    private val placesRepository: PlacesRepository,
 ) : ViewModel() {
 
     private val heading: StateFlow<Float> = headingSensor.headings()
@@ -58,11 +62,23 @@ class CompassViewModel @Inject constructor(
     private val mosqueIdentity = MutableStateFlow<MosqueSnapshot?>(null)
     @Volatile private var lastMosqueLookupFix: AppLocationStream.Fix? = null
 
+    // User-selected quick-access place categories. Each enabled entry
+    // resolves to a "nearest of this kind" pin on the compass — same
+    // model as the mosque row, but driven by the gplaces backend.
+    // In-memory-only for now; persisted to DataStore would be a
+    // follow-up if users end up picking a consistent set.
+    private val enabledCategories = MutableStateFlow<Set<PlaceCategory>>(emptySet())
+    private val nearbyCategoryPlaces =
+        MutableStateFlow<Map<PlaceCategory, CategoryPlaceSnapshot>>(emptyMap())
+    @Volatile private var lastCategoryLookupFix: AppLocationStream.Fix? = null
+
     val uiState: StateFlow<CompassUiState> = combine(
         heading,
         fix,
         mosqueIdentity,
-    ) { h, f, mosque ->
+        enabledCategories,
+        nearbyCategoryPlaces,
+    ) { h, f, mosque, enabled, nearby ->
         val qibla = f?.let { qiblaBearingDeg(it.latitude, it.longitude).toFloat() }
         val mosqueBearing = if (f != null && mosque != null) {
             bearingDeg(f.latitude, f.longitude, mosque.latitude, mosque.longitude).toFloat()
@@ -70,6 +86,29 @@ class CompassViewModel @Inject constructor(
         val mosqueDistance = if (f != null && mosque != null) {
             haversineMeters(f.latitude, f.longitude, mosque.latitude, mosque.longitude)
         } else null
+        // Recompute each enabled category's bearing from the *current*
+        // fix so the arrow reacts live to movement, same pattern as the
+        // mosque row above. The identity / distance snapshot is only
+        // refreshed on sparse location triggers — see
+        // refreshCategoriesIfNeeded.
+        val categoryRows = enabled.mapNotNull { cat ->
+            val snap = nearby[cat] ?: return@mapNotNull null
+            val b = f?.let {
+                bearingDeg(it.latitude, it.longitude, snap.latitude, snap.longitude).toFloat()
+            }
+            val d = f?.let {
+                haversineMeters(it.latitude, it.longitude, snap.latitude, snap.longitude)
+            }
+            if (b == null || d == null) return@mapNotNull null
+            CategoryRow(
+                category = cat,
+                name = snap.name,
+                latitude = snap.latitude,
+                longitude = snap.longitude,
+                distanceMeters = d,
+                bearingDeg = b,
+            )
+        }.sortedBy { it.distanceMeters }
         CompassUiState(
             headingDeg = h,
             location = f?.let { it.latitude to it.longitude },
@@ -83,6 +122,8 @@ class CompassViewModel @Inject constructor(
                     bearingDeg = mosqueBearing,
                 )
             } else null,
+            enabledCategories = enabled,
+            categoryRows = categoryRows,
             errorMessage = if (!locationStream.hasPermission() && f == null) {
                 "Location permission needed"
             } else null,
@@ -101,7 +142,16 @@ class CompassViewModel @Inject constructor(
         fix
             .map { it?.toGridBucket() }
             .distinctUntilChanged()
-            .onEach { refreshMosqueIfNeeded() }
+            .onEach {
+                refreshMosqueIfNeeded()
+                refreshCategoriesIfNeeded()
+            }
+            .launchIn(viewModelScope)
+
+        // Toggle a new category on → fire an immediate lookup so the
+        // row populates without waiting for the next movement bucket.
+        enabledCategories
+            .onEach { refreshCategoriesIfNeeded(force = true) }
             .launchIn(viewModelScope)
     }
 
@@ -137,6 +187,80 @@ class CompassViewModel @Inject constructor(
         val longitude: Double,
     )
 
+    // One row's worth of identity / position for a place-categories
+    // pin. The bearing + distance shown on screen are derived live
+    // from the current fix; this only carries enough to avoid
+    // re-querying the backend on every heading tick.
+    private data class CategoryPlaceSnapshot(
+        val name: String,
+        val latitude: Double,
+        val longitude: Double,
+    )
+
+    fun toggleCategory(category: PlaceCategory) {
+        val current = enabledCategories.value
+        enabledCategories.value = if (category in current) current - category else current + category
+    }
+
+    private suspend fun refreshCategoriesIfNeeded(force: Boolean = false) {
+        val current = fix.value ?: return
+        val enabled = enabledCategories.value
+        if (enabled.isEmpty()) {
+            if (nearbyCategoryPlaces.value.isNotEmpty()) nearbyCategoryPlaces.value = emptyMap()
+            return
+        }
+        if (!force) {
+            val last = lastCategoryLookupFix
+            if (last != null) {
+                val moved = haversineMeters(
+                    last.latitude, last.longitude,
+                    current.latitude, current.longitude,
+                )
+                // Same cadence as the mosque refresh: tight enough that
+                // driving past the nearest pharmacy flips the pin to
+                // the next one before you've gone a block, loose enough
+                // that a stopped phone doesn't hammer the backend.
+                val alreadyFetched = nearbyCategoryPlaces.value.keys.containsAll(enabled)
+                if (moved < CATEGORY_REFRESH_M && alreadyFetched) return
+            }
+        }
+        if (!placesRepository.isConfigured) return
+        lastCategoryLookupFix = current
+
+        // One request per enabled category. The set is user-toggled and
+        // expected to stay small (handful of pins), so sequential is
+        // fine — no need to add a parallelising helper for this.
+        val updated = nearbyCategoryPlaces.value.toMutableMap()
+        for (category in enabled) {
+            val result = runCatching {
+                placesRepository.nearby(
+                    latitude = current.latitude,
+                    longitude = current.longitude,
+                    category = category,
+                    radiusMeters = CATEGORY_RADIUS_M,
+                    minRating = null,
+                    minReviews = null,
+                )
+            }.onFailure {
+                Timber.w(it, "Compass nearest-%s lookup failed", category.name)
+            }.getOrNull() ?: continue
+            val nearest = result.firstOrNull()
+            if (nearest != null) {
+                updated[category] = nearest.toSnapshot()
+            }
+        }
+        // Drop entries for categories the user has since disabled so the
+        // UI doesn't keep a stale row hanging around after untoggling.
+        updated.keys.retainAll(enabled)
+        nearbyCategoryPlaces.value = updated
+    }
+
+    private fun Place.toSnapshot() = CategoryPlaceSnapshot(
+        name = name,
+        latitude = latitude,
+        longitude = longitude,
+    )
+
     // Exposed as a no-op for the refresh button — the stream keeps
     // itself fresh, so the button's job is purely reassurance.
     fun refresh() {
@@ -153,6 +277,20 @@ class CompassViewModel @Inject constructor(
         // above, a stationary phone won't thrash the asset on GPS
         // wander near a bucket boundary.
         const val MOSQUE_REFRESH_M = 50.0
+
+        // Nearest-X category pins reuse the same "refresh once we've
+        // moved enough to plausibly change the answer" pattern. 75 m
+        // is a slightly looser threshold than the mosque one because
+        // hitting the backend is ~100× more expensive than reading
+        // the on-disk mosque directory — no need to over-spin.
+        const val CATEGORY_REFRESH_M = 75.0
+
+        // Search radius for each nearest-X lookup. 5 km is wide enough
+        // to cover the user's neighbourhood for urban categories (gyms,
+        // pharmacies) and to reach the nearest metro station from most
+        // of Riyadh, without the backend returning so many candidates
+        // that the "first" entry isn't actually the nearest.
+        const val CATEGORY_RADIUS_M = 5_000
     }
 }
 
@@ -183,7 +321,26 @@ data class CompassUiState(
     val location: Pair<Double, Double>? = null,
     val qiblaBearingDeg: Float? = null,
     val nearestMosque: MosqueDirectory.NearestResult? = null,
+    // Quick-access nearby categories the user has toggled on, plus the
+    // resolved nearest place for each. enabledCategories is authoritative
+    // for which chips are "on"; categoryRows only contains resolved
+    // lookups so the UI renders whatever's actually pinpointed.
+    val enabledCategories: Set<PlaceCategory> = emptySet(),
+    val categoryRows: List<CategoryRow> = emptyList(),
     val locationAvailable: Boolean = false,
     val loading: Boolean = false,
     val errorMessage: String? = null,
+)
+
+// Resolved nearest-of-category row for the compass UI. Same shape as
+// MosqueDirectory.NearestResult but kept separate so the two types
+// can't be accidentally crossed (mosque directory is an on-disk asset
+// with no rating / backend info).
+data class CategoryRow(
+    val category: PlaceCategory,
+    val name: String,
+    val latitude: Double,
+    val longitude: Double,
+    val distanceMeters: Double,
+    val bearingDeg: Float,
 )
