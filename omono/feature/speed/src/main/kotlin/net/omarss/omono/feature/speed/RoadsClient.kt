@@ -48,6 +48,10 @@ class RoadsClient @Inject constructor(
         lat: Double,
         lon: Double,
         limit: Int = 5,
+        // `snap_m` tells the server to return the nearest road when
+        // the exact point lies off every polygon. Set to 0 to keep
+        // strict exact-contains behaviour (what the old asset did).
+        snapMetres: Int = DEFAULT_SNAP_M,
     ): List<RoadCandidate>? = withContext(Dispatchers.IO) {
         if (!isConfigured) return@withContext null
 
@@ -56,6 +60,9 @@ class RoadsClient @Inject constructor(
             .addQueryParameter("lat", lat.toString())
             .addQueryParameter("lon", lon.toString())
             .addQueryParameter("limit", limit.toString())
+            .apply {
+                if (snapMetres > 0) addQueryParameter("snap_m", snapMetres.toString())
+            }
             .build()
 
         val request = Request.Builder()
@@ -93,6 +100,12 @@ class RoadsClient @Inject constructor(
                 item.optDouble("heading_deg", Double.NaN)
                     .takeIf { !it.isNaN() }?.toFloat()
             } else null
+            val snapped = if (item.has("snapped") && !item.isNull("snapped")) {
+                item.optBoolean("snapped", false)
+            } else false
+            val snapDistance = if (item.has("snap_distance_m") && !item.isNull("snap_distance_m")) {
+                item.optDouble("snap_distance_m", Double.NaN).takeIf { !it.isNaN() }
+            } else null
             out += RoadCandidate(
                 osmId = item.optLongOrNull("osm_id"),
                 name = item.optStringOrNull("name"),
@@ -102,6 +115,8 @@ class RoadsClient @Inject constructor(
                 maxspeedKmh = maxspeedKmh,
                 speedSource = item.optStringOrNull("speed_source"),
                 headingDeg = heading,
+                snapped = snapped,
+                snapDistanceM = snapDistance,
             )
         }
         return out
@@ -109,6 +124,12 @@ class RoadsClient @Inject constructor(
 
     private companion object {
         const val USER_AGENT = "omono/0.x (personal sideload; https://apps.omarss.net)"
+
+        // Default snap window for off-polygon fixes. 20 m absorbs
+        // routine GPS wander on a divided highway without the server
+        // reporting a wildly-different parallel road. Clients that
+        // want strict behaviour can pass 0.
+        const val DEFAULT_SNAP_M = 20
     }
 }
 
@@ -125,6 +146,11 @@ data class RoadCandidate(
     val maxspeedKmh: Int?,
     val speedSource: String?,
     val headingDeg: Float?,
+    // True when the fix fell outside every polygon and the server
+    // snapped to the nearest road within the requested `snap_m`
+    // window. See FEEDBACK.md §9.5.
+    val snapped: Boolean = false,
+    val snapDistanceM: Double? = null,
 )
 
 // Same "null" literal trap as GPlacesClient — Android's org.json
