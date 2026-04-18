@@ -26,8 +26,9 @@ spec:
       containers:
         - name: api
           # Image is loaded into k3s's containerd via `make image-load` from
-          # the gplaces_parser repo — no external registry.
-          image: gplaces/api:latest
+          # the gplaces_parser repo. Podman-buildah auto-prefixes with
+          # `localhost/`, so that's the ref k3s sees.
+          image: localhost/gplaces/api:latest
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
