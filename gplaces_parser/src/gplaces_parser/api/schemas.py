@@ -55,3 +55,26 @@ class RoadsResponse(BaseModel):
     roads: list[Road]
     source: str = "gplaces"
     generated_at: datetime = Field(default_factory=lambda: datetime.utcnow())
+
+
+class SearchResult(BaseModel):
+    id: str
+    name: str
+    name_ar: str | None = None
+    category: str
+    lat: float
+    lon: float
+    address: str | None = None
+    phone: str | None = None
+    rating: float | None = None
+    review_count: int | None = None
+    open_now: bool | None = None
+    website: str | None = None
+    score: float
+
+
+class SearchResponse(BaseModel):
+    results: list[SearchResult]
+    query: str
+    source: str = "gplaces"
+    generated_at: datetime = Field(default_factory=lambda: datetime.utcnow())

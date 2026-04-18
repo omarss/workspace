@@ -10,9 +10,16 @@ from fastapi import APIRouter, HTTPException, Query, status
 from ..categories import ALLOWED_SLUGS
 from ..config import settings
 from ..db import connection
-from . import queries, roads_queries
+from . import queries, roads_queries, search_queries
 from .deps import AuthDep
-from .schemas import NearbyResponse, NearbyResult, Road, RoadsResponse
+from .schemas import (
+    NearbyResponse,
+    NearbyResult,
+    Road,
+    RoadsResponse,
+    SearchResponse,
+    SearchResult,
+)
 
 router = APIRouter(prefix="/v1")
 
@@ -132,6 +139,98 @@ async def roads(
     ]
     return RoadsResponse(
         roads=results,
+        source="gplaces",
+        generated_at=datetime.now(UTC),
+    )
+
+
+@router.get(
+    "/search",
+    response_model=SearchResponse,
+    responses={401: {}, 400: {}},
+)
+async def search(
+    _: AuthDep,
+    q: Annotated[str, Query(min_length=1, max_length=100)],
+    category: Annotated[str | None, Query()] = None,
+    lat: Annotated[float | None, Query(ge=-90.0, le=90.0)] = None,
+    lon: Annotated[float | None, Query(ge=-180.0, le=180.0)] = None,
+    radius: Annotated[int | None, Query(ge=1, le=50_000)] = None,
+    limit: Annotated[int, Query(ge=1, le=50)] = 20,
+    lang: Annotated[str, Query(pattern="^(ar|en)$")] = "en",
+) -> SearchResponse:
+    """Keyword + fuzzy search over places.
+
+    `q` is free text (Arabic or English); matched via Postgres FTS on
+    name/category/address plus trigram similarity on names for typo
+    tolerance. Optional filters:
+      - `category` — slug from the /v1/places enum
+      - `lat` + `lon` + `radius` — bounding-box prefilter in metres
+
+    Results are sorted by relevance score. Ties break on review count.
+    """
+    slug: str | None = None
+    if category is not None:
+        slug = category.strip().lower()
+        if slug not in ALLOWED_SLUGS:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"unknown category: {category}",
+            )
+
+    geo_args = (lat, lon, radius)
+    if any(v is not None for v in geo_args) and not all(v is not None for v in geo_args):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="lat, lon, radius must all be provided together",
+        )
+
+    with connection() as conn:
+        rows = search_queries.search(
+            conn,
+            q=q,
+            category=slug,
+            lat=lat,
+            lon=lon,
+            radius_m=radius,
+            limit=limit,
+        )
+
+    def pick_name(row: dict) -> tuple[str, str | None]:
+        ar, en = row["name"], row["name_en"]
+        if lang == "ar":
+            return (ar or en or "", ar)
+        return (en or ar or "", ar)
+
+    def pick_addr(row: dict) -> str | None:
+        if lang == "ar":
+            return row["full_address"] or row["full_address_en"]
+        return row["full_address_en"] or row["full_address"]
+
+    results: list[SearchResult] = []
+    for r in rows:
+        name_primary, name_ar = pick_name(r)
+        results.append(
+            SearchResult(
+                id=r["place_id"],
+                name=name_primary,
+                name_ar=name_ar,
+                category=r["category"],
+                lat=r["latitude"],
+                lon=r["longitude"],
+                address=pick_addr(r),
+                phone=r["phone"],
+                rating=float(r["rating"]) if r["rating"] is not None else None,
+                review_count=r["reviews_count"],
+                open_now=r["open_now"],
+                website=r["website"],
+                score=round(float(r["score"]), 4),
+            )
+        )
+
+    return SearchResponse(
+        results=results,
+        query=q,
         source="gplaces",
         generated_at=datetime.now(UTC),
     )
