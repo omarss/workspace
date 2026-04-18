@@ -55,6 +55,24 @@ _SLUG_QUERIES: list[tuple[str, str, str]] = [
     ("juice",       "عصائر",                   "juice bar"),
     ("juice",       "عصير قصب",                "sugarcane juice"),
     ("juice",       "عصائر طازجة",             "fresh juice"),
+    # Sub-category slugs — refinements of `restaurant` that Google
+    # ranks differently enough to surface distinct places. Each is its
+    # own slug so the API can filter cleanly (`category=seafood`).
+    ("seafood",     "مطاعم أسماك",             "seafood restaurant"),
+    ("healthy_food","أكل صحي",                 "healthy food"),
+    ("italian_food","مطاعم إيطالية",           "italian restaurant"),
+    ("sushi",       "سوشي",                    "sushi"),
+    ("burger",      "برجر",                    "burger joint"),
+    ("pizza",       "بيتزا",                   "pizzeria"),
+    ("shawarma",    "شاورما",                  "shawarma"),
+    ("kabsa",       "كبسة",                    "kabsa"),
+    ("mandi",       "مندي",                    "mandi restaurant"),
+    ("steakhouse",  "ستيك",                    "steakhouse"),
+    ("dessert",     "حلويات",                  "dessert shop"),
+    ("ice_cream",   "آيس كريم",                "ice cream"),
+    ("breakfast",   "فطور",                    "breakfast"),
+    ("indian_food", "مطاعم هندية",             "indian restaurant"),
+    ("asian_food",  "مطاعم آسيوية",            "asian restaurant"),
 ]
 
 
