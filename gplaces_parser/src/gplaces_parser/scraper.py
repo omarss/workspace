@@ -53,6 +53,8 @@ _CID_RE = re.compile(r"!1s(0x[0-9a-f]+:0x[0-9a-f]+)", re.IGNORECASE)
 _CAMERA_RE = re.compile(r"/@(-?\d+\.\d+),(-?\d+\.\d+)")
 _DATA_LATLNG_RE = re.compile(r"!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)")
 _NUM_RE = re.compile(r"-?\d[\d,]*\.?\d*")
+# Matches the "(1,234)" review-count marker that follows the rating on feed cards.
+_REVIEW_COUNT_RE = re.compile(r"\((\d[\d,]*)\)")
 
 
 # -- CAPTCHA handling ---------------------------------------------------------
@@ -189,9 +191,52 @@ class PlaywrightScraper:
                     "google_url": _abs(href),
                     "latitude": lat,
                     "longitude": lng,
+                    **self._extract_card_extras(a),
                 }
             )
         return rows
+
+    def _extract_card_extras(self, anchor: Locator) -> dict[str, Any]:
+        """Pull rating / review-count / subtitle from a card without opening
+        the detail page. Every field is best-effort — if a card lacks a
+        rating row (brand new place) we just return nothing for it."""
+        card = anchor.locator("xpath=./..").first
+        extras: dict[str, Any] = {}
+
+        # Rating — the `role="img"` span carries the numeric count in its
+        # aria-label across locales ("4.3 stars" / "4.3 نجوم" / "Rated 4.3…").
+        try:
+            rating_el = card.locator('span[role="img"][aria-label]').first
+            if rating_el.count():
+                aria = rating_el.get_attribute("aria-label", timeout=400) or ""
+                extras["rating"] = _first_number(aria)
+        except Exception:  # noqa: BLE001
+            pass
+
+        # Inner_text captures name + rating(N) + subtitle + hours etc. on
+        # separate lines — cheap to parse.
+        try:
+            text = card.inner_text(timeout=400) if card.count() else ""
+        except Exception:  # noqa: BLE001
+            text = ""
+        text = _strip_icons(text) or ""
+
+        if text:
+            m = _REVIEW_COUNT_RE.search(text)
+            if m:
+                extras["reviews"] = int(m.group(1).replace(",", ""))
+            # Subtitle line uses "·" as separator: `Coffee shop · $$ · King Fahd Rd`
+            for line in text.splitlines():
+                line = line.strip()
+                if "·" in line and len(line) < 240:
+                    parts = [p.strip() for p in line.split("·") if p.strip()]
+                    if parts:
+                        extras["subtypes"] = [parts[0]]  # primary category
+                        if len(parts) >= 2:
+                            # Last part tends to be the address snippet.
+                            extras["full_address"] = parts[-1]
+                    break
+        return extras
 
     # -- place detail + reviews ---------------------------------------------
 
