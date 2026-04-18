@@ -49,6 +49,12 @@ _SLUG_QUERIES: list[tuple[str, str, str]] = [
     ("transit",     "محطة قطار",               "train station"),
     ("transit",     "محطة سكة حديد",           "railway station"),
     ("transit",     "موقف سيارات أجرة",         "taxi stand"),
+    # Juice bars — distinct from cafes/fast-food in Riyadh. Sugarcane
+    # (قصب) is a local staple and deserves its own query to surface
+    # the one-trick juice stalls that wouldn't show up under "juice bar".
+    ("juice",       "عصائر",                   "juice bar"),
+    ("juice",       "عصير قصب",                "sugarcane juice"),
+    ("juice",       "عصائر طازجة",             "fresh juice"),
 ]
 
 

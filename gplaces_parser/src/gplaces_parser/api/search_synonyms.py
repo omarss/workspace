@@ -97,6 +97,9 @@ SYNONYM_GROUPS: list[list[str]] = [
     # library + book-cafe hybrids
     ["library", "books", "reading", "book cafe",
      "مكتبة", "مكتبات", "كتب", "كافيه مكتبة", "مطالعة"],
+    # juice — fresh juice bars, including the Saudi sugarcane-juice stalls
+    ["juice", "juices", "juice bar", "fresh juice", "sugarcane", "sugarcane juice",
+     "عصير", "عصائر", "عصائر طازجة", "عصير قصب", "قصب"],
 ]
 
 # Precompute a word → group-members map for cheap lookup. We normalise
