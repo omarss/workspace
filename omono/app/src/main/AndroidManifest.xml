@@ -52,6 +52,16 @@
          page when the user has alerts enabled. -->
     <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
 
+    <!-- Distraction guard: detect the foreground app while driving so
+         the "no phone while driving" beep can skip recognised
+         navigation apps (Google Maps, Waze, Yango). This is a
+         special-access permission — declaring it in the manifest
+         only makes the app visible in Settings → Apps → Special
+         access → Usage access; the user still has to flip it. -->
+    <uses-permission
+        android:name="android.permission.PACKAGE_USAGE_STATS"
+        tools:ignore="ProtectedPermissions" />
+
     <!-- Spending feature: reads the SMS inbox (Al Rajhi Bank + STC Bank
          transaction messages only, filtered at query time) and watches
          for new ones to keep the today/month totals fresh. Both are

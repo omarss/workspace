@@ -17,7 +17,6 @@ import javax.inject.Singleton
 // (e.g. "noise.threshold") rather than spawning a sibling DataStore.
 private val UNIT_KEY = stringPreferencesKey("speed.unit")
 private val ALERT_ON_OVER_LIMIT_KEY = booleanPreferencesKey("speed.alert_on_over_limit")
-private val ALERT_ON_TRAFFIC_AHEAD_KEY = booleanPreferencesKey("speed.alert_on_traffic_ahead")
 private val ALERT_ON_PHONE_USE_WHILE_DRIVING_KEY =
     booleanPreferencesKey("speed.alert_on_phone_use_while_driving")
 private val DISABLE_INTERNET_WHILE_DRIVING_KEY =
@@ -36,13 +35,6 @@ class SpeedSettingsRepository @Inject constructor(
     // default so the feature is discoverable from first launch.
     val alertOnOverLimit: Flow<Boolean> = context.omonoDataStore.data.map { prefs ->
         prefs[ALERT_ON_OVER_LIMIT_KEY] ?: true
-    }
-
-    // Heads-up tone when the road ~500m ahead is significantly slower
-    // than free-flow. Off by default — costs TomTom quota and can be
-    // noisy on heavily-congested city drives.
-    val alertOnTrafficAhead: Flow<Boolean> = context.omonoDataStore.data.map { prefs ->
-        prefs[ALERT_ON_TRAFFIC_AHEAD_KEY] ?: false
     }
 
     // Loops a loud beep whenever the screen turns on while the app
@@ -66,10 +58,6 @@ class SpeedSettingsRepository @Inject constructor(
 
     suspend fun setAlertOnOverLimit(enabled: Boolean) {
         context.omonoDataStore.edit { it[ALERT_ON_OVER_LIMIT_KEY] = enabled }
-    }
-
-    suspend fun setAlertOnTrafficAhead(enabled: Boolean) {
-        context.omonoDataStore.edit { it[ALERT_ON_TRAFFIC_AHEAD_KEY] = enabled }
     }
 
     suspend fun setAlertOnPhoneUseWhileDriving(enabled: Boolean) {

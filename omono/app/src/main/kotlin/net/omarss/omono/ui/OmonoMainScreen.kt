@@ -112,6 +112,19 @@ fun OmonoMainRoute(
         updateViewModel.refreshPermission()
     }
 
+    // Re-read Usage access perm on every resume so coming back from
+    // Settings → Usage access immediately reflects the new state.
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                viewModel.refreshUsageStatsPermission()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
     val foreground = rememberMultiplePermissionsState(foregroundPermissions)
     val background = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
         rememberMultiplePermissionsState(listOf(Manifest.permission.ACCESS_BACKGROUND_LOCATION))
@@ -149,8 +162,8 @@ fun OmonoMainRoute(
         onRequestDndAccess = { launchNotificationPolicyAccessSettings(context) },
         onUnitSelect = viewModel::setUnit,
         onAlertOnOverLimitChange = viewModel::setAlertOnOverLimit,
-        onAlertOnTrafficAheadChange = viewModel::setAlertOnTrafficAhead,
         onAlertOnPhoneUseWhileDrivingChange = viewModel::setAlertOnPhoneUseWhileDriving,
+        onRequestUsageStats = { launchUsageStatsSettings(context) },
         onDisableInternetWhileDrivingChange = viewModel::setDisableInternetWhileDriving,
         onRequestShizukuPermission = viewModel::requestShizukuPermission,
         onBudgetChange = viewModel::setMonthlyBudget,
@@ -207,8 +220,8 @@ fun OmonoMainScreen(
     onRequestDndAccess: () -> Unit,
     onUnitSelect: (SpeedUnit) -> Unit,
     onAlertOnOverLimitChange: (Boolean) -> Unit,
-    onAlertOnTrafficAheadChange: (Boolean) -> Unit,
     onAlertOnPhoneUseWhileDrivingChange: (Boolean) -> Unit,
+    onRequestUsageStats: () -> Unit,
     onDisableInternetWhileDrivingChange: (Boolean) -> Unit,
     onRequestShizukuPermission: () -> Unit,
     onBudgetChange: (Double) -> Unit,
@@ -305,14 +318,11 @@ fun OmonoMainScreen(
             onChange = onAlertOnOverLimitChange,
         )
 
-        TrafficAlertSettingRow(
-            enabled = state.alertOnTrafficAhead,
-            onChange = onAlertOnTrafficAheadChange,
-        )
-
         PhoneUseAlertSettingRow(
             enabled = state.alertOnPhoneUseWhileDriving,
+            usageStatsGranted = state.usageStatsGranted,
             onChange = onAlertOnPhoneUseWhileDrivingChange,
+            onRequestUsageStats = onRequestUsageStats,
         )
 
         DisableInternetSettingRow(
@@ -748,54 +758,52 @@ private fun AlertSettingRow(
 }
 
 @Composable
-private fun TrafficAlertSettingRow(
+private fun PhoneUseAlertSettingRow(
     enabled: Boolean,
+    usageStatsGranted: Boolean,
     onChange: (Boolean) -> Unit,
+    onRequestUsageStats: () -> Unit,
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = "Traffic ahead",
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-            Text(
-                text = "Heads-up tone when the road ~500 m ahead is jammed",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "No phone while driving",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    text = "Loud beep once you've been using the phone for 5+ seconds while driving. " +
+                        "Pauses automatically when Google Maps / Waze is foreground.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Switch(checked = enabled, onCheckedChange = onChange)
         }
-        Switch(checked = enabled, onCheckedChange = onChange)
+        if (enabled && !usageStatsGranted) {
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = "Navigation-app detection needs Usage access — without it the beep fires " +
+                    "whenever the screen is on (including when you're just using Maps).",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
+            Spacer(Modifier.height(4.dp))
+            TextButton(onClick = onRequestUsageStats) {
+                Text("Grant Usage access")
+            }
+        }
     }
 }
 
-@Composable
-private fun PhoneUseAlertSettingRow(
-    enabled: Boolean,
-    onChange: (Boolean) -> Unit,
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = "No phone while driving",
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-            Text(
-                text = "Continuous beep the whole time the screen is on once the app decides you're driving. " +
-                    "Stops the moment you lock the phone.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        Switch(checked = enabled, onCheckedChange = onChange)
-    }
+// Opens Settings → Apps → Special access → Usage access. The user
+// still has to flip the toggle for omono themselves; Android doesn't
+// expose an in-app grant path for PACKAGE_USAGE_STATS.
+private fun launchUsageStatsSettings(context: android.content.Context) {
+    val intent = android.content.Intent(android.provider.Settings.ACTION_USAGE_ACCESS_SETTINGS)
+        .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+    kotlin.runCatching { context.startActivity(intent) }
 }
 
 // Toggle for the Shizuku-backed internet kill-switch. Surfaces

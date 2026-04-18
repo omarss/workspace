@@ -65,7 +65,6 @@ class SpeedFeature @Inject constructor(
     private val settings: SpeedSettingsRepository,
     private val alertPlayer: SpeedAlertPlayer,
     private val tripRecorder: TripRecorder,
-    private val trafficWatcher: TrafficAheadWatcher,
     private val drivingDetector: DrivingModeDetector,
     private val distractionGuard: DistractionGuard,
     private val driveInternetGate: DriveInternetGate,
@@ -92,16 +91,6 @@ class SpeedFeature @Inject constructor(
             speedRepository.locations().collect { snapshot ->
                 tripRecorder.onLocation(snapshot)
                 drivingDetector.onSample(snapshot.speedMps, System.currentTimeMillis())
-                // Fire-and-forget so a slow TomTom round-trip never
-                // blocks the speedometer UI. The watcher owns its own
-                // throttle + dedupe state.
-                scope.launch {
-                    if (!settings.alertOnTrafficAhead.first()) return@launch
-                    runCatching { trafficWatcher.onLocation(snapshot) }
-                        .onFailure { Timber.w(it, "traffic watcher failed") }
-                        .getOrNull()
-                        ?.let { alertPlayer.alertTrafficAhead() }
-                }
                 val limit = limits.limitKmh(
                     lat = snapshot.latitude,
                     lon = snapshot.longitude,

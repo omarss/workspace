@@ -16,6 +16,8 @@ import net.omarss.omono.core.common.SpeedUnit
 import net.omarss.omono.core.service.FeatureHostStateHolder
 import net.omarss.omono.core.service.FeatureId
 import net.omarss.omono.core.service.FeatureState
+import kotlinx.coroutines.flow.MutableStateFlow
+import net.omarss.omono.feature.speed.ForegroundAppDetector
 import net.omarss.omono.feature.speed.InternetGovernor
 import net.omarss.omono.feature.speed.SpeedSettingsRepository
 import net.omarss.omono.feature.speed.trips.TripDao
@@ -35,6 +37,7 @@ class OmonoMainViewModel @Inject constructor(
     private val spendingSettings: SpendingSettingsRepository,
     private val smsExporter: SmsExporter,
     private val internetGovernor: InternetGovernor,
+    private val foregroundApp: ForegroundAppDetector,
     stateHolder: FeatureHostStateHolder,
     tripDao: TripDao,
 ) : ViewModel() {
@@ -54,24 +57,31 @@ class OmonoMainViewModel @Inject constructor(
     }
 
     // Settings is split into two sub-flows because Kotlin's combine
-    // overload tops out at 5 sources. The base group covers the
-    // pre-existing five (unit + 3 alert toggles + budget); the
-    // internet group adds the new disable-internet-while-driving
-    // toggle and the live Shizuku readiness.
+    // overload tops out at 5 sources. Base covers speed + spending
+    // toggles; internet covers the Shizuku kill-switch pair.
     private val baseSettings = combine(
         speedSettings.unit,
         speedSettings.alertOnOverLimit,
-        speedSettings.alertOnTrafficAhead,
         speedSettings.alertOnPhoneUseWhileDriving,
         spendingSettings.monthlyBudgetSar,
-    ) { unit, alertOverLimit, alertTraffic, alertPhoneUse, budget ->
-        BaseSettings(unit, alertOverLimit, alertTraffic, alertPhoneUse, budget)
+    ) { unit, alertOverLimit, alertPhoneUse, budget ->
+        BaseSettings(unit, alertOverLimit, alertPhoneUse, budget)
+    }
+
+    // Re-read whenever the user could have changed it — e.g. returning
+    // from Settings → Usage access. The screen calls
+    // refreshUsageStatsPermission() from a LaunchedEffect on resume.
+    private val usageStatsGranted = MutableStateFlow(foregroundApp.hasUsageStatsPermission())
+
+    fun refreshUsageStatsPermission() {
+        usageStatsGranted.value = foregroundApp.hasUsageStatsPermission()
     }
 
     private val internetSettings = combine(
         speedSettings.disableInternetWhileDriving,
         internetGovernor.readiness,
-    ) { enabled, readiness -> InternetSettings(enabled, readiness) }
+        usageStatsGranted,
+    ) { enabled, readiness, usage -> InternetSettings(enabled, readiness, usage) }
 
     private val mergedSettings = combine(baseSettings, internetSettings) { base, internet ->
         Settings(base, internet)
@@ -102,10 +112,6 @@ class OmonoMainViewModel @Inject constructor(
 
     fun setAlertOnOverLimit(enabled: Boolean) {
         viewModelScope.launch { speedSettings.setAlertOnOverLimit(enabled) }
-    }
-
-    fun setAlertOnTrafficAhead(enabled: Boolean) {
-        viewModelScope.launch { speedSettings.setAlertOnTrafficAhead(enabled) }
     }
 
     fun setAlertOnPhoneUseWhileDriving(enabled: Boolean) {
@@ -148,7 +154,6 @@ class OmonoMainViewModel @Inject constructor(
     private data class BaseSettings(
         val unit: SpeedUnit,
         val alertOnOverLimit: Boolean,
-        val alertOnTrafficAhead: Boolean,
         val alertOnPhoneUseWhileDriving: Boolean,
         val monthlyBudgetSar: Double,
     )
@@ -156,6 +161,7 @@ class OmonoMainViewModel @Inject constructor(
     private data class InternetSettings(
         val disableInternetWhileDriving: Boolean,
         val readiness: InternetGovernor.Readiness,
+        val usageStatsGranted: Boolean,
     )
 
     private data class Settings(
@@ -208,8 +214,8 @@ class OmonoMainViewModel @Inject constructor(
             limitDisplay = limitDisplay,
             overLimit = overLimit,
             alertOnOverLimit = base.alertOnOverLimit,
-            alertOnTrafficAhead = base.alertOnTrafficAhead,
             alertOnPhoneUseWhileDriving = base.alertOnPhoneUseWhileDriving,
+            usageStatsGranted = internet.usageStatsGranted,
             disableInternetWhileDriving = internet.disableInternetWhileDriving,
             shizukuReadiness = internet.readiness,
             spending = spending,
@@ -280,8 +286,8 @@ data class OmonoMainUiState(
     val limitDisplay: String? = null,
     val overLimit: Boolean = false,
     val alertOnOverLimit: Boolean = true,
-    val alertOnTrafficAhead: Boolean = false,
     val alertOnPhoneUseWhileDriving: Boolean = false,
+    val usageStatsGranted: Boolean = false,
     val disableInternetWhileDriving: Boolean = false,
     val shizukuReadiness: InternetGovernor.Readiness = InternetGovernor.Readiness.Unknown,
     val spending: SpendingUi = SpendingUi(),
