@@ -75,60 +75,78 @@ class SpeedAlertPlayer @Inject constructor(
 
     private val restoreRunnable = Runnable { restoreState() }
 
-    // One-shot alert. Tries the voice path first (spoken phrase in the
-    // user's preferred language); if voice is disabled or TTS isn't
-    // ready, falls back to the original CDMA call-guard tone so the
-    // user still hears *something* when they cross a limit.
+    // One-shot alert. Always plays the tone; if voice alerts are on,
+    // speaks the phrase first and chains the tone onto the utterance
+    // onDone callback so the driver hears "Slow down" immediately
+    // followed by a distinct beep. A voice-only alert is easy to
+    // miss in traffic — the beep makes the pair impossible to ignore.
     fun alert(phrase: VoiceAlertPhrase = VoiceAlertPhrase.OVER_LIMIT) {
-        if (voiceAlertPlayer.speakOnce(phrase)) return
-        playTone(ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD, TONE_DURATION_MS)
+        val spoke = voiceAlertPlayer.speakOnce(phrase) {
+            playTone(ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD, TONE_DURATION_MS)
+        }
+        if (!spoke) {
+            // Voice disabled or TTS unavailable — beep immediately so
+            // the driver isn't left guessing.
+            playTone(ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD, TONE_DURATION_MS)
+        }
     }
 
     // Looping "put the phone down" alert for the distraction guard.
-    // Prefers speaking the phrase every ~4 s (less fatiguing on
-    // repeat); falls back to the tone loop when voice isn't available.
-    // Fires every BEEP_INTERVAL_MS until stopBeeping() is called. Uses
-    // a separate code path from playTone because that path is
-    // throttled by MIN_INTERVAL_MS — looping beeps intentionally want
-    // to fire faster than the post-alert cool-down allows.
+    // Each cycle speaks the phrase (if voice is enabled) then fires a
+    // beep burst, then waits out the interval before repeating. The
+    // voice part is informative; the beeping makes it *annoying* — the
+    // explicit goal is to nudge the driver off whatever they're looking
+    // at. Falls back to a pure-beep loop if voice isn't available.
     fun startBeeping(phrase: VoiceAlertPhrase = VoiceAlertPhrase.PHONE_USE) {
-        if (voiceAlertPlayer.startLoop(phrase)) return
-        val tg = toneGenerator ?: return
-        // Cancel any pending post-alert restore so the looper can
-        // keep the stream volume raised without it being pulled back
-        // mid-beep.
+        // Reset any lingering one-shot restore — we're holding the
+        // stream volume raised for the duration of the loop.
         handler.removeCallbacks(restoreRunnable)
         snapshotAndBypass()
-        handler.removeCallbacks(beepRunnable)
-        handler.post(beepRunnable)
-        Unit // ensure single-expression body type
-        // Warm the ToneGenerator — first call after idle can be slow.
-        runCatching { tg.stopTone() }
+        currentLoopPhrase = phrase
+        handler.removeCallbacks(loopRunnable)
+        handler.post(loopRunnable)
     }
 
     fun stopBeeping() {
-        // Stop the voice loop regardless — if voice is active it was
-        // started by startBeeping above, and if it isn't this is a
-        // no-op. Same defensive logic as the tone path.
-        voiceAlertPlayer.stopLoop()
-        handler.removeCallbacks(beepRunnable)
+        currentLoopPhrase = null
+        voiceAlertPlayer.stop()
+        handler.removeCallbacks(loopRunnable)
         runCatching { toneGenerator?.stopTone() }
         // Schedule restore the same way a one-shot alert would.
         handler.postDelayed(restoreRunnable, RESTORE_MARGIN_MS)
     }
 
-    // Private loop body — posts itself back on the handler after each
-    // tone so the cadence is driven by the handler's clock, not by a
-    // coroutine scope that might be cancelled out from under us.
-    private val beepRunnable = object : Runnable {
+    // Which phrase (if any) the loop is currently cycling. Null means
+    // stopBeeping has been called; the runnable bails on the next tick.
+    @Volatile private var currentLoopPhrase: VoiceAlertPhrase? = null
+
+    // Loop body. Each iteration tries to speak; when speech ends (or
+    // immediately, if voice is off/unavailable) it plays a beep burst,
+    // then schedules the next iteration at +LOOP_INTERVAL_MS. Driven
+    // by the handler's clock so a cancelled coroutine scope upstream
+    // can't leave the loop half-running.
+    private val loopRunnable = object : Runnable {
         override fun run() {
-            val tg = toneGenerator ?: return
-            runCatching {
-                tg.stopTone()
-                tg.startTone(ToneGenerator.TONE_CDMA_ABBR_ALERT, BEEP_TONE_DURATION_MS)
-            }.onFailure { Timber.w(it, "beep loop tone failed") }
-            handler.postDelayed(this, BEEP_INTERVAL_MS)
+            val phrase = currentLoopPhrase ?: return
+            val spoke = voiceAlertPlayer.speakOnce(phrase) {
+                // Speech done — beep now. Wrapped in a phrase check so a
+                // late onDone arriving after stopBeeping doesn't fire
+                // a stray tone.
+                if (currentLoopPhrase != null) playBeepBurst()
+            }
+            if (!spoke) {
+                playBeepBurst()
+            }
+            handler.postDelayed(this, LOOP_INTERVAL_MS)
         }
+    }
+
+    private fun playBeepBurst() {
+        val tg = toneGenerator ?: return
+        runCatching {
+            tg.stopTone()
+            tg.startTone(ToneGenerator.TONE_CDMA_ABBR_ALERT, BEEP_TONE_DURATION_MS)
+        }.onFailure { Timber.w(it, "beep burst tone failed") }
     }
 
     private fun playTone(toneType: Int, durationMs: Int) {
@@ -198,7 +216,11 @@ class SpeedAlertPlayer @Inject constructor(
         const val MIN_INTERVAL_MS = 3_000L
         const val TONE_DURATION_MS = 1_200
         const val BEEP_TONE_DURATION_MS = 400
-        const val BEEP_INTERVAL_MS = 900L
         const val RESTORE_MARGIN_MS = 300L
+
+        // Cycle cadence for the phone-use loop: speak + beep, pause
+        // roughly this long, repeat. Same rhythm the voice-only loop
+        // used before the beep was re-introduced.
+        const val LOOP_INTERVAL_MS = 4_000L
     }
 }

@@ -15,6 +15,8 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import timber.log.Timber
 import java.util.Locale
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicLong
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -33,6 +35,10 @@ import javax.inject.Singleton
 // kick it off on the first speak call and hold the handle for the
 // lifetime of the process. Init failure falls through to the caller
 // (returns false) so SpeedAlertPlayer can beep instead.
+//
+// Loop orchestration (phone-use distraction) lives in SpeedAlertPlayer
+// rather than here — it needs to interleave speech with beep bursts,
+// which requires awareness of both audio paths.
 @Singleton
 class VoiceAlertPlayer @Inject constructor(
     @param:ApplicationContext private val context: Context,
@@ -53,7 +59,13 @@ class VoiceAlertPlayer @Inject constructor(
     private var ttsReady: Boolean = false
     private var savedStreamVolume: Int? = null
 
-    private var loopRunnable: Runnable? = null
+    // Map of utterance id → optional caller callback. onDone fires the
+    // matching callback and drops the entry. A map (rather than a
+    // single field) is paranoia-safe against any race where QUEUE_FLUSH
+    // emits the previous utterance's onDone after the new one has
+    // registered its callback — the ids are unique per speak call.
+    private val pendingCallbacks = ConcurrentHashMap<String, () -> Unit>()
+    private val utteranceCounter = AtomicLong(0L)
 
     init {
         scope.launch {
@@ -70,7 +82,12 @@ class VoiceAlertPlayer @Inject constructor(
     // Speak one utterance. Returns true if TTS accepted the phrase;
     // false if voice alerts are disabled, TTS isn't ready, or the
     // target locale isn't installed — caller falls back to beep.
-    fun speakOnce(phrase: VoiceAlertPhrase): Boolean {
+    //
+    // `onDone` (optional) fires on the main handler when the utterance
+    // finishes playing. Callers can use it to chain audio — e.g.
+    // SpeedAlertPlayer plays a tone *after* the spoken phrase so the
+    // driver hears both without them colliding.
+    fun speakOnce(phrase: VoiceAlertPhrase, onDone: (() -> Unit)? = null): Boolean {
         if (!enabled) return false
         val engine = ensureTts() ?: return false
         val locale = resolveLocale() ?: return false
@@ -89,31 +106,27 @@ class VoiceAlertPlayer @Inject constructor(
             else -> phrase.english
         }
         raiseStreamVolume()
+        val utteranceId = "${phrase.name}-${utteranceCounter.incrementAndGet()}"
+        if (onDone != null) pendingCallbacks[utteranceId] = onDone
         val result = runCatching {
-            engine.speak(text, TextToSpeech.QUEUE_FLUSH, null, phrase.name)
+            engine.speak(text, TextToSpeech.QUEUE_FLUSH, null, utteranceId)
         }.getOrElse {
             Timber.w(it, "VoiceAlertPlayer: speak failed")
+            pendingCallbacks.remove(utteranceId)
             return false
         }
-        return result == TextToSpeech.SUCCESS
-    }
-
-    fun startLoop(phrase: VoiceAlertPhrase): Boolean {
-        stopLoop()
-        if (!speakOnce(phrase)) return false
-        loopRunnable = object : Runnable {
-            override fun run() {
-                speakOnce(phrase)
-                handler.postDelayed(this, LOOP_INTERVAL_MS)
-            }
-        }.also { handler.postDelayed(it, LOOP_INTERVAL_MS) }
+        if (result != TextToSpeech.SUCCESS) {
+            pendingCallbacks.remove(utteranceId)
+            return false
+        }
         return true
     }
 
-    fun stopLoop() {
-        loopRunnable?.let { handler.removeCallbacks(it) }
-        loopRunnable = null
+    // Stop any in-flight speech and restore alarm-stream volume. Called
+    // by SpeedAlertPlayer when the beeping/voicing session ends.
+    fun stop() {
         runCatching { tts?.stop() }
+        pendingCallbacks.clear()
         restoreStreamVolume()
     }
 
@@ -128,7 +141,7 @@ class VoiceAlertPlayer @Inject constructor(
                         .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
                         .build(),
                 )
-                tts?.setOnUtteranceProgressListener(restoreOnDone)
+                tts?.setOnUtteranceProgressListener(utteranceListener)
                 ttsReady = true
                 Timber.i("VoiceAlertPlayer: TTS ready")
             } else {
@@ -142,14 +155,14 @@ class VoiceAlertPlayer @Inject constructor(
 
     private fun resolveLocale(): Locale? {
         val explicit = when (language) {
-            VoiceAlertLanguage.Arabic -> Locale("ar", "SA")
+            VoiceAlertLanguage.Arabic -> Locale.forLanguageTag("ar-SA")
             VoiceAlertLanguage.English -> Locale.ENGLISH
             VoiceAlertLanguage.Auto -> null
         }
         if (explicit != null) return explicit
         val device = Locale.getDefault()
         return if (device.language.equals("ar", ignoreCase = true)) {
-            Locale("ar", "SA")
+            Locale.forLanguageTag("ar-SA")
         } else {
             Locale.ENGLISH
         }
@@ -175,25 +188,23 @@ class VoiceAlertPlayer @Inject constructor(
         savedStreamVolume = null
     }
 
-    private val restoreOnDone = object : UtteranceProgressListener() {
+    // Dispatches per-utterance callbacks. Volume restore is the
+    // caller's responsibility via stop() — leaving it on here would
+    // yo-yo the alarm stream during a voice+beep sequence.
+    private val utteranceListener = object : UtteranceProgressListener() {
         override fun onStart(utteranceId: String?) = Unit
-        override fun onDone(utteranceId: String?) {
-            // Only restore when no loop is active — a running loop will
-            // speak again immediately and we want the volume held.
-            if (loopRunnable == null) {
-                handler.post { restoreStreamVolume() }
-            }
-        }
-        @Deprecated("Deprecated in Java")
-        override fun onError(utteranceId: String?) {
-            handler.post { restoreStreamVolume() }
-        }
-    }
 
-    private companion object {
-        // Pause between loop utterances. Long enough that back-to-back
-        // speech doesn't blur into one string; short enough that a
-        // distracted driver hears the phrase again within a glance.
-        const val LOOP_INTERVAL_MS = 4_000L
+        override fun onDone(utteranceId: String?) {
+            val cb = utteranceId?.let { pendingCallbacks.remove(it) } ?: return
+            handler.post { cb() }
+        }
+
+        @Suppress("DEPRECATION", "OVERRIDE_DEPRECATION")
+        override fun onError(utteranceId: String?) {
+            val cb = utteranceId?.let { pendingCallbacks.remove(it) } ?: return
+            // Still invoke so the caller can fall back to a beep even
+            // when TTS hits a mid-utterance error.
+            handler.post { cb() }
+        }
     }
 }
