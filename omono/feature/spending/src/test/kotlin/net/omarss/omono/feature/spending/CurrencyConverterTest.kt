@@ -33,23 +33,28 @@ class CurrencyConverterTest {
     }
 
     @Test
-    fun `parses frankfurter response and inverts rates`() {
-        // Frankfurter returns "units of currency per 1 SAR". We need
-        // "SAR per 1 unit", so 1 USD at 0.2667 per SAR → 3.75 SAR.
+    fun `parses frankfurter response and bridges via SAMA peg`() {
+        // Frankfurter now bases on USD (SAR is no longer in their
+        // published set). Response shape: "1 USD = rates[X] units of X".
+        // We want SAR per unit of X = (1 / rates[X]) × 3.75.
+        //
+        //   EUR: 1 USD = 0.847 EUR  → 1 EUR ≈ 1.181 USD ≈ 4.43 SAR
+        //   GBP: 1 USD = 0.739 GBP  → 1 GBP ≈ 1.353 USD ≈ 5.07 SAR
         val json = """
             {
               "amount": 1.0,
-              "base": "SAR",
-              "date": "2026-04-15",
+              "base": "USD",
+              "date": "2026-04-17",
               "rates": {
-                "USD": 0.2667,
-                "EUR": 0.245
+                "EUR": 0.847,
+                "GBP": 0.739
               }
             }
         """.trimIndent()
         val rates = converter.parseFrankfurterResponse(json)
-        rates["USD"]!!.shouldBeWithinPercentageOf(3.75, 0.5)
-        rates["EUR"]!!.shouldBeWithinPercentageOf(4.08, 1.0)
+        rates["EUR"]!!.shouldBeWithinPercentageOf(4.43, 1.0)
+        rates["GBP"]!!.shouldBeWithinPercentageOf(5.07, 1.0)
+        rates["USD"] shouldBe 3.75
         rates["SAR"] shouldBe 1.0
     }
 

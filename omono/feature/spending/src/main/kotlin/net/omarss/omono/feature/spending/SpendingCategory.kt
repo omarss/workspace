@@ -57,20 +57,50 @@ object MerchantCategorizer {
         "half million" to SpendingCategory.FOOD,
         "row cafe" to SpendingCategory.FOOD,
         "ucoffe" to SpendingCategory.FOOD,
+        "ucoffee" to SpendingCategory.FOOD,
+        "dr cafe" to SpendingCategory.FOOD,
+        "dr. cafe" to SpendingCategory.FOOD,
+        "dune cafe" to SpendingCategory.FOOD,
+        "java cafe" to SpendingCategory.FOOD,
+        "batch" to SpendingCategory.FOOD,
+        "bateel" to SpendingCategory.FOOD,
+        "arabica" to SpendingCategory.FOOD,
+        "j.co" to SpendingCategory.FOOD,
+        "cluny" to SpendingCategory.FOOD,
+        "half million" to SpendingCategory.FOOD, // already above but canonical form
+        "mezaj" to SpendingCategory.FOOD,
+        "tea" to SpendingCategory.FOOD, // "tea trees", "tea clup", "ise tea"
         "cafe" to SpendingCategory.FOOD,
         "caffe" to SpendingCategory.FOOD,
         "cafè" to SpendingCategory.FOOD,
         "coffee" to SpendingCategory.FOOD,
+        "qahwa" to SpendingCategory.FOOD, // "qahwat he", "qahwat ..."
         "restaurant" to SpendingCategory.FOOD,
         "mcdonald" to SpendingCategory.FOOD,
         "burger" to SpendingCategory.FOOD,
         "kfc" to SpendingCategory.FOOD,
+        "kudu" to SpendingCategory.FOOD, // "kudu kr ..."
         "pizza" to SpendingCategory.FOOD,
         "herfy" to SpendingCategory.FOOD,
         "albaik" to SpendingCategory.FOOD,
         "shawarma" to SpendingCategory.FOOD,
+        "shawaiat" to SpendingCategory.FOOD, // "shawaiat a..." (grill)
         "shake shack" to SpendingCategory.FOOD,
         "bakery" to SpendingCategory.FOOD,
+        "forn" to SpendingCategory.FOOD, // Arabic "forn" = oven / bakery
+        "bake" to SpendingCategory.FOOD, // "ltia bake..."
+        "kitopi" to SpendingCategory.FOOD,
+        "turkish f" to SpendingCategory.FOOD, // "Turkish F..." is a food shop
+        "food" to SpendingCategory.FOOD, // "food hob", "food syst", "food g"
+        "grill" to SpendingCategory.FOOD, // "rare gril..."
+        "mtaam" to SpendingCategory.FOOD, // Arabic transliteration of "restaurant"
+        "asado" to SpendingCategory.FOOD,
+        "mr asado" to SpendingCategory.FOOD,
+        "kuro" to SpendingCategory.FOOD,
+        "fendeem" to SpendingCategory.FOOD,
+        "flod" to SpendingCategory.FOOD,
+        "trolley" to SpendingCategory.FOOD, // "trolley" is a cafe/restaurant chain
+        "wheat and" to SpendingCategory.FOOD, // "Wheat and ..."
         "berain" to SpendingCategory.GROCERIES, // bottled water
 
         // --- Groceries / retail ---
@@ -85,6 +115,12 @@ object MerchantCategorizer {
         "othaim" to SpendingCategory.GROCERIES,
         "farm superstore" to SpendingCategory.GROCERIES,
         "manuel market" to SpendingCategory.GROCERIES,
+        "al-sadhan" to SpendingCategory.GROCERIES,
+        "sadhan" to SpendingCategory.GROCERIES,
+        "zone mart" to SpendingCategory.GROCERIES,
+        "aswaq" to SpendingCategory.GROCERIES, // "aswaq zad", "aswaq alg" — Arabic for "markets"
+        "biqala" to SpendingCategory.GROCERIES, // Arabic for "grocery"
+        "mart" to SpendingCategory.GROCERIES,
         "nahdi" to SpendingCategory.HEALTHCARE, // pharmacy — overrides GROCERIES on "nahdi market"
 
         // --- Fuel ---
@@ -94,6 +130,13 @@ object MerchantCategorizer {
         "shell" to SpendingCategory.FUEL,
         "sasco" to SpendingCategory.FUEL,
         "petrol" to SpendingCategory.FUEL,
+        "petroli" to SpendingCategory.FUEL,
+        "petrolat" to SpendingCategory.FUEL,
+        "joil" to SpendingCategory.FUEL,
+        "fuelax" to SpendingCategory.FUEL,
+        "naft" to SpendingCategory.FUEL, // Arabic for "oil / petroleum"
+        "naphtha" to SpendingCategory.FUEL,
+        "fastel fu" to SpendingCategory.FUEL,
 
         // --- Healthcare ---
         "dr. sulaiman al habib" to SpendingCategory.HEALTHCARE,
@@ -101,6 +144,9 @@ object MerchantCategorizer {
         "saudi german" to SpendingCategory.HEALTHCARE,
         "dallah" to SpendingCategory.HEALTHCARE,
         "pharmacy" to SpendingCategory.HEALTHCARE,
+        "united ph" to SpendingCategory.HEALTHCARE,
+        "aldawaa" to SpendingCategory.HEALTHCARE, // "al dawaa" pharmacy
+        "nmc" to SpendingCategory.HEALTHCARE, // NMC Healthcare chain
         "sadiriya" to SpendingCategory.HEALTHCARE,
         "saidaliah" to SpendingCategory.HEALTHCARE,
 
@@ -114,6 +160,10 @@ object MerchantCategorizer {
         "taxi" to SpendingCategory.TRANSPORT,
         "najm" to SpendingCategory.TRANSPORT, // insurance-claim ops; conservative bucket
         "traffic violations" to SpendingCategory.TRANSPORT, // Saher
+        "al-haramain" to SpendingCategory.TRANSPORT, // HHR high-speed rail
+        "haramain" to SpendingCategory.TRANSPORT,
+        "parking" to SpendingCategory.TRANSPORT,
+        "riyadh parking" to SpendingCategory.TRANSPORT,
 
         // --- Utilities / telecoms / bills ---
         "stc pay" to SpendingCategory.UTILITIES,
@@ -150,6 +200,12 @@ object MerchantCategorizer {
         "adobe" to SpendingCategory.SUBSCRIPTIONS,
         "dropbox" to SpendingCategory.SUBSCRIPTIONS,
         "notion" to SpendingCategory.SUBSCRIPTIONS,
+        "sonarsource" to SpendingCategory.SUBSCRIPTIONS,
+        "claude.ai" to SpendingCategory.SUBSCRIPTIONS,
+        "bitdefender" to SpendingCategory.SUBSCRIPTIONS,
+        "2co.com" to SpendingCategory.SUBSCRIPTIONS, // 2checkout (payment processor for many SaaS)
+        "google osn" to SpendingCategory.SUBSCRIPTIONS, // Google's OSN streaming billing
+        "google fotor" to SpendingCategory.SUBSCRIPTIONS,
 
         // --- Entertainment / leisure ---
         "cinema" to SpendingCategory.ENTERTAINMENT,
@@ -159,6 +215,7 @@ object MerchantCategorizer {
         "bowling" to SpendingCategory.ENTERTAINMENT,
         "theme park" to SpendingCategory.ENTERTAINMENT,
         "boulevard" to SpendingCategory.ENTERTAINMENT,
+        "fun night" to SpendingCategory.ENTERTAINMENT,
 
         // --- Generic shopping (last-resort — specific merchants above) ---
         "amazon" to SpendingCategory.SHOPPING,

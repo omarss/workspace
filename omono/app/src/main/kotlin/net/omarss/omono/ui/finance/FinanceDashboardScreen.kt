@@ -14,12 +14,25 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.AccountBalance
+import androidx.compose.material.icons.filled.DirectionsBus
+import androidx.compose.material.icons.filled.Fastfood
+import androidx.compose.material.icons.filled.LocalGasStation
+import androidx.compose.material.icons.filled.LocalHospital
+import androidx.compose.material.icons.filled.MovieFilter
+import androidx.compose.material.icons.automirrored.filled.ReceiptLong
+import androidx.compose.material.icons.filled.Receipt
+import androidx.compose.material.icons.filled.ShoppingBag
+import androidx.compose.material.icons.filled.ShoppingCart
+import androidx.compose.material.icons.filled.Subscriptions
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.AlertDialog
@@ -811,6 +824,8 @@ private fun RecentTransactionsCard(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
+                        CategoryBadge(kind = row.kind, category = row.category)
+                        Spacer(Modifier.width(10.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = row.merchant,
@@ -867,6 +882,59 @@ private fun kindLabel(kind: Transaction.Kind): String = when (kind) {
     Transaction.Kind.GOVT_PAYMENT -> "Government payment"
     Transaction.Kind.TRANSFER_OUT -> "Transfer out"
     Transaction.Kind.REFUND -> "Refund"
+}
+
+// Small circular category badge shown at the leading edge of each
+// Recent activity row. All icons come from Material symbols so no
+// drawable assets ship in the APK just for this (brand logos would
+// need curation + licensing checks). The kind column trumps the
+// category when it's carrying its own semantic (transfers, refunds,
+// ATM cash, govt payments) — those take priority because they
+// describe what happened, not where it happened.
+@Composable
+private fun CategoryBadge(kind: Transaction.Kind, category: SpendingCategory?) {
+    val (icon, tint) = iconFor(kind, category)
+    androidx.compose.foundation.layout.Box(
+        modifier = Modifier
+            .size(32.dp)
+            .clip(androidx.compose.foundation.shape.CircleShape)
+            .background(tint.copy(alpha = 0.14f)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = tint,
+            modifier = Modifier.size(18.dp),
+        )
+    }
+}
+
+private fun iconFor(
+    kind: Transaction.Kind,
+    category: SpendingCategory?,
+): Pair<androidx.compose.ui.graphics.vector.ImageVector, Color> {
+    // Kind-specific overrides first — these read more meaningfully
+    // than the category for the cases they cover.
+    when (kind) {
+        Transaction.Kind.TRANSFER_OUT -> return Icons.Filled.AccountBalance to Color(0xFF6366F1)
+        Transaction.Kind.REFUND -> return Icons.AutoMirrored.Filled.ReceiptLong to Color(0xFF10B981)
+        Transaction.Kind.CASH_WITHDRAWAL -> return Icons.Filled.AccountBalance to Color(0xFF8B5CF6)
+        Transaction.Kind.GOVT_PAYMENT -> return Icons.Filled.Receipt to Color(0xFF64748B)
+        else -> Unit
+    }
+    return when (category) {
+        SpendingCategory.FOOD -> Icons.Filled.Fastfood to Color(0xFFF97316)
+        SpendingCategory.GROCERIES -> Icons.Filled.ShoppingCart to Color(0xFF22C55E)
+        SpendingCategory.FUEL -> Icons.Filled.LocalGasStation to Color(0xFF0EA5E9)
+        SpendingCategory.TRANSPORT -> Icons.Filled.DirectionsBus to Color(0xFF0EA5E9)
+        SpendingCategory.UTILITIES -> Icons.Filled.Receipt to Color(0xFF64748B)
+        SpendingCategory.SHOPPING -> Icons.Filled.ShoppingBag to Color(0xFFEC4899)
+        SpendingCategory.ENTERTAINMENT -> Icons.Filled.MovieFilter to Color(0xFFA855F7)
+        SpendingCategory.SUBSCRIPTIONS -> Icons.Filled.Subscriptions to Color(0xFF6366F1)
+        SpendingCategory.HEALTHCARE -> Icons.Filled.LocalHospital to Color(0xFFEF4444)
+        SpendingCategory.OTHER, null -> Icons.Filled.Receipt to Color(0xFF64748B)
+    }
 }
 
 private fun bankLabel(bank: Transaction.Bank): String = when (bank) {
