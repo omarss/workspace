@@ -556,7 +556,10 @@ private fun DirectionArrow(placeBearing: Float, heading: Float) {
 // `geo:` URI — good enough to drop a pin but without the review
 // detail. Every Android maps handler accepts both shapes.
 private fun launchMapsFor(context: Context, place: Place) {
-    val cid = parseCidFromFtid(place.id)
+    // Prefer the server-provided decimal `cid` (FEEDBACK.md §9.3);
+    // fall back to parsing it out of the FID-shaped `id` for older
+    // responses that pre-date that field.
+    val cid = place.cid ?: parseCidFromFtid(place.id)
     val uri = if (cid != null) {
         "https://www.google.com/maps?cid=$cid".toUri()
     } else {

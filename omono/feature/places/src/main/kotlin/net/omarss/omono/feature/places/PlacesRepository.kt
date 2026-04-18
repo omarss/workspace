@@ -1,8 +1,5 @@
 package net.omarss.omono.feature.places
 
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.abs
@@ -19,48 +16,38 @@ class PlacesRepository @Inject constructor(
 
     val isConfigured: Boolean get() = source.isConfigured
 
+    // `category == null` → union of all categories (server-side
+    // via `category=all`). `minRating` / `minReviews`, when > 0,
+    // filter at the source. See FEEDBACK.md §9.1 / §9.2 — previously
+    // we fanned out N parallel calls + filtered client-side; the
+    // backend handles both now.
     suspend fun nearby(
         latitude: Double,
         longitude: Double,
-        category: PlaceCategory,
+        category: PlaceCategory?,
         radiusMeters: Int,
+        minRating: Float? = null,
+        minReviews: Int? = null,
     ): List<Place> = source.nearbySearch(
         latitude = latitude,
         longitude = longitude,
         radiusMeters = radiusMeters,
         category = category,
+        minRating = minRating,
+        minReviews = minReviews,
     )
 
-    // `/v1/places` requires a single category per request, so "show me
-    // everything in this area" becomes a parallel fan-out across all
-    // categories. Results are deduped by `id` — a place that falls
-    // under multiple server-side categories would otherwise appear
-    // multiple times — and sorted by distance for the UI. Failures
-    // from individual categories are swallowed so a single backend
-    // hiccup doesn't empty the whole list.
-    suspend fun nearbyAll(
+    suspend fun search(
+        query: String,
         latitude: Double,
         longitude: Double,
         radiusMeters: Int,
-    ): List<Place> = coroutineScope {
-        PlaceCategory.entries
-            .map { cat ->
-                async {
-                    runCatching {
-                        source.nearbySearch(
-                            latitude = latitude,
-                            longitude = longitude,
-                            radiusMeters = radiusMeters,
-                            category = cat,
-                        )
-                    }.getOrDefault(emptyList())
-                }
-            }
-            .awaitAll()
-            .flatten()
-            .distinctBy { it.id }
-            .sortedBy { it.distanceMeters }
-    }
+    ): List<Place> = source.search(
+        query = query,
+        latitude = latitude,
+        longitude = longitude,
+        radiusMeters = radiusMeters,
+    )
 }
 
 // Pure filter — keeps places whose bearing from the user is within

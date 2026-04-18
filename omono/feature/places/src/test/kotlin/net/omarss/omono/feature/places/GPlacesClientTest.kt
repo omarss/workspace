@@ -53,7 +53,7 @@ class GPlacesClientTest {
 
         val places = client.parseResponse(
             json = json,
-            category = PlaceCategory.COFFEE,
+            requestedCategory = PlaceCategory.COFFEE,
             userLat = 24.7100,
             userLon = 46.6750,
         )
@@ -75,7 +75,7 @@ class GPlacesClientTest {
         val json = """{"results": [], "source": "gplaces"}"""
         val places = client.parseResponse(
             json = json,
-            category = PlaceCategory.BANK,
+            requestedCategory = PlaceCategory.BANK,
             userLat = 0.0,
             userLon = 0.0,
         )
@@ -95,7 +95,7 @@ class GPlacesClientTest {
         """.trimIndent()
         val places = client.parseResponse(
             json = json,
-            category = PlaceCategory.COFFEE,
+            requestedCategory = PlaceCategory.COFFEE,
             userLat = 24.7, userLon = 46.7,
         )
         places shouldHaveSize 1
@@ -115,7 +115,7 @@ class GPlacesClientTest {
         """.trimIndent()
         val places = client.parseResponse(
             json = json,
-            category = PlaceCategory.COFFEE,
+            requestedCategory = PlaceCategory.COFFEE,
             userLat = 24.7, userLon = 46.7,
         )
         places shouldHaveSize 1
@@ -126,7 +126,7 @@ class GPlacesClientTest {
     fun `malformed json returns empty`() {
         client.parseResponse(
             json = "not json",
-            category = PlaceCategory.COFFEE,
+            requestedCategory = PlaceCategory.COFFEE,
             userLat = 0.0,
             userLon = 0.0,
         ) shouldHaveSize 0

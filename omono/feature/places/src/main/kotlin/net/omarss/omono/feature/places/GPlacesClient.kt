@@ -38,8 +38,10 @@ class GPlacesClient @Inject constructor(
         latitude: Double,
         longitude: Double,
         radiusMeters: Int,
-        category: PlaceCategory,
+        category: PlaceCategory?,
         limit: Int,
+        minRating: Float?,
+        minReviews: Int?,
     ): List<Place> = withContext(Dispatchers.IO) {
         if (!isConfigured) return@withContext emptyList()
 
@@ -48,8 +50,16 @@ class GPlacesClient @Inject constructor(
             .addQueryParameter("lat", latitude.toString())
             .addQueryParameter("lon", longitude.toString())
             .addQueryParameter("radius", radiusMeters.toString())
-            .addQueryParameter("category", category.slug)
+            .addQueryParameter("category", category?.slug ?: "all")
             .addQueryParameter("limit", limit.toString())
+            .apply {
+                if (minRating != null && minRating > 0f) {
+                    addQueryParameter("min_rating", minRating.toString())
+                }
+                if (minReviews != null && minReviews > 0) {
+                    addQueryParameter("min_reviews", minReviews.toString())
+                }
+            }
             .build()
 
         val request = Request.Builder()
@@ -73,6 +83,49 @@ class GPlacesClient @Inject constructor(
         }.getOrNull() ?: emptyList()
     }
 
+    override suspend fun search(
+        query: String,
+        latitude: Double,
+        longitude: Double,
+        radiusMeters: Int,
+        limit: Int,
+    ): List<Place> = withContext(Dispatchers.IO) {
+        if (!isConfigured || query.isBlank()) return@withContext emptyList()
+
+        val url = baseUrl.trimEnd('/').let { "$it/v1/search" }.toHttpUrl()
+            .newBuilder()
+            .addQueryParameter("lat", latitude.toString())
+            .addQueryParameter("lon", longitude.toString())
+            .addQueryParameter("radius", radiusMeters.toString())
+            .addQueryParameter("q", query)
+            .addQueryParameter("limit", limit.toString())
+            .build()
+
+        val request = Request.Builder()
+            .url(url)
+            .header("X-Api-Key", apiKey)
+            .header("User-Agent", USER_AGENT)
+            .get()
+            .build()
+
+        runCatching {
+            http.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) {
+                    Timber.w("gplaces search HTTP %d", response.code)
+                    return@use emptyList<Place>()
+                }
+                val body = response.body?.string() ?: return@use emptyList<Place>()
+                // Response shape is the same `results: [...]` array as
+                // /v1/places (with an extra `score` field we ignore);
+                // the per-result `category` carries the matched slug
+                // so parseResponse's lookup handles mixed results.
+                parseResponse(body, requestedCategory = null, latitude, longitude)
+            }
+        }.onFailure {
+            Timber.w(it, "gplaces search failed")
+        }.getOrNull() ?: emptyList()
+    }
+
     // Exposed so the parser test can drive it against canned JSON.
     // The parser is permissive: any required-field-missing or malformed
     // entry is skipped, not failed. Sorting trusts the server but we
@@ -80,7 +133,7 @@ class GPlacesClient @Inject constructor(
     // rogue upstream ordering later.
     internal fun parseResponse(
         json: String,
-        category: PlaceCategory,
+        requestedCategory: PlaceCategory?,
         userLat: Double,
         userLon: Double,
     ): List<Place> {
@@ -94,6 +147,16 @@ class GPlacesClient @Inject constructor(
             val lat = item.optDouble("lat", Double.NaN)
             val lon = item.optDouble("lon", Double.NaN)
             if (lat.isNaN() || lon.isNaN()) continue
+            // When the server returns a mixed-category union, honour
+            // the per-result `category` field. When the request was
+            // for a single category, trust the request and skip the
+            // lookup (server may omit the field on single-category
+            // responses). Falls back to whatever was requested if
+            // the server didn't echo a recognisable slug.
+            val itemCategory = item.optStringOrNull("category")
+                ?.let { slug -> PlaceCategory.entries.firstOrNull { it.slug == slug } }
+                ?: requestedCategory
+                ?: continue
 
             // optString on a JSON null returns the *string* "null" on
             // Android's org.json — optStringOrNull filters that out
@@ -109,13 +172,14 @@ class GPlacesClient @Inject constructor(
             val openNow = if (item.has("open_now") && !item.isNull("open_now")) {
                 item.optBoolean("open_now", false)
             } else null
+            val cid = item.optStringOrNull("cid")
             val distance = haversineMeters(userLat, userLon, lat, lon)
             val bearing = bearingDegrees(userLat, userLon, lat, lon)
 
             out += Place(
                 id = id,
                 name = name,
-                category = category,
+                category = itemCategory,
                 latitude = lat,
                 longitude = lon,
                 distanceMeters = distance,
@@ -125,6 +189,7 @@ class GPlacesClient @Inject constructor(
                 rating = rating,
                 reviewCount = reviewCount,
                 openNow = openNow,
+                cid = cid,
             )
         }
         return out.sortedBy { it.distanceMeters }
@@ -168,4 +233,5 @@ val PlaceCategory.slug: String
         PlaceCategory.SALON -> "salon"
         PlaceCategory.LAUNDRY -> "laundry"
         PlaceCategory.POST_OFFICE -> "post_office"
+        PlaceCategory.LIBRARY -> "library"
     }

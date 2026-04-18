@@ -12,10 +12,16 @@ import com.google.android.gms.location.Priority
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
@@ -27,7 +33,7 @@ import net.omarss.omono.feature.places.filterByDirection
 import timber.log.Timber
 import javax.inject.Inject
 
-@OptIn(ExperimentalCoroutinesApi::class)
+@OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
 @HiltViewModel
 class PlacesViewModel @Inject constructor(
     @param:ApplicationContext private val context: Context,
@@ -64,18 +70,16 @@ class PlacesViewModel @Inject constructor(
         },
     ) { category, cone, radius, places, extras ->
         val directionFiltered = filterByDirection(places, extras.heading, cone)
-        val searchFiltered = applySearch(directionFiltered, extras.searchQuery)
-        val qualityFiltered = if (extras.qualityFilter) {
-            applyQualityFilter(searchFiltered)
-        } else {
-            searchFiltered
-        }
+        // Both search and quality filter run server-side now — the
+        // `q`, `min_rating`, `min_reviews` params in refresh() do
+        // the work. Only direction is applied client-side because
+        // it depends on the live magnetometer.
         PlacesUiState(
             category = category,
             radiusMeters = radius,
             coneDegrees = cone,
             heading = extras.heading,
-            places = qualityFiltered,
+            places = directionFiltered,
             searchQuery = extras.searchQuery,
             qualityFilter = extras.qualityFilter,
             loading = extras.loading,
@@ -116,6 +120,9 @@ class PlacesViewModel @Inject constructor(
 
     fun setQualityFilter(enabled: Boolean) {
         qualityFilter.value = enabled
+        // Filter is server-side — toggling it changes the payload,
+        // so kick off a fresh fetch instead of relying on the cache.
+        refresh()
     }
 
     // Simple in-memory cache. When the user navigates back into the
@@ -132,7 +139,21 @@ class PlacesViewModel @Inject constructor(
         val radiusMeters: Int,
         val bucketLat: Int,
         val bucketLon: Int,
+        val qualityFilter: Boolean,
+        val searchQuery: String,
     )
+
+    init {
+        // Debounced auto-refresh on typed-query changes. Drop(1) skips
+        // the initial empty value so the constructor doesn't fire a
+        // redundant fetch before the UI has even mounted.
+        searchQuery
+            .drop(1)
+            .distinctUntilChanged()
+            .debounce(300)
+            .onEach { refresh() }
+            .launchIn(viewModelScope)
+    }
 
     private var lastFetchKey: FetchKey? = null
     private var lastFetchAtMs: Long = 0L
@@ -152,11 +173,14 @@ class PlacesViewModel @Inject constructor(
                 if (rawPlaces.value.isEmpty()) error.value = "No GPS fix yet"
                 return@launch
             }
+            val query = searchQuery.value.trim()
             val key = FetchKey(
                 category = selectedCategory.value,
                 radiusMeters = radiusMeters.value,
                 bucketLat = (location.first * BUCKETS_PER_DEGREE).toInt(),
                 bucketLon = (location.second * BUCKETS_PER_DEGREE).toInt(),
+                qualityFilter = qualityFilter.value,
+                searchQuery = query,
             )
             val now = System.currentTimeMillis()
             val fresh = !force &&
@@ -168,19 +192,29 @@ class PlacesViewModel @Inject constructor(
             loading.value = true
             error.value = null
             runCatching {
-                val cat = selectedCategory.value
-                if (cat == null) {
-                    repository.nearbyAll(
+                if (query.isNotEmpty()) {
+                    // Typed query → hit the server-side full-text
+                    // endpoint, which matches against name, address,
+                    // and the review snippet Google supplies.
+                    // Results come back in relevance order.
+                    repository.search(
+                        query = query,
                         latitude = location.first,
                         longitude = location.second,
                         radiusMeters = radiusMeters.value,
                     )
                 } else {
+                    // `category=null` here → gplaces `category=all`,
+                    // one HTTP call for the union. Quality filter is
+                    // server-side so the payload is already trimmed
+                    // to 4★ / 100 reviews when the toggle is on.
                     repository.nearby(
                         latitude = location.first,
                         longitude = location.second,
-                        category = cat,
+                        category = selectedCategory.value,
                         radiusMeters = radiusMeters.value,
+                        minRating = if (qualityFilter.value) MIN_RATING else null,
+                        minReviews = if (qualityFilter.value) MIN_REVIEW_COUNT else null,
                     )
                 }
             }
@@ -198,26 +232,6 @@ class PlacesViewModel @Inject constructor(
         }
     }
 
-    // Case-insensitive substring search on place name + address so a
-    // user typing "cafe" picks up both the name and address hits.
-    private fun applySearch(places: List<Place>, query: String): List<Place> {
-        val needle = query.trim().lowercase()
-        if (needle.isEmpty()) return places
-        return places.filter { place ->
-            place.name.lowercase().contains(needle) ||
-                place.address?.lowercase()?.contains(needle) == true
-        }
-    }
-
-    // Quality gate: ≥ 4.0 stars AND ≥ 100 reviews. Both must be
-    // present — an unrated place or a rated-but-barely-reviewed place
-    // doesn't meet the bar. Matches what the user intuitively means
-    // by "a place worth visiting".
-    private fun applyQualityFilter(places: List<Place>): List<Place> = places.filter { place ->
-        val rating = place.rating ?: return@filter false
-        val reviews = place.reviewCount ?: return@filter false
-        rating >= MIN_RATING && reviews >= MIN_REVIEW_COUNT
-    }
 
     private companion object {
         // ~60 seconds inside the cache window = silent no-op on re-open.

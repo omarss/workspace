@@ -20,6 +20,11 @@ data class Place(
     val rating: Float? = null,
     val reviewCount: Int? = null,
     val openNow: Boolean? = null,
+    // Google Maps CID as a decimal string — when present, builds a
+    // `maps.google.com/?cid=<n>` deep link that opens the place's
+    // full detail panel (reviews, photos, hours). Server-provided
+    // since v0.29.x; before that the client parsed it out of `id`.
+    val cid: String? = null,
 )
 
 // User-facing categories. Each maps to a lowercase-snake slug that
@@ -45,4 +50,5 @@ enum class PlaceCategory(val label: String, val icon: String) {
     SALON("Salon", "💈"),
     LAUNDRY("Laundry", "🧺"),
     POST_OFFICE("Post", "📮"),
+    LIBRARY("Library", "📚"),
 }

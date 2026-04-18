@@ -16,11 +16,32 @@ interface PlacesSource {
     // instead of an error.
     val isConfigured: Boolean
 
+    // `category == null` means "all categories" — backends that
+    // support it (gplaces v2 onward accepts `category=all`) should
+    // serve the union in one call; others can fan out client-side.
+    // `minRating` / `minReviews`, when non-null and > 0, filter the
+    // response at the source so the client doesn't have to throw
+    // away bytes it just downloaded.
     suspend fun nearbySearch(
         latitude: Double,
         longitude: Double,
         radiusMeters: Int,
-        category: PlaceCategory,
+        category: PlaceCategory?,
+        limit: Int = 25,
+        minRating: Float? = null,
+        minReviews: Int? = null,
+    ): List<Place>
+
+    // Full-text search across every category within the radius.
+    // Backed by `/v1/search?q=...` — server fuzzy-matches on
+    // name + address and returns a relevance-ordered list. Empty
+    // query should return an empty list (the UI expects a typed
+    // prompt before firing).
+    suspend fun search(
+        query: String,
+        latitude: Double,
+        longitude: Double,
+        radiusMeters: Int,
         limit: Int = 25,
     ): List<Place>
 }
