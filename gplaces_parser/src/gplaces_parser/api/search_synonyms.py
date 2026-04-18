@@ -73,9 +73,18 @@ SYNONYM_GROUPS: list[list[str]] = [
     # atm
     ["atm", "cash machine",
      "صراف آلي", "صراف", "ماكينة"],
-    # mosque
-    ["mosque", "masjid",
-     "مسجد", "مساجد", "جامع"],
+    # mosque — include the Friday-mosque term too
+    ["mosque", "masjid", "grand mosque", "friday mosque",
+     "مسجد", "مساجد", "جامع", "جوامع"],
+    # transit — stations of every mode the Riyadh city zone has
+    ["bus station", "bus", "saptco",
+     "محطة حافلات", "حافلات", "موقف باص", "باصات"],
+    ["metro", "metro station", "subway",
+     "محطة مترو", "مترو", "محطات المترو"],
+    ["train", "train station", "railway", "railway station", "rail", "sar",
+     "محطة قطار", "قطار", "محطة سكة حديد", "سكة حديد", "القطار"],
+    ["taxi", "taxi stand",
+     "موقف سيارات أجرة", "تاكسي", "سيارة أجرة"],
     # salon / barber
     ["salon", "barber", "barbershop", "haircut",
      "حلاق", "حلاقة", "صالون"],

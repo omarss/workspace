@@ -28,6 +28,9 @@ _SLUG_QUERIES: list[tuple[str, str, str]] = [
     ("bank",        "بنك",                     "bank"),
     ("atm",         "صراف آلي",                "atm"),
     ("mosque",      "مسجد",                    "mosque"),
+    # `جامع` (Friday mosque) is normally bigger than a `مسجد` and many
+    # big Riyadh mosques are only tagged this way in OSM / Google.
+    ("mosque",      "جامع",                    "grand mosque"),
     ("salon",       "حلاق",                    "barber shop"),
     ("laundry",     "مغسلة",                   "laundry"),
     ("post_office", "مكتب بريد",               "post office"),
@@ -38,6 +41,14 @@ _SLUG_QUERIES: list[tuple[str, str, str]] = [
     # bookstores that show up under multiple queries.
     ("library",     "مكتبة عامة",              "public library"),
     ("library",     "كافيه مكتبة",             "book cafe"),
+    # Transit — bus / metro / train / taxi / railway stations. Lumped
+    # under one slug because the client mostly wants "stations nearby"
+    # and Riyadh's transit is fragmented (SAPTCO + Metro + SAR).
+    ("transit",     "محطة حافلات",             "bus station"),
+    ("transit",     "محطة مترو",               "metro station"),
+    ("transit",     "محطة قطار",               "train station"),
+    ("transit",     "محطة سكة حديد",           "railway station"),
+    ("transit",     "موقف سيارات أجرة",         "taxi stand"),
 ]
 
 
