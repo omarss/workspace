@@ -70,6 +70,10 @@ connected-test: ## Run instrumentation tests on a connected device/emulator
 check: ## Run full verification (lint + tests)
 	$(GRADLEW) check
 
+.PHONY: refresh-speed-limits
+refresh-speed-limits: ## Re-fetch the bundled Riyadh speed-limit asset from OSM
+	@./scripts/fetch-speed-limits.sh
+
 .PHONY: install
 install: ## Install debug APK on the connected device
 	$(GRADLEW) installDebug
