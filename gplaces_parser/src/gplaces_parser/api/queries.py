@@ -66,7 +66,7 @@ WITH
 SELECT * FROM scored
 WHERE distance_m <= (SELECT r_m FROM q)
 ORDER BY distance_m ASC
-LIMIT %(limit)s
+LIMIT %(limit_plus_one)s OFFSET %(offset)s
 """
 
 
@@ -80,7 +80,11 @@ def nearby(
     limit: int,
     min_rating: float = 0.0,
     min_reviews: int = 0,
-) -> list[dict[str, Any]]:
+    offset: int = 0,
+) -> tuple[list[dict[str, Any]], bool]:
+    """Returns (rows, has_more). Rows is capped at `limit`; if the DB
+    produced `limit+1` under the hood, `has_more=True` and the trailing
+    row is dropped so the consumer never sees it."""
     """Nearby places within `radius_m` of (lat, lon).
 
     `categories=None` means "no category filter" (the FEEDBACK §9.1
@@ -98,10 +102,13 @@ def nearby(
         "lat_pad": lat_pad,
         "lon_pad": lon_pad,
         "categories": categories,  # psycopg adapts Python list → text[]
-        "limit": limit,
+        "limit_plus_one": limit + 1,
+        "offset": max(offset, 0),
         "min_rating": min_rating,
         "min_reviews": min_reviews,
     }
     with conn.cursor(row_factory=dict_row) as cur:
         cur.execute(NEARBY_SQL, params)
-        return list(cur.fetchall())
+        rows = list(cur.fetchall())
+    has_more = len(rows) > limit
+    return (rows[:limit], has_more)

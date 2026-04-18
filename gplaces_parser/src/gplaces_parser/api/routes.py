@@ -15,6 +15,7 @@ from .deps import AuthDep
 from .schemas import (
     NearbyResponse,
     NearbyResult,
+    Pagination,
     ReviewHit,
     ReviewPlace,
     ReviewSearchResponse,
@@ -58,6 +59,7 @@ async def nearby(
     lang: Annotated[str, Query(pattern="^(ar|en)$")] = "en",
     min_rating: Annotated[float, Query(ge=0.0, le=5.0)] = 0.0,
     min_reviews: Annotated[int, Query(ge=0)] = 0,
+    offset: Annotated[int, Query(ge=0, le=10_000)] = 0,
 ) -> NearbyResponse:
     # FEEDBACK §9.1: `category=all` disables the filter; comma-separated
     # lists union several slugs into one call. Back-compat preserved —
@@ -82,7 +84,7 @@ async def nearby(
     )
 
     with connection() as conn:
-        rows = queries.nearby(
+        rows, has_more = queries.nearby(
             conn,
             lat=lat,
             lon=lon,
@@ -91,6 +93,7 @@ async def nearby(
             limit=effective_limit,
             min_rating=min_rating,
             min_reviews=min_reviews,
+            offset=offset,
         )
 
     # Per FEEDBACK §3 the JSON `name` field is English and `name_ar` is
@@ -131,6 +134,12 @@ async def nearby(
 
     return NearbyResponse(
         results=results,
+        pagination=Pagination(
+            offset=offset,
+            limit=effective_limit,
+            next_offset=(offset + effective_limit) if has_more else None,
+            has_more=has_more,
+        ),
         source="gplaces",
         generated_at=datetime.now(UTC),
     )
@@ -199,6 +208,7 @@ async def search(
     lang: Annotated[str, Query(pattern="^(ar|en)$")] = "en",
     min_rating: Annotated[float, Query(ge=0.0, le=5.0)] = 0.0,
     min_reviews: Annotated[int, Query(ge=0)] = 0,
+    offset: Annotated[int, Query(ge=0, le=10_000)] = 0,
 ) -> SearchResponse:
     """Keyword + fuzzy search over places.
 
@@ -227,7 +237,7 @@ async def search(
         )
 
     with connection() as conn:
-        rows = search_queries.search(
+        rows, has_more = search_queries.search(
             conn,
             q=q,
             category=slug,
@@ -237,6 +247,7 @@ async def search(
             limit=limit,
             min_rating=min_rating,
             min_reviews=min_reviews,
+            offset=offset,
         )
 
     def pick_name(row: dict) -> tuple[str, str | None]:
@@ -274,6 +285,12 @@ async def search(
     return SearchResponse(
         results=results,
         query=q,
+        pagination=Pagination(
+            offset=offset,
+            limit=limit,
+            next_offset=(offset + limit) if has_more else None,
+            has_more=has_more,
+        ),
         source="gplaces",
         generated_at=datetime.now(UTC),
     )
@@ -292,6 +309,7 @@ async def reviews_search(
     min_rating: Annotated[int, Query(ge=1, le=5)] = 0,
     limit: Annotated[int, Query(ge=1, le=50)] = 20,
     lang: Annotated[str, Query(pattern="^(ar|en)$")] = "en",
+    offset: Annotated[int, Query(ge=0, le=10_000)] = 0,
 ) -> ReviewSearchResponse:
     """Full-text search over review bodies.
 
@@ -313,13 +331,14 @@ async def reviews_search(
             categories = slugs
 
     with connection() as conn:
-        rows = review_search_queries.search(
+        rows, has_more = review_search_queries.search(
             conn,
             q=q,
             categories=categories,
             place_id=place_id,
             min_review_rating=min_rating,
             limit=limit,
+            offset=offset,
         )
 
     def place_name(ar: str | None, en: str | None) -> tuple[str, str | None]:
@@ -355,6 +374,12 @@ async def reviews_search(
     return ReviewSearchResponse(
         results=results,
         query=q,
+        pagination=Pagination(
+            offset=offset,
+            limit=limit,
+            next_offset=(offset + limit) if has_more else None,
+            has_more=has_more,
+        ),
         source="gplaces",
         generated_at=datetime.now(UTC),
     )

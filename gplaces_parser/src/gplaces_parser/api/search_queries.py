@@ -96,7 +96,7 @@ SELECT *,
   ) AS score
 FROM cand
 ORDER BY score DESC, reviews_count DESC NULLS LAST
-LIMIT %(limit)s
+LIMIT %(limit_plus_one)s OFFSET %(offset)s
 """
 
 
@@ -111,7 +111,8 @@ def search(
     limit: int = 20,
     min_rating: float = 0.0,
     min_reviews: int = 0,
-) -> list[dict[str, Any]]:
+    offset: int = 0,
+) -> tuple[list[dict[str, Any]], bool]:
     has_geo = lat is not None and lon is not None and radius_m is not None
     if has_geo:
         lat_pad = radius_m / _M_PER_DEG_LAT
@@ -132,8 +133,12 @@ def search(
         "has_geo": has_geo,
         "min_rating": min_rating,
         "min_reviews": min_reviews,
-        "limit": min(max(limit, 1), 50),
+        "limit_plus_one": min(max(limit, 1), 50) + 1,
+        "offset": max(offset, 0),
     }
     with conn.cursor(row_factory=dict_row) as cur:
         cur.execute(SEARCH_SQL, params)
-        return list(cur.fetchall())
+        rows = list(cur.fetchall())
+    capped = min(max(limit, 1), 50)
+    has_more = len(rows) > capped
+    return (rows[:capped], has_more)

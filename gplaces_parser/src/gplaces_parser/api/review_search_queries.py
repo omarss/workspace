@@ -53,7 +53,7 @@ WHERE r.search_tsv @@ q.tsq
   AND (%(place_id)s::text IS NULL OR r.place_id = %(place_id)s)
   AND (%(min_review_rating)s::int = 0 OR r.rating >= %(min_review_rating)s::int)
 ORDER BY score DESC, r.likes DESC NULLS LAST, r.published_at DESC NULLS LAST
-LIMIT %(limit)s
+LIMIT %(limit_plus_one)s OFFSET %(offset)s
 """
 
 
@@ -65,15 +65,20 @@ def search(
     place_id: str | None = None,
     min_review_rating: int = 0,
     limit: int = 20,
-) -> list[dict[str, Any]]:
+    offset: int = 0,
+) -> tuple[list[dict[str, Any]], bool]:
+    capped = min(max(limit, 1), 50)
     params = {
         "tsq": search_synonyms.build_tsquery(q),
         "raw_q": q.strip(),
         "categories": categories,
         "place_id": place_id,
         "min_review_rating": min_review_rating,
-        "limit": min(max(limit, 1), 50),
+        "limit_plus_one": capped + 1,
+        "offset": max(offset, 0),
     }
     with conn.cursor(row_factory=dict_row) as cur:
         cur.execute(SEARCH_SQL, params)
-        return list(cur.fetchall())
+        rows = list(cur.fetchall())
+    has_more = len(rows) > capped
+    return (rows[:capped], has_more)

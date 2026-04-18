@@ -379,6 +379,160 @@ it even if it's two blocks away.
 Lower priority than 9.1–9.3; the client-side filter is acceptable for
 now.
 
+### 9.9 `/v1/places` + `/v1/search` — pagination *(ship-blocker for endless-scroll UI)*
+
+**Status:** ✅ shipped (pending `make deploy`). Offset-based, exactly
+the shape you asked for. Applies to `/v1/places`, `/v1/search`, and
+`/v1/reviews/search`. No API surface change for clients that don't
+send `offset` — they just see `offset=0, has_more` as before.
+
+```
+GET /v1/places?...&limit=50&offset=50
+GET /v1/search?q=...&limit=50&offset=50
+```
+
+Every response now carries a `pagination` block:
+
+```json
+{
+  "results": [...],
+  "pagination": {
+    "offset": 50,
+    "limit": 50,
+    "next_offset": 100,
+    "has_more": true
+  }
+}
+```
+
+- Internally fetches `limit + 1` rows so `has_more` is deterministic
+  (not a stale-ordering guess).
+- `next_offset` is `null` when `has_more=false`; client stops scrolling.
+- `offset` caps at 10,000 to guard against accidental deep pagination.
+- Ordering is unchanged (`/v1/places` by distance ascending,
+  `/v1/search` by score + review_count), so scrolling back up reloads
+  the same page verbatim.
+
+omono's `GPlacesClient` already sends `offset` — it just starts
+working once the pod has the new image.
+
+**Why (original ask):** omono's Places tab is moving to
+infinite-scroll; today the hard `limit=50` server cap means the list
+plateaus at 50 results regardless of how far the user scrolls. Every
+"nearby" category (All, coffee, restaurants, groceries, …) hits the
+same wall.
+
+**Ask:** Add cursor-or-offset pagination to both `/v1/places` and
+`/v1/search`. Either of these shapes is fine — offset is simpler to
+implement on a deterministic ordering (distance ascending), cursor is
+nicer if the ranking is ever relaxed.
+
+```
+# Offset shape (preferred, matches the existing ORDER BY distance)
+GET /v1/places?lat=...&lon=...&radius=5000&category=all&limit=50&offset=50
+```
+
+Response gains a small pagination block so the client can render the
+"load more" affordance correctly:
+
+```json
+{
+  "results": [...],
+  "pagination": {
+    "offset": 50,
+    "limit": 50,
+    "next_offset": 100,
+    "has_more": true
+  }
+}
+```
+
+- `has_more = false` is the signal to stop firing more calls.
+- `offset` must be idempotent across identical query params so scrolling
+  back up doesn't re-order the results.
+- `limit` cap can stay at 50 per page — pagination is how we go past it.
+- `/v1/search` (and `/v1/reviews/search`) should take the same params
+  for consistency; a typed query is often where users want the deepest
+  scroll.
+
+Interim client behaviour: omono sends `offset` already (ignored today);
+on a same-as-last-response payload, the client stops the scroll chain.
+Zero risk to existing integrations.
+
+### 9.12 `GET /v1/admin/usage` — per-key usage counters (2026-04-18)
+
+**Status:** ✅ shipped (pending `make deploy`). Auth: same `X-Api-Key`.
+
+Every request now increments `api_usage(key_prefix, endpoint,
+status_bucket, day, count, last_seen)`. `key_prefix` is the first 8
+hex chars of `sha256(api_key)` — stable per key, safe to log.
+`/v1/health` is excluded.
+
+```
+GET /v1/admin/usage
+```
+
+Response shape:
+```json
+{
+  "rows": [
+    { "key_prefix":"d7c5182d", "endpoint":"/v1/search", "status":200, "count":184, "first_day":"2026-04-18", "last_seen":"..." },
+    { "key_prefix":"d7c5182d", "endpoint":"/v1/places", "status":200, "count":930, ... },
+    { "key_prefix":"anon",     "endpoint":"/v1/places", "status":401, "count":3, ... }
+  ],
+  "source": "gplaces",
+  "generated_at": "..."
+}
+```
+
+Useful to sanity-check cache hit rates, detect leaked keys, and keep
+a rough heartbeat per endpoint. No omono wiring needed.
+
+### 9.11 Cuisine sub-category slugs (2026-04-18)
+
+**Status:** ✅ slugs accepted server-side, scraping in progress.
+`PlaceCategory` on the omono side is free to ignore these or add them
+as you want. Each behaves like every other slug on `/v1/places`,
+`/v1/search`, and `/v1/reviews/search`.
+
+| Slug           | Covers                                    |
+|---|---|
+| `seafood`      | مطاعم أسماك, seafood restaurants          |
+| `healthy_food` | أكل صحي, salads, health-food cafes        |
+| `italian_food` | مطاعم إيطالية, pizzeria-adjacent          |
+| `sushi`        | سوشي / Japanese                           |
+| `burger`       | برجر joints                               |
+| `pizza`        | بيتزا / pizzeria                          |
+| `shawarma`     | شاورما                                    |
+| `kabsa`        | كبسة / Saudi traditional                  |
+| `mandi`        | مندي / Yemeni                             |
+| `steakhouse`   | ستيك / لحوم                               |
+| `dessert`      | حلويات / dessert bars                     |
+| `ice_cream`    | آيس كريم / بوظة                           |
+| `breakfast`    | فطور / brunch                             |
+| `indian_food`  | مطاعم هندية                              |
+| `asian_food`   | مطاعم آسيوية (chinese / thai / etc)       |
+
+Also expanded in the synonym dictionary — `q=sushi` finds `ساشيمي` /
+`japanese`; `q=healthy` finds `سلطة` / `أكل صحي`, etc.
+
+### 9.10 `transit` + `juice` + `library` categories, `جامع` mosque variant (2026-04-18)
+
+**Status:** ✅ slugs accepted server-side, scrape jobs queued.
+
+- **`transit`** — bus / metro / train / taxi stations under one slug.
+  5 station-type queries per language. ~300 scrape jobs.
+- **`juice`** — Riyadh sugarcane-juice stalls + fresh-juice bars. 3
+  query families including `عصير قصب`. Synonyms bridge across
+  languages (`q=قصب` now matches English "juice" results too).
+- **`library`** — public reading libraries AND book-cafe hybrids.
+  Known noise: retail bookstores (Jarir etc) self-categorise as libraries.
+- **`mosque`** now also seeds the `جامع` (Friday/grand mosque) query.
+
+Current count (as of this update): library 0/120 jobs done, transit
+0/300, juice 0/180 — they're at the tail of a 2,738-job queue, so
+expect results to start flowing once the main crawl drains the head.
+
 ### 9.8 Arabic-aware search — normalisation + synonyms (2026-04-18)
 
 **Status:** ✅ shipped (pending `make deploy`). Applies to both

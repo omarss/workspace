@@ -27,8 +27,23 @@ class NearbyResult(BaseModel):
     website: str | None = None
 
 
+class Pagination(BaseModel):
+    """Offset-based pagination block.
+
+    `offset` is the starting index into the ORDER-BY stream. `next_offset`
+    is what the client should send on the next request — null when
+    `has_more=false`. `limit` echoes the effective page size the server
+    actually applied (may be smaller than requested if clamped).
+    """
+    offset: int
+    limit: int
+    next_offset: int | None = None
+    has_more: bool = False
+
+
 class NearbyResponse(BaseModel):
     results: list[NearbyResult]
+    pagination: Pagination | None = None
     source: str = "gplaces"
     generated_at: datetime = Field(default_factory=lambda: datetime.utcnow())
 
@@ -86,6 +101,7 @@ class SearchResult(BaseModel):
 class SearchResponse(BaseModel):
     results: list[SearchResult]
     query: str
+    pagination: Pagination | None = None
     source: str = "gplaces"
     generated_at: datetime = Field(default_factory=lambda: datetime.utcnow())
 
@@ -118,5 +134,6 @@ class ReviewHit(BaseModel):
 class ReviewSearchResponse(BaseModel):
     results: list[ReviewHit]
     query: str
+    pagination: Pagination | None = None
     source: str = "gplaces"
     generated_at: datetime = Field(default_factory=lambda: datetime.utcnow())
