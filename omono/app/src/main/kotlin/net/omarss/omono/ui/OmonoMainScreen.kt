@@ -412,10 +412,19 @@ private fun HeroCard(state: OmonoMainUiState) {
         ) {
             StatusDot(state)
             Spacer(Modifier.height(12.dp))
+            // When there's no live speed yet the placeholder string is
+            // a dash — rendering that at displayLarge (64 sp) reads as
+            // a white loading bar. Drop to headline weight and 40%
+            // alpha so the screen feels "waiting" instead of broken.
+            val hasSpeed = state.heroValue != "—"
             Text(
                 text = state.heroValue,
-                style = MaterialTheme.typography.displayLarge,
-                color = heroColor,
+                style = if (hasSpeed) {
+                    MaterialTheme.typography.displayLarge
+                } else {
+                    MaterialTheme.typography.headlineLarge
+                },
+                color = if (hasSpeed) heroColor else heroColor.copy(alpha = 0.4f),
             )
             Text(
                 text = state.heroUnit,

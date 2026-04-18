@@ -224,7 +224,9 @@ private fun RadiusPicker(
     modifier: Modifier = Modifier,
 ) {
     val options = listOf(1_000, 5_000, 20_000)
-    val labels = mapOf(1_000 to "1 km", 5_000 to "5 km", 20_000 to "20 km")
+    // Short labels so the "20 km" option doesn't wrap to a second
+    // line inside the segmented button cell on phone widths.
+    val labels = mapOf(1_000 to "1km", 5_000 to "5km", 20_000 to "20km")
     Column(modifier = modifier) {
         Text(
             text = "Radius",
@@ -237,7 +239,14 @@ private fun RadiusPicker(
                     selected = radiusMeters == value,
                     onClick = { onChange(value) },
                     shape = SegmentedButtonDefaults.itemShape(index, options.size),
-                ) { Text(labels[value] ?: "") }
+                    label = {
+                        Text(
+                            text = labels[value] ?: "",
+                            maxLines = 1,
+                            softWrap = false,
+                        )
+                    },
+                )
             }
         }
     }
@@ -428,10 +437,15 @@ private fun OpenChip() {
     }
 }
 
+// "125" / "1.8K" / "15K" / "1.8M". The earlier version appended a
+// second "K" on top of the %f format's built-in "K", producing
+// values like "4.7KK" on the dashboard.
 private fun formatReviewCount(n: Int): String = when {
     n < 1_000 -> n.toString()
-    n < 10_000 -> "%.1fK".format(n / 1000f).removeSuffix(".0K") + "K"
-    else -> "${n / 1000}K"
+    n < 10_000 -> "%.1f".format(n / 1_000f).removeSuffix(".0") + "K"
+    n < 1_000_000 -> "${n / 1_000}K"
+    n < 10_000_000 -> "%.1f".format(n / 1_000_000f).removeSuffix(".0") + "M"
+    else -> "${n / 1_000_000}M"
 }
 
 // Colored circular badge that holds the category emoji. Uses the

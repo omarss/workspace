@@ -89,14 +89,17 @@ class GPlacesClient @Inject constructor(
         val out = mutableListOf<Place>()
         for (i in 0 until results.length()) {
             val item = results.optJSONObject(i) ?: continue
-            val id = item.optString("id").takeIf { it.isNotBlank() } ?: continue
-            val name = item.optString("name").takeIf { it.isNotBlank() } ?: continue
+            val id = item.optStringOrNull("id") ?: continue
+            val name = item.optStringOrNull("name") ?: continue
             val lat = item.optDouble("lat", Double.NaN)
             val lon = item.optDouble("lon", Double.NaN)
             if (lat.isNaN() || lon.isNaN()) continue
 
-            val address = item.optString("address").takeIf { it.isNotBlank() }
-            val phone = item.optString("phone").takeIf { it.isNotBlank() }
+            // optString on a JSON null returns the *string* "null" on
+            // Android's org.json — optStringOrNull filters that out
+            // along with blanks so the UI never renders the literal.
+            val address = item.optStringOrNull("address")
+            val phone = item.optStringOrNull("phone")
             val rating = if (item.has("rating") && !item.isNull("rating")) {
                 item.optDouble("rating", Double.NaN).toFloat().takeIf { !it.isNaN() }
             } else null
@@ -130,6 +133,15 @@ class GPlacesClient @Inject constructor(
     private companion object {
         const val USER_AGENT = "omono/0.x (personal sideload; https://apps.omarss.net)"
     }
+}
+
+// `optString("field")` returns "null" (the word) when the JSON value
+// is null — a gotcha specific to Android's org.json. Filter the
+// literal plus empty string so callers always get real content or
+// a real null.
+private fun JSONObject.optStringOrNull(key: String): String? {
+    if (!has(key) || isNull(key)) return null
+    return optString(key).takeIf { it.isNotBlank() && it != "null" }
 }
 
 // Stable lowercase-snake slug used in the `category` query param.

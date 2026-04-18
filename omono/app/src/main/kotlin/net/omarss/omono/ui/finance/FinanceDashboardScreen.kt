@@ -424,21 +424,38 @@ private fun BudgetCard(state: FinanceDashboardUiState) {
             } else {
                 MaterialTheme.colorScheme.primary
             }
+            // budgetProgress is coerced 0..1 so the visual bar never
+            // overflows; the text below shows the uncapped percentage
+            // so a 182% over-budget month reads as "182%" not "100%".
             LinearProgressIndicator(
                 progress = { state.budgetProgress },
                 modifier = Modifier.fillMaxWidth(),
                 color = progressColor,
                 trackColor = MaterialTheme.colorScheme.surfaceVariant,
             )
+            val actualPercent = if (state.budgetSar > 0) {
+                (state.monthSar / state.budgetSar * 100.0)
+            } else 0.0
             Text(
                 text = "SAR %,.0f / SAR %,.0f · %.0f%%".format(
                     state.monthSar,
                     state.budgetSar,
-                    state.budgetProgress * 100,
+                    actualPercent,
                 ),
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = if (state.overBudget) {
+                    MaterialTheme.colorScheme.error
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
             )
+            if (state.overBudget) {
+                Text(
+                    text = "Over by SAR %,.0f".format(state.monthSar - state.budgetSar),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
         }
     }
 }
