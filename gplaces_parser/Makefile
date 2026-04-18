@@ -151,6 +151,15 @@ deploy:
 	  systemctl reload nginx; \
 	'
 	@echo ">> rolling out api-places pod"
+	# set-image is a no-op when TAG is :latest (same reference), so we
+	# always follow it with `rollout restart` to force a new ReplicaSet
+	# regardless of whether the tag actually changed.
 	kubectl -n api-places set image deployment/api-places api=localhost/gplaces/api:$(TAG)
+	kubectl -n api-places rollout restart deployment/api-places
 	kubectl -n api-places rollout status deployment/api-places --timeout=120s
+	@echo
+	@echo ">> nginx vhost was reset to the pre-certbot template. Re-run:"
+	@echo "   sudo certbot --nginx -d api.omarss.net"
+	@echo "   (idempotent — certbot reuses the cached cert and re-injects"
+	@echo "    the TLS listener. No Let's Encrypt API call.)"
 	@echo ">> deployed."
