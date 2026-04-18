@@ -1,0 +1,349 @@
+{
+  "_comment": "User-asserted ground-truth speed limits sourced from Google Maps (posted signs + Google's own speed-limit annotations seen in Driving mode). These override OSM `maxspeed` and any inference — see CORRECTIONS.md for the workflow. `name_contains` matches case-insensitively against `name` (Arabic) AND `name:en`. `highway` restricts to those classes (omit = any). `maxspeed_kmh` is the posted limit in km/h.",
+  "corrections": [
+    {
+      "label": "King Fahd Rd (urban trunk)",
+      "name_contains": [
+        "King Fahd Road",
+        "King Fahd Rd",
+        "Sharia Al Malik Fahd",
+        "طريق الملك فهد",
+        "الملك فهد"
+      ],
+      "highway": ["motorway", "motorway_link", "trunk", "trunk_link", "primary", "primary_link"],
+      "maxspeed_kmh": 100
+    },
+    {
+      "label": "King Salman Rd (trunk)",
+      "name_contains": [
+        "King Salman Road",
+        "King Salman Rd",
+        "طريق الملك سلمان",
+        "الملك سلمان"
+      ],
+      "highway": ["motorway", "motorway_link", "trunk", "trunk_link", "primary", "primary_link"],
+      "maxspeed_kmh": 110
+    },
+    {
+      "label": "King Abdullah Rd",
+      "name_contains": [
+        "King Abdullah Road",
+        "King Abdullah Rd",
+        "King Abdullah Financial District Rd",
+        "طريق الملك عبدالله",
+        "طريق الملك عبد الله",
+        "الملك عبدالله",
+        "الملك عبد الله"
+      ],
+      "highway": ["trunk", "trunk_link", "primary", "primary_link", "secondary", "secondary_link"],
+      "maxspeed_kmh": 80
+    },
+    {
+      "label": "King Khalid Rd",
+      "name_contains": [
+        "King Khalid Road",
+        "King Khalid Rd",
+        "طريق الملك خالد",
+        "الملك خالد"
+      ],
+      "highway": ["trunk", "trunk_link", "primary", "primary_link"],
+      "maxspeed_kmh": 100
+    },
+    {
+      "label": "Northern Ring Rd",
+      "name_contains": [
+        "Northern Ring Road",
+        "Northern Ring Rd",
+        "North Ring",
+        "الدائري الشمالي",
+        "طريق الدائري الشمالي",
+        "النطاق الشمالي"
+      ],
+      "highway": ["motorway", "motorway_link", "trunk", "trunk_link"],
+      "maxspeed_kmh": 110
+    },
+    {
+      "label": "Eastern Ring Rd",
+      "name_contains": [
+        "Eastern Ring Road",
+        "Eastern Ring Rd",
+        "East Ring",
+        "الدائري الشرقي",
+        "طريق الدائري الشرقي"
+      ],
+      "highway": ["motorway", "motorway_link", "trunk", "trunk_link"],
+      "maxspeed_kmh": 110
+    },
+    {
+      "label": "Western Ring Rd",
+      "name_contains": [
+        "Western Ring Road",
+        "Western Ring Rd",
+        "West Ring",
+        "الدائري الغربي",
+        "طريق الدائري الغربي"
+      ],
+      "highway": ["motorway", "motorway_link", "trunk", "trunk_link"],
+      "maxspeed_kmh": 110
+    },
+    {
+      "label": "Southern Ring Rd",
+      "name_contains": [
+        "Southern Ring Road",
+        "Southern Ring Rd",
+        "South Ring",
+        "الدائري الجنوبي",
+        "طريق الدائري الجنوبي"
+      ],
+      "highway": ["motorway", "motorway_link", "trunk", "trunk_link"],
+      "maxspeed_kmh": 110
+    },
+    {
+      "label": "Al Uroubah / Al Orouba Rd",
+      "name_contains": [
+        "Al Uroubah Road",
+        "Al Orouba Road",
+        "Al Urubah Road",
+        "Al Uaroba",
+        "Uroubah",
+        "Urubah",
+        "Orouba",
+        "Uaroba",
+        "طريق العروبة",
+        "العروبة"
+      ],
+      "highway": ["primary", "primary_link", "trunk", "trunk_link"],
+      "maxspeed_kmh": 80
+    },
+    {
+      "label": "Olaya Rd",
+      "name_contains": [
+        "Olaya Street",
+        "Olaya Road",
+        "Al Olaya",
+        "شارع العليا",
+        "طريق العليا",
+        "العليا"
+      ],
+      "highway": ["primary", "primary_link", "secondary", "secondary_link"],
+      "maxspeed_kmh": 70
+    },
+    {
+      "label": "Takhassusi Rd",
+      "name_contains": [
+        "Takhassusi Street",
+        "Takhassusi Road",
+        "Takhassusi",
+        "At Takhasusi",
+        "شارع التخصصي",
+        "طريق التخصصي",
+        "التخصصي"
+      ],
+      "highway": ["primary", "primary_link", "secondary", "secondary_link"],
+      "maxspeed_kmh": 70
+    },
+    {
+      "label": "Tahlia St (Prince Mohammed bin Abdulaziz)",
+      "name_contains": [
+        "Tahliah",
+        "Tahlia",
+        "Al Tahlia",
+        "At Tahliyah",
+        "Prince Mohammed bin Abdulaziz",
+        "Prince Muhammad bin Abdulaziz",
+        "التحلية",
+        "شارع التحلية",
+        "الأمير محمد بن عبدالعزيز",
+        "الأمير محمد بن عبد العزيز",
+        "محمد بن عبد العزيز"
+      ],
+      "highway": ["secondary", "secondary_link", "primary", "primary_link"],
+      "maxspeed_kmh": 80
+    },
+    {
+      "label": "Prince Sultan Rd",
+      "name_contains": [
+        "Prince Sultan Bin Abdulaziz",
+        "Prince Sultan Bin Abdul Aziz",
+        "Prince Sultan Road",
+        "الأمير سلطان بن عبدالعزيز",
+        "الأمير سلطان بن عبد العزيز"
+      ],
+      "highway": ["primary", "primary_link", "secondary", "secondary_link"],
+      "maxspeed_kmh": 70
+    },
+    {
+      "label": "Imam Saud bin Abdulaziz Rd",
+      "name_contains": [
+        "Imam Saud",
+        "Imam Saud Bin Abdulaziz",
+        "Imam Saud Bin Abdul Aziz",
+        "الإمام سعود",
+        "الامام سعود",
+        "الإمام سعود بن عبدالعزيز"
+      ],
+      "highway": ["primary", "primary_link", "secondary", "secondary_link"],
+      "maxspeed_kmh": 80
+    },
+    {
+      "label": "Abu Bakr Al Siddiq Rd",
+      "name_contains": [
+        "Abi Bakr Al Siddiq Road",
+        "Abu Bakr Al Siddiq",
+        "Abu Bakr As Siddiq",
+        "أبو بكر الصديق",
+        "ابو بكر الصديق",
+        "أبي بكر الصديق"
+      ],
+      "highway": ["primary", "primary_link", "trunk", "trunk_link"],
+      "maxspeed_kmh": 90
+    },
+    {
+      "label": "Makkah Al Mukarramah Rd",
+      "name_contains": [
+        "Makkah Al Mukarramah",
+        "Makkah Al Mukaramah",
+        "Makkah Road",
+        "Mecca Road",
+        "طريق مكة المكرمة",
+        "طريق مكة",
+        "مكة المكرمة"
+      ],
+      "highway": ["motorway", "motorway_link", "trunk", "trunk_link"],
+      "maxspeed_kmh": 120
+    },
+    {
+      "label": "Riyadh-Dammam Expwy",
+      "name_contains": [
+        "Riyadh-Dammam",
+        "Riyadh Dammam",
+        "Dammam Road",
+        "Dammam Expressway",
+        "طريق الدمام",
+        "الرياض - الدمام",
+        "الدمام"
+      ],
+      "highway": ["motorway", "motorway_link"],
+      "maxspeed_kmh": 120
+    },
+    {
+      "label": "Khurais Rd",
+      "name_contains": [
+        "Khurais Road",
+        "Khurais Rd",
+        "Al Khurais",
+        "طريق خريص",
+        "خريص"
+      ],
+      "highway": ["motorway", "motorway_link", "primary", "primary_link", "trunk"],
+      "maxspeed_kmh": 80
+    },
+    {
+      "label": "Salbukh Rd",
+      "name_contains": [
+        "Salbukh Road",
+        "Salbukh",
+        "Salboukh",
+        "Salbouk",
+        "طريق سلبوخ",
+        "سلبوخ",
+        "طريق صلبوخ",
+        "صلبوخ"
+      ],
+      "highway": ["trunk", "trunk_link", "primary", "primary_link"],
+      "maxspeed_kmh": 100
+    },
+    {
+      "label": "Al Thumama Rd",
+      "name_contains": [
+        "Al Thumama Road",
+        "Ath Thumamah Road",
+        "Thumama",
+        "طريق الثمامة",
+        "الثمامة"
+      ],
+      "highway": ["trunk", "trunk_link", "primary", "primary_link"],
+      "maxspeed_kmh": 100
+    },
+    {
+      "label": "Dirab Rd",
+      "name_contains": [
+        "Dirab Road",
+        "Dirab",
+        "Deerab",
+        "طريق ديراب",
+        "ديراب"
+      ],
+      "highway": ["trunk", "trunk_link", "primary", "primary_link"],
+      "maxspeed_kmh": 100
+    },
+    {
+      "label": "Al Hayer Rd",
+      "name_contains": [
+        "Al Hayer Road",
+        "Hayer",
+        "Al Hair",
+        "Al Hair Road",
+        "Al-Haer",
+        "Al-Haer Road",
+        "Al-Haer Rd",
+        "طريق الحاير",
+        "الحاير",
+        "طريق الحائر",
+        "الحائر"
+      ],
+      "highway": ["trunk", "trunk_link", "primary", "primary_link", "secondary", "unclassified"],
+      "maxspeed_kmh": 100
+    },
+    {
+      "label": "Al Imam Abdullah bin Saud Rd",
+      "name_contains": [
+        "Imam Abdullah bin Saud",
+        "Imam Abdullah Bin Saud Bin Abdulaziz",
+        "الإمام عبدالله بن سعود",
+        "الامام عبدالله بن سعود"
+      ],
+      "highway": ["primary", "primary_link", "secondary", "secondary_link"],
+      "maxspeed_kmh": 70
+    },
+    {
+      "label": "Al Ma'athar (Al Maathar) Rd",
+      "name_contains": [
+        "Al Mathar",
+        "Al Maathar",
+        "Al Ma'athar",
+        "Maathar Street",
+        "المعذر",
+        "شارع المعذر",
+        "طريق المعذر"
+      ],
+      "highway": ["primary", "primary_link", "secondary", "secondary_link"],
+      "maxspeed_kmh": 70
+    },
+    {
+      "label": "Prince Turki bin Abdulaziz Al Awwal (Turki 1)",
+      "name_contains": [
+        "Prince Turki Bin Abdulaziz Al Awwal",
+        "Prince Turki I",
+        "Prince Turki Al Awwal",
+        "الأمير تركي الأول",
+        "الأمير تركي بن عبدالعزيز الأول"
+      ],
+      "highway": ["primary", "primary_link", "secondary", "secondary_link"],
+      "maxspeed_kmh": 80
+    },
+    {
+      "label": "Prince Turki bin Abdulaziz Al Thani (Turki 2)",
+      "name_contains": [
+        "Prince Turki Bin Abdulaziz Al Thani",
+        "Prince Turkey Bin Abdul Aziz Al thani",
+        "Prince Turki II",
+        "Al thani",
+        "الأمير تركي الثاني",
+        "الأمير تركي بن عبدالعزيز الثاني"
+      ],
+      "highway": ["primary", "primary_link", "secondary", "secondary_link", "tertiary", "tertiary_link"],
+      "maxspeed_kmh": 80
+    }
+  ]
+}
