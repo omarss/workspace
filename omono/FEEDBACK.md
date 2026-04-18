@@ -192,3 +192,21 @@ up next knows.
 Hot spots to keep aligned:
 - `PlaceCategory.slug` ↔ `gplaces_parser/src/gplaces_parser/categories.py`
 - Response JSON field names ↔ `gplaces_parser/src/gplaces_parser/api/schemas.py`
+- `RoadCandidate` fields (`feature/speed/.../RoadsClient.kt`) ↔ §6 response
+  schema. Currently parsed: osm_id, name, name_en, highway, ref,
+  maxspeed_kmh, speed_source, heading_deg. `lanes` + `oneway` are
+  returned by the server but not yet consumed client-side.
+
+## 8. Current consumers
+
+Drop a one-liner when you start / stop using an endpoint so downstream
+schema changes know who they'll affect.
+
+- **omono ≥ v0.27** — `/v1/roads` is the primary source for both the
+  speed-limit number and the road-name display on the Tracking hero.
+  The bundled `assets/riyadh_speed_limits.json` is kept as an offline
+  fallback for speed limits only (no name). Called at ≈1 Hz while
+  driving, but internally cached for 5 s / 80 m so the wire traffic
+  is ~1 lookup per 5 s of driving.
+- **omono ≥ v0.23** — `/v1/places` is the only source for the Places
+  tab. No fallback.

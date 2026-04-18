@@ -98,17 +98,22 @@ class SpeedFeature @Inject constructor(
             speedRepository.locations().collect { snapshot ->
                 tripRecorder.onLocation(snapshot)
                 drivingDetector.onSample(snapshot.speedMps, System.currentTimeMillis())
-                // Non-blocking: the resolver rate-limits internally and
-                // dispatches geocoding off the main thread.
-                streetNameResolver.onLocation(snapshot)
-                val limit = limits.limitKmh(
+                // One cached `/v1/roads` lookup per tick gives us both
+                // the speed limit and the road's name(s) in the same
+                // payload — internal rate limit inside the repository
+                // means the wire hit is ≈1 per 5 s / 80 m regardless.
+                val road = limits.roadAt(
                     lat = snapshot.latitude,
                     lon = snapshot.longitude,
                     bearingDeg = snapshot.bearingDeg,
                     bearingAccuracyDeg = snapshot.bearingAccuracyDeg,
                     speedMps = snapshot.speedMps,
                 )
-                emit(snapshot.speedMps to limit)
+                // Prefer the English transliteration on the hero —
+                // easier to read at a glance in traffic. Fall back to
+                // the Arabic native name when English isn't present.
+                streetNameResolver.setName(road.nameEn ?: road.name)
+                emit(snapshot.speedMps to road.maxspeedKmh)
             }
         }
 

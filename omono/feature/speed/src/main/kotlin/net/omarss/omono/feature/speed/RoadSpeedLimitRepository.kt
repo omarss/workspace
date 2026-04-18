@@ -18,44 +18,118 @@ import kotlin.math.min
 import kotlin.math.sin
 import kotlin.math.sqrt
 
-// Returns the legal speed limit for the road the user is currently
-// on, using a bundled OpenStreetMap extract of greater Riyadh —
-// every lookup is offline. The data file lives at
-// `assets/riyadh_speed_limits.json` and is regenerated from Overpass
-// via `scripts/fetch-speed-limits.sh`.
+// Resolves "which road am I on, and what's its speed limit?" for the
+// current GPS fix. Tries the self-hosted `/v1/roads` API first
+// (OSM-backed, returns both the speed limit AND the road's name in
+// English + Arabic). On network failure, HTTP error, or missing
+// credentials, falls back to the bundled OpenStreetMap extract under
+// `assets/riyadh_speed_limits.json`, which covers the same dataset
+// for speed-limit-only queries.
 //
-// Selection: within SEARCH_RADIUS_M of the user's position, all
+// Results are cached by position: a re-query within CACHE_RADIUS_M
+// and CACHE_TTL_MS of the last call returns the cached value
+// synchronously, so the typical 1 Hz GPS cadence produces about one
+// network hit per 5 s / 100 m of driving.
+//
+// Bundled-asset selection: within SEARCH_RADIUS_M of the position,
 // candidate ways are scored by distance-to-nearest-segment and, when
 // the user's heading is trustworthy, by how closely that segment's
-// bearing aligns with the direction of travel. Bearings are
-// collapsed mod 180° so bidirectional roads are treated symmetrically.
-//
-// Load is lazy — the first query deserialises the asset into
-// compact primitive arrays. Subsequent queries are a linear scan
-// with a bbox pre-filter, a few milliseconds per call on a phone.
+// bearing aligns with the direction of travel. Bearings are collapsed
+// mod 180° so bidirectional roads are treated symmetrically.
 @Singleton
 class RoadSpeedLimitRepository @Inject constructor(
     @param:ApplicationContext private val context: Context,
+    private val roadsClient: RoadsClient,
 ) {
 
     private val mutex = Mutex()
     @Volatile private var ways: Array<Way>? = null
 
+    // Last-seen road info + where/when we saw it. Used as a small
+    // rolling cache so every location tick isn't a fresh HTTP call.
+    @Volatile private var cached: CachedRoad? = null
+
+    // Full road info (speed limit + name) for the current fix. Prefers
+    // the live API; if it can't be reached, falls back to the bundled
+    // asset for speed only.
+    suspend fun roadAt(
+        lat: Double,
+        lon: Double,
+        bearingDeg: Float? = null,
+        bearingAccuracyDeg: Float? = null,
+        speedMps: Float = 0f,
+    ): RoadInfo {
+        cachedIfFresh(lat, lon)?.let { return it.info }
+
+        val useBearing = isBearingTrustworthy(bearingDeg, bearingAccuracyDeg, speedMps)
+        val apiCandidates = roadsClient.roadsAt(lat, lon)
+        if (apiCandidates != null) {
+            // Network succeeded (even if the list is empty — point was
+            // simply outside every polygon). Pick the best candidate;
+            // cache regardless so repeated off-road fixes don't hammer
+            // the endpoint every tick.
+            val best = pickBestCandidate(apiCandidates, if (useBearing) bearingDeg else null)
+            val info = best?.toRoadInfo() ?: RoadInfo.EMPTY
+            cached = CachedRoad(lat, lon, System.currentTimeMillis(), info)
+            return info
+        }
+
+        // Network unreachable — fall back to the offline speed-limit
+        // asset. Name stays null (no offline name source yet).
+        val loaded = ensureLoaded()
+        val offlineLimit = loaded?.let {
+            selectBestLimit(
+                ways = it,
+                lat = lat,
+                lon = lon,
+                userBearingDeg = if (useBearing) bearingDeg else null,
+            )
+        }
+        val info = RoadInfo(
+            maxspeedKmh = offlineLimit,
+            name = null,
+            nameEn = null,
+            highway = null,
+        )
+        cached = CachedRoad(lat, lon, System.currentTimeMillis(), info)
+        return info
+    }
+
+    // Thin compatibility shim. SpeedFeature's existing call sites
+    // continue to read just the limit; the name side channel is read
+    // separately via roadAt().
     suspend fun limitKmh(
         lat: Double,
         lon: Double,
         bearingDeg: Float? = null,
         bearingAccuracyDeg: Float? = null,
         speedMps: Float = 0f,
-    ): Float? {
-        val loaded = ensureLoaded() ?: return null
-        val useBearing = isBearingTrustworthy(bearingDeg, bearingAccuracyDeg, speedMps)
-        return selectBestLimit(
-            ways = loaded,
-            lat = lat,
-            lon = lon,
-            userBearingDeg = if (useBearing) bearingDeg else null,
-        )
+    ): Float? = roadAt(lat, lon, bearingDeg, bearingAccuracyDeg, speedMps).maxspeedKmh
+
+    private fun cachedIfFresh(lat: Double, lon: Double): CachedRoad? {
+        val c = cached ?: return null
+        val now = System.currentTimeMillis()
+        if (now - c.timestampMs > CACHE_TTL_MS) return null
+        val distance = haversineMeters(c.lat, c.lon, lat, lon)
+        if (distance > CACHE_RADIUS_M) return null
+        return c
+    }
+
+    private fun pickBestCandidate(
+        candidates: List<RoadCandidate>,
+        userBearingDeg: Float?,
+    ): RoadCandidate? {
+        if (candidates.isEmpty()) return null
+        if (userBearingDeg == null || candidates.size == 1) return candidates[0]
+        // Server orders by highway class then area; for divided
+        // highways that means the top pick might be the opposite
+        // carriageway. Use bearing alignment to break ties — collapse
+        // mod 180° so a two-way road is symmetric.
+        return candidates.minByOrNull { c ->
+            val segBearing = c.headingDeg?.toDouble() ?: return@minByOrNull Double.POSITIVE_INFINITY
+            val diff = angularDiffDeg(userBearingDeg.toDouble(), segBearing)
+            if (diff > 90.0) 180.0 - diff else diff
+        } ?: candidates[0]
     }
 
     private suspend fun ensureLoaded(): Array<Way>? {
@@ -154,8 +228,44 @@ class RoadSpeedLimitRepository @Inject constructor(
         // than in latitude, which is fine — we never miss candidates,
         // only reject some that are already far.
         const val DEG_PER_METER_LAT: Double = 1.0 / 111_320.0
+
+        // API response cache. Per FEEDBACK.md §6, the server suggests
+        // re-querying on ≥100 m movement OR when the point leaves the
+        // cached polygon. Without the polygon locally we use a more
+        // conservative distance threshold and a short TTL so stale
+        // limits clear automatically on slow drives.
+        const val CACHE_RADIUS_M: Double = 80.0
+        const val CACHE_TTL_MS: Long = 5_000L
     }
 }
+
+// Everything the UI needs to know about the road the user is currently
+// on. Preserves null-ness at the source fields — consumers should
+// decide between Arabic / English, not the repository.
+data class RoadInfo(
+    val maxspeedKmh: Float?,
+    val name: String?,
+    val nameEn: String?,
+    val highway: String?,
+) {
+    companion object {
+        val EMPTY = RoadInfo(null, null, null, null)
+    }
+}
+
+private data class CachedRoad(
+    val lat: Double,
+    val lon: Double,
+    val timestampMs: Long,
+    val info: RoadInfo,
+)
+
+private fun RoadCandidate.toRoadInfo(): RoadInfo = RoadInfo(
+    maxspeedKmh = maxspeedKmh?.toFloat(),
+    name = name,
+    nameEn = nameEn,
+    highway = highway,
+)
 
 // --- Scoring (pure, testable) -------------------------------------
 

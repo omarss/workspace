@@ -30,6 +30,7 @@ dependencies {
     ksp(libs.androidx.room.compiler)
     implementation(libs.shizuku.api)
     implementation(libs.shizuku.provider)
+    implementation(libs.okhttp)
     implementation(libs.timber)
 
     testImplementation(libs.junit)
