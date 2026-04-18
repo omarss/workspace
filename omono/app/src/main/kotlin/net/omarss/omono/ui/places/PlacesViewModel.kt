@@ -165,6 +165,11 @@ class PlacesViewModel @Inject constructor(
         // LOCATION_REFRESH_M since the last fetch, kick off a fresh
         // nearby/search query so the list tracks movement instead of
         // showing stale "places near where I opened the tab" results.
+        //
+        // `force = true` because the 220 m cache bucket is coarser
+        // than LOCATION_REFRESH_M, so without it a 150 m move would
+        // land in the same bucket and short-circuit against the
+        // freshness window.
         locationStream.updates()
             .catch { Timber.w(it, "Places location stream failed") }
             .onEach { fix ->
@@ -174,7 +179,7 @@ class PlacesViewModel @Inject constructor(
                         last.first, last.second,
                         fix.latitude, fix.longitude,
                     ) >= LOCATION_REFRESH_M
-                if (shouldRefresh) refresh()
+                if (shouldRefresh) refresh(force = true)
             }
             .launchIn(viewModelScope)
     }
@@ -223,12 +228,19 @@ class PlacesViewModel @Inject constructor(
                     // endpoint, which matches against name, address,
                     // and the review snippet Google supplies.
                     // Results come back in relevance order.
-                    repository.search(
+                    //
+                    // `/v1/search` accepts `min_rating` + `min_reviews`
+                    // params but, as of 2026-04-18, silently ignores
+                    // them — verified with curl (see FEEDBACK.md
+                    // §9.4-bug). Apply the same gate client-side so
+                    // the search list honours the quality toggle.
+                    val raw = repository.search(
                         query = query,
                         latitude = location.first,
                         longitude = location.second,
                         radiusMeters = radiusMeters.value,
                     )
+                    if (qualityFilter.value) raw.filter(::passesQualityGate) else raw
                 } else {
                     // `category=null` here → gplaces `category=all`,
                     // one HTTP call for the union. Quality filter is
@@ -280,6 +292,17 @@ class PlacesViewModel @Inject constructor(
         // wander at a stoplight, small enough that walking past a
         // block re-lists the places around you.
         const val LOCATION_REFRESH_M: Double = 150.0
+    }
+
+    // Client-side mirror of the backend's `min_rating` + `min_reviews`
+    // gate. Identical semantics: a place must have a rating ≥ 4, a
+    // review_count ≥ 100, and both must be non-null (unrated places
+    // fail the filter). Used only on the /v1/search code path while
+    // the server-side implementation isn't honouring the params.
+    private fun passesQualityGate(place: Place): Boolean {
+        val rating = place.rating ?: return false
+        val reviews = place.reviewCount ?: return false
+        return rating >= MIN_RATING && reviews >= MIN_REVIEW_COUNT
     }
 
     private fun hasLocationPermission(): Boolean =
