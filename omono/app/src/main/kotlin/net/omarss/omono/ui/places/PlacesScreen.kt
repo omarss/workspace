@@ -32,15 +32,20 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -86,6 +91,11 @@ fun PlacesRoute(
             },
         )
 
+        SearchField(
+            query = state.searchQuery,
+            onChange = viewModel::setSearchQuery,
+        )
+
         CategoryChips(
             selected = state.category,
             onSelect = viewModel::selectCategory,
@@ -109,6 +119,11 @@ fun PlacesRoute(
                 modifier = Modifier.weight(1f),
             )
         }
+
+        QualityFilterRow(
+            enabled = state.qualityFilter,
+            onChange = viewModel::setQualityFilter,
+        )
 
         HeadingStrip(heading = state.heading)
 
@@ -164,8 +179,8 @@ fun PlacesRoute(
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 private fun CategoryChips(
-    selected: PlaceCategory,
-    onSelect: (PlaceCategory) -> Unit,
+    selected: PlaceCategory?,
+    onSelect: (PlaceCategory?) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Row(
@@ -174,6 +189,15 @@ private fun CategoryChips(
             .padding(horizontal = 16.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
+        // "All" is the default view — unions the response of every
+        // category so users landing on Places don't have to pick one
+        // to see anything. null selection = All.
+        FilterChip(
+            selected = selected == null,
+            onClick = { onSelect(null) },
+            label = { Text("✨ All") },
+            colors = FilterChipDefaults.filterChipColors(),
+        )
         PlaceCategory.entries.forEach { category ->
             FilterChip(
                 selected = category == selected,
@@ -182,6 +206,49 @@ private fun CategoryChips(
                 colors = FilterChipDefaults.filterChipColors(),
             )
         }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SearchField(query: String, onChange: (String) -> Unit) {
+    OutlinedTextField(
+        value = query,
+        onValueChange = onChange,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        placeholder = { Text("Search by name or address") },
+        leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+        singleLine = true,
+    )
+}
+
+@Composable
+private fun QualityFilterRow(enabled: Boolean, onChange: (Boolean) -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = "Hide low-signal places",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Text(
+                text = if (enabled) {
+                    "Showing 4★+ with 100+ reviews"
+                } else {
+                    "Showing all, including unrated"
+                },
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Switch(checked = enabled, onCheckedChange = onChange)
     }
 }
 
@@ -395,24 +462,39 @@ private fun PlaceCard(
     }
 }
 
-// "★ 4.6 · 1.8K" — compact rating line shown when the backend
-// provides a rating. Review count formatted with "K" suffix over a
-// thousand because four-digit review counts are uninteresting to
-// eyeball at a glance.
+// Five-star row — filled stars up to the rounded rating, outlined
+// stars for the remainder. Followed by the numeric rating and
+// review count so the user has both the visual scan and the exact
+// number available at a glance.
 @Composable
 private fun RatingLine(rating: Float, reviewCount: Int?) {
-    val label = buildString {
-        append("★ %.1f".format(rating))
-        if (reviewCount != null && reviewCount > 0) {
-            append(" · ")
-            append(formatReviewCount(reviewCount))
+    val filled = rating.coerceIn(0f, 5f).let { kotlin.math.round(it).toInt() }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        repeat(5) { i ->
+            Icon(
+                imageVector = if (i < filled) Icons.Filled.Star else Icons.Outlined.StarBorder,
+                contentDescription = null,
+                tint = if (i < filled) {
+                    Color(0xFFF59E0B) // amber for filled
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+                modifier = Modifier.size(14.dp),
+            )
         }
+        Spacer(Modifier.size(6.dp))
+        Text(
+            text = buildString {
+                append("%.1f".format(rating))
+                if (reviewCount != null && reviewCount > 0) {
+                    append(" · ")
+                    append(formatReviewCount(reviewCount))
+                }
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
-    Text(
-        text = label,
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
 }
 
 @Composable
@@ -477,16 +559,38 @@ private fun DirectionArrow(placeBearing: Float, heading: Float) {
     )
 }
 
-// geo:0,0?q=lat,lon(name) — the standard map-intent format that every
-// map app on Android handles. Parens around the name produce a labelled
-// pin in Google Maps. Name is URL-encoded so commas and & survive.
+// Launch the place's detail panel in Google Maps — reviews, photos,
+// hours, the works. The gplaces `id` is Google's FID (feature ID) in
+// the form "0x<fid_hex>:0x<cid_hex>". The decimal CID (second half)
+// is what `maps.google.com/?cid=<n>` routes to the full place card.
+//
+// When the id is missing or doesn't parse we fall back to the old
+// `geo:` URI — good enough to drop a pin but without the review
+// detail. Every Android maps handler accepts both shapes.
 private fun launchMapsFor(context: Context, place: Place) {
-    val label = Uri.encode(place.name)
-    val uri = "geo:0,0?q=${place.latitude},${place.longitude}($label)".toUri()
+    val cid = parseCidFromFtid(place.id)
+    val uri = if (cid != null) {
+        "https://www.google.com/maps?cid=$cid".toUri()
+    } else {
+        val label = Uri.encode(place.name)
+        "geo:0,0?q=${place.latitude},${place.longitude}($label)".toUri()
+    }
     val intent = Intent(Intent.ACTION_VIEW, uri).apply {
         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     }
     runCatching { context.startActivity(intent) }
+}
+
+// Google's FID shape is "0x<fid>:0x<cid>" (both hex). The second half
+// is a 64-bit CID — maps deep links consume it in decimal. Using
+// toULong because some real-world CIDs have the high bit set (> 2^63)
+// and Long.parse would throw.
+private fun parseCidFromFtid(id: String): String? {
+    val parts = id.split(":")
+    if (parts.size != 2) return null
+    val hex = parts[1].removePrefix("0x").removePrefix("0X")
+    if (hex.isEmpty() || hex.length > 16) return null
+    return runCatching { hex.toULong(16).toString() }.getOrNull()
 }
 
 private fun launchDialer(context: Context, phone: String) {

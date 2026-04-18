@@ -1,5 +1,8 @@
 package net.omarss.omono.feature.places
 
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.abs
@@ -27,6 +30,37 @@ class PlacesRepository @Inject constructor(
         radiusMeters = radiusMeters,
         category = category,
     )
+
+    // `/v1/places` requires a single category per request, so "show me
+    // everything in this area" becomes a parallel fan-out across all
+    // categories. Results are deduped by `id` — a place that falls
+    // under multiple server-side categories would otherwise appear
+    // multiple times — and sorted by distance for the UI. Failures
+    // from individual categories are swallowed so a single backend
+    // hiccup doesn't empty the whole list.
+    suspend fun nearbyAll(
+        latitude: Double,
+        longitude: Double,
+        radiusMeters: Int,
+    ): List<Place> = coroutineScope {
+        PlaceCategory.entries
+            .map { cat ->
+                async {
+                    runCatching {
+                        source.nearbySearch(
+                            latitude = latitude,
+                            longitude = longitude,
+                            radiusMeters = radiusMeters,
+                            category = cat,
+                        )
+                    }.getOrDefault(emptyList())
+                }
+            }
+            .awaitAll()
+            .flatten()
+            .distinctBy { it.id }
+            .sortedBy { it.distanceMeters }
+    }
 }
 
 // Pure filter — keeps places whose bearing from the user is within

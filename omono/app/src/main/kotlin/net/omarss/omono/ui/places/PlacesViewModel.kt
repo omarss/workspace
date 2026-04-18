@@ -35,9 +35,18 @@ class PlacesViewModel @Inject constructor(
     headingSensor: HeadingSensor,
 ) : ViewModel() {
 
-    private val selectedCategory = MutableStateFlow(PlaceCategory.COFFEE)
+    // `null` means "All categories" — the repository fans out in
+    // parallel across every PlaceCategory. The default view on first
+    // open is All so the user isn't funnelled into a single bucket.
+    private val selectedCategory = MutableStateFlow<PlaceCategory?>(null)
     private val coneDegrees = MutableStateFlow(180f) // 180 = all directions
     private val radiusMeters = MutableStateFlow(5_000)
+    private val searchQuery = MutableStateFlow("")
+    // When on (default), hide low-signal places: rating < 4 OR
+    // reviewCount < 100. Lots of the backend results are unrated
+    // stubs; hiding them by default gives the list a much higher
+    // signal-to-noise ratio.
+    private val qualityFilter = MutableStateFlow(true)
     private val rawPlaces = MutableStateFlow<List<Place>>(emptyList())
     private val loading = MutableStateFlow(false)
     private val error = MutableStateFlow<String?>(null)
@@ -50,17 +59,30 @@ class PlacesViewModel @Inject constructor(
         coneDegrees,
         radiusMeters,
         rawPlaces,
-        combine(heading, loading, error) { h, l, e -> Triple(h, l, e) },
-    ) { category, cone, radius, places, (h, l, e) ->
-        val filtered = filterByDirection(places, h, cone)
+        // Nested combine — Kotlin tops out at 5 direct args. Carries
+        // search + quality + heading + loading + error so the outer
+        // combine still stays within bounds.
+        combine(searchQuery, qualityFilter, heading, loading, error) { q, qf, h, l, e ->
+            CombinedExtras(q, qf, h, l, e)
+        },
+    ) { category, cone, radius, places, extras ->
+        val directionFiltered = filterByDirection(places, extras.heading, cone)
+        val searchFiltered = applySearch(directionFiltered, extras.searchQuery)
+        val qualityFiltered = if (extras.qualityFilter) {
+            applyQualityFilter(searchFiltered)
+        } else {
+            searchFiltered
+        }
         PlacesUiState(
             category = category,
             radiusMeters = radius,
             coneDegrees = cone,
-            heading = h,
-            places = filtered,
-            loading = l,
-            errorMessage = e,
+            heading = extras.heading,
+            places = qualityFiltered,
+            searchQuery = extras.searchQuery,
+            qualityFilter = extras.qualityFilter,
+            loading = extras.loading,
+            errorMessage = extras.error,
             configured = repository.isConfigured,
         )
     }.stateIn(
@@ -69,7 +91,15 @@ class PlacesViewModel @Inject constructor(
         initialValue = PlacesUiState(),
     )
 
-    fun selectCategory(category: PlaceCategory) {
+    private data class CombinedExtras(
+        val searchQuery: String,
+        val qualityFilter: Boolean,
+        val heading: Float,
+        val loading: Boolean,
+        val error: String?,
+    )
+
+    fun selectCategory(category: PlaceCategory?) {
         selectedCategory.value = category
         refresh()
     }
@@ -83,6 +113,14 @@ class PlacesViewModel @Inject constructor(
         refresh()
     }
 
+    fun setSearchQuery(query: String) {
+        searchQuery.value = query
+    }
+
+    fun setQualityFilter(enabled: Boolean) {
+        qualityFilter.value = enabled
+    }
+
     // Simple in-memory cache. When the user navigates back into the
     // places screen the existing results are reused instead of being
     // wiped to a loading spinner — eliminates the flicker where the
@@ -93,7 +131,7 @@ class PlacesViewModel @Inject constructor(
     // and the last fetch was less than FRESH_WINDOW_MS ago. `force`
     // bypasses the cache for the refresh button / pull-to-refresh.
     private data class FetchKey(
-        val category: PlaceCategory,
+        val category: PlaceCategory?,
         val radiusMeters: Int,
         val bucketLat: Int,
         val bucketLon: Int,
@@ -133,12 +171,21 @@ class PlacesViewModel @Inject constructor(
             loading.value = true
             error.value = null
             runCatching {
-                repository.nearby(
-                    latitude = location.first,
-                    longitude = location.second,
-                    category = selectedCategory.value,
-                    radiusMeters = radiusMeters.value,
-                )
+                val cat = selectedCategory.value
+                if (cat == null) {
+                    repository.nearbyAll(
+                        latitude = location.first,
+                        longitude = location.second,
+                        radiusMeters = radiusMeters.value,
+                    )
+                } else {
+                    repository.nearby(
+                        latitude = location.first,
+                        longitude = location.second,
+                        category = cat,
+                        radiusMeters = radiusMeters.value,
+                    )
+                }
             }
                 .onSuccess { places ->
                     rawPlaces.value = places
@@ -154,6 +201,27 @@ class PlacesViewModel @Inject constructor(
         }
     }
 
+    // Case-insensitive substring search on place name + address so a
+    // user typing "cafe" picks up both the name and address hits.
+    private fun applySearch(places: List<Place>, query: String): List<Place> {
+        val needle = query.trim().lowercase()
+        if (needle.isEmpty()) return places
+        return places.filter { place ->
+            place.name.lowercase().contains(needle) ||
+                place.address?.lowercase()?.contains(needle) == true
+        }
+    }
+
+    // Quality gate: ≥ 4.0 stars AND ≥ 100 reviews. Both must be
+    // present — an unrated place or a rated-but-barely-reviewed place
+    // doesn't meet the bar. Matches what the user intuitively means
+    // by "a place worth visiting".
+    private fun applyQualityFilter(places: List<Place>): List<Place> = places.filter { place ->
+        val rating = place.rating ?: return@filter false
+        val reviews = place.reviewCount ?: return@filter false
+        rating >= MIN_RATING && reviews >= MIN_REVIEW_COUNT
+    }
+
     private companion object {
         // ~60 seconds inside the cache window = silent no-op on re-open.
         // The dashboard refresh button always forces a fresh fetch.
@@ -163,6 +231,11 @@ class PlacesViewModel @Inject constructor(
         // the user's desk drifts within a bucket, so re-opening the
         // screen without moving doesn't re-fetch.
         const val BUCKETS_PER_DEGREE: Double = 500.0
+
+        // Default quality bar — below this the list fills with half-
+        // reviewed kiosks and closed venues.
+        const val MIN_RATING: Float = 4.0f
+        const val MIN_REVIEW_COUNT: Int = 100
     }
 
     private fun hasLocationPermission(): Boolean =
@@ -183,11 +256,13 @@ class PlacesViewModel @Inject constructor(
 }
 
 data class PlacesUiState(
-    val category: PlaceCategory = PlaceCategory.COFFEE,
+    val category: PlaceCategory? = null, // null = All
     val radiusMeters: Int = 5_000,
     val coneDegrees: Float = 180f,
     val heading: Float = 0f,
     val places: List<Place> = emptyList(),
+    val searchQuery: String = "",
+    val qualityFilter: Boolean = true,
     val loading: Boolean = false,
     val errorMessage: String? = null,
     val configured: Boolean = false,
