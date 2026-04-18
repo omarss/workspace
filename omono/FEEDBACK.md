@@ -357,6 +357,30 @@ it even if it's two blocks away.
 Lower priority than 9.1–9.3; the client-side filter is acceptable for
 now.
 
+### 9.6 New category — `library` (2026-04-18)
+
+**Status:** ✅ added server-side. 120 new scrape jobs seeded (~2 h to
+ingest; will trickle in alongside the main run). The slug covers **two
+user intents conflated into one category**:
+
+1. Pure public reading libraries (`مكتبة عامة` / `public library` queries).
+2. Coffee shops that stock books / study-cafes (`كافيه مكتبة` / `book cafe`
+   queries).
+
+Dedup by place_id means hybrid places that show up under multiple
+queries collapse to one row. Once ingested, calls like:
+
+```
+GET /v1/places?category=library&lat=…&lon=…&radius=5000
+```
+
+…return the union. To add `PlaceCategory.LIBRARY` on the omono side,
+extend the enum + the slug mapping in `GPlacesClient.kt`.
+
+**Known caveat:** Arabic retail bookstores (e.g. Jarir, `مكتبة جرير`)
+often self-categorise as libraries on Google. Expect some noise until
+reviews / hours / category-hint fields let us tighten.
+
 ### 9.5 `/v1/roads` — name fallback when polygon is missed
 
 **Status:** ✅ shipped. Optional `snap_m=<int, 0..200>` query param.

@@ -31,6 +31,13 @@ _SLUG_QUERIES: list[tuple[str, str, str]] = [
     ("salon",       "حلاق",                    "barber shop"),
     ("laundry",     "مغسلة",                   "laundry"),
     ("post_office", "مكتب بريد",               "post office"),
+    # `library` covers two things the omono agent conflated: pure public
+    # reading libraries AND coffee shops that stock books. Two query
+    # families target each; the slug is one so the client side doesn't
+    # have to pick. Dedup by place_id downstream handles Jarir-style
+    # bookstores that show up under multiple queries.
+    ("library",     "مكتبة عامة",              "public library"),
+    ("library",     "كافيه مكتبة",             "book cafe"),
 ]
 
 
