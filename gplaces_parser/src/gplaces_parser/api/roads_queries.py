@@ -20,6 +20,7 @@ from typing import Any
 from psycopg import Connection
 from psycopg.rows import dict_row
 from shapely.geometry import Point, shape
+from shapely.ops import transform as shp_transform
 
 # Lower rank == higher priority. Mirrors how a driver perceives "which
 # road am I on": intercity motorway beats arterial beats residential.
@@ -49,7 +50,22 @@ LIMIT 40
 """
 
 
-def at_point(conn: Connection, *, lat: float, lon: float, limit: int) -> list[dict[str, Any]]:
+def at_point(
+    conn: Connection,
+    *,
+    lat: float,
+    lon: float,
+    limit: int,
+    snap_m: int = 0,
+) -> list[dict[str, Any]]:
+    """Return the road polygons the point sits inside.
+
+    If `snap_m > 0` and no polygon contains the point, the bbox query is
+    re-run with a padded radius and the *nearest* polygon within
+    `snap_m` metres is returned with `snapped=True` + `snap_distance_m`
+    (FEEDBACK §9.5). A snapped result signals the client that the speed
+    number may not be authoritative (display as `~90 km/h`).
+    """
     with conn.cursor(row_factory=dict_row) as cur:
         cur.execute(BBOX_SQL, {"lat": lat, "lon": lon})
         candidates = list(cur.fetchall())
@@ -63,12 +79,67 @@ def at_point(conn: Connection, *, lat: float, lon: float, limit: int) -> list[di
             continue
         if poly.contains(pt) or poly.touches(pt):
             row["heading_deg"] = _polygon_heading_deg(poly, lat)
+            row["snapped"] = False
+            row["snap_distance_m"] = 0.0
             hits.append(row)
 
-    # Rank: motorway first, then by polygon area (smaller = more specific
-    # lane, so the local slip-road beats the huge trunk it's next to).
-    hits.sort(key=lambda r: (_HIGHWAY_RANK.get(r["highway"], 99), r["bbox_area"]))
-    return hits[:limit]
+    if hits or snap_m <= 0:
+        hits.sort(key=lambda r: (_HIGHWAY_RANK.get(r["highway"], 99), r["bbox_area"]))
+        return hits[:limit]
+
+    # No containment. Look for the nearest polygon within `snap_m` metres.
+    # Widen the bbox prefilter by the snap radius so candidates that are
+    # *near* the point (but not inside its tight bbox) get considered.
+    pad_deg_lat = snap_m / _M_PER_DEG_LAT
+    pad_deg_lon = snap_m / (_M_PER_DEG_LAT * max(math.cos(math.radians(lat)), 1e-6))
+    with conn.cursor(row_factory=dict_row) as cur:
+        cur.execute(
+            WIDE_BBOX_SQL,
+            {"lat": lat, "lon": lon, "pad_lat": pad_deg_lat, "pad_lon": pad_deg_lon},
+        )
+        wide_candidates = list(cur.fetchall())
+
+    # Convert both polygon and point to local equirectangular metres so
+    # Shapely's Euclidean distance is actually in metres. Polygons in the
+    # widened bbox are small enough that the projection error is sub-metre.
+    cos_lat = max(math.cos(math.radians(lat)), 1e-6)
+
+    def _to_m(x: float, y: float, z: float | None = None) -> tuple[float, float]:
+        # x = lon, y = lat. Standard equirectangular projection around
+        # `lat` as the reference latitude.
+        return (x * cos_lat * _M_PER_DEG_LAT, y * _M_PER_DEG_LAT)
+
+    pt_m = Point(*_to_m(lon, lat))
+    best: dict[str, Any] | None = None
+    best_dist = float("inf")
+    for row in wide_candidates:
+        try:
+            poly = shape(row["geom"])
+            poly_m = shp_transform(_to_m, poly)
+        except Exception:  # noqa: BLE001
+            continue
+        d_m = poly_m.distance(pt_m)
+        if d_m < best_dist and d_m <= snap_m:
+            best_dist = d_m
+            row["heading_deg"] = _polygon_heading_deg(poly, lat)
+            row["snapped"] = True
+            row["snap_distance_m"] = round(d_m, 1)
+            best = row
+    return [best] if best else []
+
+
+_M_PER_DEG_LAT = 111_320.0
+WIDE_BBOX_SQL = """
+SELECT osm_id, name, name_en, highway, ref, maxspeed_kmh, speed_source,
+       lanes, oneway, geom,
+       (bbox_max_lat - bbox_min_lat) * (bbox_max_lon - bbox_min_lon) AS bbox_area
+FROM roads
+WHERE bbox_max_lat >= %(lat)s - %(pad_lat)s
+  AND bbox_min_lat <= %(lat)s + %(pad_lat)s
+  AND bbox_max_lon >= %(lon)s - %(pad_lon)s
+  AND bbox_min_lon <= %(lon)s + %(pad_lon)s
+LIMIT 200
+"""
 
 
 def _polygon_heading_deg(poly: Any, center_lat: float) -> float | None:

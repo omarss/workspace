@@ -28,11 +28,18 @@ WITH
   candidates AS (
     SELECT p.*
     FROM places p, q
-    WHERE p.category = %(category)s
+    WHERE (
+        %(categories)s::text[] IS NULL
+        OR p.category = ANY(%(categories)s::text[])
+      )
       AND p.latitude BETWEEN q.lat0 - q.lat_pad AND q.lat0 + q.lat_pad
       AND p.longitude BETWEEN q.lon0 - q.lon_pad AND q.lon0 + q.lon_pad
       AND p.latitude IS NOT NULL
       AND p.longitude IS NOT NULL
+      -- Quality filters applied *before* limiting so the final page
+      -- isn't emptied by threshold-dropped results.
+      AND (%(min_rating)s::numeric = 0 OR p.rating >= %(min_rating)s::numeric)
+      AND (%(min_reviews)s::int = 0 OR p.reviews_count >= %(min_reviews)s::int)
   ),
   scored AS (
     SELECT
@@ -69,9 +76,18 @@ def nearby(
     lat: float,
     lon: float,
     radius_m: int,
-    category: str,
+    categories: list[str] | None,
     limit: int,
+    min_rating: float = 0.0,
+    min_reviews: int = 0,
 ) -> list[dict[str, Any]]:
+    """Nearby places within `radius_m` of (lat, lon).
+
+    `categories=None` means "no category filter" (the FEEDBACK §9.1
+    `category=all` case). Passing a single-element list is equivalent
+    to the original single-category behaviour. Comma-separated input is
+    parsed in the route layer.
+    """
     lat_pad = radius_m / _M_PER_DEG_LAT
     # cos(lat) collapses at poles; guard with a small minimum.
     lon_pad = radius_m / (_M_PER_DEG_LAT * max(math.cos(math.radians(lat)), 1e-6))
@@ -81,8 +97,10 @@ def nearby(
         "radius": radius_m,
         "lat_pad": lat_pad,
         "lon_pad": lon_pad,
-        "category": category,
+        "categories": categories,  # psycopg adapts Python list → text[]
         "limit": limit,
+        "min_rating": min_rating,
+        "min_reviews": min_reviews,
     }
     with conn.cursor(row_factory=dict_row) as cur:
         cur.execute(NEARBY_SQL, params)

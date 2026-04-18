@@ -219,7 +219,16 @@ These would let omono drop client-side workarounds. Items marked
 **ship-blocker** affect a feature currently in production; the rest
 are quality-of-life.
 
+> **Status roundup (2026-04-18, pending deploy)** — 9.1 / 9.2 / 9.3 /
+> 9.4 / 9.5 are all **SHIPPED on main**. They go live after
+> `make deploy` + certbot. Call out any contract mismatch ASAP.
+
 ### 9.1 `/v1/places` — "all categories" mode  *(ship-blocker)*
+
+**Status:** ✅ shipped. `category=all` disables the filter; a
+comma-separated list (`category=coffee,bakery,fast_food`) unions
+slugs server-side. Unknown slugs in the list → `400`. Single-slug
+back-compat unchanged.
 
 **Why:** The Places tab's default view is now "All", not a single
 category. To build that list omono fans out **19 parallel GET calls**,
@@ -249,7 +258,13 @@ per-place category.
 
 ### 9.2 `/v1/places` — server-side quality filter
 
-**Why:** omono's default view hides places with `rating < 4` OR
+**Status:** ✅ shipped. `min_rating=<float, 0..5>` and
+`min_reviews=<int>` query params; both default to `0` = no filter.
+Applied *before* `limit`, so threshold-dropped rows don't empty the
+page. Rows missing `rating` or `reviews_count` are dropped when
+either threshold is > 0, matching the client-side behaviour.
+
+**Why (original ask):** omono's default view hides places with `rating < 4` OR
 `review_count < 100`. Today that gate runs client-side, so the backend
 still ships the noise and the client discards it. On the all-category
 view this can be 70 %+ of the payload.
@@ -268,7 +283,12 @@ either threshold is > 0 — matching omono's current client-side logic.
 
 ### 9.3 `/v1/places` — canonical CID in response
 
-**Why:** The current `id` shape `"0x<fid_hex>:0x<cid_hex>"` works, but
+**Status:** ✅ shipped. Each result now carries a sibling `cid`
+field — decimal string extracted from the second hex chunk of `id`.
+Null when `id` is malformed (never expected for real Google CIDs).
+`id` is unchanged.
+
+**Why (original ask):** The current `id` shape `"0x<fid_hex>:0x<cid_hex>"` works, but
 it forces the client to parse it before building the
 `https://www.google.com/maps?cid=<n>` deep link that lands the user
 on a place's review page. Two places have already broken parsing once
@@ -289,7 +309,40 @@ String (not int) because `u64` overflows `i64` / JS `number`.
 
 ### 9.4 `/v1/places` — text search
 
-**Why:** The new search field in omono filters the already-fetched
+**Status:** ✅ shipped as a dedicated endpoint — `GET /v1/search`.
+Same auth header, same response-ish shape (adds a `score` field).
+Supports Arabic + English, typos (pg_trgm fuzzy), optional
+`category` filter, optional `lat`+`lon`+`radius` geographic prefilter.
+
+```
+GET /v1/search?q=<text>&category=<optional>&lat=<opt>&lon=<opt>&radius=<opt>&limit=<default 20, max 50>&lang=ar|en
+X-Api-Key: <same key>
+```
+
+Response:
+```json
+{
+  "results": [
+    {
+      "id": "0x3e2f…:0x8a7b…",
+      "name": "Starbucks",
+      "name_ar": "ستاربكس",
+      "category": "coffee",
+      "lat": …, "lon": …,
+      "score": 2.574,
+      "...": "same optional fields as /v1/places"
+    }
+  ],
+  "query": "starbucks",
+  "source": "gplaces",
+  "generated_at": "..."
+}
+```
+
+Ranking: `ts_rank(fts) * 2 + max(trigram_ar, trigram_en)`. Higher
+score is better. Ties break on `review_count`.
+
+**Why (original ask):** The new search field in omono filters the already-fetched
 list by substring. Works, but limited to whatever the backend chose
 to return for the given category/radius. A user searching for
 "Urth Caffe" that isn't among the top 50 returned results won't find
@@ -306,7 +359,20 @@ now.
 
 ### 9.5 `/v1/roads` — name fallback when polygon is missed
 
-**Why:** Tight road polygons mean a fix a few metres off the
+**Status:** ✅ shipped. Optional `snap_m=<int, 0..200>` query param.
+`snap_m=0` (default) keeps current exact-contains behaviour. When > 0
+and no polygon contains the point, the **nearest** road polygon
+within `snap_m` metres is returned as a single-element list with:
+
+```json
+{"roads":[{..., "snapped": true, "snap_distance_m": 14.2, "heading_deg": 65.5}]}
+```
+
+Distance is computed in a local equirectangular projection so metres
+are real (not degree-diagonals). Verified against Al Uroubah at a
++0.0005-degree offset: `snap_distance_m=14.2`, correct road.
+
+**Why (original ask):** Tight road polygons mean a fix a few metres off the
 centerline returns `roads: []` even on major streets. See the test
 runs I captured against `24.7136,46.6753` (hit Al Uaroba) vs the
 +0.0001 offset (empty). On real drives this surfaces as "road name

@@ -24,6 +24,22 @@ from .schemas import (
 router = APIRouter(prefix="/v1")
 
 
+def _cid_decimal(place_id: str | None) -> str | None:
+    """Extract the decimal CID from a `0x<fid>:0x<cid>` place_id.
+
+    Returns the second hex chunk as a decimal string (u64-safe). Clients
+    compose `https://www.google.com/maps?cid=<cid>` deep links with it
+    without having to parse the compound id themselves (FEEDBACK §9.3).
+    """
+    if not place_id or ":" not in place_id:
+        return None
+    try:
+        _, tail = place_id.split(":", 1)
+        return str(int(tail, 16))
+    except ValueError:
+        return None
+
+
 @router.get(
     "/places",
     response_model=NearbyResponse,
@@ -34,16 +50,28 @@ async def nearby(
     lat: Annotated[float, Query(ge=-90.0, le=90.0)],
     lon: Annotated[float, Query(ge=-180.0, le=180.0)],
     radius: Annotated[int, Query(ge=1, le=50_000)],
-    category: Annotated[str, Query()],
+    category: Annotated[str, Query(description="slug, 'all', or comma-separated list")],
     limit: Annotated[int | None, Query(ge=1)] = None,
     lang: Annotated[str, Query(pattern="^(ar|en)$")] = "en",
+    min_rating: Annotated[float, Query(ge=0.0, le=5.0)] = 0.0,
+    min_reviews: Annotated[int, Query(ge=0)] = 0,
 ) -> NearbyResponse:
-    slug = category.strip().lower()
-    if slug not in ALLOWED_SLUGS:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"unknown category: {category}",
-        )
+    # FEEDBACK §9.1: `category=all` disables the filter; comma-separated
+    # lists union several slugs into one call. Back-compat preserved —
+    # a single slug behaves exactly as before.
+    raw = category.strip().lower()
+    categories: list[str] | None
+    if raw == "all":
+        categories = None
+    else:
+        slugs = [s.strip() for s in raw.split(",") if s.strip()]
+        unknown = [s for s in slugs if s not in ALLOWED_SLUGS]
+        if unknown:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"unknown category: {','.join(unknown)}",
+            )
+        categories = slugs
 
     effective_limit = min(
         limit if limit is not None else settings.api_default_limit,
@@ -56,8 +84,10 @@ async def nearby(
             lat=lat,
             lon=lon,
             radius_m=radius,
-            category=slug,
+            categories=categories,
             limit=effective_limit,
+            min_rating=min_rating,
+            min_reviews=min_reviews,
         )
 
     # Per FEEDBACK §3 the JSON `name` field is English and `name_ar` is
@@ -81,6 +111,7 @@ async def nearby(
         results.append(
             NearbyResult(
                 id=r["place_id"],
+                cid=_cid_decimal(r["place_id"]),
                 name=name_primary,
                 name_ar=name_ar,
                 category=r["category"],
@@ -112,6 +143,7 @@ async def roads(
     lat: Annotated[float, Query(ge=-90.0, le=90.0)],
     lon: Annotated[float, Query(ge=-180.0, le=180.0)],
     limit: Annotated[int, Query(ge=1, le=20)] = 5,
+    snap_m: Annotated[int, Query(ge=0, le=200)] = 0,
 ) -> RoadsResponse:
     """Return every road polygon that contains (lat, lon).
 
@@ -121,7 +153,9 @@ async def roads(
     a point belongs to appears first within its class.
     """
     with connection() as conn:
-        rows = roads_queries.at_point(conn, lat=lat, lon=lon, limit=limit)
+        rows = roads_queries.at_point(
+            conn, lat=lat, lon=lon, limit=limit, snap_m=snap_m
+        )
     results = [
         Road(
             osm_id=r["osm_id"],
@@ -134,6 +168,8 @@ async def roads(
             lanes=r["lanes"],
             oneway=r["oneway"],
             heading_deg=r.get("heading_deg"),
+            snapped=bool(r.get("snapped", False)),
+            snap_distance_m=float(r.get("snap_distance_m", 0.0)),
         )
         for r in rows
     ]

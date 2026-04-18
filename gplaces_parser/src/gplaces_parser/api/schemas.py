@@ -9,6 +9,11 @@ from pydantic import BaseModel, Field
 
 class NearbyResult(BaseModel):
     id: str
+    # Decimal CID extracted from the second half of `id` (`0x<fid>:0x<cid>`).
+    # String, not int — CIDs routinely exceed 2**63 so JS `number` and
+    # Kotlin `Long` would truncate. Used by the client to build
+    # `https://www.google.com/maps?cid=<cid>` review links directly.
+    cid: str | None = None
     name: str
     name_ar: str | None = None
     category: str
@@ -46,6 +51,11 @@ class Road(BaseModel):
     # Normalised to [0, 360); since a road is symmetric, clients pairing
     # against a GPS heading should match either `h` or `(h + 180) % 360`.
     heading_deg: float | None = None
+    # `snapped=true` means the request's point was NOT inside any road
+    # polygon; this match is the nearest road within `snap_m` metres.
+    # Clients should treat `maxspeed_kmh` as approximate in that case.
+    snapped: bool = False
+    snap_distance_m: float = 0.0
 
 
 class RoadsResponse(BaseModel):
