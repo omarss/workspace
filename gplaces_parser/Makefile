@@ -8,7 +8,7 @@ DB_ROLE := gplaces
 DB_PASS := gplaces
 DB_NAME := gplaces
 
-.PHONY: help install install-browser db-create db-drop migrate revision scrape-places scrape-reviews status psql lint clean release
+.PHONY: help install install-browser db-create db-drop migrate revision scrape-places scrape-reviews status psql lint clean release deploy
 
 help:
 	@echo "Setup"
@@ -29,6 +29,7 @@ help:
 	@echo "  k8s-apply         kubectl apply the homelab manifests"
 	@echo "  k8s-status        show deploy/pod/svc for api-places"
 	@echo "  release           bump + commit + tag + image + rollout + push"
+	@echo "  deploy            (sudo) import image, rollout pod, copy + reload nginx"
 	@echo "Dev"
 	@echo "  psql              open psql shell against the project db"
 	@echo "  lint              ruff check"
@@ -107,11 +108,10 @@ clean:
 #   3. Commit the bump as `release gplaces vX.Y.Z`
 #   4. Tag `gplaces/vX.Y.Z`
 #   5. Build the container image under BOTH gplaces/api:vX.Y.Z and :latest
-#   6. Save to /tmp/gplaces-api.tar so the user can `sudo k3s ctr images import`
-#   7. Push main + tag (respects --no-verify-never-set policy)
-#
-# k3s rollout + image-import require sudo, which is not automatable here, so
-# the target prints the two commands to run after it finishes. They're idempotent.
+#   6. Save to /tmp/gplaces-api.tar
+#   7. Deploy: import into k3s, roll the pod, sync + reload nginx (sudo — you
+#      will be prompted once for the password; sudo caches for the rest)
+#   8. Push main + tag
 release:
 	@test -z "$$(git -C .. status --porcelain gplaces_parser/)" \
 	  || (echo "working tree has uncommitted changes under gplaces_parser/"; exit 1)
@@ -125,12 +125,32 @@ release:
 	git -C .. tag "gplaces/v$(NEW_VERSION)"
 	@echo ">> building image gplaces/api:v$(NEW_VERSION) + :latest"
 	docker build -t $(IMAGE) -t gplaces/api:v$(NEW_VERSION) .
+	rm -f /tmp/gplaces-api.tar
 	docker save gplaces/api:v$(NEW_VERSION) -o /tmp/gplaces-api.tar
-	@echo
-	@echo "run these two as root to roll the deployment over:"
-	@echo "  sudo k3s ctr images import /tmp/gplaces-api.tar"
-	@echo "  kubectl -n api-places set image deployment/api-places api=localhost/gplaces/api:v$(NEW_VERSION)"
-	@echo
+	@$(MAKE) deploy TAG=v$(NEW_VERSION)
 	git -C .. push origin main
 	git -C .. push origin "gplaces/v$(NEW_VERSION)"
-	@echo ">> released gplaces v$(NEW_VERSION)"
+	@echo ">> released + deployed gplaces v$(NEW_VERSION)"
+
+# Import the image into k3s containerd, roll the Deployment, and sync the
+# nginx vhost. Every sudo'd step is bundled into a single `sudo bash -c`
+# so the password is prompted once; kubectl runs as the user since its
+# kubeconfig is at ~/.kube/config.
+#
+# Override TAG= to pin the Deployment at a specific version (default = latest).
+TAG ?= latest
+NGINX_SRC ?= ../homelab/nginx/api.omarss.net.conf
+NGINX_DST ?= /etc/nginx/sites-available/api.omarss.net.conf
+deploy:
+	@echo ">> importing /tmp/gplaces-api.tar + syncing nginx (sudo)"
+	@sudo bash -c '\
+	  set -euo pipefail; \
+	  k3s ctr images import /tmp/gplaces-api.tar; \
+	  install -o root -g root -m 644 $(NGINX_SRC) $(NGINX_DST); \
+	  nginx -t; \
+	  systemctl reload nginx; \
+	'
+	@echo ">> rolling out api-places pod"
+	kubectl -n api-places set image deployment/api-places api=localhost/gplaces/api:$(TAG)
+	kubectl -n api-places rollout status deployment/api-places --timeout=120s
+	@echo ">> deployed."
