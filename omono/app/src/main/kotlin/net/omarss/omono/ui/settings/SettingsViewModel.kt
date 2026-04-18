@@ -19,6 +19,8 @@ import net.omarss.omono.feature.speed.ForegroundAppDetector
 import net.omarss.omono.feature.speed.InternetGovernor
 import net.omarss.omono.feature.speed.SpeedSettingsRepository
 import net.omarss.omono.feature.speed.VoiceAlertLanguage
+import net.omarss.omono.settings.AppSettingsRepository
+import net.omarss.omono.settings.ThemePreference
 import net.omarss.omono.feature.spending.SmsExporter
 import net.omarss.omono.feature.spending.SpendingSettingsRepository
 import net.omarss.omono.ui.ExportEvent
@@ -43,6 +45,7 @@ class SettingsViewModel @Inject constructor(
     private val internetGovernor: InternetGovernor,
     private val foregroundApp: ForegroundAppDetector,
     private val diagnosticsLogger: DiagnosticsLogger,
+    private val appSettings: AppSettingsRepository,
 ) : ViewModel() {
 
     // Shizuku governor lifecycle is managed at the Application level —
@@ -85,7 +88,8 @@ class SettingsViewModel @Inject constructor(
         baseFlow,
         accessFlow,
         voiceFlow,
-    ) { base, access, voice ->
+        appSettings.theme,
+    ) { base, access, voice, theme ->
         SettingsUiState(
             unit = base.unit,
             alertOnOverLimit = base.alertOnOverLimit,
@@ -96,6 +100,7 @@ class SettingsViewModel @Inject constructor(
             monthlyBudgetSar = base.monthlyBudgetSar,
             voiceAlertsEnabled = voice.enabled,
             voiceAlertLanguage = voice.language,
+            theme = theme,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -136,6 +141,10 @@ class SettingsViewModel @Inject constructor(
 
     fun setVoiceAlertLanguage(language: VoiceAlertLanguage) {
         viewModelScope.launch { speedSettings.setVoiceAlertLanguage(language) }
+    }
+
+    fun setTheme(preference: ThemePreference) {
+        viewModelScope.launch { appSettings.setTheme(preference) }
     }
 
     fun setMonthlyBudget(budgetSar: Double) {
@@ -207,6 +216,7 @@ data class SettingsUiState(
     val monthlyBudgetSar: Double = 0.0,
     val voiceAlertsEnabled: Boolean = true,
     val voiceAlertLanguage: VoiceAlertLanguage = VoiceAlertLanguage.Auto,
+    val theme: ThemePreference = ThemePreference.Auto,
 )
 
 sealed interface DiagnosticsShareEvent {

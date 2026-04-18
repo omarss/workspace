@@ -51,6 +51,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import net.omarss.omono.core.common.SpeedUnit
 import net.omarss.omono.feature.speed.InternetGovernor
 import net.omarss.omono.feature.speed.VoiceAlertLanguage
+import net.omarss.omono.settings.ThemePreference
 import net.omarss.omono.ui.ExportEvent
 import net.omarss.omono.ui.launchSmsExportShare
 
@@ -129,6 +130,10 @@ fun SettingsRoute(
                 .padding(horizontal = 20.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
+            SectionCard(title = "Appearance") {
+                ThemePicker(current = state.theme, onSelect = viewModel::setTheme)
+            }
+
             SectionCard(title = "Units") {
                 UnitPicker(current = state.unit, onSelect = viewModel::setUnit)
             }
@@ -247,6 +252,27 @@ private fun SectionCard(title: String, content: @Composable () -> Unit) {
         }
     }
 }
+
+@Composable
+private fun ThemePicker(current: ThemePreference, onSelect: (ThemePreference) -> Unit) {
+    val options = ThemePreference.entries
+    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+        options.forEachIndexed { index, pref ->
+            SegmentedButton(
+                selected = current == pref,
+                onClick = { onSelect(pref) },
+                shape = SegmentedButtonDefaults.itemShape(index, options.size),
+            ) { Text(pref.label) }
+        }
+    }
+}
+
+private val ThemePreference.label: String
+    get() = when (this) {
+        ThemePreference.Auto -> "Auto"
+        ThemePreference.Light -> "Light"
+        ThemePreference.Dark -> "Dark"
+    }
 
 @Composable
 private fun UnitPicker(current: SpeedUnit, onSelect: (SpeedUnit) -> Unit) {

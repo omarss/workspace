@@ -4,6 +4,8 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.viewModels
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -22,6 +24,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
@@ -31,6 +34,8 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import dagger.hilt.android.AndroidEntryPoint
 import net.omarss.omono.core.designsystem.theme.OmonoTheme
+import net.omarss.omono.settings.AppSettingsViewModel
+import net.omarss.omono.settings.ThemePreference
 import net.omarss.omono.ui.OmonoMainRoute
 import net.omarss.omono.ui.finance.FinanceDashboardRoute
 import net.omarss.omono.ui.places.PlacesRoute
@@ -38,11 +43,20 @@ import net.omarss.omono.ui.settings.SettingsRoute
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+
+    private val appSettingsViewModel: AppSettingsViewModel by viewModels()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            OmonoTheme {
+            val preference by appSettingsViewModel.theme.collectAsStateWithLifecycle()
+            val darkTheme = when (preference) {
+                ThemePreference.Auto -> isSystemInDarkTheme()
+                ThemePreference.Light -> false
+                ThemePreference.Dark -> true
+            }
+            OmonoTheme(darkTheme = darkTheme) {
                 val navController = rememberNavController()
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
