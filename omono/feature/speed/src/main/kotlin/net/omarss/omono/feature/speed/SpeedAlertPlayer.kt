@@ -80,7 +80,11 @@ class SpeedAlertPlayer @Inject constructor(
     // onDone callback so the driver hears "Slow down" immediately
     // followed by a distinct beep. A voice-only alert is easy to
     // miss in traffic — the beep makes the pair impossible to ignore.
+    //
+    // Silently no-ops while the user is on a phone call — stepping on
+    // the call audio would cause more confusion than the limit breach.
     fun alert(phrase: VoiceAlertPhrase = VoiceAlertPhrase.OVER_LIMIT) {
+        if (isInCall()) return
         val spoke = voiceAlertPlayer.speakOnce(phrase) {
             playTone(ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD, TONE_DURATION_MS)
         }
@@ -91,18 +95,26 @@ class SpeedAlertPlayer @Inject constructor(
         }
     }
 
+    private fun isInCall(): Boolean {
+        val mode = audioManager?.mode ?: return false
+        return mode == AudioManager.MODE_IN_CALL || mode == AudioManager.MODE_IN_COMMUNICATION
+    }
+
     // Looping "put the phone down" alert for the distraction guard.
-    // Each cycle speaks the phrase (if voice is enabled) then fires a
-    // beep burst, then waits out the interval before repeating. The
-    // voice part is informative; the beeping makes it *annoying* — the
-    // explicit goal is to nudge the driver off whatever they're looking
-    // at. Falls back to a pure-beep loop if voice isn't available.
+    // Each tick fires a beep burst; TTS is throttled to at most once
+    // per VOICE_INTERVAL_MS (1 min) so the driver hears the phrase on
+    // first offence but isn't drowned in it, while the beep keeps
+    // firing steadily so they stay nagged. Falls back to pure-beep
+    // when voice isn't available.
     fun startBeeping(phrase: VoiceAlertPhrase = VoiceAlertPhrase.PHONE_USE) {
         // Reset any lingering one-shot restore — we're holding the
         // stream volume raised for the duration of the loop.
         handler.removeCallbacks(restoreRunnable)
         snapshotAndBypass()
         currentLoopPhrase = phrase
+        // First tick always speaks so the user hears the phrase the
+        // moment they start being distracted.
+        lastSpokenAtMillis = 0L
         handler.removeCallbacks(loopRunnable)
         handler.post(loopRunnable)
     }
@@ -120,21 +132,33 @@ class SpeedAlertPlayer @Inject constructor(
     // stopBeeping has been called; the runnable bails on the next tick.
     @Volatile private var currentLoopPhrase: VoiceAlertPhrase? = null
 
-    // Loop body. Each iteration tries to speak; when speech ends (or
-    // immediately, if voice is off/unavailable) it plays a beep burst,
-    // then schedules the next iteration at +LOOP_INTERVAL_MS. Driven
-    // by the handler's clock so a cancelled coroutine scope upstream
-    // can't leave the loop half-running.
+    // Last-spoken timestamp for the TTS throttle. Reset on each
+    // startBeeping so the first tick of every new offence speaks.
+    @Volatile private var lastSpokenAtMillis: Long = 0L
+
+    // Loop body. Every tick plays a beep burst; TTS piggybacks only
+    // when the throttle window has elapsed. Driven by the handler's
+    // clock so a cancelled coroutine scope upstream can't leave the
+    // loop half-running.
     private val loopRunnable = object : Runnable {
         override fun run() {
             val phrase = currentLoopPhrase ?: return
-            val spoke = voiceAlertPlayer.speakOnce(phrase) {
-                // Speech done — beep now. Wrapped in a phrase check so a
-                // late onDone arriving after stopBeeping doesn't fire
-                // a stray tone.
-                if (currentLoopPhrase != null) playBeepBurst()
+            val now = System.currentTimeMillis()
+            val shouldSpeak = now - lastSpokenAtMillis >= VOICE_INTERVAL_MS
+            var spoke = false
+            if (shouldSpeak) {
+                spoke = voiceAlertPlayer.speakOnce(phrase) {
+                    // Speech done — beep now so voice + beep land as
+                    // a pair. Wrapped in a phrase check so a late
+                    // onDone arriving after stopBeeping doesn't fire
+                    // a stray tone.
+                    if (currentLoopPhrase != null) playBeepBurst()
+                }
+                if (spoke) lastSpokenAtMillis = now
             }
             if (!spoke) {
+                // No speech this tick — just beep. Keeps the driver
+                // annoyed between announcement windows.
                 playBeepBurst()
             }
             handler.postDelayed(this, LOOP_INTERVAL_MS)
@@ -218,9 +242,15 @@ class SpeedAlertPlayer @Inject constructor(
         const val BEEP_TONE_DURATION_MS = 400
         const val RESTORE_MARGIN_MS = 300L
 
-        // Cycle cadence for the phone-use loop: speak + beep, pause
-        // roughly this long, repeat. Same rhythm the voice-only loop
-        // used before the beep was re-introduced.
-        const val LOOP_INTERVAL_MS = 4_000L
+        // Beep cadence for the phone-use loop. Short enough to
+        // actually annoy the driver; long enough to let each burst
+        // register as a discrete beep rather than a continuous tone.
+        const val LOOP_INTERVAL_MS = 3_000L
+
+        // Minimum gap between spoken TTS phrases inside the loop.
+        // The driver hears "Eyes on the road" once per offence window
+        // rather than every cycle — repeating words become background
+        // noise; repeating beeps do not.
+        const val VOICE_INTERVAL_MS = 60_000L
     }
 }

@@ -46,12 +46,19 @@ class DistractionGuard @Inject constructor(
 
     fun attach(scope: CoroutineScope) {
         scope.launch {
+            // Five signals × combine(): driving, screen on, setting
+            // enabled, proximity uncovered (phone not face-down / in
+            // pocket), not currently on a call. Armed only when all
+            // align — any one of them tipping false stops the loop
+            // immediately via distinctUntilChanged + the else branch.
             combine(
                 driving.isDriving,
                 context.screenOnFlow(),
                 settings.alertOnPhoneUseWhileDriving,
-            ) { isDriving, screenOn, enabled ->
-                enabled && isDriving && screenOn
+                context.proximityCoveredFlow(),
+                context.inCallFlow(),
+            ) { isDriving, screenOn, enabled, proxCovered, inCall ->
+                enabled && isDriving && screenOn && !proxCovered && !inCall
             }
                 .distinctUntilChanged()
                 .collect { armed ->
