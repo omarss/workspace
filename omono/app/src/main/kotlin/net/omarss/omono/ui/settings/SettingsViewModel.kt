@@ -18,6 +18,7 @@ import net.omarss.omono.diagnostics.DiagnosticsLogger
 import net.omarss.omono.feature.speed.ForegroundAppDetector
 import net.omarss.omono.feature.speed.InternetGovernor
 import net.omarss.omono.feature.speed.SpeedSettingsRepository
+import net.omarss.omono.feature.speed.VoiceAlertLanguage
 import net.omarss.omono.feature.spending.SmsExporter
 import net.omarss.omono.feature.spending.SpendingSettingsRepository
 import net.omarss.omono.ui.ExportEvent
@@ -75,7 +76,16 @@ class SettingsViewModel @Inject constructor(
         AccessState(usageStats, readiness)
     }
 
-    val uiState: StateFlow<SettingsUiState> = combine(baseFlow, accessFlow) { base, access ->
+    private val voiceFlow: Flow<VoiceSettings> = combine(
+        speedSettings.voiceAlertsEnabled,
+        speedSettings.voiceAlertLanguage,
+    ) { enabled, lang -> VoiceSettings(enabled, lang) }
+
+    val uiState: StateFlow<SettingsUiState> = combine(
+        baseFlow,
+        accessFlow,
+        voiceFlow,
+    ) { base, access, voice ->
         SettingsUiState(
             unit = base.unit,
             alertOnOverLimit = base.alertOnOverLimit,
@@ -84,6 +94,8 @@ class SettingsViewModel @Inject constructor(
             disableInternetWhileDriving = base.disableInternetWhileDriving,
             shizukuReadiness = access.shizukuReadiness,
             monthlyBudgetSar = base.monthlyBudgetSar,
+            voiceAlertsEnabled = voice.enabled,
+            voiceAlertLanguage = voice.language,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -116,6 +128,14 @@ class SettingsViewModel @Inject constructor(
 
     fun setDisableInternetWhileDriving(enabled: Boolean) {
         viewModelScope.launch { speedSettings.setDisableInternetWhileDriving(enabled) }
+    }
+
+    fun setVoiceAlertsEnabled(enabled: Boolean) {
+        viewModelScope.launch { speedSettings.setVoiceAlertsEnabled(enabled) }
+    }
+
+    fun setVoiceAlertLanguage(language: VoiceAlertLanguage) {
+        viewModelScope.launch { speedSettings.setVoiceAlertLanguage(language) }
     }
 
     fun setMonthlyBudget(budgetSar: Double) {
@@ -167,6 +187,11 @@ class SettingsViewModel @Inject constructor(
         val shizukuReadiness: InternetGovernor.Readiness,
     )
 
+    private data class VoiceSettings(
+        val enabled: Boolean,
+        val language: VoiceAlertLanguage,
+    )
+
     private companion object {
         const val SHIZUKU_PERMISSION_REQUEST_CODE = 7124
     }
@@ -180,6 +205,8 @@ data class SettingsUiState(
     val disableInternetWhileDriving: Boolean = false,
     val shizukuReadiness: InternetGovernor.Readiness = InternetGovernor.Readiness.Unknown,
     val monthlyBudgetSar: Double = 0.0,
+    val voiceAlertsEnabled: Boolean = true,
+    val voiceAlertLanguage: VoiceAlertLanguage = VoiceAlertLanguage.Auto,
 )
 
 sealed interface DiagnosticsShareEvent {

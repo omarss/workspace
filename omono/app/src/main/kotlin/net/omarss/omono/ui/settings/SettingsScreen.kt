@@ -50,6 +50,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import net.omarss.omono.core.common.SpeedUnit
 import net.omarss.omono.feature.speed.InternetGovernor
+import net.omarss.omono.feature.speed.VoiceAlertLanguage
 import net.omarss.omono.ui.ExportEvent
 import net.omarss.omono.ui.launchSmsExportShare
 
@@ -135,7 +136,11 @@ fun SettingsRoute(
             SectionCard(title = "Alerts") {
                 AlertSettingRow(
                     title = "Alert over limit",
-                    subtitle = "Loud beep the moment you cross a posted speed limit.",
+                    subtitle = if (state.voiceAlertsEnabled) {
+                        "Voice alert the moment you cross a posted speed limit."
+                    } else {
+                        "Loud beep the moment you cross a posted speed limit."
+                    },
                     enabled = state.alertOnOverLimit,
                     onChange = viewModel::setAlertOnOverLimit,
                 )
@@ -145,6 +150,13 @@ fun SettingsRoute(
                     usageStatsGranted = state.usageStatsGranted,
                     onChange = viewModel::setAlertOnPhoneUseWhileDriving,
                     onRequestUsageStats = { launchUsageStatsSettings(context) },
+                )
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                VoiceAlertSettingRow(
+                    enabled = state.voiceAlertsEnabled,
+                    language = state.voiceAlertLanguage,
+                    onEnabledChange = viewModel::setVoiceAlertsEnabled,
+                    onLanguageChange = viewModel::setVoiceAlertLanguage,
                 )
             }
 
@@ -312,6 +324,53 @@ private fun PhoneUseAlertSettingRow(
         }
     }
 }
+
+@Composable
+private fun VoiceAlertSettingRow(
+    enabled: Boolean,
+    language: VoiceAlertLanguage,
+    onEnabledChange: (Boolean) -> Unit,
+    onLanguageChange: (VoiceAlertLanguage) -> Unit,
+) {
+    Column {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Voice alerts",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    text = "Speak alerts in English or Arabic instead of beeping. " +
+                        "Falls back to a beep if the phone's TTS can't speak the chosen language.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Switch(checked = enabled, onCheckedChange = onEnabledChange)
+        }
+        if (enabled) {
+            Spacer(Modifier.height(8.dp))
+            val options = VoiceAlertLanguage.entries
+            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                options.forEachIndexed { index, lang ->
+                    SegmentedButton(
+                        selected = language == lang,
+                        onClick = { onLanguageChange(lang) },
+                        shape = SegmentedButtonDefaults.itemShape(index, options.size),
+                    ) { Text(lang.label) }
+                }
+            }
+        }
+    }
+}
+
+private val VoiceAlertLanguage.label: String
+    get() = when (this) {
+        VoiceAlertLanguage.Auto -> "Auto"
+        VoiceAlertLanguage.English -> "English"
+        VoiceAlertLanguage.Arabic -> "العربية"
+    }
 
 @Composable
 private fun DisableInternetSettingRow(

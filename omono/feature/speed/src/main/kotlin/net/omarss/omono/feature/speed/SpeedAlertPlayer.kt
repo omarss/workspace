@@ -47,6 +47,7 @@ internal fun shouldAlertOnCrossing(
 @Singleton
 class SpeedAlertPlayer @Inject constructor(
     @param:ApplicationContext private val context: Context,
+    private val voiceAlertPlayer: VoiceAlertPlayer,
 ) {
 
     private val audioManager by lazy { context.getSystemService(AudioManager::class.java) }
@@ -74,16 +75,24 @@ class SpeedAlertPlayer @Inject constructor(
 
     private val restoreRunnable = Runnable { restoreState() }
 
-    fun alert() {
+    // One-shot alert. Tries the voice path first (spoken phrase in the
+    // user's preferred language); if voice is disabled or TTS isn't
+    // ready, falls back to the original CDMA call-guard tone so the
+    // user still hears *something* when they cross a limit.
+    fun alert(phrase: VoiceAlertPhrase = VoiceAlertPhrase.OVER_LIMIT) {
+        if (voiceAlertPlayer.speakOnce(phrase)) return
         playTone(ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD, TONE_DURATION_MS)
     }
 
-    // Looping "put the phone down" tone for the distraction guard.
+    // Looping "put the phone down" alert for the distraction guard.
+    // Prefers speaking the phrase every ~4 s (less fatiguing on
+    // repeat); falls back to the tone loop when voice isn't available.
     // Fires every BEEP_INTERVAL_MS until stopBeeping() is called. Uses
     // a separate code path from playTone because that path is
     // throttled by MIN_INTERVAL_MS — looping beeps intentionally want
     // to fire faster than the post-alert cool-down allows.
-    fun startBeeping() {
+    fun startBeeping(phrase: VoiceAlertPhrase = VoiceAlertPhrase.PHONE_USE) {
+        if (voiceAlertPlayer.startLoop(phrase)) return
         val tg = toneGenerator ?: return
         // Cancel any pending post-alert restore so the looper can
         // keep the stream volume raised without it being pulled back
@@ -98,6 +107,10 @@ class SpeedAlertPlayer @Inject constructor(
     }
 
     fun stopBeeping() {
+        // Stop the voice loop regardless — if voice is active it was
+        // started by startBeeping above, and if it isn't this is a
+        // no-op. Same defensive logic as the tone path.
+        voiceAlertPlayer.stopLoop()
         handler.removeCallbacks(beepRunnable)
         runCatching { toneGenerator?.stopTone() }
         // Schedule restore the same way a one-shot alert would.

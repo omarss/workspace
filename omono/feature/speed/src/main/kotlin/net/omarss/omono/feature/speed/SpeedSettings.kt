@@ -21,6 +21,8 @@ private val ALERT_ON_PHONE_USE_WHILE_DRIVING_KEY =
     booleanPreferencesKey("speed.alert_on_phone_use_while_driving")
 private val DISABLE_INTERNET_WHILE_DRIVING_KEY =
     booleanPreferencesKey("speed.disable_internet_while_driving")
+private val VOICE_ALERTS_ENABLED_KEY = booleanPreferencesKey("speed.voice_alerts_enabled")
+private val VOICE_ALERT_LANGUAGE_KEY = stringPreferencesKey("speed.voice_alert_language")
 
 @Singleton
 class SpeedSettingsRepository @Inject constructor(
@@ -52,6 +54,20 @@ class SpeedSettingsRepository @Inject constructor(
         prefs[DISABLE_INTERNET_WHILE_DRIVING_KEY] ?: false
     }
 
+    // Replaces the beep / loop-beep with a spoken phrase in English or
+    // Arabic. On by default — clearer to a distracted driver than a
+    // tone, and if TTS isn't installed the player falls back to the
+    // existing beep path automatically.
+    val voiceAlertsEnabled: Flow<Boolean> = context.omonoDataStore.data.map { prefs ->
+        prefs[VOICE_ALERTS_ENABLED_KEY] ?: true
+    }
+
+    // Auto = follow device locale (Arabic if the phone is set to any
+    // Arabic variant, else English). Explicit picks override that.
+    val voiceAlertLanguage: Flow<VoiceAlertLanguage> = context.omonoDataStore.data.map { prefs ->
+        VoiceAlertLanguage.fromStorage(prefs[VOICE_ALERT_LANGUAGE_KEY])
+    }
+
     suspend fun setUnit(unit: SpeedUnit) {
         context.omonoDataStore.edit { it[UNIT_KEY] = unit.name }
     }
@@ -66,5 +82,13 @@ class SpeedSettingsRepository @Inject constructor(
 
     suspend fun setDisableInternetWhileDriving(enabled: Boolean) {
         context.omonoDataStore.edit { it[DISABLE_INTERNET_WHILE_DRIVING_KEY] = enabled }
+    }
+
+    suspend fun setVoiceAlertsEnabled(enabled: Boolean) {
+        context.omonoDataStore.edit { it[VOICE_ALERTS_ENABLED_KEY] = enabled }
+    }
+
+    suspend fun setVoiceAlertLanguage(language: VoiceAlertLanguage) {
+        context.omonoDataStore.edit { it[VOICE_ALERT_LANGUAGE_KEY] = language.name }
     }
 }
