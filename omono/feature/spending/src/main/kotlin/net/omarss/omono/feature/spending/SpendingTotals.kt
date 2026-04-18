@@ -54,11 +54,14 @@ data class SpendingTotals(
 }
 
 // Pure totals calculation — exposed at file scope so it can be unit
-// tested without any Android / SMS plumbing.
+// tested without any Android / SMS plumbing. `overrides` lets callers
+// inject the user-taught merchant-to-category map so tap-to-correct
+// results flow through every aggregation path.
 fun computeTotals(
     transactions: List<Transaction>,
     now: Instant,
     zone: ZoneId,
+    overrides: Map<String, SpendingCategory> = emptyMap(),
 ): SpendingTotals {
     val zonedNow = now.atZone(zone)
     val today = zonedNow.toLocalDate()
@@ -107,7 +110,7 @@ fun computeTotals(
             if (inMonth) {
                 monthSum += tx.amountSar
                 monthCount += 1
-                val category = MerchantCategorizer.categorize(tx.merchant)
+                val category = MerchantCategorizer.categorize(tx.merchant, overrides)
                 monthByCategory.merge(category, tx.amountSar) { a, b -> a + b }
                 if (inDay) {
                     todaySum += tx.amountSar
@@ -147,6 +150,7 @@ fun computeTotalsForMonth(
     transactions: List<Transaction>,
     yearMonth: YearMonth,
     zone: ZoneId,
+    overrides: Map<String, SpendingCategory> = emptyMap(),
 ): SpendingTotals {
     val startOfMonth = yearMonth.atDay(1).atStartOfDay(zone).toInstant().toEpochMilli()
     val endExclusive = yearMonth.plusMonths(1).atDay(1)
@@ -165,7 +169,7 @@ fun computeTotalsForMonth(
             tx.kind.isPurchase -> {
                 monthSum += tx.amountSar
                 monthCount += 1
-                val category = MerchantCategorizer.categorize(tx.merchant)
+                val category = MerchantCategorizer.categorize(tx.merchant, overrides)
                 monthByCategory.merge(category, tx.amountSar) { a, b -> a + b }
             }
             tx.kind == Transaction.Kind.REFUND -> {

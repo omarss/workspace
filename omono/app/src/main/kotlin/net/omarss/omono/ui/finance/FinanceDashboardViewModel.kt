@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import net.omarss.omono.feature.spending.MerchantCategorizer
 import net.omarss.omono.feature.spending.SpendingCategory
+import net.omarss.omono.feature.spending.cleanMerchantName
 import net.omarss.omono.feature.spending.SpendingRepository
 import net.omarss.omono.feature.spending.SpendingSettingsRepository
 import net.omarss.omono.feature.spending.Subscription
@@ -65,12 +66,13 @@ class FinanceDashboardViewModel @Inject constructor(
     private suspend fun render() {
         val budget = settings.monthlyBudgetSar.first()
         val categoryBudgets = settings.categoryBudgets.first()
+        val overrides = settings.categoryOverrides.first()
         val current = YearMonth.now(zone)
         val isCurrent = selectedMonth == current
         val totals = if (isCurrent) {
-            computeTotals(transactionsCache, Instant.now(), zone)
+            computeTotals(transactionsCache, Instant.now(), zone, overrides)
         } else {
-            computeTotalsForMonth(transactionsCache, selectedMonth, zone)
+            computeTotalsForMonth(transactionsCache, selectedMonth, zone, overrides)
         }
         val inSelectedMonth = transactionsCache.filterIn(selectedMonth, zone)
         val projectedMonthSar = if (isCurrent) projectMonthEnd(totals.monthSar) else 0.0
@@ -98,11 +100,20 @@ class FinanceDashboardViewModel @Inject constructor(
                 totals.monthByCategory, totals.monthSar, categoryBudgets,
             ),
             subscriptions = subscriptions,
-            topMerchants = buildTopMerchants(inSelectedMonth),
+            topMerchants = buildTopMerchants(inSelectedMonth, overrides),
             bills = buildBills(inSelectedMonth),
             transfers = buildTransfers(inSelectedMonth),
-            recent = buildRecent(transactionsCache),
+            recent = buildRecent(transactionsCache, overrides),
         )
+    }
+
+    // Persist the user's correction for this merchant. Every past and
+    // future transaction with the same normalised name reclassifies.
+    fun overrideCategory(merchant: String, category: SpendingCategory) {
+        viewModelScope.launch {
+            settings.setCategoryOverride(merchant, category)
+            render()
+        }
     }
 
     fun setCategoryBudget(category: SpendingCategory, valueSar: Double) {
@@ -180,7 +191,10 @@ class FinanceDashboardViewModel @Inject constructor(
         if (word.isEmpty()) word else word.replaceFirstChar(Char::uppercaseChar)
     }
 
-    private fun buildTopMerchants(thisMonth: List<Transaction>): List<MerchantRow> {
+    private fun buildTopMerchants(
+        thisMonth: List<Transaction>,
+        overrides: Map<String, SpendingCategory>,
+    ): List<MerchantRow> {
         val purchases = thisMonth.filter { it.kind.isPurchaseForUi() }
         val bucketed = purchases
             .groupBy { (it.merchant ?: "Unknown").trim() }
@@ -190,9 +204,10 @@ class FinanceDashboardViewModel @Inject constructor(
             .take(5)
             .map { (merchant, amount) ->
                 MerchantRow(
-                    merchant = merchant,
+                    merchant = cleanMerchantName(merchant),
+                    rawMerchant = merchant,
                     amountSar = amount,
-                    category = MerchantCategorizer.categorize(merchant),
+                    category = MerchantCategorizer.categorize(merchant, overrides),
                 )
             }
     }
@@ -245,16 +260,22 @@ class FinanceDashboardViewModel @Inject constructor(
             .sortedByDescending { it.amountSar }
     }
 
-    private fun buildRecent(transactions: List<Transaction>): List<RecentRow> {
+    private fun buildRecent(
+        transactions: List<Transaction>,
+        overrides: Map<String, SpendingCategory>,
+    ): List<RecentRow> {
         val fmt = SimpleDateFormat("EEE d MMM · HH:mm", Locale.getDefault())
         return transactions
             .sortedByDescending { it.timestampMillis }
             .take(20)
             .map { tx ->
+                val raw = tx.merchant?.takeIf { it.isNotBlank() }
                 RecentRow(
                     id = "${tx.bank}-${tx.timestampMillis}-${tx.amountSar}",
                     date = fmt.format(tx.timestampMillis),
-                    merchant = tx.merchant ?: "(no merchant)",
+                    merchant = cleanMerchantName(raw ?: "(no merchant)"),
+                    rawMerchant = raw,
+                    category = raw?.let { MerchantCategorizer.categorize(it, overrides) },
                     amountSar = tx.amountSar,
                     originalAmount = tx.originalAmount,
                     originalCurrency = tx.originalCurrency,
@@ -389,6 +410,7 @@ data class CategoryRow(
 
 data class MerchantRow(
     val merchant: String,
+    val rawMerchant: String,
     val amountSar: Double,
     val category: SpendingCategory,
 )
@@ -419,6 +441,11 @@ data class RecentRow(
     val id: String,
     val date: String,
     val merchant: String,
+    // Unnormalised SMS-field merchant. Used as the override key when
+    // the user taps to correct the category; null only for truly
+    // merchant-less rows (transfers to "Unknown recipient").
+    val rawMerchant: String?,
+    val category: SpendingCategory?,
     val amountSar: Double,
     val originalAmount: Double,
     val originalCurrency: String,

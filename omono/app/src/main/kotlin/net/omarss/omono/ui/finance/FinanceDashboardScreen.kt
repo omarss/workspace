@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -31,6 +32,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -60,6 +62,7 @@ fun FinanceDashboardRoute(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var editingBudget by remember { mutableStateOf<SpendingCategory?>(null) }
+    var editingCategoryForMerchant by remember { mutableStateOf<String?>(null) }
 
     editingBudget?.let { category ->
         val existing = state.categoryBreakdown
@@ -73,6 +76,20 @@ fun FinanceDashboardRoute(
                 editingBudget = null
             },
             onDismiss = { editingBudget = null },
+        )
+    }
+
+    editingCategoryForMerchant?.let { merchant ->
+        CorrectCategoryDialog(
+            merchant = merchant,
+            currentCategory = state.recent
+                .firstOrNull { it.rawMerchant == merchant }
+                ?.category,
+            onSave = { category ->
+                viewModel.overrideCategory(merchant, category)
+                editingCategoryForMerchant = null
+            },
+            onDismiss = { editingCategoryForMerchant = null },
         )
     }
 
@@ -132,7 +149,12 @@ fun FinanceDashboardRoute(
                 TransfersCard(state.monthTransfersSar, state.transfers)
             }
             if (state.recent.isNotEmpty()) {
-                RecentTransactionsCard(state.recent)
+                RecentTransactionsCard(
+                    rows = state.recent,
+                    onCorrectCategory = { row ->
+                        editingCategoryForMerchant = row.rawMerchant
+                    },
+                )
             }
             Spacer(Modifier.height(24.dp))
         }
@@ -275,6 +297,61 @@ private fun CategoryBudgetDialog(
         },
         confirmButton = {
             TextButton(onClick = { onSave(text.toDoubleOrNull() ?: 0.0) }) {
+                Text("Save")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        },
+    )
+}
+
+// Per-merchant category override editor. Save persists the override
+// across every past and future transaction with the same merchant
+// name. The current category (keyword-detected or a prior override)
+// is pre-selected so the user can see what they're overriding.
+@Composable
+private fun CorrectCategoryDialog(
+    merchant: String,
+    currentCategory: SpendingCategory?,
+    onSave: (SpendingCategory) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var selected by remember { mutableStateOf(currentCategory ?: SpendingCategory.OTHER) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Set category for $merchant") },
+        text = {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Text(
+                    "Applies to every past and future transaction with this merchant.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(4.dp))
+                SpendingCategory.entries.forEach { category ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { selected = category }
+                            .padding(vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RadioButton(
+                            selected = selected == category,
+                            onClick = { selected = category },
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(text = category.label)
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onSave(selected) }) {
                 Text("Save")
             }
         },
@@ -685,7 +762,10 @@ private fun formatAmount(amountSar: Double, originalAmount: Double, originalCurr
     }
 
 @Composable
-private fun RecentTransactionsCard(rows: List<RecentRow>) {
+private fun RecentTransactionsCard(
+    rows: List<RecentRow>,
+    onCorrectCategory: (RecentRow) -> Unit,
+) {
     Card(
         modifier = Modifier.fillMaxWidth().animateContentSize(),
         colors = CardDefaults.elevatedCardColors(
@@ -699,7 +779,7 @@ private fun RecentTransactionsCard(rows: List<RecentRow>) {
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Text(
-                text = "Recent activity",
+                text = "Recent activity · tap a row to fix its category",
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -707,7 +787,21 @@ private fun RecentTransactionsCard(rows: List<RecentRow>) {
                 if (index > 0) {
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 }
-                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                // A non-null rawMerchant means we can key an override
+                // against this row; pure-transfer rows without a
+                // merchant aren't interactive.
+                val tappable = row.rawMerchant != null &&
+                    row.kind.let { it != Transaction.Kind.TRANSFER_OUT }
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .let { m ->
+                            if (tappable) m.clickable { onCorrectCategory(row) }
+                            else m
+                        }
+                        .padding(vertical = 2.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
                     Text(
                         text = row.date,
                         style = MaterialTheme.typography.labelSmall,
@@ -723,8 +817,17 @@ private fun RecentTransactionsCard(rows: List<RecentRow>) {
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurface,
                             )
+                            val subtitle = buildString {
+                                append(kindLabel(row.kind))
+                                append(" · ")
+                                append(bankLabel(row.bank))
+                                if (row.category != null) {
+                                    append(" · ")
+                                    append(row.category.label)
+                                }
+                            }
                             Text(
-                                text = kindLabel(row.kind) + " · " + bankLabel(row.bank),
+                                text = subtitle,
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
