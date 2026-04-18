@@ -342,23 +342,27 @@ Response:
 Ranking: `ts_rank(fts) * 2 + max(trigram_ar, trigram_en)`. Higher
 score is better. Ties break on `review_count`.
 
-#### 9.4-bug — `/v1/search` silently ignores `min_rating` / `min_reviews`
+#### 9.4-bug — `/v1/search` silently ignores `min_rating` / `min_reviews` — ✅ FIXED (pending deploy)
 
-Verified 2026-04-18 against live `api.omarss.net`:
+Fix committed. `/v1/search` now accepts and honours:
 
-```
-curl '.../v1/search?q=coffee&lat=24.7136&lon=46.6753&radius=5000&min_rating=4&min_reviews=100&limit=5'
-# returns rating=4.8 reviews=58, rating=4.2 reviews=5, ... — same 5
-# results as the same call without the min_* params.
-```
+- `min_rating=<float, 0..5>` — drops places whose `rating` is null or below.
+- `min_reviews=<int>` — drops places whose `review_count` is null or below.
 
-Server accepts the params (no 400, no "unknown field" error) but
-doesn't filter on them. `/v1/places` honours the same params
-correctly — only `/v1/search` drops them.
+Same semantics as `/v1/places`. You can remove the client-side
+`passesQualityGate` filter once `make deploy` has landed.
 
-omono v0.31.x applies the filter client-side on the search path as a
-workaround. Please wire the gate server-side so we can delete the
-extra `.filter { ... }` in `PlacesViewModel.passesQualityGate`.
+Also shipped alongside (`c0f9083`): tighter ranking for `/v1/search` —
+
+1. **Exact match** of the normalised query against `name` / `name_en` — +10
+2. **Prefix match** — +4
+3. **Substring match** — +2
+4. **Phrase adjacency** (`<->`) — × 5 the FTS rank
+5. **Synonym-expanded tokens** — × 2
+6. **Trigram fuzzy** (typo tolerance) — × 1
+
+So `q=قهوة` or `q=coffee shop` now returns the exact/adjacent match
+first, not a long-review-count place that happens to contain the word.
 
 **Why (original ask):** The new search field in omono filters the already-fetched
 list by substring. Works, but limited to whatever the backend chose
