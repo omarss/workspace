@@ -34,9 +34,9 @@ from . import repo
 from .categories import CATEGORIES
 from .config import settings
 from .db import connection
+from .districts import RIYADH_DISTRICTS, District
 from .normalize import normalize_place, normalize_review
 from .scraper import PlaywrightScraper
-from .tiling import tile_grid
 
 console = Console()
 
@@ -61,25 +61,31 @@ def _active_categories() -> list[tuple[str, str]]:
     return [c for c in CATEGORIES if c[0] in flt]
 
 
+def _active_districts() -> list[District]:
+    flt = {s.strip() for s in settings.districts_filter.split(",") if s.strip()}
+    if not flt:
+        return RIYADH_DISTRICTS
+    return [d for d in RIYADH_DISTRICTS if d.slug in flt]
+
+
 def seed_places_jobs() -> int:
-    tiles = tile_grid(
-        settings.riyadh_lat_min,
-        settings.riyadh_lat_max,
-        settings.riyadh_lng_min,
-        settings.riyadh_lng_max,
-        settings.tile_km,
-    )
+    districts = _active_districts()
     cats = _active_categories()
-    # One job per (slug, tile, query) — CATEGORIES is already flattened so
-    # each slug appears twice (Arabic + English query).
-    combos = [(slug, t.lat, t.lng, query) for slug, query in cats for t in tiles]
+    # One job per (slug, district, query). The district centroid becomes
+    # the tile_lat/tile_lng on scrape_jobs (and later on places).
+    combos = [
+        (slug, d.lat, d.lng, query)
+        for slug, query in cats
+        for d in districts
+    ]
     with connection() as conn:
         n = repo.ensure_places_jobs(conn, combos)
         conn.commit()
     unique_slugs = len({s for s, _ in cats})
     console.print(
         f"[bold]places jobs:[/] {len(combos)} combos "
-        f"({unique_slugs} slugs × 2 languages × {len(tiles)} tiles), {n} newly seeded"
+        f"({unique_slugs} slugs × 2 languages × {len(districts)} districts), "
+        f"{n} newly seeded"
     )
     return n
 

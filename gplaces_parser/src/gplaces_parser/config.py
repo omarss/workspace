@@ -38,8 +38,13 @@ class Settings(BaseSettings):
     riyadh_lng_max: float = 47.10
 
     # Comma-separated category slug filter (empty = all). For smoke tests:
-    #   CATEGORIES_FILTER=cafes
+    #   CATEGORIES_FILTER=coffee
     categories_filter: str = ""
+
+    # Comma-separated district slug filter (empty = all districts in
+    # districts.RIYADH_DISTRICTS). For smoke tests:
+    #   DISTRICTS_FILTER=olaya,malaz
+    districts_filter: str = ""
 
     tile_km: float = 3.0
     search_radius_km: float = 2.5

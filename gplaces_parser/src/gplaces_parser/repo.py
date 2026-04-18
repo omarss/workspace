@@ -79,12 +79,28 @@ def _to_jsonb(row: dict[str, Any], keys: Iterable[str]) -> dict[str, Any]:
 
 
 def upsert_places(conn: Connection, rows: list[dict[str, Any]]) -> int:
+    """Insert-or-update with COALESCE semantics.
+
+    Pass 1 (feed crawl) carries only name/lat/lng/url and leaves the
+    detail columns NULL. Pass 2 (review crawl) fills phone/address/
+    rating/etc. Plain `EXCLUDED.col` would wipe pass-2 data the next
+    time pass 1 re-runs, so we only overwrite when the incoming value
+    isn't NULL. The `raw` JSONB is always replaced — it's the most
+    recent payload, not an accumulation.
+    """
     if not rows:
         return 0
     cols = ", ".join(PLACE_COLS)
     placeholders = ", ".join(f"%({c})s" for c in PLACE_COLS)
+    preserved_on_null = {"place_id", "raw", "scraped_at", "updated_at"}
     updates = ", ".join(
-        f"{c} = EXCLUDED.{c}" for c in PLACE_COLS if c not in ("place_id",)
+        (
+            f"{c} = EXCLUDED.{c}"
+            if c in preserved_on_null
+            else f"{c} = COALESCE(EXCLUDED.{c}, places.{c})"
+        )
+        for c in PLACE_COLS
+        if c != "place_id"
     )
     sql = (
         f"INSERT INTO places ({cols}) VALUES ({placeholders}) "
