@@ -1,0 +1,19 @@
+# NodePort so the host-nginx reverse-proxy can reach the pod at
+# http://127.0.0.1:30801 without needing an Ingress or a load balancer.
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-places
+  namespace: api-places
+  labels:
+    app.kubernetes.io/name: api-places
+spec:
+  type: NodePort
+  selector:
+    app.kubernetes.io/name: api-places
+  ports:
+    - name: http
+      port: 8000
+      targetPort: http
+      nodePort: 30801
+      protocol: TCP
