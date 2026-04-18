@@ -18,11 +18,6 @@ object ApiKeysModule {
 
     @Provides
     @Singleton
-    @Named("tomtomApiKey")
-    fun provideTomTomApiKey(): String = BuildConfig.TOMTOM_API_KEY
-
-    @Provides
-    @Singleton
     @Named("gplacesApiUrl")
     fun provideGPlacesApiUrl(): String = BuildConfig.GPLACES_API_URL
 

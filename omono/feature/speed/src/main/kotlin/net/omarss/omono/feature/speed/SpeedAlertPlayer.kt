@@ -78,12 +78,6 @@ class SpeedAlertPlayer @Inject constructor(
         playTone(ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD, TONE_DURATION_MS)
     }
 
-    // Distinct two-beep tone used for the traffic-ahead heads-up so the
-    // user can distinguish it from the over-limit alert.
-    fun alertTrafficAhead() {
-        playTone(ToneGenerator.TONE_CDMA_PIP, TRAFFIC_TONE_DURATION_MS)
-    }
-
     // Looping "put the phone down" tone for the distraction guard.
     // Fires every BEEP_INTERVAL_MS until stopBeeping() is called. Uses
     // a separate code path from playTone because that path is
@@ -190,7 +184,6 @@ class SpeedAlertPlayer @Inject constructor(
         const val MAX_VOLUME = 100
         const val MIN_INTERVAL_MS = 3_000L
         const val TONE_DURATION_MS = 1_200
-        const val TRAFFIC_TONE_DURATION_MS = 800
         const val BEEP_TONE_DURATION_MS = 400
         const val BEEP_INTERVAL_MS = 900L
         const val RESTORE_MARGIN_MS = 300L

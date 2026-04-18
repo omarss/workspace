@@ -120,9 +120,9 @@ fun PlacesRoute(
 
         if (!state.configured) {
             EmptyState(
-                title = "TomTom API key not set",
-                body = "Add tomtom.api.key=... to local.properties and rebuild " +
-                    "to enable the places search.",
+                title = "Places backend not configured",
+                body = "Add gplaces.api.url and gplaces.api.key to local.properties " +
+                    "and rebuild to enable the places search.",
             )
             return@Column
         }
@@ -313,7 +313,7 @@ private fun PlaceList(
 
 // Elevated card variant of the old row. Tapping anywhere on the card
 // drops the user into their default maps app on the place's coords;
-// an inline call button appears when TomTom returned a phone number.
+// an inline call button appears when the backend returned a phone number.
 @Composable
 private fun PlaceCard(
     place: Place,
@@ -352,8 +352,8 @@ private fun PlaceCard(
                         OpenChip()
                     }
                 }
-                // Rating line only appears when we actually have one.
-                // GPlaces fills it in; TomTom fallback omits it.
+                // Rating line only appears when we actually have one
+                // from the gplaces backend.
                 place.rating?.let { rating ->
                     Spacer(Modifier.height(2.dp))
                     RatingLine(rating = rating, reviewCount = place.reviewCount)

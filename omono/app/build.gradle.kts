@@ -23,10 +23,10 @@ val rootLocalProps = Properties().apply {
     rootProject.file("local.properties").takeIf { it.exists() }
         ?.inputStream()?.use { load(it) }
 }
-val tomtomApiKey: String = rootLocalProps.getProperty("tomtom.api.key", "")
-// Self-hosted Google Places proxy (gplaces_parser backend). When both
-// URL and key are present, DI uses this instead of TomTom for POI
-// lookups. Both default to empty so a fresh clone still builds.
+// Self-hosted Google Places proxy (gplaces_parser backend) — the only
+// POI source the app uses. Missing values build an APK that renders
+// a "not configured" empty state on the places screen; the rest of
+// the app still works.
 val gplacesApiUrl: String = rootLocalProps.getProperty("gplaces.api.url", "")
 val gplacesApiKey: String = rootLocalProps.getProperty("gplaces.api.key", "")
 
@@ -38,7 +38,6 @@ android {
         versionCode = 31
         versionName = "0.22.0"
 
-        buildConfigField("String", "TOMTOM_API_KEY", "\"${tomtomApiKey}\"")
         buildConfigField("String", "GPLACES_API_URL", "\"${gplacesApiUrl}\"")
         buildConfigField("String", "GPLACES_API_KEY", "\"${gplacesApiKey}\"")
     }
