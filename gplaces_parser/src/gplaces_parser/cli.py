@@ -15,7 +15,7 @@ console = Console()
 
 @app.command("serve")
 def serve() -> None:
-    """Run the FastAPI /v1/nearby service (see FEEDBACK.md)."""
+    """Run the FastAPI /v1/places service (see FEEDBACK.md)."""
     from .api.main import run
 
     run()

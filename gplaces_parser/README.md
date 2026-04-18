@@ -1,74 +1,115 @@
 # gplaces_parser
 
-Crawl every public Google Maps place and review in Riyadh (in Arabic)
-via [Outscraper](https://outscraper.com), stored in a local Postgres 18
-database. Resumable, idempotent, and throttled for concurrent workers.
+Two halves of one personal product:
 
-## How it works
+1. **Scraper** — a Playwright-driven Chromium that crawls Google Maps
+   results for Arabic categories across a Riyadh tile grid, captures
+   places + reviews, and upserts everything into Postgres 18.
+2. **API** — a small FastAPI service (`GET /v1/places`) that serves
+   those places by lat/lon/radius/category to the omono Android client.
+   Contract: [FEEDBACK.md](./FEEDBACK.md).
 
-1. **Tile Riyadh** — bounding box `(24.50–25.05, 46.45–47.10)` is split into
-   ~3 km cells (~400 tiles).
-2. **Fan out queries** — for each tile × ~40 Arabic category queries
-   (`مطاعم`, `مقاهي`, `حدائق`, …) one Outscraper async job is submitted.
-3. **Upsert places** — results land in `places`, deduped by `place_id`;
-   raw JSON kept in a `JSONB` column.
-4. **Fan out reviews** — for each new place, fetch up to 2000 reviews
-   (`sort=newest`) and upsert into `reviews`.
-5. **Resume** — `scrape_jobs` tracks every (kind, scope) so a rerun only
-   picks up pending work; `SKIP LOCKED` makes multi-worker safe.
+## How the scraper works
+
+1. **Tile Riyadh** — bbox from `.env` (default `24.50–25.05, 46.45–47.10`)
+   is split into ~3 km cells.
+2. **Fan out queries** — for each tile × 19 Arabic category queries
+   (see `src/gplaces_parser/categories.py`: `مقاهي، مطاعم، حدائق…`) a
+   Google Maps search URL is opened in persistent Chromium.
+3. **Scroll + extract** — the results feed is scrolled until the end
+   marker; each result card gives us CID, name, lat/lng, and url.
+4. **Review pass** — for each place, open the detail page, read
+   address/phone/rating/website, click **Reviews → Newest**, scroll
+   through every review, and upsert.
+5. **Resume** — every unit of work is a row in `scrape_jobs`, claimed
+   with `SELECT … FOR UPDATE SKIP LOCKED`, so re-running after a
+   crash picks up exactly where it left off and multiple terminals can
+   share the queue without stepping on each other.
+
+CAPTCHA handling: the scraper pauses on Google's interstitials and
+waits for you to solve them in the open Chromium window, then press
+Enter. Session cookies survive across runs (`~/.cache/gplaces_parser/
+chromium`), so the rate limiter stays quieter over time.
 
 ## Prerequisites
 
 - Python 3.12+
-- Postgres 18 running locally on `localhost:5432` (already installed on this
-  machine)
-- An Outscraper API key
+- Postgres 18 on `localhost:5432` (no PostGIS needed — haversine runs
+  in plain SQL)
+- A graphical desktop so Chromium can open for CAPTCHA solving
 
 ## Setup
 
 ```bash
 cp .env.example .env
-# then put your OUTSCRAPER_API_KEY in .env
+# edit .env — set GPLACES_API_KEY (openssl rand -hex 32) for the API
 
-make install         # creates .venv, installs the package + deps
-make db-create       # creates role `gplaces` and db `gplaces` (uses sudo)
-make migrate         # applies Alembic schema
+make install             # .venv + project + dev deps
+make install-browser     # Chromium (~200 MB)
+make db-create           # create role `gplaces` + db `gplaces` (sudo)
+make migrate             # applies Alembic schema
 ```
 
 ## Running the crawl
 
 ```bash
-make scrape-places   # Pass 1 — fetch all places across Riyadh
-make scrape-reviews  # Pass 2 — fetch reviews for every place with >0 reviews
-make status          # Show totals + scrape_jobs breakdown
+make scrape-places       # pass 1 — fetch place cards across the bbox
+make scrape-reviews      # pass 2 — detail + reviews for every place
+make status              # totals + scrape_jobs breakdown
+make psql                # ad-hoc SQL
 ```
 
-Both passes are resumable — re-run after a crash and they pick up where they
-left off. To inspect state directly:
+Both passes are resumable. To parallelise, run `make scrape-places` in
+several terminals — each launches its own Chromium and each `SKIP
+LOCKED` transaction claims a disjoint slice of the queue.
+
+## Serving the API
 
 ```bash
-make psql
+make serve               # runs `uvicorn` on $API_PORT (default 8000)
 ```
+
+Spot-check:
+
+```bash
+curl -H "X-Api-Key: $GPLACES_API_KEY" \
+  'http://127.0.0.1:8000/v1/places?lat=24.7140&lon=46.6760&radius=1500&category=coffee&limit=10' | jq .
+```
+
+## Deploying
+
+```bash
+make image-build image-load      # build and import into the local k3s
+make k8s-apply                   # apply homelab/apps/api-places
+# then, on the host:
+sudo cp ../homelab/nginx/api.omarss.net.conf /etc/nginx/sites-available/
+sudo ln -sf /etc/nginx/sites-available/api.omarss.net.conf /etc/nginx/sites-enabled/
+sudo nginx -t && sudo systemctl reload nginx
+sudo certbot --nginx -d api.omarss.net
+```
+
+Public URL after that: `https://api.omarss.net/v1/places` (see
+`FEEDBACK.md` for the contract omono speaks).
 
 ## Schema
 
 | Table | PK | Notes |
 |-------|-----|-------|
-| `places` | `place_id` | Normalized columns + full `raw` JSONB |
+| `places` | `place_id` (Google CID) | Normalised columns + full `raw` JSONB |
 | `reviews` | `review_id` | FK → `places.place_id`, full `raw` JSONB |
-| `scrape_jobs` | `id` | Resumability: `(kind, category, tile)` or `(kind, place_id)` |
+| `scrape_jobs` | `id` | Resumable job log, one row per (kind, scope) |
 
 Handy queries:
 
 ```sql
--- Top rated cafes in Riyadh with ≥ 500 reviews
+-- Top-rated cafes in Riyadh with ≥ 100 reviews
 SELECT name, rating, reviews_count, full_address
 FROM places
-WHERE category = 'cafes' AND reviews_count >= 500
-ORDER BY rating DESC, reviews_count DESC
+WHERE category = 'coffee' AND COALESCE(reviews_count, 0) >= 100
+ORDER BY rating DESC NULLS LAST, reviews_count DESC NULLS LAST
 LIMIT 20;
 
--- Newest 1-star reviews
+-- Every 1-star review, newest first
 SELECT r.published_at, r.rating, r.text, p.name
 FROM reviews r JOIN places p USING (place_id)
 WHERE r.rating = 1
@@ -76,21 +117,12 @@ ORDER BY r.published_at DESC NULLS LAST
 LIMIT 50;
 ```
 
-## Cost control
-
-Outscraper charges per result. To do a dry-run before spending credit,
-limit the scope via `.env`:
-
-- Smaller bounding box (e.g. one Riyadh district)
-- `TILE_KM=5.0` instead of `3.0` (fewer tiles)
-- Trim `src/gplaces_parser/categories.py` to 3–5 categories
-- `RESULTS_PER_QUERY=100` and `REVIEWS_PER_PLACE=200`
-
 ## Troubleshooting
 
 | Symptom | Fix |
 |---|---|
-| `make db-create` fails on `sudo -u postgres` | Make sure `postgres` role exists and you can `sudo` |
-| `pydantic_core.ValidationError: outscraper_api_key` | Missing/too-short key in `.env` |
-| Stuck `running` jobs after a crash | `UPDATE scrape_jobs SET status='pending' WHERE status='running' AND started_at < now()-interval '1 hour';` then re-run |
-| Failed jobs | `SELECT id, error FROM scrape_jobs WHERE status='failed';` — reset with `UPDATE scrape_jobs SET status='pending', attempts=0 WHERE id IN (...);` |
+| `make db-create` fails on `sudo -u postgres` | make sure the `postgres` role exists locally |
+| `pydantic_core.ValidationError: gplaces_api_key` | empty `GPLACES_API_KEY` in `.env` — API refuses to start without one |
+| Stuck `running` jobs after crash | `UPDATE scrape_jobs SET status='pending' WHERE status='running' AND started_at < now() - interval '1 hour';` then rerun |
+| Failed jobs | `SELECT id, error FROM scrape_jobs WHERE status='failed';` → reset: `UPDATE scrape_jobs SET status='pending', attempts=0 WHERE id IN (…);` |
+| Chromium won't launch (ProcessSingleton) | another scraper instance already holds the profile — `pkill -f scrape-` or wait |

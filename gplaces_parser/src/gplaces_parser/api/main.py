@@ -1,6 +1,6 @@
 """FastAPI app factory + uvicorn entry.
 
-Exposes one endpoint, `GET /v1/nearby`, per the contract in
+Exposes one endpoint, `GET /v1/places`, per the contract in
 `FEEDBACK.md` at the repo root. The app is read-only against Postgres —
 it never writes, which is why no DB migration story is wired into it.
 """

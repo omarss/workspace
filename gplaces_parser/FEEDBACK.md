@@ -17,9 +17,9 @@ confirm with the user before varying these shapes.
 - **Host**: k8s on the same machine (`homelab/apps/...`). Match the
   existing `apps-host` pattern — HTTP-only Deployment + Service, nginx
   vhost without the `listen 443 ssl` block (certbot adds TLS after the
-  fact via `sudo certbot --nginx -d api-places.omarss.net`).
-- **DNS / vhost name**: `api-places.omarss.net` (suggested — flag if you
-  prefer a different subdomain).
+  fact via `sudo certbot --nginx -d api.omarss.net`).
+- **DNS / vhost name**: `api.omarss.net` (general personal API host —
+  gplaces lives under `/v1/places` there).
 - **Port inside the pod**: `8000` (conventional FastAPI default; any
   port is fine, the Service maps to it).
 - **Geofence**: already covered by the Saudi geofence at the host level.
@@ -51,7 +51,7 @@ secret, mirror it into omono's `local.properties` as `gplaces.api.key`.
 
 ---
 
-## 3. Primary endpoint — `GET /v1/nearby`
+## 3. Primary endpoint — `GET /v1/places`
 
 This is the only endpoint omono calls. Everything else (`/v1/place/{id}`,
 `/v1/reviews`, etc.) is optional — build them if it suits the data
@@ -160,7 +160,7 @@ to backfill.
 
 ## 5. Rate + caching expectations from the client
 
-- Omono hits `/v1/nearby` once per user-triggered refresh
+- Omono hits `/v1/places` once per user-triggered refresh
   (screen-open, pull-to-refresh, category change, radius change).
 - No polling, no background calls. Peak realistic usage: ~10 rpm from
   a single user.

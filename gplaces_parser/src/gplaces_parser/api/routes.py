@@ -1,4 +1,4 @@
-"""/v1/nearby — see FEEDBACK.md §3."""
+"""/v1/places — see FEEDBACK.md §3."""
 
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ router = APIRouter(prefix="/v1")
 
 
 @router.get(
-    "/nearby",
+    "/places",
     response_model=NearbyResponse,
     responses={401: {}, 400: {}},
 )
