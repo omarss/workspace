@@ -125,39 +125,6 @@ fun PlacesRoute(
             onChange = viewModel::setQualityFilter,
         )
 
-        val compassMarkers = buildList {
-            add(
-                CompassMarker(
-                    bearingDeg = 0f,
-                    color = Color(0xFFEF4444), // red — true north
-                    label = "North",
-                ),
-            )
-            state.qiblaBearing?.let {
-                add(
-                    CompassMarker(
-                        bearingDeg = it,
-                        color = Color(0xFFF59E0B), // amber — Kaaba / Qibla
-                        label = "Mecca",
-                    ),
-                )
-            }
-            state.nearestMosque?.let { mosque ->
-                add(
-                    CompassMarker(
-                        bearingDeg = mosque.bearingDegrees,
-                        color = Color(0xFF10B981), // emerald — nearest mosque
-                        label = "Mosque · ${formatDistance(mosque.distanceMeters)}",
-                    ),
-                )
-            }
-        }
-        CompassRose(
-            headingDeg = state.heading,
-            markers = compassMarkers,
-            modifier = Modifier.padding(vertical = 8.dp),
-        )
-
         if (!state.configured) {
             EmptyState(
                 title = "Places backend not configured",

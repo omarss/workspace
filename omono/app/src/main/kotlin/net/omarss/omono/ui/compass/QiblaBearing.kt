@@ -1,4 +1,4 @@
-package net.omarss.omono.ui.places
+package net.omarss.omono.ui.compass
 
 import kotlin.math.atan2
 import kotlin.math.cos

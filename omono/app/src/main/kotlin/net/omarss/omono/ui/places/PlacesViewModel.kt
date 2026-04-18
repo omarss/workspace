@@ -50,11 +50,6 @@ class PlacesViewModel @Inject constructor(
     private val rawPlaces = MutableStateFlow<List<Place>>(emptyList())
     private val loading = MutableStateFlow(false)
     private val error = MutableStateFlow<String?>(null)
-    // Last GPS fix — used to compute the qibla bearing and feed the
-    // nearest-mosque query. Nullable because refresh may fail before
-    // a fix arrives (no permission, airplane mode, etc.).
-    private val currentLocation = MutableStateFlow<Pair<Double, Double>?>(null)
-    private val nearestMosque = MutableStateFlow<Place?>(null)
 
     private val heading: StateFlow<Float> = headingSensor.headings()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), initialValue = 0f)
@@ -64,17 +59,8 @@ class PlacesViewModel @Inject constructor(
         coneDegrees,
         radiusMeters,
         rawPlaces,
-        // Nested combine — Kotlin tops out at 5 direct args. Carries
-        // search + quality + heading + loading + error + compass data
-        // so the outer combine still stays within bounds.
-        combine(
-            combine(searchQuery, qualityFilter, heading) { q, qf, h ->
-                Triple(q, qf, h)
-            },
-            combine(loading, error) { l, e -> l to e },
-            combine(currentLocation, nearestMosque) { loc, mosque -> loc to mosque },
-        ) { (q, qf, h), (l, e), (loc, mosque) ->
-            CombinedExtras(q, qf, h, l, e, loc, mosque)
+        combine(searchQuery, qualityFilter, heading, loading, error) { q, qf, h, l, e ->
+            CombinedExtras(q, qf, h, l, e)
         },
     ) { category, cone, radius, places, extras ->
         val directionFiltered = filterByDirection(places, extras.heading, cone)
@@ -92,10 +78,6 @@ class PlacesViewModel @Inject constructor(
             places = qualityFiltered,
             searchQuery = extras.searchQuery,
             qualityFilter = extras.qualityFilter,
-            qiblaBearing = extras.currentLocation?.let {
-                qiblaBearingDeg(it.first, it.second).toFloat()
-            },
-            nearestMosque = extras.nearestMosque,
             loading = extras.loading,
             errorMessage = extras.error,
             configured = repository.isConfigured,
@@ -112,8 +94,6 @@ class PlacesViewModel @Inject constructor(
         val heading: Float,
         val loading: Boolean,
         val error: String?,
-        val currentLocation: Pair<Double, Double>?,
-        val nearestMosque: Place?,
     )
 
     fun selectCategory(category: PlaceCategory?) {
@@ -172,11 +152,6 @@ class PlacesViewModel @Inject constructor(
                 if (rawPlaces.value.isEmpty()) error.value = "No GPS fix yet"
                 return@launch
             }
-            currentLocation.value = location
-            // Fire the nearest-mosque query alongside the main list.
-            // One extra HTTP call per refresh; the compass needs its
-            // bearing and the user expects it to follow location.
-            refreshNearestMosque(location)
             val key = FetchKey(
                 category = selectedCategory.value,
                 radiusMeters = radiusMeters.value,
@@ -258,11 +233,6 @@ class PlacesViewModel @Inject constructor(
         // reviewed kiosks and closed venues.
         const val MIN_RATING: Float = 4.0f
         const val MIN_REVIEW_COUNT: Int = 100
-
-        // Mosque-compass search radius. Roomy enough to always find
-        // something in urban Riyadh; smaller and a user in a less-
-        // dense part of the city would see an empty mosque marker.
-        const val MOSQUE_SEARCH_RADIUS_M = 5_000
     }
 
     private fun hasLocationPermission(): Boolean =
@@ -281,25 +251,6 @@ class PlacesViewModel @Inject constructor(
         return loc?.let { Pair(it.latitude, it.longitude) }
     }
 
-    // Dedicated fetch for the single nearest mosque so the compass
-    // always has a sensible "where to pray" arrow regardless of the
-    // category currently selected in the list. Failures are silent —
-    // the marker just disappears.
-    private suspend fun refreshNearestMosque(location: Pair<Double, Double>) {
-        runCatching {
-            repository.nearby(
-                latitude = location.first,
-                longitude = location.second,
-                category = PlaceCategory.MOSQUE,
-                radiusMeters = MOSQUE_SEARCH_RADIUS_M,
-            )
-        }.onSuccess { places ->
-            nearestMosque.value = places.minByOrNull { it.distanceMeters }
-        }.onFailure {
-            Timber.w(it, "Nearest-mosque lookup failed")
-        }
-    }
-
 }
 
 data class PlacesUiState(
@@ -310,10 +261,6 @@ data class PlacesUiState(
     val places: List<Place> = emptyList(),
     val searchQuery: String = "",
     val qualityFilter: Boolean = true,
-    // true bearings in degrees from north, used by the compass rose.
-    // Null until the first GPS fix arrives.
-    val qiblaBearing: Float? = null,
-    val nearestMosque: Place? = null,
     val loading: Boolean = false,
     val errorMessage: String? = null,
     val configured: Boolean = false,

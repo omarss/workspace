@@ -1,4 +1,4 @@
-package net.omarss.omono.ui.places
+package net.omarss.omono.ui.compass
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
