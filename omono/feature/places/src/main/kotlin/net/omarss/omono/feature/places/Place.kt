@@ -25,6 +25,13 @@ data class Place(
     // full detail panel (reviews, photos, hours). Server-provided
     // since v0.29.x; before that the client parsed it out of `id`.
     val cid: String? = null,
+    // Operational state from Google — one of OPERATIONAL,
+    // CLOSED_TEMPORARILY, CLOSED_PERMANENTLY, or null when Google
+    // didn't surface it. UI layers that direct users toward a place
+    // (compass quick-toggle pins, navigation shortcuts) should hide
+    // any CLOSED_* entry so we don't route the driver to a dead
+    // destination.
+    val businessStatus: String? = null,
 )
 
 // User-facing categories. Each maps to a lowercase-snake slug that

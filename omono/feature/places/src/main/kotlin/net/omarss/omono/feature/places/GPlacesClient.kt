@@ -185,6 +185,7 @@ class GPlacesClient @Inject constructor(
                 item.optBoolean("open_now", false)
             } else null
             val cid = item.optStringOrNull("cid")
+            val businessStatus = item.optStringOrNull("business_status")
             val distance = haversineMeters(userLat, userLon, lat, lon)
             val bearing = bearingDegrees(userLat, userLon, lat, lon)
 
@@ -202,6 +203,7 @@ class GPlacesClient @Inject constructor(
                 reviewCount = reviewCount,
                 openNow = openNow,
                 cid = cid,
+                businessStatus = businessStatus,
             )
         }
         return out.sortedBy { it.distanceMeters }

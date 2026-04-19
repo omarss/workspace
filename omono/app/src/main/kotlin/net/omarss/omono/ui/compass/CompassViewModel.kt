@@ -105,6 +105,7 @@ class CompassViewModel @Inject constructor(
                 name = snap.name,
                 latitude = snap.latitude,
                 longitude = snap.longitude,
+                cid = snap.cid,
                 distanceMeters = d,
                 bearingDeg = b,
             )
@@ -190,11 +191,15 @@ class CompassViewModel @Inject constructor(
     // One row's worth of identity / position for a place-categories
     // pin. The bearing + distance shown on screen are derived live
     // from the current fix; this only carries enough to avoid
-    // re-querying the backend on every heading tick.
+    // re-querying the backend on every heading tick. The `cid`
+    // survives here so the tap handler can deep-link to Google Maps'
+    // full place card (reviews / photos / hours) instead of dropping
+    // the user into turn-by-turn navigation.
     private data class CategoryPlaceSnapshot(
         val name: String,
         val latitude: Double,
         val longitude: Double,
+        val cid: String?,
     )
 
     fun toggleCategory(category: PlaceCategory) {
@@ -230,6 +235,9 @@ class CompassViewModel @Inject constructor(
         // One request per enabled category. The set is user-toggled and
         // expected to stay small (handful of pins), so sequential is
         // fine — no need to add a parallelising helper for this.
+        // We ask for a small page (not just the single nearest) so that
+        // if the literal nearest place is closed we can still surface
+        // the next-nearest open one rather than rendering nothing.
         val updated = nearbyCategoryPlaces.value.toMutableMap()
         for (category in enabled) {
             val result = runCatching {
@@ -240,13 +248,19 @@ class CompassViewModel @Inject constructor(
                     radiusMeters = CATEGORY_RADIUS_M,
                     minRating = null,
                     minReviews = null,
+                    limit = CATEGORY_CANDIDATES,
                 )
             }.onFailure {
                 Timber.w(it, "Compass nearest-%s lookup failed", category.name)
             }.getOrNull() ?: continue
-            val nearest = result.firstOrNull()
+            val nearest = result.firstOrNull(::isOpenEnough)
             if (nearest != null) {
                 updated[category] = nearest.toSnapshot()
+            } else {
+                // No non-closed candidate in the page — drop any stale
+                // entry so the row doesn't point at a place that's
+                // since been flagged closed.
+                updated.remove(category)
             }
         }
         // Drop entries for categories the user has since disabled so the
@@ -255,10 +269,25 @@ class CompassViewModel @Inject constructor(
         nearbyCategoryPlaces.value = updated
     }
 
+    // The compass is a driver-aid surface — routing a user to a place
+    // that's permanently or temporarily closed is worse than showing
+    // nothing. We filter both the explicit `business_status` closures
+    // and the `open_now == false` signal. Places with `null` signals
+    // (Google didn't surface one) are allowed through — most of the
+    // current scrape data falls in that bucket and dropping them all
+    // would leave the compass empty for a long time.
+    private fun isOpenEnough(place: Place): Boolean {
+        val status = place.businessStatus?.uppercase()
+        if (status == "CLOSED_TEMPORARILY" || status == "CLOSED_PERMANENTLY") return false
+        if (place.openNow == false) return false
+        return true
+    }
+
     private fun Place.toSnapshot() = CategoryPlaceSnapshot(
         name = name,
         latitude = latitude,
         longitude = longitude,
+        cid = cid,
     )
 
     // Exposed as a no-op for the refresh button — the stream keeps
@@ -291,6 +320,11 @@ class CompassViewModel @Inject constructor(
         // of Riyadh, without the backend returning so many candidates
         // that the "first" entry isn't actually the nearest.
         const val CATEGORY_RADIUS_M = 5_000
+
+        // Small candidate page per category — enough headroom for the
+        // open-filter to fall through the literal nearest result when
+        // it's flagged closed.
+        const val CATEGORY_CANDIDATES = 10
     }
 }
 
@@ -341,6 +375,10 @@ data class CategoryRow(
     val name: String,
     val latitude: Double,
     val longitude: Double,
+    // Google Maps CID when the backend supplied one. The UI prefers a
+    // `?cid=<n>` deep link so tapping the row opens the place's full
+    // card (reviews, photos, hours) rather than raw turn-by-turn nav.
+    val cid: String?,
     val distanceMeters: Double,
     val bearingDeg: Float,
 )

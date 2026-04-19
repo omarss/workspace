@@ -117,12 +117,15 @@ fun CompassRoute(
                     color = Color(0xFF10B981),
                     subtitle = "${formatMetres(mosque.distanceMeters)} · heading " +
                         compassLabel(mosque.bearingDeg),
-                    // Tapping the row opens Google Maps in navigation
-                    // mode so the user can drive straight there; this
-                    // sidesteps the usual "pick a mode" Maps chooser.
+                    // The offline mosque directory has no Google Maps
+                    // CID, so drop a labelled pin at its coords. From
+                    // there Maps shows name + the "Directions" button
+                    // like any regular search result.
                     onClick = {
-                        launchMapsNavigation(
+                        launchMapsPlace(
                             context = context,
+                            cid = null,
+                            label = mosque.name ?: "Mosque",
                             lat = mosque.latitude,
                             lon = mosque.longitude,
                         )
@@ -141,8 +144,10 @@ fun CompassRoute(
                     subtitle = "${row.category.label} · ${formatMetres(row.distanceMeters)} · heading " +
                         compassLabel(row.bearingDeg),
                     onClick = {
-                        launchMapsNavigation(
+                        launchMapsPlace(
                             context = context,
+                            cid = row.cid,
+                            label = row.name.ifBlank { row.category.label },
                             lat = row.latitude,
                             lon = row.longitude,
                         )
@@ -290,22 +295,27 @@ private fun BearingRow(
     }
 }
 
-// Opens Google Maps in driving-navigation mode to the destination.
-// Uses the universal maps URL (`/maps/dir/?api=1&destination=`) so any
-// handler — Google Maps, an OEM maps app, the generic geo: resolver —
-// can take the intent. Falling back to the lat/lon `geo:` URI when no
-// http viewer is installed is the usual Android dance; we keep it
-// simple here because every Android phone ships Google Maps capable of
-// resolving the https URL.
-private fun launchMapsNavigation(
+// Opens the Google Maps place card for the given place, preferring a
+// `?cid=<n>` deep link when the backend supplied one so the user lands
+// on the full detail view (reviews, photos, hours) rather than a bare
+// lat/lon pin. The `geo:` fallback still labels the pin with the
+// place's name, so even without a CID the result feels like a real
+// place page with a Directions button ready to tap. Mirrors the
+// PlacesScreen logic so both tabs feel identical when the user taps a
+// result.
+private fun launchMapsPlace(
     context: Context,
+    cid: String?,
+    label: String,
     lat: Double,
     lon: Double,
 ) {
-    val encoded = android.net.Uri.encode("$lat,$lon")
-    val uri = ("https://www.google.com/maps/dir/?api=1" +
-        "&destination=$encoded" +
-        "&travelmode=driving").toUri()
+    val uri = if (!cid.isNullOrBlank()) {
+        "https://www.google.com/maps?cid=$cid".toUri()
+    } else {
+        val encodedLabel = android.net.Uri.encode(label)
+        "geo:0,0?q=$lat,$lon($encodedLabel)".toUri()
+    }
     val intent = Intent(Intent.ACTION_VIEW, uri).apply {
         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     }
