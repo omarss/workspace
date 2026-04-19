@@ -28,7 +28,8 @@ WITH
   candidates AS (
     SELECT p.*
     FROM places p, q
-    WHERE (
+    WHERE p.category IS NOT NULL
+      AND (
         %(categories)s::text[] IS NULL
         OR p.category = ANY(%(categories)s::text[])
       )
