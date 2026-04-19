@@ -107,7 +107,7 @@ class FinanceDashboardViewModel @Inject constructor(
             ready = true,
             selectedMonth = selectedMonth,
             isAllTime = selectedAllTime,
-            availableMonths = buildAvailableMonths(current),
+            availableMonths = buildAvailableMonths(current, transactionsCache, zone),
             isCurrentMonth = isCurrent,
             todaySar = totals.todaySar,
             monthSar = totals.monthSar,
@@ -163,11 +163,26 @@ class FinanceDashboardViewModel @Inject constructor(
         return monthSar * daysInMonth / dayOfMonth
     }
 
-    // A fixed six-month rolling window ending at the current month. The
-    // underlying SMS store only holds ~180 days of history, so anything
-    // older just renders as empty totals rather than going missing.
-    private fun buildAvailableMonths(current: YearMonth): List<YearMonth> =
-        (0 until 6).map { current.minusMonths(it.toLong()) }
+    // Build the month chip list from the actual cache: every calendar
+    // month between the earliest parsed transaction and the current
+    // month, newest first. Ensures the picker covers however far back
+    // the user's SMS inbox goes instead of a hardcoded window. Falls
+    // back to the last 6 months when the cache is empty (fresh install
+    // / no SMS permission) so the UI still has something to render.
+    private fun buildAvailableMonths(
+        current: YearMonth,
+        transactions: List<Transaction>,
+        zone: ZoneId,
+    ): List<YearMonth> {
+        val earliest = transactions.minOfOrNull { it.timestampMillis } ?: return (0 until 6).map {
+            current.minusMonths(it.toLong())
+        }
+        val earliestYm = YearMonth.from(Instant.ofEpochMilli(earliest).atZone(zone).toLocalDate())
+        val span = java.time.temporal.ChronoUnit.MONTHS.between(earliestYm, current)
+            .toInt()
+            .coerceAtLeast(0)
+        return (0..span).map { current.minusMonths(it.toLong()) }
+    }
 
     private fun buildCategoryRows(
         byCategory: Map<SpendingCategory, Double>,

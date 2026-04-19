@@ -141,9 +141,12 @@ class SpendingRepository @Inject constructor(
         }
 
     private companion object {
-        // ~6 months of history so the finance dashboard can offer a
-        // month picker for comparison. SMS inbox queries are cheap and
-        // even 6 months of transactions parse in ≈10 ms on-device.
-        const val LOOKBACK_MILLIS: Long = 180L * 24 * 60 * 60 * 1000
+        // ~3 years of history so the finance dashboard's month picker
+        // and the "All time" tab can see everything the user's SMS
+        // inbox holds. The inbox query is O(n) over bank-senders only
+        // (the address filter cuts the hit rate hard), and parsing a
+        // few hundred rows stays under ~30 ms on-device. Bumping past
+        // this needs a hard benchmark on real data before shipping.
+        const val LOOKBACK_MILLIS: Long = 3L * 365 * 24 * 60 * 60 * 1000
     }
 }
