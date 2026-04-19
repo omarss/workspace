@@ -4,11 +4,16 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.Atm
 import androidx.compose.material.icons.filled.BakeryDining
+import androidx.compose.material.icons.filled.Cake
 import androidx.compose.material.icons.filled.ContentCut
+import androidx.compose.material.icons.filled.DinnerDining
 import androidx.compose.material.icons.filled.DirectionsBus
+import androidx.compose.material.icons.filled.Eco
 import androidx.compose.material.icons.filled.ElectricBolt
 import androidx.compose.material.icons.filled.Fastfood
 import androidx.compose.material.icons.filled.FitnessCenter
+import androidx.compose.material.icons.filled.FreeBreakfast
+import androidx.compose.material.icons.filled.Icecream
 import androidx.compose.material.icons.filled.LocalCafe
 import androidx.compose.material.icons.filled.LocalCarWash
 import androidx.compose.material.icons.filled.LocalDrink
@@ -18,10 +23,15 @@ import androidx.compose.material.icons.filled.LocalLaundryService
 import androidx.compose.material.icons.filled.LocalLibrary
 import androidx.compose.material.icons.filled.LocalMall
 import androidx.compose.material.icons.filled.LocalPharmacy
+import androidx.compose.material.icons.filled.LocalPizza
 import androidx.compose.material.icons.filled.LocalPostOffice
+import androidx.compose.material.icons.filled.LunchDining
 import androidx.compose.material.icons.filled.Mosque
 import androidx.compose.material.icons.filled.Park
+import androidx.compose.material.icons.filled.RamenDining
 import androidx.compose.material.icons.filled.Restaurant
+import androidx.compose.material.icons.filled.RiceBowl
+import androidx.compose.material.icons.filled.SetMeal
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -62,4 +72,19 @@ fun PlaceCategory.visual(): PlaceCategoryVisual = when (this) {
     PlaceCategory.LIBRARY -> PlaceCategoryVisual(Icons.Filled.LocalLibrary, Color(0xFF7C3AED))
     PlaceCategory.TRANSIT -> PlaceCategoryVisual(Icons.Filled.DirectionsBus, Color(0xFFF59E0B))
     PlaceCategory.JUICE -> PlaceCategoryVisual(Icons.Filled.LocalDrink, Color(0xFFF43F5E))
+    PlaceCategory.SEAFOOD -> PlaceCategoryVisual(Icons.Filled.SetMeal, Color(0xFF0EA5E9))
+    PlaceCategory.SUSHI -> PlaceCategoryVisual(Icons.Filled.RiceBowl, Color(0xFFDB2777))
+    PlaceCategory.BURGER -> PlaceCategoryVisual(Icons.Filled.LunchDining, Color(0xFFF97316))
+    PlaceCategory.PIZZA -> PlaceCategoryVisual(Icons.Filled.LocalPizza, Color(0xFFDC2626))
+    PlaceCategory.SHAWARMA -> PlaceCategoryVisual(Icons.Filled.DinnerDining, Color(0xFFCA8A04))
+    PlaceCategory.KABSA -> PlaceCategoryVisual(Icons.Filled.RiceBowl, Color(0xFFB45309))
+    PlaceCategory.MANDI -> PlaceCategoryVisual(Icons.Filled.DinnerDining, Color(0xFF92400E))
+    PlaceCategory.STEAKHOUSE -> PlaceCategoryVisual(Icons.Filled.DinnerDining, Color(0xFF7F1D1D))
+    PlaceCategory.ITALIAN_FOOD -> PlaceCategoryVisual(Icons.Filled.DinnerDining, Color(0xFF16A34A))
+    PlaceCategory.INDIAN_FOOD -> PlaceCategoryVisual(Icons.Filled.RiceBowl, Color(0xFFEA580C))
+    PlaceCategory.ASIAN_FOOD -> PlaceCategoryVisual(Icons.Filled.RamenDining, Color(0xFFE11D48))
+    PlaceCategory.HEALTHY_FOOD -> PlaceCategoryVisual(Icons.Filled.Eco, Color(0xFF22C55E))
+    PlaceCategory.BREAKFAST -> PlaceCategoryVisual(Icons.Filled.FreeBreakfast, Color(0xFF6B7280))
+    PlaceCategory.DESSERT -> PlaceCategoryVisual(Icons.Filled.Cake, Color(0xFFEC4899))
+    PlaceCategory.ICE_CREAM -> PlaceCategoryVisual(Icons.Filled.Icecream, Color(0xFF38BDF8))
 }

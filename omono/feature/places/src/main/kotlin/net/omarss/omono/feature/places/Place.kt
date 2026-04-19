@@ -37,7 +37,17 @@ data class Place(
 // User-facing categories. Each maps to a lowercase-snake slug that
 // the gplaces backend accepts on the `category` query param — see
 // GPlacesClient.slug and gplaces_parser/FEEDBACK.md.
-enum class PlaceCategory(val label: String, val icon: String) {
+//
+// `isCuisine` flags the food-adjacent sub-slugs the backend accepts
+// (FEEDBACK.md §9.11). They're narrower than the top-level buckets
+// like RESTAURANT / FAST_FOOD / BAKERY and show up as a second chip
+// row only when one of those food parents is selected, so the main
+// chip row stays scannable.
+enum class PlaceCategory(
+    val label: String,
+    val icon: String,
+    val isCuisine: Boolean = false,
+) {
     COFFEE("Coffee", "☕"),
     RESTAURANT("Restaurants", "🍽"),
     FAST_FOOD("Fast food", "🍔"),
@@ -60,4 +70,24 @@ enum class PlaceCategory(val label: String, val icon: String) {
     LIBRARY("Library", "📚"),
     TRANSIT("Transit", "🚌"),
     JUICE("Juice", "🥤"),
+
+    // Cuisine sub-slugs — shown only when RESTAURANT / FAST_FOOD /
+    // BAKERY is the active top-level pick. Each behaves as an
+    // independent category on the backend (category=sushi etc.) so
+    // picking one replaces the parent selection on the wire.
+    SEAFOOD("Seafood", "🦐", isCuisine = true),
+    SUSHI("Sushi", "🍣", isCuisine = true),
+    BURGER("Burger", "🍔", isCuisine = true),
+    PIZZA("Pizza", "🍕", isCuisine = true),
+    SHAWARMA("Shawarma", "🥙", isCuisine = true),
+    KABSA("Kabsa", "🍛", isCuisine = true),
+    MANDI("Mandi", "🍖", isCuisine = true),
+    STEAKHOUSE("Steakhouse", "🥩", isCuisine = true),
+    ITALIAN_FOOD("Italian", "🍝", isCuisine = true),
+    INDIAN_FOOD("Indian", "🍲", isCuisine = true),
+    ASIAN_FOOD("Asian", "🍜", isCuisine = true),
+    HEALTHY_FOOD("Healthy", "🥗", isCuisine = true),
+    BREAKFAST("Breakfast", "🍳", isCuisine = true),
+    DESSERT("Dessert", "🍰", isCuisine = true),
+    ICE_CREAM("Ice cream", "🍨", isCuisine = true),
 }

@@ -3,6 +3,11 @@ package net.omarss.omono.ui.places
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.expandVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -20,15 +25,20 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Call
+import androidx.compose.material.icons.filled.FilterAltOff
 import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Card
@@ -76,10 +86,47 @@ fun PlacesRoute(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val listState = rememberLazyListState()
 
     // First-load: fire a refresh once the screen mounts. The user can
     // re-trigger via the refresh icon or by changing category/radius.
     LaunchedEffect(Unit) { viewModel.refresh() }
+
+    // Collapse the filter stack while the user scrolls down through
+    // the list and bring it back on scroll-up (or when they're
+    // already near the top). Bare-bones direction detection is enough
+    // — tracking actual pixel deltas across every list layout change
+    // would be overkill for a UX tweak.
+    var filtersExpanded by remember { mutableStateOf(true) }
+    LaunchedEffect(listState) {
+        var prevIndex = listState.firstVisibleItemIndex
+        var prevOffset = listState.firstVisibleItemScrollOffset
+        snapshotFlow {
+            listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset
+        }.collect { (index, offset) ->
+            val atTop = index == 0 && offset < TOP_EXPAND_THRESHOLD_PX
+            val scrolledDown = index > prevIndex ||
+                (index == prevIndex && offset > prevOffset + SCROLL_HYSTERESIS_PX)
+            val scrolledUp = index < prevIndex ||
+                (index == prevIndex && offset < prevOffset - SCROLL_HYSTERESIS_PX)
+            when {
+                atTop -> filtersExpanded = true
+                scrolledDown -> filtersExpanded = false
+                scrolledUp -> filtersExpanded = true
+            }
+            prevIndex = index
+            prevOffset = offset
+        }
+    }
+
+    // Jump back to the top of the list whenever the selected category
+    // (or the cuisine sub-filter) changes — users expect a fresh result
+    // set to start at the top, not continue from wherever they were
+    // scrolled in the previous category.
+    LaunchedEffect(state.category) {
+        if (listState.firstVisibleItemIndex > 0) listState.scrollToItem(0)
+        filtersExpanded = true
+    }
 
     Column(
         modifier = Modifier
@@ -89,45 +136,77 @@ fun PlacesRoute(
         TopAppBar(
             title = { Text("Places nearby") },
             actions = {
+                // Clear-all icon only lights up when any filter is
+                // actually non-default — otherwise it'd visually
+                // clutter the bar on a fresh-open screen for no action.
+                if (hasActiveFilters(state)) {
+                    IconButton(onClick = {
+                        viewModel.clearFilters()
+                    }) {
+                        Icon(
+                            Icons.Filled.FilterAltOff,
+                            contentDescription = "Clear all filters",
+                        )
+                    }
+                }
                 IconButton(onClick = { viewModel.refresh(force = true) }) {
                     Icon(Icons.Filled.Refresh, contentDescription = "Refresh")
                 }
             },
         )
 
-        SearchField(
-            query = state.searchQuery,
-            onChange = viewModel::setSearchQuery,
-        )
-
-        CategoryChips(
-            selected = state.category,
-            onSelect = viewModel::selectCategory,
-            modifier = Modifier.fillMaxWidth(),
-        )
-
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        AnimatedVisibility(
+            visible = filtersExpanded,
+            enter = expandVertically() + fadeIn(),
+            exit = shrinkVertically() + fadeOut(),
         ) {
-            ConePicker(
-                cone = state.coneDegrees,
-                onChange = viewModel::setCone,
-                modifier = Modifier.weight(1f),
-            )
-            RadiusPicker(
-                radiusMeters = state.radiusMeters,
-                onChange = viewModel::setRadius,
-                modifier = Modifier.weight(1f),
-            )
-        }
+            Column(modifier = Modifier.fillMaxWidth()) {
+                SearchField(
+                    query = state.searchQuery,
+                    onChange = viewModel::setSearchQuery,
+                )
 
-        QualityFilterRow(
-            enabled = state.qualityFilter,
-            onChange = viewModel::setQualityFilter,
-        )
+                CategoryChips(
+                    selected = state.category,
+                    onSelect = viewModel::selectCategory,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+
+                // Cuisine sub-row only appears when the parent
+                // category is a food bucket. Keeps the default view
+                // clean; revealing specialty cuisines only where they
+                // make sense.
+                if (state.category in FOOD_PARENT_CATEGORIES) {
+                    CuisineChips(
+                        selected = state.category,
+                        onSelect = viewModel::selectCategory,
+                    )
+                }
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    ConePicker(
+                        cone = state.coneDegrees,
+                        onChange = viewModel::setCone,
+                        modifier = Modifier.weight(1f),
+                    )
+                    RadiusPicker(
+                        radiusMeters = state.radiusMeters,
+                        onChange = viewModel::setRadius,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+
+                QualityFilterRow(
+                    enabled = state.qualityFilter,
+                    onChange = viewModel::setQualityFilter,
+                )
+            }
+        }
 
         if (!state.configured) {
             EmptyState(
@@ -170,6 +249,7 @@ fun PlacesRoute(
             )
         }
         PlaceList(
+            listState = listState,
             places = state.places,
             heading = state.heading,
             loadingMore = state.loadingMore,
@@ -181,6 +261,35 @@ fun PlacesRoute(
     }
 }
 
+// Default state: no cuisine, "All", 180° cone, 5 km radius, quality
+// filter on, empty search. Any deviation lights up the clear button.
+private fun hasActiveFilters(state: PlacesUiState): Boolean {
+    if (state.category != null) return true
+    if (state.searchQuery.isNotEmpty()) return true
+    if (state.coneDegrees != 180f) return true
+    if (state.radiusMeters != 5_000) return true
+    if (!state.qualityFilter) return true
+    return false
+}
+
+// Top-level food categories under which the cuisine sub-row reveals
+// itself. When the user picks, say, SUSHI from that sub-row, the UI
+// treats the cuisine itself as the "selected parent" — the row still
+// shows because the cuisine's own isCuisine flag is true, and we
+// return to the food bucket when the user picks "Any" from the sub-row.
+private val FOOD_PARENT_CATEGORIES: Set<PlaceCategory?> =
+    PlaceCategory.entries.filter { it.isCuisine }.toSet<PlaceCategory?>() +
+        setOf(PlaceCategory.RESTAURANT, PlaceCategory.FAST_FOOD, PlaceCategory.BAKERY)
+
+// ~24 dp at typical densities — below this offset "at the top" still
+// reads as "at the top" even after a tiny overshoot / spring settle.
+private const val TOP_EXPAND_THRESHOLD_PX: Int = 40
+
+// Minimum scroll delta between reads before the collapse/expand
+// toggle flips. Stops a one-pixel wobble (fling physics, IME push)
+// from flapping the filter bar open-closed-open.
+private const val SCROLL_HYSTERESIS_PX: Int = 16
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 private fun CategoryChips(
@@ -189,14 +298,13 @@ private fun CategoryChips(
     modifier: Modifier = Modifier,
 ) {
     Row(
-        modifier = modifier
-            .horizontalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+        modifier = modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        // "All" is the default view — unions the response of every
-        // category so users landing on Places don't have to pick one
-        // to see anything. null selection = All.
+        // "All" is pinned on the leading edge so the reset option
+        // stays visible no matter how far the user has horizontally
+        // scrolled through the other categories. null selection = All.
         FilterChip(
             selected = selected == null,
             onClick = { onSelect(null) },
@@ -210,7 +318,59 @@ private fun CategoryChips(
             },
             colors = FilterChipDefaults.filterChipColors(),
         )
+        Row(
+            modifier = Modifier
+                .weight(1f)
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            PlaceCategory.entries.forEach { category ->
+                if (category.isCuisine) return@forEach
+                val visual = category.visual()
+                FilterChip(
+                    selected = category == selected,
+                    onClick = { onSelect(category) },
+                    label = { Text(category.label) },
+                    leadingIcon = {
+                        Icon(
+                            visual.icon,
+                            contentDescription = null,
+                            tint = visual.tint,
+                            modifier = Modifier.size(16.dp),
+                        )
+                    },
+                    colors = FilterChipDefaults.filterChipColors(),
+                )
+            }
+        }
+    }
+}
+
+// Second chip row showing only the cuisine sub-slugs. Rendered just
+// below CategoryChips when one of the food parents (or a cuisine
+// itself) is active. "Any" clears back to RESTAURANT so the user can
+// broaden again without hunting for the parent chip.
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
+@Composable
+private fun CuisineChips(
+    selected: PlaceCategory?,
+    onSelect: (PlaceCategory?) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = 16.dp, vertical = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        FilterChip(
+            selected = selected?.isCuisine != true,
+            onClick = { onSelect(PlaceCategory.RESTAURANT) },
+            label = { Text("Any") },
+            colors = FilterChipDefaults.filterChipColors(),
+        )
         PlaceCategory.entries.forEach { category ->
+            if (!category.isCuisine) return@forEach
             val visual = category.visual()
             FilterChip(
                 selected = category == selected,
@@ -371,6 +531,7 @@ private fun EmptyState(title: String, body: String) {
 
 @Composable
 private fun PlaceList(
+    listState: LazyListState,
     places: List<Place>,
     heading: Float,
     loadingMore: Boolean,
@@ -379,7 +540,6 @@ private fun PlaceList(
     onCall: (String) -> Unit,
     onLoadMore: () -> Unit,
 ) {
-    val listState = rememberLazyListState()
     // Triggers a next-page fetch when the user scrolls within
     // LOAD_MORE_THRESHOLD of the end of the list. derivedStateOf
     // means we re-evaluate only when the scroll position changes,

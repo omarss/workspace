@@ -156,6 +156,20 @@ class PlacesViewModel @Inject constructor(
         refresh()
     }
 
+    // Reset every filter back to its default — "All" category, the
+    // unconstrained 180° direction cone, 5 km radius, the default
+    // quality gate on, and an empty search box. One fresh fetch
+    // lands the new result set immediately so the user doesn't have
+    // to pull-to-refresh after hitting the clear action.
+    fun clearFilters() {
+        selectedCategory.value = null
+        coneDegrees.value = 180f
+        radiusMeters.value = 5_000
+        qualityFilter.value = true
+        searchQuery.value = ""
+        refresh(force = true)
+    }
+
     // Simple in-memory cache. When the user navigates back into the
     // places screen the existing results are reused instead of being
     // wiped to a loading spinner — eliminates the flicker where the
