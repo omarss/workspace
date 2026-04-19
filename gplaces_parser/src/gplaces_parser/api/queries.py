@@ -40,6 +40,12 @@ WITH
       -- isn't emptied by threshold-dropped results.
       AND (%(min_rating)s::numeric = 0 OR p.rating >= %(min_rating)s::numeric)
       AND (%(min_reviews)s::int = 0 OR p.reviews_count >= %(min_reviews)s::int)
+      -- Hide permanently/temporarily closed places unless the client asks
+      -- for them. NULL business_status stays visible (we don't know =
+      -- don't hide).
+      AND (%(include_closed)s
+           OR p.business_status IS NULL
+           OR p.business_status NOT IN ('CLOSED_TEMPORARILY','CLOSED_PERMANENTLY'))
   ),
   scored AS (
     SELECT
@@ -83,6 +89,7 @@ def nearby(
     min_rating: float = 0.0,
     min_reviews: int = 0,
     offset: int = 0,
+    include_closed: bool = False,
 ) -> tuple[list[dict[str, Any]], bool]:
     """Returns (rows, has_more). Rows is capped at `limit`; if the DB
     produced `limit+1` under the hood, `has_more=True` and the trailing
@@ -108,6 +115,7 @@ def nearby(
         "offset": max(offset, 0),
         "min_rating": min_rating,
         "min_reviews": min_reviews,
+        "include_closed": include_closed,
     }
     with conn.cursor(row_factory=dict_row) as cur:
         cur.execute(NEARBY_SQL, params)

@@ -60,6 +60,7 @@ async def nearby(
     min_rating: Annotated[float, Query(ge=0.0, le=5.0)] = 0.0,
     min_reviews: Annotated[int, Query(ge=0)] = 0,
     offset: Annotated[int, Query(ge=0, le=10_000)] = 0,
+    include_closed: Annotated[bool, Query()] = False,
 ) -> NearbyResponse:
     # FEEDBACK §9.1: `category=all` disables the filter; comma-separated
     # lists union several slugs into one call. Back-compat preserved —
@@ -94,6 +95,7 @@ async def nearby(
             min_rating=min_rating,
             min_reviews=min_reviews,
             offset=offset,
+            include_closed=include_closed,
         )
 
     # Per FEEDBACK §3 the JSON `name` field is English and `name_ar` is
@@ -210,6 +212,7 @@ async def search(
     min_rating: Annotated[float, Query(ge=0.0, le=5.0)] = 0.0,
     min_reviews: Annotated[int, Query(ge=0)] = 0,
     offset: Annotated[int, Query(ge=0, le=10_000)] = 0,
+    include_closed: Annotated[bool, Query()] = False,
 ) -> SearchResponse:
     """Keyword + fuzzy search over places.
 
@@ -249,6 +252,7 @@ async def search(
             min_rating=min_rating,
             min_reviews=min_reviews,
             offset=offset,
+            include_closed=include_closed,
         )
 
     def pick_name(row: dict) -> tuple[str, str | None]:

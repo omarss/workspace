@@ -80,6 +80,9 @@ cand AS (
            OR (p.rating IS NOT NULL AND p.rating >= %(min_rating)s::numeric))
       AND (%(min_reviews)s::int = 0
            OR (p.reviews_count IS NOT NULL AND p.reviews_count >= %(min_reviews)s::int))
+      AND (%(include_closed)s
+           OR p.business_status IS NULL
+           OR p.business_status NOT IN ('CLOSED_TEMPORARILY','CLOSED_PERMANENTLY'))
       AND (
         %(has_geo)s = false OR (
           p.latitude  BETWEEN %(lat)s - %(lat_pad)s AND %(lat)s + %(lat_pad)s
@@ -112,6 +115,7 @@ def search(
     min_rating: float = 0.0,
     min_reviews: int = 0,
     offset: int = 0,
+    include_closed: bool = False,
 ) -> tuple[list[dict[str, Any]], bool]:
     has_geo = lat is not None and lon is not None and radius_m is not None
     if has_geo:
@@ -133,6 +137,7 @@ def search(
         "has_geo": has_geo,
         "min_rating": min_rating,
         "min_reviews": min_reviews,
+        "include_closed": include_closed,
         "limit_plus_one": min(max(limit, 1), 50) + 1,
         "offset": max(offset, 0),
     }
