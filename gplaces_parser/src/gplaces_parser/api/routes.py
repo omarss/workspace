@@ -127,8 +127,9 @@ async def nearby(
                 phone=r["phone"],
                 rating=float(r["rating"]) if r["rating"] is not None else None,
                 review_count=r["reviews_count"],
-                open_now=None,
+                open_now=r["open_now"],
                 website=r["website"],
+                business_status=r["business_status"],
             )
         )
 
@@ -278,6 +279,7 @@ async def search(
                 review_count=r["reviews_count"],
                 open_now=r["open_now"],
                 website=r["website"],
+                business_status=r["business_status"],
                 score=round(float(r["score"]), 4),
             )
         )

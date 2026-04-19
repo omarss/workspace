@@ -56,6 +56,8 @@ WITH
       c.website,
       c.category,
       c.working_hours,
+      c.business_status,
+      c.open_now,
       6371000.0 * 2.0 * asin(sqrt(
         power(sin(radians((c.latitude - q.lat0) / 2.0)), 2)
         + cos(radians(q.lat0)) * cos(radians(c.latitude))

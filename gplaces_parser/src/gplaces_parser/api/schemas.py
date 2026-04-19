@@ -25,6 +25,11 @@ class NearbyResult(BaseModel):
     review_count: int | None = None
     open_now: bool | None = None
     website: str | None = None
+    # One of OPERATIONAL / CLOSED_TEMPORARILY / CLOSED_PERMANENTLY (or null
+    # if Google didn't surface it). The client should gate UI on this
+    # before routing / calling / navigating — a permanently closed place
+    # is usually what the user actually *doesn't* want to see.
+    business_status: str | None = None
 
 
 class Pagination(BaseModel):
@@ -95,6 +100,7 @@ class SearchResult(BaseModel):
     review_count: int | None = None
     open_now: bool | None = None
     website: str | None = None
+    business_status: str | None = None
     score: float
 
 
