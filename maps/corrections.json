@@ -580,6 +580,183 @@
       ],
       "highway": ["motorway", "motorway_link"],
       "maxspeed_kmh": 120
+    },
+    {
+      "label": "Hail–Qassim Expwy (Road 110)",
+      "name_contains": [
+        "Hail-Qassim",
+        "Hail Road",
+        "Ha'il Road",
+        "طريق حائل",
+        "طريق حائل - القصيم"
+      ],
+      "highway": ["motorway", "motorway_link"],
+      "maxspeed_kmh": 120
+    },
+    {
+      "label": "Hail–Madinah Expwy",
+      "name_contains": [
+        "Hail-Madinah",
+        "Hail Medina",
+        "طريق حائل - المدينة"
+      ],
+      "highway": ["motorway", "motorway_link"],
+      "maxspeed_kmh": 120
+    },
+    {
+      "label": "Madinah–Yanbu Expwy",
+      "name_contains": [
+        "Madinah-Yanbu",
+        "Yanbu Road",
+        "طريق ينبع",
+        "طريق المدينة - ينبع"
+      ],
+      "highway": ["motorway", "motorway_link"],
+      "maxspeed_kmh": 120
+    },
+    {
+      "label": "Jeddah–Yanbu–Rabigh Coastal Rd (Road 5 north)",
+      "name_contains": [
+        "Rabigh Road",
+        "Rabigh-Yanbu",
+        "Jeddah-Yanbu",
+        "طريق رابغ",
+        "طريق جدة - ينبع"
+      ],
+      "highway": ["motorway", "motorway_link", "trunk", "trunk_link"],
+      "maxspeed_kmh": 120
+    },
+    {
+      "label": "Tabuk–Al Jouf Expwy (Road 85)",
+      "name_contains": [
+        "Tabuk-Al Jouf",
+        "Jouf Road",
+        "Sakaka Road",
+        "طريق الجوف",
+        "طريق سكاكا",
+        "طريق تبوك - الجوف"
+      ],
+      "highway": ["motorway", "motorway_link"],
+      "maxspeed_kmh": 120
+    },
+    {
+      "label": "Jouf–Arar Northern Corridor",
+      "name_contains": [
+        "Jouf-Arar",
+        "Arar Road",
+        "طريق عرعر",
+        "طريق الجوف - عرعر"
+      ],
+      "highway": ["motorway", "motorway_link", "trunk", "trunk_link"],
+      "maxspeed_kmh": 120
+    },
+    {
+      "label": "Arar–Hafr Al Batin Northern Rd",
+      "name_contains": [
+        "Arar-Hafr",
+        "Arar-Hafar",
+        "طريق عرعر - حفر الباطن"
+      ],
+      "highway": ["motorway", "motorway_link", "trunk", "trunk_link"],
+      "maxspeed_kmh": 120
+    },
+    {
+      "label": "Qurayyat Northern Border Rd",
+      "name_contains": [
+        "Qurayyat Road",
+        "Al Qurayyat",
+        "القريات",
+        "طريق القريات"
+      ],
+      "highway": ["motorway", "motorway_link", "trunk", "trunk_link"],
+      "maxspeed_kmh": 120
+    },
+    {
+      "label": "Turaif Pipeline Rd",
+      "name_contains": [
+        "Turaif Road",
+        "طريق طريف",
+        "خط الأنابيب"
+      ],
+      "highway": ["motorway", "motorway_link", "trunk", "trunk_link"],
+      "maxspeed_kmh": 120
+    },
+    {
+      "label": "Abha–Najran Expwy",
+      "name_contains": [
+        "Abha-Najran",
+        "Najran Road",
+        "طريق نجران",
+        "طريق أبها - نجران"
+      ],
+      "highway": ["motorway", "motorway_link", "trunk", "trunk_link"],
+      "maxspeed_kmh": 120
+    },
+    {
+      "label": "Najran–Sharurah Rd (desert)",
+      "name_contains": [
+        "Najran-Sharurah",
+        "Sharurah Road",
+        "طريق شرورة",
+        "طريق نجران - شرورة"
+      ],
+      "highway": ["motorway", "motorway_link", "trunk", "trunk_link"],
+      "maxspeed_kmh": 120
+    },
+    {
+      "label": "Riyadh–Wadi Dawasir–Najran Corridor",
+      "name_contains": [
+        "Wadi Dawasir",
+        "Wadi Al Dawasir",
+        "طريق وادي الدواسر",
+        "طريق الدواسر"
+      ],
+      "highway": ["motorway", "motorway_link", "trunk", "trunk_link"],
+      "maxspeed_kmh": 120
+    },
+    {
+      "label": "Jazan–Abu Arish Coastal Rd",
+      "name_contains": [
+        "Abu Arish",
+        "Jazan-Abu",
+        "طريق أبو عريش",
+        "طريق جازان - أبو عريش"
+      ],
+      "highway": ["motorway", "motorway_link", "trunk", "trunk_link"],
+      "maxspeed_kmh": 100
+    },
+    {
+      "label": "Qassim–Madinah Expwy (Road 60)",
+      "name_contains": [
+        "Qassim-Madinah",
+        "Buraidah-Madinah",
+        "طريق القصيم - المدينة",
+        "طريق بريدة - المدينة"
+      ],
+      "highway": ["motorway", "motorway_link"],
+      "maxspeed_kmh": 120
+    },
+    {
+      "label": "Al Hofuf–Salwa (Qatar Border, Road 70)",
+      "name_contains": [
+        "Salwa Road",
+        "Al Ahsa-Salwa",
+        "طريق سلوى",
+        "طريق الأحساء - سلوى"
+      ],
+      "highway": ["motorway", "motorway_link"],
+      "maxspeed_kmh": 120
+    },
+    {
+      "label": "Unaizah–Buraidah Connector",
+      "name_contains": [
+        "Unaizah Road",
+        "Buraidah-Unaizah",
+        "طريق عنيزة",
+        "طريق بريدة - عنيزة"
+      ],
+      "highway": ["motorway", "motorway_link", "trunk", "trunk_link"],
+      "maxspeed_kmh": 120
     }
   ]
 }
