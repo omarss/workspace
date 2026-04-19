@@ -8,7 +8,7 @@ DB_ROLE := gplaces
 DB_PASS := gplaces
 DB_NAME := gplaces
 
-.PHONY: help install install-browser db-create db-drop migrate revision scrape-places scrape-reviews status psql lint clean release deploy
+.PHONY: help install install-browser db-create db-drop migrate revision scrape-places scrape-reviews status psql lint clean release deploy deploy-nginx
 
 help:
 	@echo "Setup"
@@ -29,7 +29,8 @@ help:
 	@echo "  k8s-apply         kubectl apply the homelab manifests"
 	@echo "  k8s-status        show deploy/pod/svc for api-places"
 	@echo "  release           bump + commit + tag + image + rollout + push"
-	@echo "  deploy            (sudo) import image, rollout pod, copy + reload nginx"
+	@echo "  deploy            (sudo) import image + rollout pod — code-only path"
+	@echo "  deploy-nginx      (sudo) sync nginx vhost + remind to re-run certbot"
 	@echo "Dev"
 	@echo "  psql              open psql shell against the project db"
 	@echo "  lint              ruff check"
@@ -132,38 +133,43 @@ release:
 	git -C .. push origin "gplaces/v$(NEW_VERSION)"
 	@echo ">> released + deployed gplaces v$(NEW_VERSION)"
 
-# Import the image into k3s containerd, roll the Deployment, and sync the
-# nginx vhost. Every sudo'd step is bundled into a single `sudo bash -c`
-# so the password is prompted once; kubectl runs as the user since its
-# kubeconfig is at ~/.kube/config.
+# Deploy the API image only. No nginx touching, no certbot retrigger —
+# the vhost file in homelab/nginx is a template; you sync it to
+# /etc/nginx/... only when it *actually changes*, via the separate
+# `deploy-nginx` target.
 #
 # Override TAG= to pin the Deployment at a specific version (default = latest).
 TAG ?= latest
 NGINX_SRC ?= ../homelab/nginx/api.omarss.net.conf
 NGINX_DST ?= /etc/nginx/sites-available/api.omarss.net.conf
 deploy:
-	@echo ">> importing /tmp/gplaces-api.tar + syncing nginx (sudo)"
+	@echo ">> importing /tmp/gplaces-api.tar into k3s containerd"
+	@sudo k3s ctr images import /tmp/gplaces-api.tar
+	@echo ">> rolling out api-places pod"
+	# set-image is a no-op when TAG is :latest (same reference), so we
+	# always follow it with `rollout restart` to force a new ReplicaSet
+	# regardless of whether the tag actually changed. `sudo k3s kubectl`
+	# bakes in the root-owned kubeconfig at /etc/rancher/k3s/k3s.yaml.
+	sudo k3s kubectl -n api-places set image deployment/api-places api=localhost/gplaces/api:$(TAG)
+	sudo k3s kubectl -n api-places rollout restart deployment/api-places
+	sudo k3s kubectl -n api-places rollout status deployment/api-places --timeout=120s
+	@echo ">> deployed."
+
+# Sync the nginx vhost from homelab/nginx/ into /etc/nginx/sites-available/
+# and reload. Separate from `deploy` because the vhost rarely changes and
+# every copy wipes certbot's injected 443 block — triggering the cert-
+# missing footgun. Only run this target when the *file itself* changed
+# (new location block, edit headers, etc).
+deploy-nginx:
+	@echo ">> syncing $(NGINX_SRC) → $(NGINX_DST) (sudo)"
 	@sudo bash -c '\
 	  set -euo pipefail; \
-	  k3s ctr images import /tmp/gplaces-api.tar; \
 	  install -o root -g root -m 644 $(NGINX_SRC) $(NGINX_DST); \
 	  nginx -t; \
 	  systemctl reload nginx; \
 	'
-	@echo ">> rolling out api-places pod"
-	# set-image is a no-op when TAG is :latest (same reference), so we
-	# always follow it with `rollout restart` to force a new ReplicaSet
-	# regardless of whether the tag actually changed. We call kubectl
-	# via `sudo k3s kubectl` because k3s stashes the admin kubeconfig at
-	# /etc/rancher/k3s/k3s.yaml (root-owned) and the user-shell fallback
-	# to localhost:8080 doesn't resolve the API server. `k3s kubectl`
-	# bakes the right config path in.
-	sudo k3s kubectl -n api-places set image deployment/api-places api=localhost/gplaces/api:$(TAG)
-	sudo k3s kubectl -n api-places rollout restart deployment/api-places
-	sudo k3s kubectl -n api-places rollout status deployment/api-places --timeout=120s
 	@echo
 	@echo ">> nginx vhost was reset to the pre-certbot template. Re-run:"
 	@echo "   sudo certbot --nginx -d api.omarss.net"
 	@echo "   (idempotent — certbot reuses the cached cert and re-injects"
 	@echo "    the TLS listener. No Let's Encrypt API call.)"
-	@echo ">> deployed."
