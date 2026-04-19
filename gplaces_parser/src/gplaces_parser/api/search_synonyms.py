@@ -58,9 +58,12 @@ SYNONYM_GROUPS: list[list[str]] = [
     # pharmacy
     ["pharmacy", "drugstore", "medicine",
      "صيدلية", "صيدليات", "دواء"],
-    # hospital / clinic
-    ["hospital", "clinic", "medical center",
-     "مستشفى", "مستشفيات", "عيادة", "عيادات", "مجمع طبي"],
+    # hospital — full-size facilities
+    ["hospital",
+     "مستشفى", "مستشفيات"],
+    # clinic — small/medium medical practices + polyclinics
+    ["clinic", "medical center", "polyclinic", "medical complex",
+     "عيادة", "عيادات", "مجمع طبي", "مركز طبي"],
     # gym
     ["gym", "fitness", "workout",
      "نادي رياضي", "جيم", "نادي", "لياقة"],

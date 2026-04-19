@@ -23,6 +23,11 @@ _SLUG_QUERIES: list[tuple[str, str, str]] = [
     ("car_wash",    "غسيل سيارات",             "car wash"),
     ("pharmacy",    "صيدلية",                  "pharmacy"),
     ("hospital",    "مستشفى",                  "hospital"),
+    # `clinic` — siphons the small-practice / medical-center rows off
+    # the `hospital` slug so `category=hospital` returns true hospitals.
+    # Dedicated queries seed new data under the clinic slug directly.
+    ("clinic",      "عيادات",                  "clinic"),
+    ("clinic",      "مجمع طبي",                "medical center"),
     ("gym",         "نادي رياضي",              "gym"),
     ("park",        "حديقة",                   "park"),
     ("bank",        "بنك",                     "bank"),
