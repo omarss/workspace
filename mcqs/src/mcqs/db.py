@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import atexit
+import contextlib
 from collections.abc import Iterator
 from contextlib import contextmanager
 
@@ -23,10 +24,8 @@ def _close_pool() -> None:
     the race without changing how callers use the pool."""
     global _pool
     if _pool is not None:
-        try:
+        with contextlib.suppress(Exception):
             _pool.close()
-        except Exception:
-            pass
         _pool = None
 
 
