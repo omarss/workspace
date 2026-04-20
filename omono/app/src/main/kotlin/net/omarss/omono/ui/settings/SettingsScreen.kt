@@ -163,6 +163,28 @@ fun SettingsRoute(
                     onEnabledChange = viewModel::setVoiceAlertsEnabled,
                     onLanguageChange = viewModel::setVoiceAlertLanguage,
                 )
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                AlertSettingRow(
+                    title = "Vibrate only",
+                    subtitle = "Replace beeps and voice with a vibration pattern. " +
+                        "Useful for quiet places; loses the audible cue.",
+                    enabled = state.vibrateOnly,
+                    onChange = viewModel::setVibrateOnly,
+                )
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                AlertSettingRow(
+                    title = "Fun mode",
+                    subtitle = if (state.voiceAlertLanguage == VoiceAlertLanguage.Arabic ||
+                        (state.voiceAlertLanguage == VoiceAlertLanguage.Auto &&
+                            java.util.Locale.getDefault().language.equals("ar", ignoreCase = true))
+                    ) {
+                        "بدل التحذير الثابت، عبارات عشوائية من قائمة مرحة."
+                    } else {
+                        "Pick a random playful phrase instead of the canned warning."
+                    },
+                    enabled = state.funMode,
+                    onChange = viewModel::setFunMode,
+                )
             }
 
             SectionCard(title = "Internet kill-switch") {

@@ -4,9 +4,18 @@ import android.app.NotificationManager
 import android.content.Context
 import android.media.AudioManager
 import android.media.ToneGenerator
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -48,9 +57,33 @@ internal fun shouldAlertOnCrossing(
 class SpeedAlertPlayer @Inject constructor(
     @param:ApplicationContext private val context: Context,
     private val voiceAlertPlayer: VoiceAlertPlayer,
+    private val settings: SpeedSettingsRepository,
 ) {
 
     private val audioManager by lazy { context.getSystemService(AudioManager::class.java) }
+    private val vibrator: Vibrator? by lazy {
+        runCatching {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val vm = context.getSystemService(VibratorManager::class.java)
+                vm?.defaultVibrator
+            } else {
+                @Suppress("DEPRECATION")
+                context.getSystemService(Vibrator::class.java)
+            }
+        }.onFailure { Timber.w(it, "Vibrator init failed") }.getOrNull()
+    }
+
+    // Settings scope — subscribes to vibrateOnly so alert() / loop
+    // paths read the current flag without re-querying DataStore on
+    // every tick.
+    private val settingsScope = CoroutineScope(Dispatchers.Main.immediate + SupervisorJob())
+    @Volatile private var vibrateOnly: Boolean = false
+
+    init {
+        settings.vibrateOnly
+            .onEach { vibrateOnly = it }
+            .launchIn(settingsScope)
+    }
     private val notificationManager by lazy {
         context.getSystemService(NotificationManager::class.java)
     }
@@ -85,6 +118,13 @@ class SpeedAlertPlayer @Inject constructor(
     // the call audio would cause more confusion than the limit breach.
     fun alert(phrase: VoiceAlertPhrase = VoiceAlertPhrase.OVER_LIMIT) {
         if (isInCall()) return
+        if (vibrateOnly) {
+            // Vibrate-only overrides both voice and beep — a
+            // two-pulse pattern that's distinct from notification
+            // vibrations the phone might already be producing.
+            vibrate(SHORT_ALERT_PATTERN)
+            return
+        }
         val spoke = voiceAlertPlayer.speakOnce(phrase) {
             playTone(ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD, TONE_DURATION_MS)
         }
@@ -92,6 +132,21 @@ class SpeedAlertPlayer @Inject constructor(
             // Voice disabled or TTS unavailable — beep immediately so
             // the driver isn't left guessing.
             playTone(ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD, TONE_DURATION_MS)
+        }
+    }
+
+    // Fire-and-forget vibration. Pattern is `[delay, on, off, on, ...]`
+    // millis; amplitude defaults so the call works on both pre- and
+    // post-Oreo vibrator APIs.
+    private fun vibrate(pattern: LongArray) {
+        val v = vibrator ?: return
+        runCatching {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                v.vibrate(VibrationEffect.createWaveform(pattern, -1))
+            } else {
+                @Suppress("DEPRECATION")
+                v.vibrate(pattern, -1)
+            }
         }
     }
 
@@ -107,6 +162,14 @@ class SpeedAlertPlayer @Inject constructor(
     // firing steadily so they stay nagged. Falls back to pure-beep
     // when voice isn't available.
     fun startBeeping(phrase: VoiceAlertPhrase = VoiceAlertPhrase.PHONE_USE) {
+        if (vibrateOnly) {
+            // Vibrate-only loop — runs a repeating pulse on the
+            // handler rather than the tone/voice runnables. Stays
+            // clear of the audio stream entirely.
+            handler.removeCallbacks(vibrateLoopRunnable)
+            handler.post(vibrateLoopRunnable)
+            return
+        }
         // Reset any lingering one-shot restore — we're holding the
         // stream volume raised for the duration of the loop.
         handler.removeCallbacks(restoreRunnable)
@@ -123,9 +186,21 @@ class SpeedAlertPlayer @Inject constructor(
         currentLoopPhrase = null
         voiceAlertPlayer.stop()
         handler.removeCallbacks(loopRunnable)
+        handler.removeCallbacks(vibrateLoopRunnable)
         runCatching { toneGenerator?.stopTone() }
+        runCatching { vibrator?.cancel() }
         // Schedule restore the same way a one-shot alert would.
         handler.postDelayed(restoreRunnable, RESTORE_MARGIN_MS)
+    }
+
+    // Vibrate-only distraction loop — pulses every ~1.5 s while
+    // `startBeeping` is active. Cadence matches the audible loop
+    // interval so the user feels a steady nag rather than a one-off.
+    private val vibrateLoopRunnable = object : Runnable {
+        override fun run() {
+            vibrate(LOOP_VIBRATE_PATTERN)
+            handler.postDelayed(this, LOOP_INTERVAL_MS)
+        }
     }
 
     // Which phrase (if any) the loop is currently cycling. Null means
@@ -252,5 +327,13 @@ class SpeedAlertPlayer @Inject constructor(
         // rather than every cycle — repeating words become background
         // noise; repeating beeps do not.
         const val VOICE_INTERVAL_MS = 60_000L
+
+        // Vibrate patterns. Waveform is `[delay, on, off, on, …]` ms.
+        // The one-shot alert is two quick 200 ms pulses (feels like
+        // a double-tap); the loop variant is one punchier 400 ms
+        // pulse per tick so the wrist/pocket feels the same rhythm
+        // as the audible beep loop.
+        val SHORT_ALERT_PATTERN: LongArray = longArrayOf(0L, 200L, 120L, 200L)
+        val LOOP_VIBRATE_PATTERN: LongArray = longArrayOf(0L, 400L)
     }
 }

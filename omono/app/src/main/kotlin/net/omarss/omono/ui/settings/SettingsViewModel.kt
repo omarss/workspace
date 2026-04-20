@@ -82,7 +82,9 @@ class SettingsViewModel @Inject constructor(
     private val voiceFlow: Flow<VoiceSettings> = combine(
         speedSettings.voiceAlertsEnabled,
         speedSettings.voiceAlertLanguage,
-    ) { enabled, lang -> VoiceSettings(enabled, lang) }
+        speedSettings.vibrateOnly,
+        speedSettings.funMode,
+    ) { enabled, lang, vibrate, fun_ -> VoiceSettings(enabled, lang, vibrate, fun_) }
 
     val uiState: StateFlow<SettingsUiState> = combine(
         baseFlow,
@@ -100,6 +102,8 @@ class SettingsViewModel @Inject constructor(
             monthlyBudgetSar = base.monthlyBudgetSar,
             voiceAlertsEnabled = voice.enabled,
             voiceAlertLanguage = voice.language,
+            vibrateOnly = voice.vibrateOnly,
+            funMode = voice.funMode,
             theme = theme,
         )
     }.stateIn(
@@ -141,6 +145,14 @@ class SettingsViewModel @Inject constructor(
 
     fun setVoiceAlertLanguage(language: VoiceAlertLanguage) {
         viewModelScope.launch { speedSettings.setVoiceAlertLanguage(language) }
+    }
+
+    fun setVibrateOnly(enabled: Boolean) {
+        viewModelScope.launch { speedSettings.setVibrateOnly(enabled) }
+    }
+
+    fun setFunMode(enabled: Boolean) {
+        viewModelScope.launch { speedSettings.setFunMode(enabled) }
     }
 
     fun setTheme(preference: ThemePreference) {
@@ -199,6 +211,8 @@ class SettingsViewModel @Inject constructor(
     private data class VoiceSettings(
         val enabled: Boolean,
         val language: VoiceAlertLanguage,
+        val vibrateOnly: Boolean,
+        val funMode: Boolean,
     )
 
     private companion object {
@@ -216,6 +230,8 @@ data class SettingsUiState(
     val monthlyBudgetSar: Double = 0.0,
     val voiceAlertsEnabled: Boolean = true,
     val voiceAlertLanguage: VoiceAlertLanguage = VoiceAlertLanguage.Auto,
+    val vibrateOnly: Boolean = false,
+    val funMode: Boolean = false,
     val theme: ThemePreference = ThemePreference.Auto,
 )
 

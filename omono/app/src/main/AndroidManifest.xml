@@ -44,6 +44,10 @@
          restores it afterwards. Normal permission, granted at install. -->
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
 
+    <!-- Used by the "Vibrate only" alert mode — replaces the audible
+         beep/TTS with a device vibration pattern for speed alerts. -->
+    <uses-permission android:name="android.permission.VIBRATE" />
+
     <!-- Lets us temporarily call setInterruptionFilter(ALL) to make the
          over-limit tone audible even in Do Not Disturb. The declaration
          itself is a normal permission; the user still has to grant

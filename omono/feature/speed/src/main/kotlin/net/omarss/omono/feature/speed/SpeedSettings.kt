@@ -23,6 +23,8 @@ private val DISABLE_INTERNET_WHILE_DRIVING_KEY =
     booleanPreferencesKey("speed.disable_internet_while_driving")
 private val VOICE_ALERTS_ENABLED_KEY = booleanPreferencesKey("speed.voice_alerts_enabled")
 private val VOICE_ALERT_LANGUAGE_KEY = stringPreferencesKey("speed.voice_alert_language")
+private val VIBRATE_ONLY_KEY = booleanPreferencesKey("speed.vibrate_only")
+private val FUN_MODE_KEY = booleanPreferencesKey("speed.fun_mode")
 
 @Singleton
 class SpeedSettingsRepository @Inject constructor(
@@ -68,6 +70,23 @@ class SpeedSettingsRepository @Inject constructor(
         VoiceAlertLanguage.fromStorage(prefs[VOICE_ALERT_LANGUAGE_KEY])
     }
 
+    // Replaces every audible alert (beep + TTS) with a vibration
+    // pattern. For use in quiet places (meetings, mosques, late
+    // night) where the user still wants the feedback. Off by
+    // default — audible alerts are safer for driving.
+    val vibrateOnly: Flow<Boolean> = context.omonoDataStore.data.map { prefs ->
+        prefs[VIBRATE_ONLY_KEY] ?: false
+    }
+
+    // "Fun mode" — instead of the canned "Slow down, please" voice
+    // line, speed alerts say a random phrase from a bundled list
+    // (English or Arabic, per voiceAlertLanguage). Purely cosmetic,
+    // off by default so a new install gets the straightforward
+    // warning.
+    val funMode: Flow<Boolean> = context.omonoDataStore.data.map { prefs ->
+        prefs[FUN_MODE_KEY] ?: false
+    }
+
     suspend fun setUnit(unit: SpeedUnit) {
         context.omonoDataStore.edit { it[UNIT_KEY] = unit.name }
     }
@@ -90,5 +109,13 @@ class SpeedSettingsRepository @Inject constructor(
 
     suspend fun setVoiceAlertLanguage(language: VoiceAlertLanguage) {
         context.omonoDataStore.edit { it[VOICE_ALERT_LANGUAGE_KEY] = language.name }
+    }
+
+    suspend fun setVibrateOnly(enabled: Boolean) {
+        context.omonoDataStore.edit { it[VIBRATE_ONLY_KEY] = enabled }
+    }
+
+    suspend fun setFunMode(enabled: Boolean) {
+        context.omonoDataStore.edit { it[FUN_MODE_KEY] = enabled }
     }
 }

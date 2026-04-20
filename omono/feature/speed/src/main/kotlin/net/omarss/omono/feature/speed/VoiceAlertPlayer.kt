@@ -54,6 +54,7 @@ class VoiceAlertPlayer @Inject constructor(
 
     @Volatile private var enabled: Boolean = false
     @Volatile private var language: VoiceAlertLanguage = VoiceAlertLanguage.Auto
+    @Volatile private var funMode: Boolean = false
 
     private var tts: TextToSpeech? = null
     private var ttsReady: Boolean = false
@@ -72,9 +73,11 @@ class VoiceAlertPlayer @Inject constructor(
             combine(
                 settings.voiceAlertsEnabled,
                 settings.voiceAlertLanguage,
-            ) { e, lang -> e to lang }.collect { (e, lang) ->
+                settings.funMode,
+            ) { e, lang, fun_ -> Triple(e, lang, fun_) }.collect { (e, lang, fun_) ->
                 enabled = e
                 language = lang
+                funMode = fun_
             }
         }
     }
@@ -101,9 +104,20 @@ class VoiceAlertPlayer @Inject constructor(
             )
             return false
         }
-        val text = when (locale.language) {
-            "ar" -> phrase.arabic
-            else -> phrase.english
+        // Fun mode swaps the canned imperative for a random zinger
+        // from the bundled phrase bank. Still honours the user's
+        // language selection — Arabic phrases play when the locale
+        // resolves to ar, English otherwise.
+        val text = if (funMode) {
+            when (locale.language) {
+                "ar" -> FunPhrases.arabic.random()
+                else -> FunPhrases.english.random()
+            }
+        } else {
+            when (locale.language) {
+                "ar" -> phrase.arabic
+                else -> phrase.english
+            }
         }
         raiseStreamVolume()
         val utteranceId = "${phrase.name}-${utteranceCounter.incrementAndGet()}"
