@@ -3,8 +3,13 @@ package net.omarss.omono.ui.compass
 import android.content.Context
 import android.content.Intent
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -19,6 +24,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Explore
+import androidx.compose.material.icons.filled.Mosque
 import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -102,12 +109,14 @@ fun CompassRoute(
                 label = "North (true)",
                 bearingDeg = 0f,
                 color = Color(0xFFEF4444),
+                icon = Icons.Filled.Explore,
             )
             state.qiblaBearingDeg?.let {
                 BearingRow(
                     label = "Mecca (Qibla)",
                     bearingDeg = it,
                     color = Color(0xFFF59E0B),
+                    icon = Icons.Filled.Mosque,
                 )
             }
             state.nearestMosque?.let { mosque ->
@@ -115,6 +124,7 @@ fun CompassRoute(
                     label = mosque.name ?: "Nearest mosque",
                     bearingDeg = mosque.bearingDeg,
                     color = Color(0xFF10B981),
+                    icon = PlaceCategory.MOSQUE.visual().icon,
                     subtitle = "${formatMetres(mosque.distanceMeters)} · heading " +
                         compassLabel(mosque.bearingDeg),
                     // When the winner came from the gplaces backend we
@@ -141,6 +151,7 @@ fun CompassRoute(
                     label = row.name.ifBlank { row.category.label },
                     bearingDeg = row.bearingDeg,
                     color = row.category.visual().tint,
+                    icon = row.category.visual().icon,
                     subtitle = "${row.category.label} · ${formatMetres(row.distanceMeters)} · heading " +
                         compassLabel(row.bearingDeg),
                     onClick = {
@@ -230,20 +241,47 @@ private fun CategoryToggleRow(
     }
 }
 
+// Every category the backend supports, ordered driving-utility
+// first (fuel / pharmacy / hospital / transit), then common errands
+// (atm / bank / grocery / mall / ev / park / gym / salon / laundry),
+// then food parents (restaurant / fast food / coffee / bakery / juice),
+// then standalone niches (library / bookstore / clinic / museum /
+// cultural_site / brunch / mosque), then cuisine subcats. The chip
+// row is horizontally scrollable so length isn't an issue, but the
+// ordering keeps the most-likely picks near the leading edge.
 private val COMPASS_QUICK_CATEGORIES: List<PlaceCategory> = listOf(
+    // Driving utility
     PlaceCategory.FUEL,
     PlaceCategory.PHARMACY,
     PlaceCategory.HOSPITAL,
     PlaceCategory.TRANSIT,
+    // Common errands
     PlaceCategory.ATM,
     PlaceCategory.BANK,
     PlaceCategory.GROCERY,
     PlaceCategory.MALL,
     PlaceCategory.EV_CHARGER,
+    PlaceCategory.CAR_WASH,
     PlaceCategory.PARK,
     PlaceCategory.GYM,
     PlaceCategory.SALON,
-)
+    PlaceCategory.LAUNDRY,
+    PlaceCategory.POST_OFFICE,
+    // Food parents
+    PlaceCategory.COFFEE,
+    PlaceCategory.RESTAURANT,
+    PlaceCategory.FAST_FOOD,
+    PlaceCategory.BAKERY,
+    PlaceCategory.JUICE,
+    // Niches
+    PlaceCategory.LIBRARY,
+    PlaceCategory.BOOKSTORE,
+    PlaceCategory.CLINIC,
+    PlaceCategory.MUSEUM,
+    PlaceCategory.CULTURAL_SITE,
+    PlaceCategory.BRUNCH,
+    PlaceCategory.MOSQUE,
+) + PlaceCategory.entries.filter { it.isCuisine }
 
 @Composable
 private fun BearingRow(
@@ -251,6 +289,7 @@ private fun BearingRow(
     bearingDeg: Float,
     color: Color,
     subtitle: String? = null,
+    icon: androidx.compose.ui.graphics.vector.ImageVector? = null,
     onClick: (() -> Unit)? = null,
 ) {
     val rowModifier = Modifier
@@ -261,7 +300,14 @@ private fun BearingRow(
         modifier = rowModifier,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        ColoredDot(color)
+        // Leading glyph: a category-specific Material icon when we
+        // have one, otherwise the legacy coloured dot so the row
+        // still carries its colour identity for a legend.
+        if (icon != null) {
+            IconBadge(icon = icon, tint = color)
+        } else {
+            ColoredDot(color)
+        }
         Spacer(Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
@@ -326,6 +372,29 @@ private fun launchMapsPlace(
 private fun ColoredDot(color: Color) {
     Canvas(modifier = Modifier.size(12.dp)) {
         drawCircle(color)
+    }
+}
+
+// Circular 32 dp icon badge — tint-coloured Material icon over a
+// 14 % alpha wash of the same colour. Matches the pattern used on
+// the Places tab's CategoryBadge so the compass row reads as
+// "this is a pharmacy / fuel / mosque" without needing a separate
+// colour legend.
+@Composable
+private fun IconBadge(icon: ImageVector, tint: Color) {
+    Box(
+        modifier = Modifier
+            .size(32.dp)
+            .clip(CircleShape)
+            .background(tint.copy(alpha = 0.14f)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = tint,
+            modifier = Modifier.size(20.dp),
+        )
     }
 }
 
