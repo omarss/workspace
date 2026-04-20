@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import atexit
 from collections.abc import Iterator
 from contextlib import contextmanager
 
@@ -11,6 +12,22 @@ from psycopg_pool import ConnectionPool
 from .config import settings
 
 _pool: ConnectionPool | None = None
+
+
+def _close_pool() -> None:
+    """Explicit close at interpreter exit.
+
+    Python 3.14's finalizer ordering is stricter than 3.12/3.13 and
+    `ConnectionPool.__del__` can race with thread teardown, producing a
+    `PythonFinalizationError`. Closing explicitly via atexit sidesteps
+    the race without changing how callers use the pool."""
+    global _pool
+    if _pool is not None:
+        try:
+            _pool.close()
+        except Exception:
+            pass
+        _pool = None
 
 
 def pool() -> ConnectionPool:
@@ -23,6 +40,7 @@ def pool() -> ConnectionPool:
             kwargs={"autocommit": False},
             open=True,
         )
+        atexit.register(_close_pool)
     return _pool
 
 
