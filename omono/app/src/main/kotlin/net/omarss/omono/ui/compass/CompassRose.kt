@@ -1,6 +1,7 @@
 package net.omarss.omono.ui.compass
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,6 +14,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -24,6 +26,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -39,6 +42,12 @@ data class CompassMarker(
     val bearingDeg: Float,
     val color: Color,
     val label: String,
+    // When present, a small tint-coloured icon is overlaid on the
+    // ring at the marker's bearing so the user can identify the
+    // pin at a glance (pharmacy, fuel, mosque, etc.) rather than
+    // relying on the colour legend underneath. Null falls back to
+    // the legacy coloured-dot rendering.
+    val icon: ImageVector? = null,
 )
 
 // Circular compass dial that shows:
@@ -121,8 +130,15 @@ fun CompassRose(
                         )
                     }
 
-                    // Coloured dots for each marker on the ring.
+                    // Markers without an icon still render as a
+                    // classic coloured dot (North is the main one —
+                    // it's a cardinal indicator, not a place pin).
+                    // Icon-bearing markers are drawn as composables
+                    // in a separate overlay pass below so they use
+                    // the system's vector renderer and stay crisp
+                    // at any accessibility scale.
                     markers.forEach { marker ->
+                        if (marker.icon != null) return@forEach
                         val rad = Math.toRadians(marker.bearingDeg.toDouble() - 90.0)
                         val pos = Offset(
                             centre.x + innerRingRadius * cos(rad).toFloat(),
@@ -170,6 +186,12 @@ fun CompassRose(
             // The ring rotates visually via tick marks; the labels move
             // around the circle by bearing.
             CardinalLabels(headingDeg = headingDeg)
+
+            // Icon markers (pharmacy, fuel, mosque, Mecca, etc.) as
+            // composable overlays. Same polar math as the cardinal
+            // labels; each icon sits in a tinted circular badge so
+            // it reads well against the ring ticks.
+            MarkerIcons(headingDeg = headingDeg, markers = markers)
         }
 
         Spacer(Modifier.height(10.dp))
@@ -185,6 +207,39 @@ fun CompassRose(
         if (markers.isNotEmpty()) {
             Spacer(Modifier.height(4.dp))
             MarkerLegend(markers)
+        }
+    }
+}
+
+// Overlays a small tinted-badge icon on the ring for each marker
+// that has one. Positioned by polar math identical to CardinalLabels
+// so the icons rotate with the dial and sit right on the tick band.
+@Composable
+private fun MarkerIcons(headingDeg: Float, markers: List<CompassMarker>) {
+    val density = LocalDensity.current
+    // Same radius the cardinal letters sit at so icons align with
+    // the inner edge of the tick marks, not floating above them.
+    val r = with(density) { 76.dp.toPx() }
+    markers.forEach { marker ->
+        val icon = marker.icon ?: return@forEach
+        val onScreenDeg = marker.bearingDeg - headingDeg
+        val rad = Math.toRadians(onScreenDeg.toDouble() - 90.0)
+        val xPx = (r * cos(rad)).toFloat()
+        val yPx = (r * sin(rad)).toFloat()
+        Box(
+            modifier = Modifier
+                .offsetPx(xPx, yPx)
+                .size(24.dp)
+                .clip(CircleShape)
+                .background(marker.color.copy(alpha = 0.18f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = marker.label,
+                tint = marker.color,
+                modifier = Modifier.size(14.dp),
+            )
         }
     }
 }

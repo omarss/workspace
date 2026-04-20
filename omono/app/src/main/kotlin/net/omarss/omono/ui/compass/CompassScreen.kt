@@ -185,20 +185,39 @@ private fun buildCompassMarkers(
     nearestMosqueDistance: Double?,
     categoryRows: List<CategoryRow>,
 ): List<CompassMarker> = buildList {
+    // North stays a plain dot — it's a cardinal reference, not a
+    // place pin, and the big red "N" cardinal label already carries
+    // its identity.
     add(CompassMarker(bearingDeg = 0f, color = Color(0xFFEF4444), label = "North"))
     qiblaBearingDeg?.let {
-        add(CompassMarker(bearingDeg = it, color = Color(0xFFF59E0B), label = "Mecca"))
+        add(
+            CompassMarker(
+                bearingDeg = it,
+                color = Color(0xFFF59E0B),
+                label = "Mecca",
+                icon = Icons.Filled.Mosque,
+            ),
+        )
     }
     nearestMosqueBearingDeg?.let { bearing ->
         val distLabel = nearestMosqueDistance?.let { " · ${formatMetres(it)}" }.orEmpty()
-        add(CompassMarker(bearingDeg = bearing, color = Color(0xFF10B981), label = "Mosque$distLabel"))
+        add(
+            CompassMarker(
+                bearingDeg = bearing,
+                color = Color(0xFF10B981),
+                label = "Mosque$distLabel",
+                icon = PlaceCategory.MOSQUE.visual().icon,
+            ),
+        )
     }
     categoryRows.forEach { row ->
+        val visual = row.category.visual()
         add(
             CompassMarker(
                 bearingDeg = row.bearingDeg,
-                color = row.category.visual().tint,
+                color = visual.tint,
                 label = "${row.category.label} · ${formatMetres(row.distanceMeters)}",
+                icon = visual.icon,
             ),
         )
     }
