@@ -35,12 +35,18 @@ class MosqueDirectory @Inject constructor(
     // Result of a nearest-mosque lookup. Bearing is in true degrees
     // from north (0 = north, 90 = east), the same frame as the
     // compass rose's markers.
+    //
+    // `cid` is populated only when the winner came from the backend
+    // (gplaces) — the offline OSM directory has no Google Maps
+    // place IDs. The UI uses it to pick between a `?cid=<n>` deep
+    // link (place card with reviews) and a plain `geo:` pin.
     data class NearestResult(
         val name: String?,
         val latitude: Double,
         val longitude: Double,
         val distanceMeters: Double,
         val bearingDeg: Float,
+        val cid: String? = null,
     )
 
     suspend fun nearestTo(userLat: Double, userLon: Double): NearestResult? {

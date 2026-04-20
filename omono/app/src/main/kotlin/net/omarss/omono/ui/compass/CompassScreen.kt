@@ -117,14 +117,14 @@ fun CompassRoute(
                     color = Color(0xFF10B981),
                     subtitle = "${formatMetres(mosque.distanceMeters)} · heading " +
                         compassLabel(mosque.bearingDeg),
-                    // The offline mosque directory has no Google Maps
-                    // CID, so drop a labelled pin at its coords. From
-                    // there Maps shows name + the "Directions" button
-                    // like any regular search result.
+                    // When the winner came from the gplaces backend we
+                    // have a CID → open the full Maps place card
+                    // (reviews, hours, photos). When it came from the
+                    // offline OSM directory we drop a labelled pin.
                     onClick = {
                         launchMapsPlace(
                             context = context,
-                            cid = null,
+                            cid = mosque.cid,
                             label = mosque.name ?: "Mosque",
                             lat = mosque.latitude,
                             lon = mosque.longitude,

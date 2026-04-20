@@ -121,6 +121,7 @@ class CompassViewModel @Inject constructor(
                     longitude = mosque.longitude,
                     distanceMeters = mosqueDistance,
                     bearingDeg = mosqueBearing,
+                    cid = mosque.cid,
                 )
             } else null,
             enabledCategories = enabled,
@@ -167,13 +168,67 @@ class CompassViewModel @Inject constructor(
             if (moved < MOSQUE_REFRESH_M && mosqueIdentity.value != null) return
         }
         lastMosqueLookupFix = current
-        val result = runCatching {
+
+        // Two candidate sources: the bundled OSM directory (offline,
+        // fast, comprehensive for Riyadh but may lag on new mosques)
+        // and the gplaces backend (live-scraped, richer metadata via
+        // CID, but sometimes missing coords). Take whichever is
+        // genuinely nearer to the user's current fix — that's the
+        // right answer regardless of which catalogue has better
+        // coverage in their neighbourhood. Either source failing
+        // (e.g. geofence blocking the backend) is tolerated — we
+        // just use whatever succeeded.
+        val offline = runCatching {
             mosqueDirectory.nearestTo(current.latitude, current.longitude)
         }.onFailure { Timber.w(it, "MosqueDirectory lookup failed") }
             .getOrNull()
-        mosqueIdentity.value = result?.let {
-            MosqueSnapshot(name = it.name, latitude = it.latitude, longitude = it.longitude)
-        }
+            ?.let {
+                MosqueSnapshot(
+                    name = it.name,
+                    latitude = it.latitude,
+                    longitude = it.longitude,
+                    cid = null,
+                )
+            }
+
+        val online = if (placesRepository.isConfigured) {
+            runCatching {
+                placesRepository.nearby(
+                    latitude = current.latitude,
+                    longitude = current.longitude,
+                    category = PlaceCategory.MOSQUE,
+                    radiusMeters = CATEGORY_RADIUS_M,
+                    minRating = null,
+                    minReviews = null,
+                    limit = CATEGORY_CANDIDATES,
+                )
+            }.onFailure {
+                Timber.w(it, "Backend mosque lookup failed")
+            }.getOrNull()
+                ?.firstOrNull(::isOpenEnough)
+                ?.let {
+                    MosqueSnapshot(
+                        name = it.name,
+                        latitude = it.latitude,
+                        longitude = it.longitude,
+                        cid = it.cid,
+                    )
+                }
+        } else null
+
+        mosqueIdentity.value = pickNearer(current, offline, online)
+    }
+
+    private fun pickNearer(
+        fix: AppLocationStream.Fix,
+        a: MosqueSnapshot?,
+        b: MosqueSnapshot?,
+    ): MosqueSnapshot? {
+        if (a == null) return b
+        if (b == null) return a
+        val da = haversineMeters(fix.latitude, fix.longitude, a.latitude, a.longitude)
+        val db = haversineMeters(fix.latitude, fix.longitude, b.latitude, b.longitude)
+        return if (da <= db) a else b
     }
 
     private fun AppLocationStream.Fix.toGridBucket(): Pair<Int, Int> =
@@ -186,6 +241,12 @@ class CompassViewModel @Inject constructor(
         val name: String?,
         val latitude: Double,
         val longitude: Double,
+        // Google Maps CID when the nearest mosque came from the
+        // backend (new `?cid=<n>` deep link opens the place card with
+        // reviews / hours). Null when the winner came from the
+        // offline OSM directory, in which case the tap handler falls
+        // back to a labelled `geo:` pin.
+        val cid: String? = null,
     )
 
     // One row's worth of identity / position for a place-categories
