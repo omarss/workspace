@@ -155,7 +155,62 @@ GENERIC_PURGE: list[tuple[str, str, str | None]] = [
      "hospital"),
 ]
 
-ALL_RULES: list[tuple[str, str, str | None]] = LIBRARY_PURGE + HOSPITAL_PURGE + GENERIC_PURGE
+# Post-sampling fixes from the audits. Each rule addresses a concrete
+# misclassification seen in the DB; keep them tight so they only match
+# the noise and not legitimate rows.
+CROSS_SLUG_PURGE: list[tuple[str, str, str | None]] = [
+    # bank slug had "AlRajhi Bank ATM" etc — Google's gtype says ATM
+    ("bank", "subcategories[1] ~* 'atm|cash machine'", "atm"),
+    # bank slug also had "Saudi Investment Bank Parking" etc — drop
+    ("bank",
+     "subcategories[1] ~* 'parking|warehouse|office|storage'"
+     " OR COALESCE(name, '') ~ 'مواقف' OR COALESCE(name_en, '') ~* 'parking'",
+     None),
+
+    # hospital has parking lots + mislabeled factories etc
+    ("hospital",
+     "COALESCE(name, '') ~ 'مواقف|مستودع' OR COALESCE(name_en, '') ~* 'parking|warehouse|storage'",
+     None),
+    ("hospital",
+     "subcategories[1] ~* 'factory|office|store|warehouse|pharmacy' OR subcategories[1] ~ 'مصنع|مكتب|متجر|مستودع|صيدلية'",
+     None),
+
+    # park — business parks + parking plazas aren't public parks
+    ("park",
+     "subcategories[1] ~* 'corporate|parking|office|business park|plaza'"
+     " OR COALESCE(name_en, '') ~* 'business park|parking plaza|office park'",
+     None),
+
+    # mall — shopping arcades only; drop single-shop inside malls + offices
+    ("mall",
+     "subcategories[1] ~* 'corporate|office|showroom|locksmith|parking' OR subcategories[1] ~ 'مكتب|معرض|مواقف'",
+     None),
+
+    # healthy_food — drop corporate / trading / animal-feed / yogurt
+    ("healthy_food",
+     "subcategories[1] ~* 'trading|corporate|company|office|animal feed|pet|wholesale'"
+     " OR subcategories[1] ~ 'أعلاف|حبوب|متجر حيوانات|تجارة|شركة'"
+     " OR COALESCE(name_en, '') ~* 'trading company|corporation|animal feed'"
+     " OR COALESCE(name, '') ~ 'أعلاف|حبوب'",
+     None),
+
+    # sushi has corporate offices leaked in
+    ("sushi",
+     "subcategories[1] ~* 'corporate|office|company' OR subcategories[1] ~ 'مكتب الشركات|مكتب'",
+     None),
+
+    # steakhouse — farouj = chicken, salduwitch = sandwich
+    ("steakhouse",
+     "COALESCE(name, '') ~ 'فروج|ساندوتش|شاورما|برجر' OR COALESCE(name_en, '') ~* 'farouj|sandwich|shawarma|burger|chicken'",
+     "restaurant"),
+
+    # atm ≠ bank — keep things labeled Bank in the bank slug
+    ("atm", "subcategories[1] ~* '^bank$' OR subcategories[1] ~ 'مصرف$'", "bank"),
+]
+
+ALL_RULES: list[tuple[str, str, str | None]] = (
+    LIBRARY_PURGE + HOSPITAL_PURGE + GENERIC_PURGE + CROSS_SLUG_PURGE
+)
 
 
 def main() -> None:
