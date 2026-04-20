@@ -26,10 +26,17 @@ import kotlin.math.sqrt
 // `assets/riyadh_speed_limits.json`, which covers the same dataset
 // for speed-limit-only queries.
 //
-// Results are cached by position: a re-query within CACHE_RADIUS_M
-// and CACHE_TTL_MS of the last call returns the cached value
-// synchronously, so the typical 1 Hz GPS cadence produces about one
-// network hit per 5 s / 100 m of driving.
+// Cache: two tiers.
+//   * The "recent" slot keeps the last answer so contiguous GPS ticks
+//     within CACHE_RADIUS_M / CACHE_TTL_MS skip both the grid lookup
+//     and any network work.
+//   * The grid LRU stores every recent answer keyed by an 80 m cell
+//     so revisited stretches of a commute (same traffic light each
+//     morning, same exit each evening) return from memory without
+//     hitting the backend. Cap is small enough (~64 cells ≈ a few
+//     km of driving) that the map never grows unbounded on a long
+//     trip; TTL is minutes, not seconds, so the cache survives a
+//     screen-off pause.
 //
 // Bundled-asset selection: within SEARCH_RADIUS_M of the position,
 // candidate ways are scored by distance-to-nearest-segment and, when
@@ -49,6 +56,23 @@ class RoadSpeedLimitRepository @Inject constructor(
     // rolling cache so every location tick isn't a fresh HTTP call.
     @Volatile private var cached: CachedRoad? = null
 
+    // Grid-bucketed LRU for revisited cells. `LinkedHashMap` in
+    // access-order mode doubles as an LRU container; eviction happens
+    // in `put` when the size crosses GRID_CACHE_MAX. Synchronised
+    // manually because Android's LinkedHashMap isn't thread-safe —
+    // the single-threaded nature of the feature's location scope
+    // makes contention rare, but the single lock keeps the cache
+    // honest on pathological re-entry.
+    private val gridCache = object : LinkedHashMap<Long, CachedRoad>(
+        GRID_CACHE_MAX,
+        0.75f,
+        /* accessOrder = */ true,
+    ) {
+        override fun removeEldestEntry(eldest: Map.Entry<Long, CachedRoad>?): Boolean =
+            size > GRID_CACHE_MAX
+    }
+    private val gridCacheLock = Any()
+
     // Full road info (speed limit + name) for the current fix. Prefers
     // the live API; if it can't be reached, falls back to the bundled
     // asset for speed only.
@@ -60,6 +84,10 @@ class RoadSpeedLimitRepository @Inject constructor(
         speedMps: Float = 0f,
     ): RoadInfo {
         cachedIfFresh(lat, lon)?.let { return it.info }
+        lookupGridCache(lat, lon)?.let {
+            cached = it
+            return it.info
+        }
 
         val useBearing = isBearingTrustworthy(bearingDeg, bearingAccuracyDeg, speedMps)
         val apiCandidates = roadsClient.roadsAt(lat, lon)
@@ -70,7 +98,9 @@ class RoadSpeedLimitRepository @Inject constructor(
             // the endpoint every tick.
             val best = pickBestCandidate(apiCandidates, if (useBearing) bearingDeg else null)
             val info = best?.toRoadInfo() ?: RoadInfo.EMPTY
-            cached = CachedRoad(lat, lon, System.currentTimeMillis(), info)
+            val entry = CachedRoad(lat, lon, System.currentTimeMillis(), info)
+            cached = entry
+            storeGridCache(lat, lon, entry)
             return info
         }
 
@@ -91,8 +121,38 @@ class RoadSpeedLimitRepository @Inject constructor(
             nameEn = null,
             highway = null,
         )
-        cached = CachedRoad(lat, lon, System.currentTimeMillis(), info)
+        val entry = CachedRoad(lat, lon, System.currentTimeMillis(), info)
+        cached = entry
+        storeGridCache(lat, lon, entry)
         return info
+    }
+
+    private fun gridKey(lat: Double, lon: Double): Long {
+        // ~80 m cells matches CACHE_RADIUS_M on the recent-slot cache
+        // so neighbouring buckets blend smoothly. Quantise with a
+        // truncating cast so negative latitudes hash the same way;
+        // combine into a single long to avoid Pair<Double, Double>
+        // allocation on every lookup.
+        val latCell = (lat / GRID_DEG_LAT).toLong()
+        val lonCell = (lon / GRID_DEG_LAT).toLong()
+        return (latCell shl 32) xor (lonCell and 0xFFFFFFFFL)
+    }
+
+    private fun lookupGridCache(lat: Double, lon: Double): CachedRoad? {
+        val key = gridKey(lat, lon)
+        val now = System.currentTimeMillis()
+        val entry = synchronized(gridCacheLock) { gridCache[key] }
+            ?: return null
+        if (now - entry.timestampMs > GRID_CACHE_TTL_MS) {
+            synchronized(gridCacheLock) { gridCache.remove(key) }
+            return null
+        }
+        return entry
+    }
+
+    private fun storeGridCache(lat: Double, lon: Double, entry: CachedRoad) {
+        val key = gridKey(lat, lon)
+        synchronized(gridCacheLock) { gridCache[key] = entry }
     }
 
     // Thin compatibility shim. SpeedFeature's existing call sites
@@ -236,6 +296,16 @@ class RoadSpeedLimitRepository @Inject constructor(
         // limits clear automatically on slow drives.
         const val CACHE_RADIUS_M: Double = 80.0
         const val CACHE_TTL_MS: Long = 5_000L
+
+        // Grid cache — keyed by 80 m cells so walking across a cell
+        // boundary promotes a fresh lookup. A 15 min TTL covers a
+        // normal commute + a short errand without risking stale
+        // speed-limit data (OSM edits don't propagate to the scrape
+        // at sub-hour cadence either way). Cap is small enough that
+        // worst-case memory is ~64 × (RoadInfo + few strings).
+        const val GRID_CACHE_MAX: Int = 128
+        const val GRID_CACHE_TTL_MS: Long = 15L * 60 * 1000
+        const val GRID_DEG_LAT: Double = 80.0 / 111_320.0 // ~80 m cell
     }
 }
 

@@ -78,17 +78,19 @@ class DistractionGuard @Inject constructor(
             // boolean so the top-level combine stays under Kotlin's 5-
             // flow overload. Any one of these being true = silenced.
             //
-            // The accelerometer-variance "phone in hand" signal used
-            // to live here too; it was dropped because it reported
-            // "not in hand" for dashboard-mounted phones (where the
-            // whole device barely moves even while the user scrolls),
-            // which silently suppressed the alert in exactly the
-            // situation we want it for. See the class-level comment.
+            // The phone-in-hand signal is back, but with a very low
+            // variance threshold (see SilenceSignals.phoneInHandFlow)
+            // and a hold window — we only silence on *prolonged*
+            // stillness (8 s under 0.05 m²/s⁴). A dashboard-mounted
+            // phone in a moving car picks up enough road vibration to
+            // stay "active", but a phone laid flat on a seat with
+            // no-one using it drops to "still" and the beep stops.
             val silencedFlow: Flow<Boolean> = combine(
                 context.proximityCoveredFlow(),
                 context.inCallFlow(),
-            ) { proxCovered, inCall ->
-                proxCovered || inCall
+                context.phoneInHandFlow(),
+            ) { proxCovered, inCall, active ->
+                proxCovered || inCall || !active
             }
 
             combine(

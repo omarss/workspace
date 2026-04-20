@@ -65,19 +65,27 @@ fun Context.inCallFlow(): Flow<Boolean> = flow {
     }
 }
 
-// "Is someone actively holding / handling the phone right now?" —
-// derived from the variance of the accelerometer magnitude over a
-// short rolling window.
+// "Is the phone moving at all right now?" — derived from the
+// variance of the accelerometer magnitude over a short rolling
+// window.
 //
-// Rationale: a phone in a driver's hand picks up continuous micro-
-// movements from hand tremor + scrolling + typing (variance > 0.5
-// m²/s⁴). A phone resting on a dashboard or seat only shows road
-// vibration, which at highway speeds lands well below that floor
-// (typical 0.05–0.15). Thresholding the variance cleanly
-// distinguishes "in hand" from "at rest" without any FFT gymnastics.
+// Threshold is intentionally very low (0.05 m²/s⁴) so it only
+// classifies "dead still" — a phone left flat on a passenger seat,
+// cup-holder, or dashboard in a stopped car. A phone that's
+// dashboard-mounted in a moving car picks up road vibration
+// (typical 0.05–0.15) which stays above this floor, so the user's
+// scroll-while-driving case still reads as "active" and the
+// distraction beep fires. Holding the phone in-hand picks up
+// dominant variance > 0.5, which is emphatically "active".
+//
+// The guard uses this as a hold-off: if the phone stays below the
+// floor for `STILL_HOLD_MS`, we stop beeping until the next time
+// the phone moves (picked up / car shakes over a speed bump).
+// Returns `true` when the phone has registered *any* motion within
+// the hold window, `false` only after a prolonged quiet.
 //
 // Emits only on state transitions (not on every 20 Hz sample) so the
-// downstream combine doesn't thrash. Defaults to `true` (in-hand) on
+// downstream combine doesn't thrash. Defaults to `true` (active) on
 // devices without an accelerometer so the guard behaves as before.
 fun Context.phoneInHandFlow(): Flow<Boolean> = callbackFlow {
     val sensorManager = getSystemService<android.hardware.SensorManager>()
@@ -91,6 +99,7 @@ fun Context.phoneInHandFlow(): Flow<Boolean> = callbackFlow {
 
     val window = ArrayDeque<Float>()
     var lastEmitted: Boolean? = null
+    var lastActiveMs = System.currentTimeMillis()
 
     val listener = object : android.hardware.SensorEventListener {
         override fun onSensorChanged(event: android.hardware.SensorEvent) {
@@ -105,10 +114,19 @@ fun Context.phoneInHandFlow(): Flow<Boolean> = callbackFlow {
             var ss = 0.0
             window.forEach { ss += (it - mean) * (it - mean) }
             val variance = ss / window.size
-            val inHand = variance > STILL_VARIANCE_THRESHOLD
-            if (inHand != lastEmitted) {
-                lastEmitted = inHand
-                trySend(inHand)
+            val now = System.currentTimeMillis()
+            if (variance > STILL_VARIANCE_THRESHOLD) {
+                lastActiveMs = now
+            }
+            // Emit "active" while we've seen motion within the hold
+            // window — catches road vibration keeping a mounted
+            // phone "active" across a brief between-bumps lull, and
+            // releases to "still" only after prolonged quiet (phone
+            // put down on a flat surface).
+            val active = (now - lastActiveMs) < STILL_HOLD_MS
+            if (active != lastEmitted) {
+                lastEmitted = active
+                trySend(active)
             }
         }
         override fun onAccuracyChanged(s: android.hardware.Sensor?, a: Int) = Unit
@@ -126,7 +144,15 @@ private const val IN_CALL_POLL_MS: Long = 2_000L
 // within one second.
 private const val WINDOW_SIZE: Int = 16
 
-// Empirically chosen boundary: resting phone ≈ 0.05–0.15 m²/s⁴;
-// handheld phone ≈ 0.5+ even when sitting still. 0.25 gives a
-// comfortable margin for road vibration on rough surfaces.
-private const val STILL_VARIANCE_THRESHOLD: Double = 0.25
+// Very low threshold — we only want to classify "dead still" as
+// stationary. A phone dashboard-mounted in a moving car picks up
+// enough road vibration to clear this floor even at urban crawl
+// speeds; a phone left flat on a seat in a stopped car does not.
+private const val STILL_VARIANCE_THRESHOLD: Double = 0.05
+
+// Hold window — keep reporting "active" for this long after the
+// last above-threshold sample. Covers the between-bump lull on
+// very smooth roads / in a well-suspended vehicle. After the
+// window expires with no motion the guard de-arms and beeping
+// stops; the next bump or pickup re-arms within a sample (~60 ms).
+private const val STILL_HOLD_MS: Long = 8_000L
