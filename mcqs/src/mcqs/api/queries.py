@@ -142,7 +142,11 @@ def list_questions(
     sql = _QUESTION_BASE
     if where:
         sql += " WHERE " + " AND ".join(where)
-    sql += " ORDER BY q.id ASC LIMIT %s OFFSET %s"
+    # Random order by default so a paginated consumer rotating through
+    # the bank doesn't see the same questions in the same sequence.
+    # Acceptable caveat: different requests on the same filter produce
+    # different pages — use `/questions/{id}` for stable addressing.
+    sql += " ORDER BY random() LIMIT %s OFFSET %s"
     params.extend([limit + 1, offset])
 
     with conn.cursor(row_factory=dict_row) as cur:

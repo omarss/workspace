@@ -13,9 +13,9 @@ class Settings(BaseSettings):
     # Corpus
     docs_bundle_root: str = "/home/omar/workspace/vrtx-ai/docs-bundle"
 
-    # Anthropic (generation)
-    anthropic_api_key: str = ""  # required at runtime for `mcqs generate`
-    anthropic_model: str = "claude-sonnet-4-6"
+    # Generation — shells out to the `claude` CLI (Claude Code login)
+    claude_cli: str = "claude"
+    claude_model: str = "sonnet"
 
     # FastAPI
     mcqs_api_key: str = ""  # required at runtime for `mcqs serve`

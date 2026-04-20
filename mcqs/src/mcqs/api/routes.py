@@ -10,6 +10,7 @@ Design notes:
 
 from __future__ import annotations
 
+import random
 from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query, status
@@ -30,6 +31,8 @@ from .schemas import (
     TopicsResponse,
     TopicSummary,
 )
+
+_OUTPUT_LETTERS = ("A", "B", "C", "D", "E", "F", "G", "H")
 
 router = APIRouter(prefix="/v1/mcq")
 
@@ -90,13 +93,19 @@ async def topics(
 
 
 def _row_to_question(r: dict, *, hide_answer: bool = False) -> Question:
+    # Shuffle on every retrieval and re-letter A..H — the DB letter is
+    # the LLM's emission order, which has positional bias we don't want
+    # to leak to consumers. Every request sees a fresh permutation, so
+    # two calls for the same question return different orderings.
+    stored = list(r["options"])
+    random.shuffle(stored)
     opts = [
         Option(
-            letter=o["letter"],
+            letter=_OUTPUT_LETTERS[i],
             text=o["text"],
             is_correct=None if hide_answer else bool(o["is_correct"]),
         )
-        for o in r["options"]
+        for i, o in enumerate(stored)
     ]
     return Question(
         id=r["id"],
