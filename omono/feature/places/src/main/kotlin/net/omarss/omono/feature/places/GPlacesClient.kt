@@ -151,6 +151,24 @@ class GPlacesClient @Inject constructor(
     ): List<Place> {
         val root = runCatching { JSONObject(json) }.getOrNull() ?: return emptyList()
         val results = root.optJSONArray("results") ?: return emptyList()
+
+        // First pass: tally how many results share each (lat, lon)
+        // pair. The backend currently returns batches where several
+        // entries collide on a single placeholder coord (FEEDBACK.md
+        // §9.13) whenever the scraper's geocoding didn't resolve.
+        // Dropping colliders is a conservative fix — two legitimately
+        // co-located businesses are vanishingly rare compared to the
+        // upstream bug.
+        val coordTally = HashMap<Long, Int>(results.length())
+        for (i in 0 until results.length()) {
+            val item = results.optJSONObject(i) ?: continue
+            val lat = item.optDouble("lat", Double.NaN)
+            val lon = item.optDouble("lon", Double.NaN)
+            if (lat.isNaN() || lon.isNaN()) continue
+            val key = coordKey(lat, lon)
+            coordTally[key] = (coordTally[key] ?: 0) + 1
+        }
+
         val out = mutableListOf<Place>()
         for (i in 0 until results.length()) {
             val item = results.optJSONObject(i) ?: continue
@@ -159,6 +177,11 @@ class GPlacesClient @Inject constructor(
             val lat = item.optDouble("lat", Double.NaN)
             val lon = item.optDouble("lon", Double.NaN)
             if (lat.isNaN() || lon.isNaN()) continue
+            // Skip entries that share a lat/lon with any other row in
+            // the same payload — almost always the placeholder coord
+            // the backend falls back to for unresolved geocodes. Left
+            // in, they sort to the top as phantom 0 m matches.
+            if ((coordTally[coordKey(lat, lon)] ?: 0) > 1) continue
             // When the server returns a mixed-category union, honour
             // the per-result `category` field. When the request was
             // for a single category, trust the request and skip the
@@ -212,6 +235,18 @@ class GPlacesClient @Inject constructor(
     private companion object {
         const val USER_AGENT = "omono/0.x (personal sideload; https://apps.omarss.net)"
     }
+}
+
+// Pack a (lat, lon) pair into a single long keyed at 7-decimal
+// precision (~1 cm). That's well below any useful spatial resolution,
+// so two rows that hash to the same bucket effectively share
+// coordinates. Doubles can't be used as HashMap keys safely because
+// of NaN / equality quirks, and a Pair<Double, Double> allocates on
+// every lookup.
+private fun coordKey(lat: Double, lon: Double): Long {
+    val latQ = (lat * 10_000_000.0).toLong()
+    val lonQ = (lon * 10_000_000.0).toLong()
+    return (latQ shl 32) xor (lonQ and 0xFFFFFFFFL)
 }
 
 // `optString("field")` returns "null" (the word) when the JSON value

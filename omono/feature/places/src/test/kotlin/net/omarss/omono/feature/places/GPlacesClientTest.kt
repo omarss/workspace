@@ -104,12 +104,16 @@ class GPlacesClientTest {
 
     @Test
     fun `result missing id or name is skipped`() {
+        // Distinct coords per row so the placeholder-coord dedup
+        // (multi-row identical lat/lon → drop all; see the "colliding
+        // coords are skipped" test) doesn't interfere with this
+        // test's narrower intent of id/name validation.
         val json = """
             {
               "results": [
-                {"id":"","name":"No id","lat":24.7,"lon":46.7},
-                {"id":"ok","name":"","lat":24.7,"lon":46.7},
-                {"id":"good","name":"Good","lat":24.7,"lon":46.7}
+                {"id":"","name":"No id","lat":24.701,"lon":46.701},
+                {"id":"ok","name":"","lat":24.702,"lon":46.702},
+                {"id":"good","name":"Good","lat":24.703,"lon":46.703}
               ]
             }
         """.trimIndent()
@@ -120,6 +124,32 @@ class GPlacesClientTest {
         )
         places shouldHaveSize 1
         places[0].name shouldBe "Good"
+    }
+
+    @Test
+    fun `rows sharing coords are dropped as placeholders`() {
+        // Backend currently emits placeholder coordinates on entries
+        // whose geocoding hasn't resolved (see FEEDBACK.md §9.13).
+        // Whenever two or more rows share the same `(lat, lon)` we
+        // treat them as placeholders and drop them all — real
+        // businesses at identical coords are vanishingly rare.
+        val json = """
+            {
+              "results": [
+                {"id":"a","name":"A","lat":24.7135517,"lon":46.6752957,"category":"mosque"},
+                {"id":"b","name":"B","lat":24.7135517,"lon":46.6752957,"category":"mosque"},
+                {"id":"c","name":"C","lat":24.72,"lon":46.68,"category":"mosque"}
+              ]
+            }
+        """.trimIndent()
+        val places = client.parseResponse(
+            json = json,
+            requestedCategory = PlaceCategory.MOSQUE,
+            userLat = 24.7136,
+            userLon = 46.6753,
+        )
+        places shouldHaveSize 1
+        places[0].id shouldBe "c"
     }
 
     @Test
