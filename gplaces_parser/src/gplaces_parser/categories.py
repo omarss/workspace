@@ -45,7 +45,11 @@ _SLUG_QUERIES: list[tuple[str, str, str]] = [
     # have to pick. Dedup by place_id downstream handles Jarir-style
     # bookstores that show up under multiple queries.
     ("library",     "مكتبة عامة",              "public library"),
+    ("library",     "مكتبة وطنية",             "national library"),
+    ("library",     "مكتبة الملك",             "king library"),
+    ("library",     "مكتبة جامعة",             "university library"),
     ("library",     "كافيه مكتبة",             "book cafe"),
+    ("library",     "مقهى كتب",                "book café"),
     # Transit — bus / metro / train / taxi / railway stations. Lumped
     # under one slug because the client mostly wants "stations nearby"
     # and Riyadh's transit is fragmented (SAPTCO + Metro + SAR).
