@@ -78,6 +78,13 @@ class PlacesViewModel @Inject constructor(
     private val hiddenCategories: StateFlow<Set<PlaceCategory>> = placesSettings.hiddenCategories
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), initialValue = emptySet())
 
+    private val orderedCategories: StateFlow<List<PlaceCategory>> = placesSettings.orderedCategories
+        .stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5_000),
+            initialValue = PlaceCategory.entries,
+        )
+
     val uiState: StateFlow<PlacesUiState> = combine(
         selectedCategory,
         coneDegrees,
@@ -88,8 +95,14 @@ class PlacesViewModel @Inject constructor(
             qualityFilter,
             heading,
             loading,
-            combine(error, loadingMore, canLoadMore, hiddenCategories) { e, lm, cm, hidden ->
-                ErrorLoadingHidden(e, lm, cm, hidden)
+            combine(
+                error,
+                loadingMore,
+                canLoadMore,
+                hiddenCategories,
+                orderedCategories,
+            ) { e, lm, cm, hidden, ordered ->
+                ErrorLoadingHidden(e, lm, cm, hidden, ordered)
             },
         ) { q, qf, h, l, elh ->
             CombinedExtras(
@@ -101,6 +114,7 @@ class PlacesViewModel @Inject constructor(
                 loadingMore = elh.loadingMore,
                 canLoadMore = elh.canLoadMore,
                 hiddenCategories = elh.hiddenCategories,
+                orderedCategories = elh.orderedCategories,
             )
         },
     ) { category, cone, radius, places, extras ->
@@ -121,6 +135,7 @@ class PlacesViewModel @Inject constructor(
             loadingMore = extras.loadingMore,
             canLoadMore = extras.canLoadMore,
             hiddenCategories = extras.hiddenCategories,
+            orderedCategories = extras.orderedCategories,
             errorMessage = extras.error,
             configured = repository.isConfigured,
         )
@@ -139,6 +154,7 @@ class PlacesViewModel @Inject constructor(
         val loadingMore: Boolean,
         val canLoadMore: Boolean,
         val hiddenCategories: Set<PlaceCategory>,
+        val orderedCategories: List<PlaceCategory>,
     )
 
     private data class ErrorLoadingHidden(
@@ -146,10 +162,27 @@ class PlacesViewModel @Inject constructor(
         val loadingMore: Boolean,
         val canLoadMore: Boolean,
         val hiddenCategories: Set<PlaceCategory>,
+        val orderedCategories: List<PlaceCategory>,
     )
 
     fun setCategoryHidden(category: PlaceCategory, hidden: Boolean) {
         viewModelScope.launch { placesSettings.toggleHidden(category, hidden) }
+    }
+
+    fun setAllCategoriesHidden(hidden: Boolean) {
+        viewModelScope.launch {
+            placesSettings.setHiddenCategories(
+                if (hidden) PlaceCategory.entries.toHashSet() else emptySet(),
+            )
+        }
+    }
+
+    fun moveCategory(category: PlaceCategory, up: Boolean) {
+        viewModelScope.launch { placesSettings.move(category, up) }
+    }
+
+    fun resetCategoryPreferences() {
+        viewModelScope.launch { placesSettings.reset() }
     }
 
     fun selectCategory(category: PlaceCategory?) {
@@ -473,6 +506,10 @@ data class PlacesUiState(
     // filters them out so the Places tab shows only what the user
     // cares about. Empty set = show everything (default).
     val hiddenCategories: Set<PlaceCategory> = emptySet(),
+    // Ordered list of every category — the Customize sheet edits
+    // this, the chip row renders in this order. Defaults to
+    // PlaceCategory.entries for a fresh install.
+    val orderedCategories: List<PlaceCategory> = PlaceCategory.entries,
     val errorMessage: String? = null,
     val configured: Boolean = false,
 )

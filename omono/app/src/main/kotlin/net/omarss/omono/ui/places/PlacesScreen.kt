@@ -39,16 +39,21 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.FilterAltOff
 import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.TextButton
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.StarBorder
@@ -94,11 +99,15 @@ fun PlacesRoute(
     var showCustomizeDialog by remember { mutableStateOf(false) }
 
     if (showCustomizeDialog) {
-        CustomizeCategoriesDialog(
+        CustomizeCategoriesSheet(
             hidden = state.hiddenCategories,
+            ordered = state.orderedCategories,
             onToggle = { category, isHidden ->
                 viewModel.setCategoryHidden(category, isHidden)
             },
+            onMove = { category, up -> viewModel.moveCategory(category, up) },
+            onSetAllHidden = { isHidden -> viewModel.setAllCategoriesHidden(isHidden) },
+            onReset = { viewModel.resetCategoryPreferences() },
             onDismiss = { showCustomizeDialog = false },
         )
     }
@@ -190,6 +199,7 @@ fun PlacesRoute(
                 CategoryChips(
                     selected = state.category,
                     hidden = state.hiddenCategories,
+                    ordered = state.orderedCategories,
                     onSelect = viewModel::selectCategory,
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -202,6 +212,7 @@ fun PlacesRoute(
                     CuisineChips(
                         selected = state.category,
                         hidden = state.hiddenCategories,
+                        ordered = state.orderedCategories,
                         onSelect = viewModel::selectCategory,
                     )
                 }
@@ -284,83 +295,184 @@ fun PlacesRoute(
     }
 }
 
-// Simple show/hide dialog for the Places category chip row. Lists
-// every PlaceCategory with a Switch; toggling updates DataStore via
-// the ViewModel, which re-emits the chips with the new hidden set.
-// Reorder is deliberately not wired (that wants a draggable list
-// primitive we don't have yet) — users get the ordering baked into
-// the enum until a follow-up ships explicit reordering.
+// Bottom-sheet customise surface. Three zones:
+//   * Header actions — "Show all", "Hide all", "Reset", with a
+//     live "N of M showing" count.
+//   * A scrollable list of categories in the user's current order,
+//     each with a toggle + up / down reorder arrows.
+//   * Cuisines rendered as their own section so the long food tail
+//     doesn't visually merge with the daily-utility picks.
+//
+// Reorder is a pair of arrow buttons because we don't have a
+// drag-and-drop list primitive baked in — arrows are cheap, work
+// on every Android version, and let the user nudge favourites to
+// the top without learning a new gesture.
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun CustomizeCategoriesDialog(
+private fun CustomizeCategoriesSheet(
     hidden: Set<PlaceCategory>,
+    ordered: List<PlaceCategory>,
     onToggle: (PlaceCategory, Boolean) -> Unit,
+    onMove: (PlaceCategory, Boolean) -> Unit,
+    onSetAllHidden: (Boolean) -> Unit,
+    onReset: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    androidx.compose.material3.AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Categories to show") },
-        text = {
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        val topLevel = ordered.filterNot { it.isCuisine }
+        val cuisines = ordered.filter { it.isCuisine }
+        val visibleCount = ordered.count { it !in hidden }
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 12.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        "Customize categories",
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    Text(
+                        "Showing $visibleCount of ${ordered.size}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                TextButton(onClick = onReset) { Text("Reset") }
+            }
+            Spacer(Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                AssistChip(
+                    onClick = { onSetAllHidden(false) },
+                    label = { Text("Show all") },
+                )
+                AssistChip(
+                    onClick = { onSetAllHidden(true) },
+                    label = { Text("Hide all") },
+                )
+            }
+            Spacer(Modifier.height(16.dp))
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(max = 480.dp)
+                    .heightIn(max = 560.dp)
                     .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
-                Text(
-                    "Uncheck categories you want hidden from the chip row.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(Modifier.height(8.dp))
-                PlaceCategory.entries.forEach { category ->
-                    val isVisible = category !in hidden
-                    val visual = category.visual()
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onToggle(category, isVisible) }
-                            .padding(vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Icon(
-                            imageVector = visual.icon,
-                            contentDescription = null,
-                            tint = visual.tint,
-                            modifier = Modifier.size(18.dp),
+                if (topLevel.isNotEmpty()) {
+                    CategorySectionHeader("Places")
+                    topLevel.forEachIndexed { index, category ->
+                        CategoryCustomizeRow(
+                            category = category,
+                            visible = category !in hidden,
+                            canMoveUp = index > 0,
+                            canMoveDown = index < topLevel.lastIndex,
+                            onToggle = { isVisible -> onToggle(category, !isVisible) },
+                            onMove = { up -> onMove(category, up) },
                         )
-                        Spacer(Modifier.width(12.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = category.label,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurface,
-                            )
-                            if (category.isCuisine) {
-                                Text(
-                                    text = "Cuisine",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                        }
-                        Switch(
-                            checked = isVisible,
-                            onCheckedChange = { checked ->
-                                onToggle(category, !checked)
-                            },
+                    }
+                }
+                if (cuisines.isNotEmpty()) {
+                    Spacer(Modifier.height(8.dp))
+                    CategorySectionHeader("Cuisines")
+                    cuisines.forEachIndexed { index, category ->
+                        CategoryCustomizeRow(
+                            category = category,
+                            visible = category !in hidden,
+                            canMoveUp = index > 0,
+                            canMoveDown = index < cuisines.lastIndex,
+                            onToggle = { isVisible -> onToggle(category, !isVisible) },
+                            onMove = { up -> onMove(category, up) },
                         )
                     }
                 }
             }
-        },
-        confirmButton = {
-            androidx.compose.material3.TextButton(onClick = onDismiss) {
-                Text("Done")
+            Spacer(Modifier.height(12.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+            ) {
+                TextButton(onClick = onDismiss) { Text("Done") }
             }
-        },
+        }
+    }
+}
+
+@Composable
+private fun CategorySectionHeader(title: String) {
+    Text(
+        text = title,
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(vertical = 8.dp),
     )
+}
+
+@Composable
+private fun CategoryCustomizeRow(
+    category: PlaceCategory,
+    visible: Boolean,
+    canMoveUp: Boolean,
+    canMoveDown: Boolean,
+    onToggle: (Boolean) -> Unit,
+    onMove: (Boolean) -> Unit,
+) {
+    val visual = category.visual()
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(32.dp)
+                .clip(CircleShape)
+                .background(visual.tint.copy(alpha = 0.14f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = visual.icon,
+                contentDescription = null,
+                tint = visual.tint,
+                modifier = Modifier.size(18.dp),
+            )
+        }
+        Spacer(Modifier.width(12.dp))
+        Text(
+            text = category.label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier
+                .weight(1f)
+                .clickable { onToggle(visible) },
+        )
+        IconButton(
+            onClick = { onMove(true) },
+            enabled = canMoveUp,
+        ) {
+            Icon(
+                imageVector = Icons.Filled.ArrowUpward,
+                contentDescription = "Move ${category.label} up",
+                modifier = Modifier.size(18.dp),
+            )
+        }
+        IconButton(
+            onClick = { onMove(false) },
+            enabled = canMoveDown,
+        ) {
+            Icon(
+                imageVector = Icons.Filled.ArrowDownward,
+                contentDescription = "Move ${category.label} down",
+                modifier = Modifier.size(18.dp),
+            )
+        }
+        Switch(
+            checked = visible,
+            onCheckedChange = { checked -> onToggle(!checked) },
+        )
+    }
 }
 
 // Default state: no cuisine, "All", 180° cone, 5 km radius, quality
@@ -397,6 +509,7 @@ private const val SCROLL_HYSTERESIS_PX: Int = 16
 private fun CategoryChips(
     selected: PlaceCategory?,
     hidden: Set<PlaceCategory>,
+    ordered: List<PlaceCategory>,
     onSelect: (PlaceCategory?) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -427,7 +540,7 @@ private fun CategoryChips(
                 .horizontalScroll(rememberScrollState()),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            PlaceCategory.entries.forEach { category ->
+            ordered.forEach { category ->
                 if (category.isCuisine) return@forEach
                 if (category in hidden) return@forEach
                 val visual = category.visual()
@@ -459,6 +572,7 @@ private fun CategoryChips(
 private fun CuisineChips(
     selected: PlaceCategory?,
     hidden: Set<PlaceCategory>,
+    ordered: List<PlaceCategory>,
     onSelect: (PlaceCategory?) -> Unit,
 ) {
     Row(
@@ -474,7 +588,7 @@ private fun CuisineChips(
             label = { Text("Any") },
             colors = FilterChipDefaults.filterChipColors(),
         )
-        PlaceCategory.entries.forEach { category ->
+        ordered.forEach { category ->
             if (!category.isCuisine) return@forEach
             if (category in hidden) return@forEach
             val visual = category.visual()
