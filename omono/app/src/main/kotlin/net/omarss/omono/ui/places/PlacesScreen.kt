@@ -578,13 +578,18 @@ private fun CuisineChips(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         FilterChip(
-            selected = selected?.isCuisine != true,
+            selected = selected?.isCuisine != true && selected != PlaceCategory.BAKERY,
             onClick = { onSelect(PlaceCategory.RESTAURANT) },
             label = { Text("Any") },
             colors = FilterChipDefaults.filterChipColors(),
         )
-        ordered.forEach { category ->
-            if (!category.isCuisine) return@forEach
+        // Render BAKERY alongside cuisines so the user can narrow
+        // "food parents → Bakery" without returning to the top-level
+        // chip row. BAKERY is still a top-level slug on the server;
+        // we just display it in the cuisine strip for convenience.
+        val cuisineLikeExtras = listOf(PlaceCategory.BAKERY)
+        val cuisineRow = ordered.filter { it.isCuisine || it in cuisineLikeExtras }
+        cuisineRow.forEach { category ->
             if (category in hidden) return@forEach
             val visual = category.visual()
             FilterChip(
