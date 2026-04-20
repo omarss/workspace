@@ -188,6 +188,21 @@ fun PlacesRoute(
             },
         )
 
+        // Collapsed-state summary: the filter stack auto-hides on
+        // scroll, but the user still needs to know what's applied.
+        // Render a compact one-line pill strip that shows every
+        // non-default filter, and lets the user tap to re-expand.
+        AnimatedVisibility(
+            visible = !filtersExpanded,
+            enter = expandVertically() + fadeIn(),
+            exit = shrinkVertically() + fadeOut(),
+        ) {
+            CollapsedFilterSummary(
+                state = state,
+                onExpand = { filtersExpanded = true },
+            )
+        }
+
         AnimatedVisibility(
             visible = filtersExpanded,
             enter = expandVertically() + fadeIn(),
@@ -421,15 +436,21 @@ private fun CategoryCustomizeRow(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         // Drag handle on the leading edge — long-press to grab,
-        // drag to move. draggableHandle() comes from the reorderable
-        // library's ReorderableCollectionItemScope.
-        Icon(
-            imageVector = Icons.Filled.DragHandle,
-            contentDescription = "Drag to reorder ${category.label}",
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = dragHandleModifier.size(24.dp),
-        )
-        Spacer(Modifier.width(8.dp))
+        // drag to move. The grab area is a 40 dp box (not just the
+        // 20 dp icon) so users with hand tremor / thumb use can
+        // reliably pick up the row. `draggableHandle()` from the
+        // reorderable library wires the gesture.
+        Box(
+            modifier = dragHandleModifier.size(40.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = Icons.Filled.DragHandle,
+                contentDescription = "Drag to reorder ${category.label}",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(20.dp),
+            )
+        }
         Box(
             modifier = Modifier
                 .size(32.dp)
@@ -479,6 +500,81 @@ private fun hasActiveFilters(state: PlacesUiState): Boolean {
     if (state.radiusMeters != 5_000) return true
     if (!state.qualityFilter) return true
     return false
+}
+
+// Single-line summary of the currently-applied filters, shown only
+// when the expanded filter stack is collapsed. Clicking anywhere on
+// the strip re-expands the full controls so the user can adjust.
+// Pills are rendered as muted Surface containers (not FilterChips)
+// because they're read-only indicators here — the real chips live
+// in the expanded section.
+@Composable
+private fun CollapsedFilterSummary(
+    state: PlacesUiState,
+    onExpand: () -> Unit,
+) {
+    if (!hasActiveFilters(state) && state.category == null) {
+        // Nothing to summarise and nothing to tease — reserve the
+        // height so the user still knows filters are above and
+        // tapping re-expands them.
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onExpand)
+                .padding(horizontal = 16.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "All places · 5 km",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                text = "Tap to filter",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        return
+    }
+
+    val pills: List<String> = buildList {
+        val category = state.category
+        if (category != null) add(category.label)
+        if (state.searchQuery.isNotEmpty()) add("\"${state.searchQuery}\"")
+        if (state.coneDegrees == 30f) add("±30°")
+        else if (state.coneDegrees == 60f) add("±60°")
+        when (state.radiusMeters) {
+            1_000 -> add("1 km")
+            5_000 -> add("5 km")
+            20_000 -> add("20 km")
+            50_000 -> add("All radii")
+        }
+        if (state.qualityFilter) add("4★+, 100+")
+    }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onExpand)
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = 16.dp, vertical = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        pills.forEach { label ->
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(50))
+                    .background(MaterialTheme.colorScheme.secondaryContainer)
+                    .padding(horizontal = 10.dp, vertical = 4.dp),
+            )
+        }
+    }
 }
 
 // Top-level food categories under which the cuisine sub-row reveals
