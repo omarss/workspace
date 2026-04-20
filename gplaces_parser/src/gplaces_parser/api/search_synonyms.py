@@ -134,6 +134,22 @@ SYNONYM_GROUPS: list[list[str]] = [
      "مطاعم هندية", "هندي", "برياني"],
     ["asian", "asian food", "chinese", "thai", "vietnamese",
      "مطاعم آسيوية", "آسيوي", "صيني", "تايلندي"],
+    # museum + cultural / heritage
+    ["museum", "national museum", "art museum", "gallery",
+     "متحف", "متاحف", "معرض", "المتحف الوطني"],
+    ["cultural", "cultural site", "heritage", "heritage site",
+     "landmark", "historic", "historic site", "monument",
+     "معلم", "معالم", "تراث", "تراثي", "موقع تراثي", "معلم ثقافي"],
+    # brunch — distinct from traditional Saudi breakfast (فطور) and
+    # from all-day fast breakfast spots; these are the sit-down café types
+    ["brunch", "brunch cafe", "all-day brunch", "all day brunch",
+     "برانش", "برانش كافيه"],
+    # american coffee — filter/drip/pour-over/specialty third-wave. Maps
+    # both the literal "american coffee" term and the specialty-coffee
+    # families that typically serve it.
+    ["american coffee", "filter coffee", "drip coffee", "pour over",
+     "pour-over", "v60", "chemex", "specialty coffee", "third wave",
+     "قهوة أمريكية", "قهوة مقطرة", "قهوة مختصة", "فلتر"],
 ]
 
 # Precompute a word → group-members map for cheap lookup. We normalise
@@ -192,15 +208,24 @@ def to_tsquery_or(token_or_phrase: str) -> str:
     return "(" + " & ".join(words) + ")"
 
 
+# Greedy phrase match — try spans up to 4 tokens. Covers every
+# multi-word synonym member we define today ("american coffee", "book
+# cafe", "قهوة أمريكية", "shopping mall", "pour over"...).
+_MAX_PHRASE_TOKENS = 4
+
+
 def build_tsquery(q: str) -> str:
     """Turn a user query into a tsquery string with synonym expansion.
 
-    Steps: normalise → tokenise on whitespace → for each token, look up
-    synonym group → `(a | b | c)` → join tokens with `&`. Returns a
-    string suitable for `to_tsquery('simple', ...)`.
+    Walk the normalised tokens left-to-right. At each position, try the
+    longest phrase (up to 4 tokens) that matches a synonym group —
+    expand that group to an `(a | b | c)` OR-block and advance. If no
+    phrase hits, fall back to single-token lookup (and pass-through).
+    Conjoin the resulting parts with `&`.
 
-    If expansion ends up empty (all tokens were whitespace), returns the
-    original normalised input so the caller doesn't pass an empty query.
+    Handles both single-word (`coffee`, `قهوة`) and multi-word
+    (`american coffee`, `قهوة أمريكية`) synonyms without the caller
+    having to disambiguate.
     """
     normalised = _ar_normalize(q)
     tokens = [t for t in normalised.split() if t]
@@ -208,14 +233,27 @@ def build_tsquery(q: str) -> str:
         return normalised
 
     conj_parts: list[str] = []
-    for tok in tokens:
-        group = expand(tok)
-        fragments = [to_tsquery_or(m) for m in group if m]
-        fragments = [f for f in fragments if f]
-        if not fragments:
-            continue
-        if len(fragments) == 1:
-            conj_parts.append(fragments[0])
-        else:
-            conj_parts.append("(" + " | ".join(fragments) + ")")
+    i = 0
+    while i < len(tokens):
+        matched = False
+        # Try the longest phrase first, shrinking down to single token.
+        for span in range(min(_MAX_PHRASE_TOKENS, len(tokens) - i), 0, -1):
+            phrase = " ".join(tokens[i : i + span])
+            group = _INDEX.get(phrase)
+            if group:
+                fragments = [to_tsquery_or(m) for m in sorted(group) if m]
+                fragments = [f for f in fragments if f]
+                if not fragments:
+                    continue
+                if len(fragments) == 1:
+                    conj_parts.append(fragments[0])
+                else:
+                    conj_parts.append("(" + " | ".join(fragments) + ")")
+                i += span
+                matched = True
+                break
+        if not matched:
+            # No phrase hit — pass this single token through verbatim.
+            conj_parts.append(tokens[i])
+            i += 1
     return " & ".join(conj_parts) if conj_parts else normalised

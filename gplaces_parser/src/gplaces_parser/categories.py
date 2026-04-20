@@ -78,6 +78,17 @@ _SLUG_QUERIES: list[tuple[str, str, str]] = [
     ("breakfast",   "فطور",                    "breakfast"),
     ("indian_food", "مطاعم هندية",             "indian restaurant"),
     ("asian_food",  "مطاعم آسيوية",            "asian restaurant"),
+    # Museums + cultural / heritage sites. Two slugs because users ask
+    # different things: `museum` → indoor collections, `cultural_site` →
+    # outdoor heritage / monuments / historic districts.
+    ("museum",      "متحف",                    "museum"),
+    ("museum",      "متحف وطني",               "national museum"),
+    ("cultural_site","معلم ثقافي",             "cultural landmark"),
+    ("cultural_site","موقع تراثي",             "heritage site"),
+    # Brunch as its own slug — `breakfast` catches traditional فطور
+    # spots, this one surfaces modern brunch / all-day-breakfast cafes.
+    ("brunch",      "برانش",                   "brunch"),
+    ("brunch",      "برانش كافيه",             "brunch cafe"),
 ]
 
 

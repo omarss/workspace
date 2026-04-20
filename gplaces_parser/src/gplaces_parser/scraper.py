@@ -56,6 +56,42 @@ _NUM_RE = re.compile(r"-?\d[\d,]*\.?\d*")
 # Matches the "(1,234)" review-count marker that follows the rating on feed cards.
 _REVIEW_COUNT_RE = re.compile(r"\((\d[\d,]*)\)")
 
+# Rating blob that sometimes sits on the SAME line as the category when
+# Google collapses the card header: "Name 4.3(1,234) Coffee shop · …"
+_RATING_BLOB_RE = re.compile(r"\b\d+(?:\.\d+)?\s*\(\d[\d,]*\)")
+# Lone parenthesised count — same idea, without the preceding digit.
+_PAREN_COUNT_RE = re.compile(r"\(\d[\d,]*\)")
+# Price/tier tokens — single `$`, `$$`, `$$$$`, or Arabic `﷼` dollar-like
+# patterns we treat as metadata not category.
+_PRICE_TOKEN_RE = re.compile(r"^\$+$")
+
+
+def _clean_card_text(text: str, *, name: str) -> str:
+    """Strip every occurrence of the name + any embedded rating/review-
+    count blobs so the remaining `·`-separated metadata is parseable
+    cleanly. Name is stripped globally (not just first match) because
+    Google sometimes renders it on the header AND inline with metadata."""
+    if name:
+        text = text.replace(name, " ")
+    text = _RATING_BLOB_RE.sub(" ", text)
+    text = _PAREN_COUNT_RE.sub(" ", text)
+    # Collapse runs of whitespace inside each line.
+    return "\n".join(re.sub(r"\s+", " ", ln).strip() for ln in text.splitlines())
+
+
+def _is_price_token(s: str) -> bool:
+    return bool(_PRICE_TOKEN_RE.match(s))
+
+
+def _is_noise_token(s: str) -> bool:
+    """Drop leftover rating-like scraps that the cleaner didn't catch."""
+    return (
+        not s
+        or s.isdigit()
+        or bool(re.fullmatch(r"\d+(?:\.\d+)?", s))  # "4.3"
+        or bool(_PAREN_COUNT_RE.fullmatch(s))        # "(123)"
+    )
+
 # Markers Google uses on feed cards for business status + open/closed info.
 # Each regex is intentionally permissive — Arabic / English variants and the
 # small formatting differences Google sprinkles in over time (unicode dashes,
@@ -239,9 +275,16 @@ class PlaywrightScraper:
     def _extract_card_extras(self, anchor: Locator) -> dict[str, Any]:
         """Pull rating / review-count / subtitle from a card without opening
         the detail page. Every field is best-effort — if a card lacks a
-        rating row (brand new place) we just return nothing for it."""
+        rating row (brand new place) we just return nothing for it.
+
+        Subtitle parsing is what gives us Google's real category
+        (`Coffee shop`, `Library`, `Museum`, …). We scrub the card text
+        of the name + rating noise before splitting on `·`, so the first
+        `·`-separated token is always the category, not a leaked name.
+        """
         card = anchor.locator("xpath=./..").first
         extras: dict[str, Any] = {}
+        name = (anchor.get_attribute("aria-label") or "").strip()
 
         # Rating — the `role="img"` span carries the numeric count in its
         # aria-label across locales ("4.3 stars" / "4.3 نجوم" / "Rated 4.3…").
@@ -265,17 +308,29 @@ class PlaywrightScraper:
             m = _REVIEW_COUNT_RE.search(text)
             if m:
                 extras["reviews"] = int(m.group(1).replace(",", ""))
-            # Subtitle line uses "·" as separator: `Coffee shop · $$ · King Fahd Rd`
-            for line in text.splitlines():
+
+            cleaned = _clean_card_text(text, name=name)
+            # Subtitle uses `·` as separator: `Coffee shop · $$ · King Fahd Rd`.
+            # We scan all cleaned lines, not just the first, because the
+            # rating row sometimes sits above the subtitle.
+            for line in cleaned.splitlines():
                 line = line.strip()
-                if "·" in line and len(line) < 240:
-                    parts = [p.strip() for p in line.split("·") if p.strip()]
-                    if parts:
-                        extras["subtypes"] = [parts[0]]  # primary category
-                        if len(parts) >= 2:
-                            # Last part tends to be the address snippet.
-                            extras["full_address"] = parts[-1]
-                    break
+                if "·" not in line or len(line) >= 240:
+                    continue
+                parts = [p.strip() for p in line.split("·") if p.strip()]
+                parts = [p for p in parts if not _is_noise_token(p)]
+                if not parts:
+                    continue
+                # Collect every non-price token as a subcategory — lets the
+                # API filter `'library' = ANY(subcategories)` or show
+                # richer facets than the slug alone.
+                subtypes = [p for p in parts if not _is_price_token(p)]
+                if subtypes:
+                    extras["subtypes"] = subtypes
+                if len(parts) >= 2:
+                    # Last non-price part tends to be the address snippet.
+                    extras["full_address"] = parts[-1]
+                break
 
             # Business-status + open/closed inference from card text.
             status, open_now, hours_snippet = _infer_status(text)
