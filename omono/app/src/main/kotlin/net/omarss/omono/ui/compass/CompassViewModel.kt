@@ -79,6 +79,19 @@ class CompassViewModel @Inject constructor(
         enabledCategories,
         nearbyCategoryPlaces,
     ) { h, f, mosque, enabled, nearby ->
+        // The rotation-vector sensor reports azimuth referenced to
+        // MAGNETIC north. Every place bearing we compute (qibla,
+        // mosque, backend pins) is TRUE-referenced, so rotating the
+        // dial by a magnetic heading would leave those markers off
+        // by the local declination (≈3° E in Riyadh, up to 20° near
+        // the magnetic poles). Lift the heading into the true frame
+        // the moment we have a GPS fix so the rose and the markers
+        // stay in the same coordinate system.
+        val trueHeading = if (f != null) {
+            magneticToTrueDeg(h, f.latitude, f.longitude)
+        } else {
+            h
+        }
         val qibla = f?.let { qiblaBearingDeg(it.latitude, it.longitude).toFloat() }
         val mosqueBearing = if (f != null && mosque != null) {
             bearingDeg(f.latitude, f.longitude, mosque.latitude, mosque.longitude).toFloat()
@@ -111,7 +124,7 @@ class CompassViewModel @Inject constructor(
             )
         }.sortedBy { it.distanceMeters }
         CompassUiState(
-            headingDeg = h,
+            headingDeg = trueHeading,
             location = f?.let { it.latitude to it.longitude },
             qiblaBearingDeg = qibla,
             nearestMosque = if (mosque != null && mosqueBearing != null && mosqueDistance != null) {
