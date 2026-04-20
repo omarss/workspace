@@ -36,6 +36,11 @@ playServicesLocation = "21.3.0"
 # Permissions UX
 accompanistPermissions = "0.37.3"
 
+# Drag-and-drop reordering on LazyColumn (used by the Places
+# "Customize categories" bottom sheet). Compose-first, no extra
+# configuration — drops into an ordinary LazyListScope.
+reorderable = "3.0.0"
+
 # Logging facade
 timber = "5.0.1"
 
@@ -96,6 +101,9 @@ play-services-location = { group = "com.google.android.gms", name = "play-servic
 
 # Permissions UX (Compose)
 accompanist-permissions = { group = "com.google.accompanist", name = "accompanist-permissions", version.ref = "accompanistPermissions" }
+
+# Reorderable — Compose drag-and-drop
+reorderable = { group = "sh.calvin.reorderable", name = "reorderable", version.ref = "reorderable" }
 
 # Logging
 timber = { group = "com.jakewharton.timber", name = "timber", version.ref = "timber" }

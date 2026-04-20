@@ -111,5 +111,6 @@ dependencies {
     implementation(libs.kotlinx.coroutines.play.services)
     implementation(libs.play.services.location)
     implementation(libs.accompanist.permissions)
+    implementation(libs.reorderable)
     implementation(libs.timber)
 }

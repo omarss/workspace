@@ -93,6 +93,23 @@ class PlacesSettingsRepository @Inject constructor(
         }
     }
 
+    // Drag-and-drop reorder primitive. Takes the source category
+    // out of its current slot and re-inserts it at the target
+    // category's slot, shifting every category between by one —
+    // same semantics as a classic drag-reorder gesture.
+    suspend fun reorder(from: PlaceCategory, to: PlaceCategory) {
+        if (from == to) return
+        context.omonoDataStore.edit { prefs ->
+            val current = applyOrder(prefs[CATEGORY_ORDER_KEY]).toMutableList()
+            val fromIdx = current.indexOf(from)
+            val toIdx = current.indexOf(to)
+            if (fromIdx < 0 || toIdx < 0 || fromIdx == toIdx) return@edit
+            current.removeAt(fromIdx)
+            current.add(toIdx, from)
+            prefs[CATEGORY_ORDER_KEY] = current.joinToString(",") { it.name }
+        }
+    }
+
     // Merges a stored order string with the enum so every category
     // has a deterministic position even when the preference is empty
     // or lists a subset. Unknown slugs (from a stale rename or a

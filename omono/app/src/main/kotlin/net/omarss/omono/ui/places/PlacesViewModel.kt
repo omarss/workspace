@@ -177,8 +177,18 @@ class PlacesViewModel @Inject constructor(
         }
     }
 
+    // Used by the up/down arrow variant (kept for backwards-compat
+    // with external callers of the public API). UI now prefers
+    // `reorderCategory(from, to)` for the drag-and-drop path.
     fun moveCategory(category: PlaceCategory, up: Boolean) {
         viewModelScope.launch { placesSettings.move(category, up) }
+    }
+
+    // Drag-and-drop reorder. Moves `from` to the slot currently
+    // occupied by `to`, shifting other entries by one. Pushed
+    // through the repository so DataStore persists the new order.
+    fun reorderCategory(from: PlaceCategory, to: PlaceCategory) {
+        viewModelScope.launch { placesSettings.reorder(from, to) }
     }
 
     fun resetCategoryPreferences() {

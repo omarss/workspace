@@ -39,9 +39,8 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.ArrowDownward
-import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.FilterAltOff
 import androidx.compose.material.icons.filled.Navigation
@@ -86,6 +85,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import net.omarss.omono.feature.places.Place
 import net.omarss.omono.feature.places.PlaceCategory
+import sh.calvin.reorderable.ReorderableItem
+import sh.calvin.reorderable.rememberReorderableLazyListState
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
@@ -102,10 +103,12 @@ fun PlacesRoute(
         CustomizeCategoriesSheet(
             hidden = state.hiddenCategories,
             ordered = state.orderedCategories,
-            onToggle = { category, isHidden ->
-                viewModel.setCategoryHidden(category, isHidden)
+            onVisibilityChange = { category, visible ->
+                // `visible = true` means the user wants the category
+                // shown, i.e. NOT hidden → pass `hidden = !visible`.
+                viewModel.setCategoryHidden(category, !visible)
             },
-            onMove = { category, up -> viewModel.moveCategory(category, up) },
+            onReorder = { from, to -> viewModel.reorderCategory(from, to) },
             onSetAllHidden = { isHidden -> viewModel.setAllCategoriesHidden(isHidden) },
             onReset = { viewModel.resetCategoryPreferences() },
             onDismiss = { showCustomizeDialog = false },
@@ -295,33 +298,43 @@ fun PlacesRoute(
     }
 }
 
-// Bottom-sheet customise surface. Three zones:
-//   * Header actions — "Show all", "Hide all", "Reset", with a
-//     live "N of M showing" count.
-//   * A scrollable list of categories in the user's current order,
-//     each with a toggle + up / down reorder arrows.
-//   * Cuisines rendered as their own section so the long food tail
-//     doesn't visually merge with the daily-utility picks.
+// Bottom-sheet customise surface. Single scrollable list of every
+// category, with a drag-handle on the left for free-form reorder
+// (via sh.calvin.reorderable), tint-icon in a badge, tap-to-toggle
+// label, and a visibility Switch. Cuisines carry a small "Cuisine"
+// subtitle so the user can tell them apart from top-level picks
+// without splitting the list into sections (which would make the
+// reorder story awkward).
 //
-// Reorder is a pair of arrow buttons because we don't have a
-// drag-and-drop list primitive baked in — arrows are cheap, work
-// on every Android version, and let the user nudge favourites to
-// the top without learning a new gesture.
+// Header actions — Show all / Hide all / Reset — plus a live
+// "N of M showing" count.
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CustomizeCategoriesSheet(
     hidden: Set<PlaceCategory>,
     ordered: List<PlaceCategory>,
-    onToggle: (PlaceCategory, Boolean) -> Unit,
-    onMove: (PlaceCategory, Boolean) -> Unit,
+    onVisibilityChange: (PlaceCategory, visible: Boolean) -> Unit,
+    onReorder: (from: PlaceCategory, to: PlaceCategory) -> Unit,
     onSetAllHidden: (Boolean) -> Unit,
     onReset: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     ModalBottomSheet(onDismissRequest = onDismiss) {
-        val topLevel = ordered.filterNot { it.isCuisine }
-        val cuisines = ordered.filter { it.isCuisine }
         val visibleCount = ordered.count { it !in hidden }
+        val listState = rememberLazyListState()
+        val reorderState = rememberReorderableLazyListState(listState) { from, to ->
+            // from.key / to.key are the PlaceCategory.name strings we
+            // attach per ReorderableItem below. Translate back to the
+            // enum and push a single move through the ViewModel —
+            // DataStore re-emits the new order, the list recomposes,
+            // and the drag ghost follows along.
+            val fromCategory = (from.key as? String)?.let { runCatching { PlaceCategory.valueOf(it) }.getOrNull() }
+            val toCategory = (to.key as? String)?.let { runCatching { PlaceCategory.valueOf(it) }.getOrNull() }
+            if (fromCategory != null && toCategory != null && fromCategory != toCategory) {
+                onReorder(fromCategory, toCategory)
+            }
+        }
+
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -335,7 +348,7 @@ private fun CustomizeCategoriesSheet(
                         style = MaterialTheme.typography.titleMedium,
                     )
                     Text(
-                        "Showing $visibleCount of ${ordered.size}",
+                        "Showing $visibleCount of ${ordered.size} · drag to reorder",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -353,37 +366,24 @@ private fun CustomizeCategoriesSheet(
                     label = { Text("Hide all") },
                 )
             }
-            Spacer(Modifier.height(16.dp))
-            Column(
+            Spacer(Modifier.height(12.dp))
+            LazyColumn(
+                state = listState,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(max = 560.dp)
-                    .verticalScroll(rememberScrollState()),
+                    .heightIn(max = 560.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
-                if (topLevel.isNotEmpty()) {
-                    CategorySectionHeader("Places")
-                    topLevel.forEachIndexed { index, category ->
+                items(items = ordered, key = { it.name }) { category ->
+                    ReorderableItem(reorderState, key = category.name) { isDragging ->
                         CategoryCustomizeRow(
                             category = category,
                             visible = category !in hidden,
-                            canMoveUp = index > 0,
-                            canMoveDown = index < topLevel.lastIndex,
-                            onToggle = { isVisible -> onToggle(category, !isVisible) },
-                            onMove = { up -> onMove(category, up) },
-                        )
-                    }
-                }
-                if (cuisines.isNotEmpty()) {
-                    Spacer(Modifier.height(8.dp))
-                    CategorySectionHeader("Cuisines")
-                    cuisines.forEachIndexed { index, category ->
-                        CategoryCustomizeRow(
-                            category = category,
-                            visible = category !in hidden,
-                            canMoveUp = index > 0,
-                            canMoveDown = index < cuisines.lastIndex,
-                            onToggle = { isVisible -> onToggle(category, !isVisible) },
-                            onMove = { up -> onMove(category, up) },
+                            isDragging = isDragging,
+                            dragHandleModifier = Modifier.draggableHandle(),
+                            onVisibilityChange = { newVisible ->
+                                onVisibilityChange(category, newVisible)
+                            },
                         )
                     }
                 }
@@ -400,31 +400,36 @@ private fun CustomizeCategoriesSheet(
 }
 
 @Composable
-private fun CategorySectionHeader(title: String) {
-    Text(
-        text = title,
-        style = MaterialTheme.typography.labelLarge,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(vertical = 8.dp),
-    )
-}
-
-@Composable
 private fun CategoryCustomizeRow(
     category: PlaceCategory,
     visible: Boolean,
-    canMoveUp: Boolean,
-    canMoveDown: Boolean,
-    onToggle: (Boolean) -> Unit,
-    onMove: (Boolean) -> Unit,
+    isDragging: Boolean,
+    dragHandleModifier: Modifier,
+    onVisibilityChange: (newVisible: Boolean) -> Unit,
 ) {
     val visual = category.visual()
+    val containerColor = if (isDragging) {
+        MaterialTheme.colorScheme.surfaceContainerHigh
+    } else {
+        Color.Transparent
+    }
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .background(containerColor)
             .padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        // Drag handle on the leading edge — long-press to grab,
+        // drag to move. draggableHandle() comes from the reorderable
+        // library's ReorderableCollectionItemScope.
+        Icon(
+            imageVector = Icons.Filled.DragHandle,
+            contentDescription = "Drag to reorder ${category.label}",
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = dragHandleModifier.size(24.dp),
+        )
+        Spacer(Modifier.width(8.dp))
         Box(
             modifier = Modifier
                 .size(32.dp)
@@ -440,37 +445,27 @@ private fun CategoryCustomizeRow(
             )
         }
         Spacer(Modifier.width(12.dp))
-        Text(
-            text = category.label,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurface,
+        Column(
             modifier = Modifier
                 .weight(1f)
-                .clickable { onToggle(visible) },
-        )
-        IconButton(
-            onClick = { onMove(true) },
-            enabled = canMoveUp,
+                .clickable { onVisibilityChange(!visible) },
         ) {
-            Icon(
-                imageVector = Icons.Filled.ArrowUpward,
-                contentDescription = "Move ${category.label} up",
-                modifier = Modifier.size(18.dp),
+            Text(
+                text = category.label,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface,
             )
-        }
-        IconButton(
-            onClick = { onMove(false) },
-            enabled = canMoveDown,
-        ) {
-            Icon(
-                imageVector = Icons.Filled.ArrowDownward,
-                contentDescription = "Move ${category.label} down",
-                modifier = Modifier.size(18.dp),
-            )
+            if (category.isCuisine) {
+                Text(
+                    text = "Cuisine",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
         Switch(
             checked = visible,
-            onCheckedChange = { checked -> onToggle(!checked) },
+            onCheckedChange = { checked -> onVisibilityChange(checked) },
         )
     }
 }
