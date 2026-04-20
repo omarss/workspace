@@ -15,6 +15,7 @@ import net.omarss.omono.feature.spending.SpendingRepository
 import net.omarss.omono.feature.spending.SpendingSettingsRepository
 import net.omarss.omono.feature.spending.Subscription
 import net.omarss.omono.feature.spending.Transaction
+import net.omarss.omono.feature.spending.isTransfer
 import net.omarss.omono.feature.spending.computeTotals
 import net.omarss.omono.feature.spending.computeTotalsAllTime
 import net.omarss.omono.feature.spending.computeTotalsForMonth
@@ -113,6 +114,7 @@ class FinanceDashboardViewModel @Inject constructor(
             monthSar = totals.monthSar,
             projectedMonthSar = projectedMonthSar,
             monthTransfersSar = totals.monthTransfersSar,
+            monthTransfersInSar = totals.monthTransfersInSar,
             monthRefundsSar = totals.monthRefundsSar,
             monthCount = totals.monthCount,
             lastMonthToDateSar = totals.lastMonthToDateSar,
@@ -274,34 +276,52 @@ class FinanceDashboardViewModel @Inject constructor(
             .sortedByDescending { it.amountSar }
     }
 
-    // Groups outgoing transfers by recipient — someone you sent money
-    // to three times in a month should show as one row with the total,
-    // not three noisy lines. Sort by total descending so the biggest
-    // recipients stick to the top. Single transfers still render;
-    // they just show "1 transfer".
+    // Groups transfers by direction × counterparty — outgoing and
+    // incoming both show up on the same card, but direction is
+    // carried explicitly on the row so the UI can render them with
+    // distinct colour + arrow glyphs. Sort: incoming first (money
+    // in tends to be more noteworthy when it arrives, so it's where
+    // the eye goes), then outgoing, each sorted by total descending.
     private fun buildTransfers(thisMonth: List<Transaction>): List<TransferRow> {
         val fmt = SimpleDateFormat("d MMM", Locale.getDefault())
-        val transfers = thisMonth.filter { it.kind == Transaction.Kind.TRANSFER_OUT }
-        return transfers
-            .groupBy { (it.merchant ?: "Unknown recipient").trim() }
-            .map { (recipient, group) ->
-                val total = group.sumOf { it.amountSar }
-                val lastTx = group.maxBy { it.timestampMillis }
-                TransferRow(
-                    id = "transfer-group-${recipient.hashCode()}",
-                    recipient = recipient,
-                    lastDate = fmt.format(lastTx.timestampMillis),
-                    count = group.size,
-                    amountSar = total,
-                    // When every transfer in the group was SAR, show
-                    // only SAR. If any was foreign, we lose the per-
-                    // transfer original amounts in aggregation — the
-                    // user can still drill down via Recent activity.
-                    originalCurrency = if (group.all { it.originalCurrency == "SAR" }) "SAR" else "—",
-                )
-            }
-            .sortedByDescending { it.amountSar }
+        val transfers = thisMonth.filter { it.kind.isTransfer }
+        val incoming = transfers.filter { it.kind == Transaction.Kind.TRANSFER_IN }
+        val outgoing = transfers.filter { it.kind == Transaction.Kind.TRANSFER_OUT }
+        return buildList {
+            addAll(groupTransfers(incoming, TransferDirection.IN, fmt))
+            addAll(groupTransfers(outgoing, TransferDirection.OUT, fmt))
+        }
     }
+
+    private fun groupTransfers(
+        group: List<Transaction>,
+        direction: TransferDirection,
+        fmt: SimpleDateFormat,
+    ): List<TransferRow> = group
+        .groupBy {
+            (it.merchant ?: when (direction) {
+                TransferDirection.IN -> "Unknown sender"
+                TransferDirection.OUT -> "Unknown recipient"
+            }).trim()
+        }
+        .map { (counterparty, items) ->
+            val total = items.sumOf { it.amountSar }
+            val lastTx = items.maxBy { it.timestampMillis }
+            TransferRow(
+                id = "transfer-${direction.name.lowercase()}-${counterparty.hashCode()}",
+                recipient = counterparty,
+                direction = direction,
+                lastDate = fmt.format(lastTx.timestampMillis),
+                count = items.size,
+                amountSar = total,
+                // When every transfer in the group was SAR, show
+                // only SAR. If any was foreign, we lose the per-
+                // transfer original amounts in aggregation — the
+                // user can still drill down via Recent activity.
+                originalCurrency = if (items.all { it.originalCurrency == "SAR" }) "SAR" else "—",
+            )
+        }
+        .sortedByDescending { it.amountSar }
 
     private fun buildRecent(
         transactions: List<Transaction>,
@@ -342,6 +362,7 @@ private fun List<Transaction>.filterIn(ym: YearMonth, zone: ZoneId): List<Transa
 // domain rule ever changes.
 private fun Transaction.Kind.isPurchaseForUi(): Boolean = when (this) {
     Transaction.Kind.TRANSFER_OUT,
+    Transaction.Kind.TRANSFER_IN,
     Transaction.Kind.REFUND -> false
     else -> true
 }
@@ -383,6 +404,7 @@ data class FinanceDashboardUiState(
     val monthSar: Double = 0.0,
     val projectedMonthSar: Double = 0.0,
     val monthTransfersSar: Double = 0.0,
+    val monthTransfersInSar: Double = 0.0,
     val monthRefundsSar: Double = 0.0,
     val monthCount: Int = 0,
     val lastMonthToDateSar: Double = 0.0,
@@ -476,11 +498,20 @@ data class BillRow(
 data class TransferRow(
     val id: String,
     val recipient: String,
+    val direction: TransferDirection,
     val lastDate: String,
     val count: Int,
     val amountSar: Double,
     val originalCurrency: String,
 )
+
+// Axis that the UI uses to tint rows + flip the arrow glyph.
+// Outgoing money tints neutral / secondary, incoming tints emerald
+// to match the "money back" cue on refund rows — both mean the
+// balance went up.
+enum class TransferDirection {
+    IN, OUT;
+}
 
 data class RecentRow(
     val id: String,

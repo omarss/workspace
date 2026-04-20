@@ -161,7 +161,11 @@ fun FinanceDashboardRoute(
                 BillsCard(state.bills)
             }
             if (state.transfers.isNotEmpty()) {
-                TransfersCard(state.monthTransfersSar, state.transfers)
+                TransfersCard(
+                    outgoingSar = state.monthTransfersSar,
+                    incomingSar = state.monthTransfersInSar,
+                    rows = state.transfers,
+                )
             }
             if (state.recent.isNotEmpty()) {
                 RecentTransactionsCard(
@@ -720,7 +724,11 @@ private fun BillsCard(rows: List<BillRow>) {
 }
 
 @Composable
-private fun TransfersCard(totalSar: Double, rows: List<TransferRow>) {
+private fun TransfersCard(
+    outgoingSar: Double,
+    incomingSar: Double,
+    rows: List<TransferRow>,
+) {
     Card(
         modifier = Modifier.fillMaxWidth().animateContentSize(),
         colors = CardDefaults.cardColors(
@@ -738,13 +746,28 @@ private fun TransfersCard(totalSar: Double, rows: List<TransferRow>) {
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSecondaryContainer,
             )
+            // Headline row: inflow and outflow side-by-side so the
+            // card communicates at a glance "this month you sent X
+            // and received Y". Net would be implicit but tucking
+            // two numbers in is easier to read than a computed net
+            // that's blank when one side is zero.
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(24.dp),
+            ) {
+                TransferTotal(
+                    label = "Incoming",
+                    amount = incomingSar,
+                    direction = TransferDirection.IN,
+                )
+                TransferTotal(
+                    label = "Outgoing",
+                    amount = outgoingSar,
+                    direction = TransferDirection.OUT,
+                )
+            }
             Text(
-                text = "SAR %,.0f".format(totalSar),
-                style = MaterialTheme.typography.headlineSmall,
-                color = MaterialTheme.colorScheme.onSecondaryContainer,
-            )
-            Text(
-                text = "Outgoing transfers aren't counted toward the monthly purchase total.",
+                text = "Neither side counts toward the monthly purchase total.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSecondaryContainer,
             )
@@ -752,36 +775,100 @@ private fun TransfersCard(totalSar: Double, rows: List<TransferRow>) {
                 if (index > 0) {
                     HorizontalDivider(color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.2f))
                 }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = row.recipient,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer,
-                        )
-                        val subtitle = if (row.count > 1) {
-                            "${row.count} transfers · last ${row.lastDate}"
-                        } else {
-                            row.lastDate
-                        }
-                        Text(
-                            text = subtitle,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer,
-                        )
-                    }
-                    Text(
-                        text = "SAR %,.0f".format(row.amountSar),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer,
-                    )
-                }
+                TransferDirectionRow(row = row)
             }
         }
     }
+}
+
+@Composable
+private fun TransferTotal(
+    label: String,
+    amount: Double,
+    direction: TransferDirection,
+) {
+    Column {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSecondaryContainer,
+        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = directionGlyph(direction),
+                style = MaterialTheme.typography.titleMedium,
+                color = directionTint(direction),
+            )
+            Spacer(Modifier.width(4.dp))
+            Text(
+                text = "SAR %,.0f".format(amount),
+                style = MaterialTheme.typography.headlineSmall,
+                color = MaterialTheme.colorScheme.onSecondaryContainer,
+            )
+        }
+    }
+}
+
+@Composable
+private fun TransferDirectionRow(row: TransferRow) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        // Direction glyph on the leading edge — a down-triangle for
+        // money IN and an up-triangle for OUT, tinted with the
+        // distinct direction colour. Single character keeps the row
+        // compact while still visually unambiguous.
+        Text(
+            text = directionGlyph(row.direction),
+            style = MaterialTheme.typography.titleMedium,
+            color = directionTint(row.direction),
+        )
+        Spacer(Modifier.width(10.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = row.recipient,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSecondaryContainer,
+            )
+            val plural = if (row.direction == TransferDirection.IN) "credits" else "transfers"
+            val subtitle = if (row.count > 1) {
+                "${row.count} $plural · last ${row.lastDate}"
+            } else {
+                row.lastDate
+            }
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSecondaryContainer,
+            )
+        }
+        // Incoming amounts are shown with a leading "+" so the
+        // ledger direction is legible at a glance without relying
+        // solely on the row-start arrow.
+        val sign = if (row.direction == TransferDirection.IN) "+" else ""
+        Text(
+            text = "${sign}SAR %,.0f".format(row.amountSar),
+            style = MaterialTheme.typography.bodyMedium,
+            color = directionTint(row.direction),
+        )
+    }
+}
+
+private fun directionGlyph(direction: TransferDirection): String = when (direction) {
+    TransferDirection.IN -> "▼"
+    TransferDirection.OUT -> "▲"
+}
+
+@Composable
+private fun directionTint(direction: TransferDirection): Color = when (direction) {
+    // Emerald for money in, matching the refund "+" tint elsewhere
+    // on the dashboard so "money came back" reads the same way
+    // across the screen.
+    TransferDirection.IN -> Color(0xFF10B981)
+    // Outgoing uses the card's onSecondaryContainer, so it blends
+    // with the surrounding text and reads as the "default" case.
+    TransferDirection.OUT -> MaterialTheme.colorScheme.onSecondaryContainer
 }
 
 // "SAR 863 (USD 230)" for foreign currency, "SAR 72" for SAR.
@@ -822,7 +909,8 @@ private fun RecentTransactionsCard(
                 // against this row; pure-transfer rows without a
                 // merchant aren't interactive.
                 val tappable = row.rawMerchant != null &&
-                    row.kind.let { it != Transaction.Kind.TRANSFER_OUT }
+                    row.kind != Transaction.Kind.TRANSFER_OUT &&
+                    row.kind != Transaction.Kind.TRANSFER_IN
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -867,13 +955,16 @@ private fun RecentTransactionsCard(
                         }
                         val amountColor = when (row.kind) {
                             Transaction.Kind.TRANSFER_OUT -> MaterialTheme.colorScheme.secondary
-                            Transaction.Kind.REFUND -> Color(0xFF10B981) // emerald — money back in
+                            Transaction.Kind.REFUND,
+                            Transaction.Kind.TRANSFER_IN -> Color(0xFF10B981) // emerald — money in
                             else -> MaterialTheme.colorScheme.onSurface
                         }
                         val amountText = formatAmount(row.amountSar, row.originalAmount, row.originalCurrency)
+                        val isCredit = row.kind == Transaction.Kind.REFUND ||
+                            row.kind == Transaction.Kind.TRANSFER_IN
                         Column(horizontalAlignment = Alignment.End) {
                             Text(
-                                text = if (row.kind == Transaction.Kind.REFUND) "+$amountText" else amountText,
+                                text = if (isCredit) "+$amountText" else amountText,
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = amountColor,
                             )
@@ -899,6 +990,7 @@ private fun kindLabel(kind: Transaction.Kind): String = when (kind) {
     Transaction.Kind.CASH_WITHDRAWAL -> "Cash withdrawal"
     Transaction.Kind.GOVT_PAYMENT -> "Government payment"
     Transaction.Kind.TRANSFER_OUT -> "Transfer out"
+    Transaction.Kind.TRANSFER_IN -> "Credit in"
     Transaction.Kind.REFUND -> "Refund"
 }
 
@@ -936,6 +1028,10 @@ private fun iconFor(
     // than the category for the cases they cover.
     when (kind) {
         Transaction.Kind.TRANSFER_OUT -> return Icons.Filled.AccountBalance to Color(0xFF6366F1)
+        // Emerald matches the refund / incoming tint used elsewhere
+        // on the dashboard so "money came in" reads consistently
+        // whether it's a refund or an explicit credit transfer.
+        Transaction.Kind.TRANSFER_IN -> return Icons.AutoMirrored.Filled.ReceiptLong to Color(0xFF10B981)
         Transaction.Kind.REFUND -> return Icons.AutoMirrored.Filled.ReceiptLong to Color(0xFF10B981)
         Transaction.Kind.CASH_WITHDRAWAL -> return Icons.Filled.AccountBalance to Color(0xFF8B5CF6)
         Transaction.Kind.GOVT_PAYMENT -> return Icons.Filled.Receipt to Color(0xFF64748B)

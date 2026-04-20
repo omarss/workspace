@@ -36,14 +36,15 @@ object SmsParser {
     //   "Withdrawal:ATM"          → Kind.CASH_WITHDRAWAL
     //   "International Transfer"  → Kind.TRANSFER_OUT
     //   "Debit Internal Transfer" → Kind.TRANSFER_OUT (P2P within Al Rajhi)
+    //   "Credit Transfer"         → Kind.TRANSFER_IN  (incoming wire / salary / P2P)
+    //   "Deposit:"                → Kind.TRANSFER_IN  (monthly profit / dividend / ATM deposit)
     //
     // What we reject outright:
     //   OTP Code / One Time Password (auth)
     //   Transaction Declined / Notification : Declined (failed)
-    //   Selling Gold (income)
-    //   Transfer Between Your Accounts (own-account)
+    //   Selling Gold (income but cash-out, not a credit)
+    //   Transfer Between Your Accounts (own-account — net zero)
     //   Rajhi Transfer (OTP-like — "Reason:Rajhi Transfer" on OTPs)
-    //   Credit Transfer Local (incoming credit — salary / deposit)
     //   Credit Card:Payment (bank's echo of a PoS purchase — the same
     //     money is already captured on the following "PoS purchase"
     //     SMS a few seconds later; counting both would double-book,
@@ -52,7 +53,6 @@ object SmsParser {
     //     has always been immediately reversed by a Credit Card:transfer
     //     in the observed data, so net zero either way.)
     //   Credit Card:transfer (own card → own account reversal)
-    //   Deposit:* (incoming)
     //   Dear (Customer|customer) (marketing)
     //   Your card ... MadaPay (admin, no amount)
     //
@@ -71,9 +71,7 @@ object SmsParser {
         // (already caught by "OTP Code" above), but the text also shows
         // up standalone on some auth notifications — keep it as a guard.
         if (body.containsIgnoreCase("Reason:Rajhi Transfer")) return null
-        if (body.containsIgnoreCase("Credit Transfer")) return null
         if (body.containsIgnoreCase("Credit Card:transfer")) return null
-        if (body.containsIgnoreCase("Deposit:")) return null
         // Credit-card purchases arrive as a pair: a "Credit Card:Payment"
         // SMS reporting the bank's auto-settle from checking → card,
         // immediately followed by a "PoS purchase" SMS with the merchant
@@ -105,13 +103,28 @@ object SmsParser {
             body.containsIgnoreCase("Withdrawal:ATM") -> Kind.CASH_WITHDRAWAL
             body.containsIgnoreCase("International Transfer") -> Kind.TRANSFER_OUT
             body.containsIgnoreCase("Debit Internal Transfer") -> Kind.TRANSFER_OUT
+            // Incoming credits — treated as TRANSFER_IN so they land
+            // on the Transfers card with a distinct direction rather
+            // than being silently dropped. "Credit Transfer" covers
+            // both Local and incoming wires; "Deposit:" covers the
+            // bank's monthly profit / dividend / ATM cash-in shapes.
+            body.containsIgnoreCase("Credit Transfer") -> Kind.TRANSFER_IN
+            body.contains("Deposit:", ignoreCase = true) -> Kind.TRANSFER_IN
             body.contains("Biller:", ignoreCase = true) -> Kind.BILLER
             body.containsIgnoreCase("Online Purchase") -> Kind.ONLINE_PURCHASE
             body.containsIgnoreCase("PoS") -> Kind.POS
             else -> return null
         }
 
-        val merchant = AL_RAJHI_MERCHANT_RE.find(body)?.groupValues?.get(1)?.trim()
+        val merchant = when (kind) {
+            // Incoming wire / P2P — the first non-numeric "From:"
+            // line carries the sender name. The regex guards against
+            // "From:0019"-style account-number lines.
+            Kind.TRANSFER_IN ->
+                AL_RAJHI_DEPOSIT_RE.find(body)?.groupValues?.get(1)?.trim()
+                    ?: AL_RAJHI_FROM_NAME_RE.find(body)?.groupValues?.get(1)?.trim()
+            else -> null
+        } ?: AL_RAJHI_MERCHANT_RE.find(body)?.groupValues?.get(1)?.trim()
             ?: AL_RAJHI_PLACE_RE.find(body)?.groupValues?.get(1)?.trim()
             ?: AL_RAJHI_SERVICE_RE.find(body)?.groupValues?.get(1)?.trim()
             ?: AL_RAJHI_TO_RE.find(body)?.groupValues?.get(1)?.trim()
@@ -290,6 +303,20 @@ object SmsParser {
     )
     private val AL_RAJHI_TO_RE = Regex(
         """To\s*:\s*(?!\d+\s*$)([^\r\n]+)""",
+        RegexOption.IGNORE_CASE,
+    )
+    // Credit Transfer incoming — prefer the named From: line. The
+    // negative lookahead excludes all-digits From: lines (account
+    // numbers) so we land on the human-readable sender.
+    private val AL_RAJHI_FROM_NAME_RE = Regex(
+        """From\s*:\s*(?!\d+\s*$)([^\r\n]+)""",
+        RegexOption.IGNORE_CASE,
+    )
+    // Deposit label — "Deposit:Saving Account Monthly Profit" —
+    // the text after the colon reads well as the "merchant" for
+    // the UI to display on the transfer row.
+    private val AL_RAJHI_DEPOSIT_RE = Regex(
+        """Deposit\s*:\s*([^\r\n]+)""",
         RegexOption.IGNORE_CASE,
     )
 

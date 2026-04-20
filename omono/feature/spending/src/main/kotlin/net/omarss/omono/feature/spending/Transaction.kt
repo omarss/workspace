@@ -62,6 +62,16 @@ data class Transaction(
         TRANSFER_OUT,
 
         /**
+         * Money credited into the account from another party — bank
+         * "Credit Transfer" (incoming wires / salaries / P2P), bank
+         * deposits (monthly profit, dividends, etc.). Book-kept on
+         * the same Transfers ledger as TRANSFER_OUT so the user can
+         * see inflows and outflows side by side, but direction is
+         * carried explicitly so the UI can distinguish them.
+         */
+        TRANSFER_IN,
+
+        /**
          * Refund / reversal posted back to the account. Subtracted
          * from the month's purchase total so the headline reflects
          * the net outflow, and surfaced in its own UI row so the
@@ -72,7 +82,14 @@ data class Transaction(
 }
 
 // True when the transaction drives the purchase total up. Transfers
-// (money to another person) and refunds (money coming back) are tracked
-// on their own ledgers and intentionally excluded.
+// (money to/from another person) and refunds (money coming back) are
+// tracked on their own ledgers and intentionally excluded.
 val Transaction.Kind.isPurchase: Boolean
-    get() = this != Transaction.Kind.TRANSFER_OUT && this != Transaction.Kind.REFUND
+    get() = this != Transaction.Kind.TRANSFER_OUT &&
+        this != Transaction.Kind.TRANSFER_IN &&
+        this != Transaction.Kind.REFUND
+
+// True when the transaction affects the Transfers card — inflow and
+// outflow are both rendered there but styled differently.
+val Transaction.Kind.isTransfer: Boolean
+    get() = this == Transaction.Kind.TRANSFER_OUT || this == Transaction.Kind.TRANSFER_IN

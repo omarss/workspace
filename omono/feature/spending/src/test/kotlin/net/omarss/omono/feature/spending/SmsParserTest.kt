@@ -272,7 +272,7 @@ class SmsParserTest {
     }
 
     @Test
-    fun `alrajhi credit transfer local is ignored as incoming`() {
+    fun `alrajhi credit transfer local is captured as incoming`() {
         val body = """
             Credit Transfer Local
             Via:ANB
@@ -282,18 +282,26 @@ class SmsParserTest {
             From:0019
             26/3/29 09:01
         """.trimIndent()
-        SmsParser.parse("AlRajhiBank", body).shouldBeNull()
+        val parsed = SmsParser.parse("AlRajhiBank", body)
+        parsed!!.kind shouldBe Transaction.Kind.TRANSFER_IN
+        parsed.originalAmount shouldBe 30000.0
+        parsed.originalCurrency shouldBe "SAR"
+        // Must pick the named From line, skipping the numeric From:0019
+        parsed.merchant shouldBe "شركة القمة الهامة للتقنية المالية"
     }
 
     @Test
-    fun `alrajhi deposit is ignored as incoming`() {
+    fun `alrajhi deposit is captured as incoming`() {
         val body = """
             Deposit:Saving Account Monthly Profit
             Amount:SAR 1.11
             To:0758
             1/3/26 07:21
         """.trimIndent()
-        SmsParser.parse("AlRajhiBank", body).shouldBeNull()
+        val parsed = SmsParser.parse("AlRajhiBank", body)
+        parsed!!.kind shouldBe Transaction.Kind.TRANSFER_IN
+        parsed.originalAmount shouldBe 1.11
+        parsed.merchant shouldBe "Saving Account Monthly Profit"
     }
 
     @Test

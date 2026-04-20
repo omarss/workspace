@@ -13,11 +13,17 @@ data class SpendingTotals(
     val todayCount: Int,
     val monthCount: Int,
     val monthByCategory: Map<SpendingCategory, Double> = emptyMap(),
-    // Transfer totals — money sent to other people / accounts. Kept
-    // separate so salary remittances don't inflate the spending
-    // headline.
+    // Outgoing transfer totals — money sent to other people /
+    // accounts. Kept separate from purchases so salary remittances
+    // don't inflate the spending headline.
     val monthTransfersSar: Double = 0.0,
     val monthTransfersCount: Int = 0,
+    // Incoming transfer totals — credit transfers, deposits, salary
+    // wires. Surfaced on the Transfers card alongside outgoing so
+    // the user can see both directions without the headline
+    // purchase total being affected by either.
+    val monthTransfersInSar: Double = 0.0,
+    val monthTransfersInCount: Int = 0,
     // Refund totals — money reversed back into the account. Tracked
     // alongside purchases so the UI can show net spending without
     // polluting the per-category breakdown.
@@ -45,6 +51,8 @@ data class SpendingTotals(
             monthByCategory = emptyMap(),
             monthTransfersSar = 0.0,
             monthTransfersCount = 0,
+            monthTransfersInSar = 0.0,
+            monthTransfersInCount = 0,
             monthRefundsSar = 0.0,
             monthRefundsCount = 0,
             lastMonthToDateSar = 0.0,
@@ -90,6 +98,8 @@ fun computeTotals(
     var monthCount = 0
     var monthTransferSum = 0.0
     var monthTransferCount = 0
+    var monthTransferInSum = 0.0
+    var monthTransferInCount = 0
     var monthRefundSum = 0.0
     var monthRefundCount = 0
     var lastMonthToDateSum = 0.0
@@ -122,6 +132,11 @@ fun computeTotals(
                 monthRefundSum += tx.amountSar
                 monthRefundCount += 1
             }
+        } else if (tx.kind == Transaction.Kind.TRANSFER_IN) {
+            if (inMonth) {
+                monthTransferInSum += tx.amountSar
+                monthTransferInCount += 1
+            }
         } else if (inMonth) {
             monthTransferSum += tx.amountSar
             monthTransferCount += 1
@@ -135,6 +150,8 @@ fun computeTotals(
         monthByCategory = monthByCategory,
         monthTransfersSar = monthTransferSum,
         monthTransfersCount = monthTransferCount,
+        monthTransfersInSar = monthTransferInSum,
+        monthTransfersInCount = monthTransferInCount,
         monthRefundsSar = monthRefundSum,
         monthRefundsCount = monthRefundCount,
         lastMonthToDateSar = lastMonthToDateSum,
@@ -156,6 +173,8 @@ fun computeTotalsAllTime(
     var purchaseCount = 0
     var transferSum = 0.0
     var transferCount = 0
+    var transferInSum = 0.0
+    var transferInCount = 0
     var refundSum = 0.0
     var refundCount = 0
     val byCategory = mutableMapOf<SpendingCategory, Double>()
@@ -171,6 +190,10 @@ fun computeTotalsAllTime(
                 refundSum += tx.amountSar
                 refundCount += 1
             }
+            tx.kind == Transaction.Kind.TRANSFER_IN -> {
+                transferInSum += tx.amountSar
+                transferInCount += 1
+            }
             else -> {
                 transferSum += tx.amountSar
                 transferCount += 1
@@ -185,6 +208,8 @@ fun computeTotalsAllTime(
         monthByCategory = byCategory,
         monthTransfersSar = transferSum,
         monthTransfersCount = transferCount,
+        monthTransfersInSar = transferInSum,
+        monthTransfersInCount = transferInCount,
         monthRefundsSar = refundSum,
         monthRefundsCount = refundCount,
         lastMonthToDateSar = 0.0,
@@ -210,6 +235,8 @@ fun computeTotalsForMonth(
     var monthCount = 0
     var monthTransferSum = 0.0
     var monthTransferCount = 0
+    var monthTransferInSum = 0.0
+    var monthTransferInCount = 0
     var monthRefundSum = 0.0
     var monthRefundCount = 0
     val monthByCategory = mutableMapOf<SpendingCategory, Double>()
@@ -226,6 +253,10 @@ fun computeTotalsForMonth(
                 monthRefundSum += tx.amountSar
                 monthRefundCount += 1
             }
+            tx.kind == Transaction.Kind.TRANSFER_IN -> {
+                monthTransferInSum += tx.amountSar
+                monthTransferInCount += 1
+            }
             else -> {
                 monthTransferSum += tx.amountSar
                 monthTransferCount += 1
@@ -240,6 +271,8 @@ fun computeTotalsForMonth(
         monthByCategory = monthByCategory,
         monthTransfersSar = monthTransferSum,
         monthTransfersCount = monthTransferCount,
+        monthTransfersInSar = monthTransferInSum,
+        monthTransfersInCount = monthTransferInCount,
         monthRefundsSar = monthRefundSum,
         monthRefundsCount = monthRefundCount,
         lastMonthToDateSar = 0.0,
