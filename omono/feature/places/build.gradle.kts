@@ -14,7 +14,9 @@ android {
 
 dependencies {
     implementation(projects.core.common)
+    implementation(projects.core.data)
     implementation(libs.okhttp)
+    implementation(libs.androidx.datastore.preferences)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.timber)
 

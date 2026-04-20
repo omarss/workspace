@@ -30,6 +30,7 @@ import net.omarss.omono.feature.places.HeadingSensor
 import net.omarss.omono.feature.places.Place
 import net.omarss.omono.feature.places.PlaceCategory
 import net.omarss.omono.feature.places.PlacesRepository
+import net.omarss.omono.feature.places.PlacesSettingsRepository
 import net.omarss.omono.feature.places.filterByDirection
 import net.omarss.omono.location.AppLocationStream
 import timber.log.Timber
@@ -44,6 +45,7 @@ import kotlin.math.sqrt
 class PlacesViewModel @Inject constructor(
     @param:ApplicationContext private val context: Context,
     private val repository: PlacesRepository,
+    private val placesSettings: PlacesSettingsRepository,
     headingSensor: HeadingSensor,
     private val locationStream: AppLocationStream,
 ) : ViewModel() {
@@ -73,6 +75,9 @@ class PlacesViewModel @Inject constructor(
     private val heading: StateFlow<Float> = headingSensor.headings()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), initialValue = 0f)
 
+    private val hiddenCategories: StateFlow<Set<PlaceCategory>> = placesSettings.hiddenCategories
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), initialValue = emptySet())
+
     val uiState: StateFlow<PlacesUiState> = combine(
         selectedCategory,
         coneDegrees,
@@ -83,16 +88,19 @@ class PlacesViewModel @Inject constructor(
             qualityFilter,
             heading,
             loading,
-            combine(error, loadingMore, canLoadMore) { e, lm, cm -> Triple(e, lm, cm) },
-        ) { q, qf, h, l, trio ->
+            combine(error, loadingMore, canLoadMore, hiddenCategories) { e, lm, cm, hidden ->
+                ErrorLoadingHidden(e, lm, cm, hidden)
+            },
+        ) { q, qf, h, l, elh ->
             CombinedExtras(
                 searchQuery = q,
                 qualityFilter = qf,
                 heading = h,
                 loading = l,
-                error = trio.first,
-                loadingMore = trio.second,
-                canLoadMore = trio.third,
+                error = elh.error,
+                loadingMore = elh.loadingMore,
+                canLoadMore = elh.canLoadMore,
+                hiddenCategories = elh.hiddenCategories,
             )
         },
     ) { category, cone, radius, places, extras ->
@@ -112,6 +120,7 @@ class PlacesViewModel @Inject constructor(
             loading = extras.loading,
             loadingMore = extras.loadingMore,
             canLoadMore = extras.canLoadMore,
+            hiddenCategories = extras.hiddenCategories,
             errorMessage = extras.error,
             configured = repository.isConfigured,
         )
@@ -129,7 +138,19 @@ class PlacesViewModel @Inject constructor(
         val error: String?,
         val loadingMore: Boolean,
         val canLoadMore: Boolean,
+        val hiddenCategories: Set<PlaceCategory>,
     )
+
+    private data class ErrorLoadingHidden(
+        val error: String?,
+        val loadingMore: Boolean,
+        val canLoadMore: Boolean,
+        val hiddenCategories: Set<PlaceCategory>,
+    )
+
+    fun setCategoryHidden(category: PlaceCategory, hidden: Boolean) {
+        viewModelScope.launch { placesSettings.toggleHidden(category, hidden) }
+    }
 
     fun selectCategory(category: PlaceCategory?) {
         selectedCategory.value = category
@@ -448,6 +469,10 @@ data class PlacesUiState(
     // can show a spinner below the list without hiding existing rows.
     val loadingMore: Boolean = false,
     val canLoadMore: Boolean = false,
+    // Categories the user has toggled off in settings. The chip row
+    // filters them out so the Places tab shows only what the user
+    // cares about. Empty set = show everything (default).
+    val hiddenCategories: Set<PlaceCategory> = emptySet(),
     val errorMessage: String? = null,
     val configured: Boolean = false,
 )

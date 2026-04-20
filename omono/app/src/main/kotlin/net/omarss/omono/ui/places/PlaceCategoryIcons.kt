@@ -4,6 +4,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.Atm
 import androidx.compose.material.icons.filled.BakeryDining
+import androidx.compose.material.icons.filled.Book
 import androidx.compose.material.icons.filled.Cake
 import androidx.compose.material.icons.filled.ContentCut
 import androidx.compose.material.icons.filled.DinnerDining
@@ -26,7 +27,9 @@ import androidx.compose.material.icons.filled.LocalPharmacy
 import androidx.compose.material.icons.filled.LocalPizza
 import androidx.compose.material.icons.filled.LocalPostOffice
 import androidx.compose.material.icons.filled.LunchDining
+import androidx.compose.material.icons.filled.MedicalServices
 import androidx.compose.material.icons.filled.Mosque
+import androidx.compose.material.icons.filled.Museum
 import androidx.compose.material.icons.filled.Park
 import androidx.compose.material.icons.filled.RamenDining
 import androidx.compose.material.icons.filled.Restaurant
@@ -72,6 +75,11 @@ fun PlaceCategory.visual(): PlaceCategoryVisual = when (this) {
     PlaceCategory.LIBRARY -> PlaceCategoryVisual(Icons.Filled.LocalLibrary, Color(0xFF7C3AED))
     PlaceCategory.TRANSIT -> PlaceCategoryVisual(Icons.Filled.DirectionsBus, Color(0xFFF59E0B))
     PlaceCategory.JUICE -> PlaceCategoryVisual(Icons.Filled.LocalDrink, Color(0xFFF43F5E))
+    PlaceCategory.BOOKSTORE -> PlaceCategoryVisual(Icons.Filled.Book, Color(0xFF6D28D9))
+    PlaceCategory.CLINIC -> PlaceCategoryVisual(Icons.Filled.MedicalServices, Color(0xFF14B8A6))
+    PlaceCategory.MUSEUM -> PlaceCategoryVisual(Icons.Filled.Museum, Color(0xFFA16207))
+    PlaceCategory.CULTURAL_SITE -> PlaceCategoryVisual(Icons.Filled.AccountBalance, Color(0xFF92400E))
+    PlaceCategory.BRUNCH -> PlaceCategoryVisual(Icons.Filled.FreeBreakfast, Color(0xFFF59E0B))
     PlaceCategory.SEAFOOD -> PlaceCategoryVisual(Icons.Filled.SetMeal, Color(0xFF0EA5E9))
     PlaceCategory.SUSHI -> PlaceCategoryVisual(Icons.Filled.RiceBowl, Color(0xFFDB2777))
     PlaceCategory.BURGER -> PlaceCategoryVisual(Icons.Filled.LunchDining, Color(0xFFF97316))

@@ -70,6 +70,14 @@ enum class PlaceCategory(
     LIBRARY("Library", "📚"),
     TRANSIT("Transit", "🚌"),
     JUICE("Juice", "🥤"),
+    // Extra top-level slugs added server-side in the gplaces API
+    // (README "Additions"). Each is a full, standalone category —
+    // not a cuisine — and can be filtered independently on /v1/places.
+    BOOKSTORE("Bookstore", "📖"),
+    CLINIC("Clinic", "🩺"),
+    MUSEUM("Museum", "🏛"),
+    CULTURAL_SITE("Cultural site", "🏺"),
+    BRUNCH("Brunch", "🥞"),
 
     // Cuisine sub-slugs — shown only when RESTAURANT / FAST_FOOD /
     // BAKERY is the active top-level pick. Each behaves as an

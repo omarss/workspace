@@ -22,8 +22,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
@@ -41,6 +44,7 @@ import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.FilterAltOff
 import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -87,6 +91,17 @@ fun PlacesRoute(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val listState = rememberLazyListState()
+    var showCustomizeDialog by remember { mutableStateOf(false) }
+
+    if (showCustomizeDialog) {
+        CustomizeCategoriesDialog(
+            hidden = state.hiddenCategories,
+            onToggle = { category, isHidden ->
+                viewModel.setCategoryHidden(category, isHidden)
+            },
+            onDismiss = { showCustomizeDialog = false },
+        )
+    }
 
     // First-load: fire a refresh once the screen mounts. The user can
     // re-trigger via the refresh icon or by changing category/radius.
@@ -149,6 +164,12 @@ fun PlacesRoute(
                         )
                     }
                 }
+                IconButton(onClick = { showCustomizeDialog = true }) {
+                    Icon(
+                        Icons.Filled.Tune,
+                        contentDescription = "Customize categories",
+                    )
+                }
                 IconButton(onClick = { viewModel.refresh(force = true) }) {
                     Icon(Icons.Filled.Refresh, contentDescription = "Refresh")
                 }
@@ -168,6 +189,7 @@ fun PlacesRoute(
 
                 CategoryChips(
                     selected = state.category,
+                    hidden = state.hiddenCategories,
                     onSelect = viewModel::selectCategory,
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -179,6 +201,7 @@ fun PlacesRoute(
                 if (state.category in FOOD_PARENT_CATEGORIES) {
                     CuisineChips(
                         selected = state.category,
+                        hidden = state.hiddenCategories,
                         onSelect = viewModel::selectCategory,
                     )
                 }
@@ -261,6 +284,85 @@ fun PlacesRoute(
     }
 }
 
+// Simple show/hide dialog for the Places category chip row. Lists
+// every PlaceCategory with a Switch; toggling updates DataStore via
+// the ViewModel, which re-emits the chips with the new hidden set.
+// Reorder is deliberately not wired (that wants a draggable list
+// primitive we don't have yet) — users get the ordering baked into
+// the enum until a follow-up ships explicit reordering.
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CustomizeCategoriesDialog(
+    hidden: Set<PlaceCategory>,
+    onToggle: (PlaceCategory, Boolean) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Categories to show") },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 480.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                Text(
+                    "Uncheck categories you want hidden from the chip row.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(8.dp))
+                PlaceCategory.entries.forEach { category ->
+                    val isVisible = category !in hidden
+                    val visual = category.visual()
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onToggle(category, isVisible) }
+                            .padding(vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            imageVector = visual.icon,
+                            contentDescription = null,
+                            tint = visual.tint,
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Spacer(Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = category.label,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurface,
+                            )
+                            if (category.isCuisine) {
+                                Text(
+                                    text = "Cuisine",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                        Switch(
+                            checked = isVisible,
+                            onCheckedChange = { checked ->
+                                onToggle(category, !checked)
+                            },
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            androidx.compose.material3.TextButton(onClick = onDismiss) {
+                Text("Done")
+            }
+        },
+    )
+}
+
 // Default state: no cuisine, "All", 180° cone, 5 km radius, quality
 // filter on, empty search. Any deviation lights up the clear button.
 private fun hasActiveFilters(state: PlacesUiState): Boolean {
@@ -294,6 +396,7 @@ private const val SCROLL_HYSTERESIS_PX: Int = 16
 @Composable
 private fun CategoryChips(
     selected: PlaceCategory?,
+    hidden: Set<PlaceCategory>,
     onSelect: (PlaceCategory?) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -326,6 +429,7 @@ private fun CategoryChips(
         ) {
             PlaceCategory.entries.forEach { category ->
                 if (category.isCuisine) return@forEach
+                if (category in hidden) return@forEach
                 val visual = category.visual()
                 FilterChip(
                     selected = category == selected,
@@ -354,6 +458,7 @@ private fun CategoryChips(
 @Composable
 private fun CuisineChips(
     selected: PlaceCategory?,
+    hidden: Set<PlaceCategory>,
     onSelect: (PlaceCategory?) -> Unit,
 ) {
     Row(
@@ -371,6 +476,7 @@ private fun CuisineChips(
         )
         PlaceCategory.entries.forEach { category ->
             if (!category.isCuisine) return@forEach
+            if (category in hidden) return@forEach
             val visual = category.visual()
             FilterChip(
                 selected = category == selected,
@@ -465,10 +571,14 @@ private fun RadiusPicker(
     onChange: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val options = listOf(1_000, 5_000, 20_000)
+    // 50 km is the backend's hard cap (see gplaces_parser README —
+    // `radius` is validated to `1..50000`); "All" just sends the
+    // ceiling so the user gets the widest possible result set
+    // without a special-case off-screen path.
+    val options = listOf(1_000, 5_000, 20_000, 50_000)
     // Short labels so the "20 km" option doesn't wrap to a second
     // line inside the segmented button cell on phone widths.
-    val labels = mapOf(1_000 to "1km", 5_000 to "5km", 20_000 to "20km")
+    val labels = mapOf(1_000 to "1km", 5_000 to "5km", 20_000 to "20km", 50_000 to "All")
     Column(modifier = modifier) {
         Text(
             text = "Radius",
