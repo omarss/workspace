@@ -194,6 +194,14 @@ private fun MonthChipRow(
     onSelectAllTime: () -> Unit,
 ) {
     if (months.isEmpty()) return
+    // Selected-state colour is promoted to the primary container so
+    // the chosen period visibly wins over the row; the default
+    // FilterChipDefaults selected treatment sits too close to the
+    // unselected one to catch the eye at a glance.
+    val emphasisColors = FilterChipDefaults.filterChipColors(
+        selectedContainerColor = MaterialTheme.colorScheme.primary,
+        selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+    )
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -211,7 +219,7 @@ private fun MonthChipRow(
                 selected = !isAllTime && ym == selected,
                 onClick = { onSelect(ym) },
                 label = { Text(label) },
-                colors = FilterChipDefaults.filterChipColors(),
+                colors = emphasisColors,
             )
         }
         // Trailing "All time" chip — bypasses the month scoping so the
@@ -222,7 +230,7 @@ private fun MonthChipRow(
             selected = isAllTime,
             onClick = onSelectAllTime,
             label = { Text("All time") },
-            colors = FilterChipDefaults.filterChipColors(),
+            colors = emphasisColors,
         )
     }
 }
@@ -392,6 +400,20 @@ private fun CorrectCategoryDialog(
     )
 }
 
+// Hero summary card. Information hierarchy top-to-bottom:
+//   1. Period label ("This month" / "March 2026" / "All time")
+//   2. Overspend pill (ONLY when over budget — the single most
+//      actionable signal on the screen)
+//   3. Total spend (hero number + month trend pill)
+//   4. Purchases count + today's spend in one compact row, with
+//      today's own trend pill inline when current-month
+//   5. Projection and refund lines (both optional, both small)
+//   6. Budget progress bar (only when a budget exists)
+//
+// The earlier layout put overspend at the very bottom buried in
+// subtitle text — the eye never reached it. Moving it to its own
+// red pill above the hero number makes "you're over" a one-glance
+// read.
 @Composable
 private fun SummaryCard(state: FinanceDashboardUiState) {
     val gradientColors = listOf(
@@ -411,15 +433,21 @@ private fun SummaryCard(state: FinanceDashboardUiState) {
                 .padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Text(
-                text = when {
-                    state.isAllTime -> "All time"
-                    state.isCurrentMonth -> "This month"
-                    else -> state.selectedMonth.format(MONTH_CHIP_FMT)
-                },
-                style = MaterialTheme.typography.labelLarge,
-                color = Color.White.copy(alpha = 0.8f),
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = when {
+                        state.isAllTime -> "All time"
+                        state.isCurrentMonth -> "This month"
+                        else -> state.selectedMonth.format(MONTH_CHIP_FMT)
+                    },
+                    style = MaterialTheme.typography.labelLarge,
+                    color = Color.White.copy(alpha = 0.85f),
+                    modifier = Modifier.weight(1f),
+                )
+                if (state.overBudget) {
+                    OverBudgetPill(overBy = state.monthSar - state.budgetSar)
+                }
+            }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = "SAR %,.0f".format(state.monthSar),
@@ -442,7 +470,7 @@ private fun SummaryCard(state: FinanceDashboardUiState) {
                 Text(
                     text = subtitle,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = Color.White.copy(alpha = 0.8f),
+                    color = Color.White.copy(alpha = 0.85f),
                 )
                 if (state.isCurrentMonth) {
                     TrendPill(
@@ -468,10 +496,6 @@ private fun SummaryCard(state: FinanceDashboardUiState) {
                 )
             }
 
-            // Budget line lives on the summary card (instead of a
-            // separate card repeating the month total). The bar stays
-            // clamped to 0..1 so it doesn't overflow visually; the
-            // text alongside shows the uncapped percentage.
             if (state.budgetSar > 0.0) {
                 Spacer(Modifier.height(6.dp))
                 val barColor = if (state.overBudget) {
@@ -486,23 +510,38 @@ private fun SummaryCard(state: FinanceDashboardUiState) {
                     trackColor = Color.White.copy(alpha = 0.2f),
                 )
                 val actualPercent = state.monthSar / state.budgetSar * 100.0
-                val label = buildString {
-                    append("Budget SAR %,.0f  ·  %.0f%%".format(state.budgetSar, actualPercent))
-                    if (state.overBudget) {
-                        append("  ·  over by SAR %,.0f".format(state.monthSar - state.budgetSar))
-                    }
-                }
+                // Overspend is already surfaced as a dedicated pill
+                // up top; here we keep the budget line clean —
+                // just the ceiling and the percentage against it.
+                val label = "Budget SAR %,.0f  ·  %.0f%%".format(state.budgetSar, actualPercent)
                 Text(
                     text = label,
                     style = MaterialTheme.typography.bodySmall,
-                    color = if (state.overBudget) {
-                        Color(0xFFFECACA) // red 200 on gradient
-                    } else {
-                        Color.White.copy(alpha = 0.8f)
-                    },
+                    color = Color.White.copy(alpha = 0.8f),
                 )
             }
         }
+    }
+}
+
+// Red-tinted capsule calling out an over-budget state. Pairs with
+// the progress bar below — bar goes red, pill puts a number on the
+// overspend so the user knows the magnitude without doing mental
+// arithmetic. Intentionally bright on the indigo/violet gradient:
+// this is the one thing the user should notice first.
+@Composable
+private fun OverBudgetPill(overBy: Double) {
+    Row(
+        modifier = Modifier
+            .background(Color(0xFFDC2626), RoundedCornerShape(50)) // red 600
+            .padding(horizontal = 10.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = "Over by SAR %,.0f".format(overBy),
+            style = MaterialTheme.typography.labelMedium,
+            color = Color.White,
+        )
     }
 }
 
