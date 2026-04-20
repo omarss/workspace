@@ -247,6 +247,28 @@ CROSS_SLUG_PURGE: list[tuple[str, str, str | None]] = [
      " OR COALESCE(name, '') ~ 'د\\.كيف|د\\. كيف|ستاربكس|كوستا'"
      " OR COALESCE(name_en, '') ~* 'dr\\.?\\s?cafe|starbucks|costa'",
      "coffee"),
+
+    # steakhouse with pizza gtype → pizza (not restaurant)
+    ("steakhouse",
+     "subcategories[1] ~* 'pizza' OR subcategories[1] ~ 'بيتزا'",
+     "pizza"),
+
+    # asian_food with بخاري (bukhari rice) in name — Arab rice dish, not Asian
+    ("asian_food",
+     "COALESCE(name, '') ~ 'بخاري' OR COALESCE(name_en, '') ~* 'bukhari'",
+     "kabsa"),
+
+    # kabsa rows whose gtype is a housing / residential / non-food category
+    ("kabsa",
+     "subcategories[1] ~* 'residential|housing|real estate'"
+     " OR subcategories[1] ~ 'التنمية السكنية|سكني|عقارات'",
+     None),
+
+    # sushi with buffet/grill gtype that isn't sushi → restaurant
+    ("sushi",
+     "subcategories[1] !~* 'sushi|japanese' AND subcategories[1] ~* 'buffet|grill|restaurant'"
+     " AND subcategories[1] !~ 'الياباني|سوشي'",
+     "restaurant"),
 ]
 
 ALL_RULES: list[tuple[str, str, str | None]] = (
