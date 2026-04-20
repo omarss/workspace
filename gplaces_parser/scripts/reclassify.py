@@ -206,6 +206,47 @@ CROSS_SLUG_PURGE: list[tuple[str, str, str | None]] = [
 
     # atm ≠ bank — keep things labeled Bank in the bank slug
     ("atm", "subcategories[1] ~* '^bank$' OR subcategories[1] ~ 'مصرف$'", "bank"),
+
+    # dessert / ice_cream / juice with Coffee shop gtype → coffee
+    ("dessert",
+     "subcategories[1] ~* 'coffee shop|cafe|café' OR subcategories[1] ~ 'مقهى|كافيه'",
+     "coffee"),
+    ("juice",
+     "subcategories[1] ~* 'coffee shop|cafe|café' OR subcategories[1] ~ 'مقهى|كافيه'",
+     "coffee"),
+
+    # ice_cream with Bakery gtype OR bakery name → bakery
+    ("ice_cream",
+     "subcategories[1] ~* 'bakery' OR subcategories[1] ~ 'مخبز'"
+     " OR COALESCE(name, '') ~ 'مخبز' OR COALESCE(name_en, '') ~* 'bakery'",
+     "bakery"),
+
+    # mall with single-store gtype (shoe store, accessories, etc) → drop
+    ("mall",
+     "subcategories[1] ~* 'shoe store|clothing store|accessories|jewellery|jewelry|electronics store'"
+     " OR subcategories[1] ~ 'متجر أحذية|متجر ملابس|متجر إكسسوارات|متجر مجوهرات|متجر إلكترونيات'",
+     None),
+
+    # steakhouse — shisha lounge is a restaurant, not a steakhouse
+    ("steakhouse",
+     "subcategories[1] ~* 'shisha|hookah lounge' OR subcategories[1] ~ 'مقهى للشيشة|الأرجيلة'",
+     "restaurant"),
+    # steakhouse tagged الإيطالي (Italian) → italian_food
+    ("steakhouse",
+     "subcategories[1] ~* 'italian' OR subcategories[1] ~ 'الإيطالي|إيطالي'",
+     "italian_food"),
+
+    # clinic with warehouse name (مستودع) → drop
+    ("clinic",
+     "COALESCE(name, '') ~ '^مستودع' OR COALESCE(name_en, '') ~* '^warehouse|storage facility'",
+     None),
+
+    # park with a coffee-brand name — dr.CAFE/Starbucks/Costa IN a park → coffee
+    ("park",
+     "subcategories[1] ~* 'coffee shop|cafe|café' OR subcategories[1] ~ 'مقهى|كافيه'"
+     " OR COALESCE(name, '') ~ 'د\\.كيف|د\\. كيف|ستاربكس|كوستا'"
+     " OR COALESCE(name_en, '') ~* 'dr\\.?\\s?cafe|starbucks|costa'",
+     "coffee"),
 ]
 
 ALL_RULES: list[tuple[str, str, str | None]] = (
