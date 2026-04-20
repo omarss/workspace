@@ -41,6 +41,30 @@ LIBRARY_PURGE = [
      "COALESCE(name, '') ~ 'للنشر|للتوزيع|دار .*نشر|دار الهدى|دار المقحم|دار الجداول|للطباعة|للنسخ|للتصوير|قرطاسية|للخدمات الطلابية|للخدمات العامة|خدمات الطالب'"
      " OR COALESCE(name_en, '') ~* 'publishing|distribution|wholesale'",
      "bookstore"),
+    # Metro / subway stations with "library" in the name → transit
+    ("library",
+     "subcategories[1] ~* 'subway station|suburban train|transportation service|metro station|bus station'",
+     "transit"),
+    # Culture oasis / cultural park / science museum — these are cultural_site / museum
+    ("library",
+     "subcategories[1] ~* 'science museum|art museum|museum'",
+     "museum"),
+    ("library",
+     "subcategories[1] ~* 'cultural center|community center'",
+     "cultural_site"),
+    # Nightlife (lounge bars) aren't libraries
+    ("library",
+     "subcategories[1] ~* 'lounge bar|bar|nightclub'",
+     None),
+    # Hospital departments / specialized admin — null
+    ("library",
+     "subcategories[1] ~* 'hospital department|local government office|consultant'",
+     None),
+    # Restaurant gtype (Bakery) snuck in via "King Fahd library" NAME
+    # on a cafe; respect Google.
+    ("library",
+     "subcategories[1] ~* 'bakery|restaurant'",
+     "restaurant"),
     ("library", "subcategories[1] ~* 'supermarket|hypermarket|grocery|market' OR subcategories[1] ~ 'سوبر|بقالة'", "grocery"),
     ("library", "subcategories[1] ~* 'park|garden' OR subcategories[1] ~ 'حديقة|منتزه'", "park"),
     ("library", "subcategories[1] ~* 'university|college|school' OR subcategories[1] ~ 'جامعة|كلية|مدرسة'", None),
