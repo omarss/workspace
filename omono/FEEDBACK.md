@@ -379,6 +379,38 @@ it even if it's two blocks away.
 Lower priority than 9.1–9.3; the client-side filter is acceptable for
 now.
 
+### 9.13 Placeholder coords on unresolved entries *(data-quality bug, 2026-04-20)*
+
+**Status:** 🟡 reported. Many `/v1/places?category=mosque` (and some
+`coffee`) results around a dense Riyadh centre (e.g. `lat=24.7136,
+lon=46.6753`) return `lat` / `lon` identical to the query point —
+all five or ten entries share the same `24.7135517, 46.6752957`
+coordinate. Queries from a less dense area (e.g. the Diplomatic
+Quarter) return real coordinates, so this isn't a per-category bug —
+it looks like entries whose geocoding hasn't resolved yet are
+emitting the request centre as a fallback.
+
+Reproduce:
+
+```
+curl -H "X-Api-Key: $K" 'https://api.omarss.net/v1/places?lat=24.7136&lon=46.6753&radius=5000&category=mosque&limit=5' \
+  | jq '.results[] | {name, lat, lon}'
+```
+
+Every row comes back with the same lat/lon as the request.
+
+**Client-side mitigation:** `GPlacesClient.parseResponse` now drops
+every result whose `(lat, lon)` pair collides with another entry
+in the same payload — that catches the 5-mosques-at-identical-coord
+case without false-flagging legitimate near-the-user matches.
+Happy to remove once the backend stops emitting them.
+
+**Ask:** Either resolve the geocode during the scrape pass and emit
+the real coordinates, or drop entries without resolved coords from
+the response entirely. A third option (emit `lat=null, lon=null` and
+let the client skip them) works too, but then the Kotlin parser
+already filters `NaN` so it's effectively the same as dropping them.
+
 ### 9.9 `/v1/places` + `/v1/search` — pagination *(ship-blocker for endless-scroll UI)*
 
 **Status:** ✅ shipped (pending `make deploy`). Offset-based, exactly
