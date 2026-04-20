@@ -27,7 +27,20 @@ LIBRARY_PURGE = [
     # subcategory-driven: Google's own type is clearly not a library
     ("library", "subcategories[1] ~* 'cafe|café|coffee' OR subcategories[1] ~ 'مقهى|كافيه|قهوة'", "coffee"),
     ("library", "subcategories[1] ~* 'restaurant' OR subcategories[1] ~ 'مطعم'", "restaurant"),
-    ("library", "subcategories[1] ~* 'electronics|bookstore|book store|stationery|office supplies' OR subcategories[1] ~ 'متجر|قرطاسية|أدوات مكتبية'", "bookstore"),
+    ("library",
+     "subcategories[1] ~* 'electronics|bookstore|book store|stationery|office supplies|digital printing|print service|retail'"
+     " OR subcategories[1] ~ 'متجر|قرطاسية|أدوات مكتبية|محل نسخ|خدمة طباعة|تاجر كتب|أثاث مكتبي|منفذ بيع'",
+     "bookstore"),
+    # Academic/government/research facilities that aren't libraries
+    ("library",
+     "subcategories[1] ~* 'university|college|department|academic|research|educational|institute|government'"
+     " OR subcategories[1] ~ 'جامعة|كلية|قسم أكاديمي|معهد|مؤسسة تعليمية|مؤسسة دينية|مكتب حكومي|استشاري|إدارة|التربية والتعليم|رابطة|مستشار تعليمي|مكتب الشركات'",
+     None),
+    # Publishers / wholesale book dealers — not reading libraries
+    ("library",
+     "COALESCE(name, '') ~ 'للنشر|للتوزيع|دار .*نشر|دار الهدى|دار المقحم|دار الجداول|للطباعة|للنسخ|للتصوير|قرطاسية|للخدمات الطلابية|للخدمات العامة|خدمات الطالب'"
+     " OR COALESCE(name_en, '') ~* 'publishing|distribution|wholesale'",
+     "bookstore"),
     ("library", "subcategories[1] ~* 'supermarket|hypermarket|grocery|market' OR subcategories[1] ~ 'سوبر|بقالة'", "grocery"),
     ("library", "subcategories[1] ~* 'park|garden' OR subcategories[1] ~ 'حديقة|منتزه'", "park"),
     ("library", "subcategories[1] ~* 'university|college|school' OR subcategories[1] ~ 'جامعة|كلية|مدرسة'", None),
