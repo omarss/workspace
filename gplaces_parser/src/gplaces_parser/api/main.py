@@ -18,12 +18,21 @@ from .usage import ApiUsageMiddleware
 
 
 def create_app() -> FastAPI:
+    # Auto-docs live under /v1/ so the existing nginx `location /v1/…`
+    # block reverse-proxies them without a new rule. They describe the
+    # surface only — every data endpoint still requires X-Api-Key, so
+    # exposing the schema itself leaks nothing sensitive.
     app = FastAPI(
-        title="gplaces",
-        version="0.1.0",
-        docs_url=None,  # no public docs — private k8s service
-        redoc_url=None,
-        openapi_url=None,
+        title="gplaces API",
+        version="0.2.0",
+        description=(
+            "Self-hosted Google Places / Roads / Reviews proxy for omono. "
+            "Every data endpoint requires `X-Api-Key`. "
+            "Full reference: https://github.com/omarss/workspace/blob/main/gplaces_parser/README.md"
+        ),
+        docs_url="/v1/docs",
+        redoc_url="/v1/redoc",
+        openapi_url="/v1/openapi.json",
     )
 
     @app.exception_handler(StarletteHTTPException)
