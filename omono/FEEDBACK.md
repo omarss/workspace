@@ -712,8 +712,9 @@ different k3s Deployment.
 **TL;DR for omono**
 
 - New base path: `/v1/mcq/…`
-- New header value: `X-Api-Key: <MCQS_API_KEY>` (different from
-  `GPLACES_API_KEY` — do NOT reuse it)
+- **Same `X-Api-Key` value as gplaces** — the two deployments share the
+  one secret (`gplaces.api.key` in `local.properties`). No new
+  property to add
 - Read-only surface. Nothing here affects the places / roads / search
   flows you already have.
 
@@ -730,20 +731,29 @@ places app is untouched.
 
 Android emulator quirk (`10.0.2.2` alias) is identical to gplaces.
 
-Put the key in `omono/local.properties` as `mcqs.api.key` (new
-property, alongside `gplaces.api.key`). Base URL can reuse
-`api.base.url` if you add a path switch in the client, or add
-`mcqs.api.url`.
+No new settings property needed. Reuse `gplaces.api.key` and
+`api.base.url` — the client just appends `/v1/mcq/…` to the existing
+base URL.
 
 ### 10.2 API key (shared secret)
 
+**The mcqs deployment is rotated to the same secret as gplaces.** Use
+the value already in `omono/local.properties` as `gplaces.api.key` —
+don't add a second property.
+
 ```
-MCQS_API_KEY=9a097defbf229225b593ab5dc8a1f79176461dbb4ae97b9a39a6dad479ef8a0c
+X-Api-Key: <same value you send to /v1/places>
 ```
 
-Independent of `GPLACES_API_KEY`. Same `X-Api-Key` header, same
-`hmac.compare_digest` check on the server. Missing/wrong → `401
+Same `X-Api-Key` header, same `hmac.compare_digest` check on the
+server (just a different service instance with the same secret loaded
+into its `MCQS_API_KEY` env var). Missing/wrong → `401
 {"error":"unauthorized"}`.
+
+> **Security footnote**: the two APIs share a secret, so a leaked key
+> compromises both. If divergent lifecycles become a requirement,
+> `mcqs/src/mcqs/api/deps.py` can be extended to accept either of two
+> independent keys (~5 lines). Not done yet — ask when you need it.
 
 ### 10.3 Data model
 
