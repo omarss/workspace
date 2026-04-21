@@ -3,11 +3,16 @@ package net.omarss.omono.ui.quiz
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import net.omarss.omono.feature.quiz.McqRepository
 import net.omarss.omono.feature.quiz.Question
 import net.omarss.omono.feature.quiz.QuestionType
@@ -144,6 +149,33 @@ class QuizViewModel @Inject constructor(
                 }
                 return@launch
             }
+            // Pre-fetch every question's reveal in parallel. The
+            // server returns 8 options on /quiz with `is_correct`
+            // hidden, but we want to display only 4 (the correct
+            // one + 3 stable distractors) and score picks locally
+            // without a per-tap round-trip. Revealing upfront is
+            // the cleanest way to get there without hitting the
+            // server twice per question during play.
+            val reveals = withContext(Dispatchers.IO) {
+                coroutineScope {
+                    fetched.map { q ->
+                        async {
+                            runCatching { repository.reveal(q.id) }
+                                .onFailure { Timber.w(it, "quiz prefetch %d failed", q.id) }
+                                .getOrNull()
+                        }
+                    }.awaitAll()
+                }
+            }
+            val revealedMap = reveals.withIndex()
+                .mapNotNull { (i, revealed) -> revealed?.let { i to it } }
+                .toMap()
+            if (revealedMap.size < fetched.size) {
+                // At least one reveal failed — the affected questions
+                // will fall back to 8 options and on-demand reveal
+                // when the user picks. Not ideal but not a blocker.
+                Timber.w("quiz: %d of %d reveals failed", fetched.size - revealedMap.size, fetched.size)
+            }
             _uiState.update {
                 it.copy(
                     loadingQuestions = false,
@@ -151,7 +183,7 @@ class QuizViewModel @Inject constructor(
                     questions = fetched,
                     currentIndex = 0,
                     pickedByIndex = emptyMap(),
-                    revealedByIndex = emptyMap(),
+                    revealedByIndex = revealedMap,
                     revealing = false,
                 )
             }
@@ -165,14 +197,17 @@ class QuizViewModel @Inject constructor(
         val question = state.questions.getOrNull(index) ?: return
         if (state.pickedByIndex[index] != null) return
 
-        // Capture the pick immediately so the UI can highlight it,
-        // then fetch the revealed answer in the background.
+        // Capture the pick. Reveal was pre-fetched at quiz start, so
+        // no extra round-trip is needed — we already have the
+        // correct answer and the explanation. If the prefetch
+        // failed for this one question, fall back to an on-demand
+        // /questions/{id} call.
         _uiState.update {
-            it.copy(
-                pickedByIndex = it.pickedByIndex + (index to letter),
-                revealing = true,
-            )
+            it.copy(pickedByIndex = it.pickedByIndex + (index to letter))
         }
+        if (state.revealedByIndex[index] != null) return
+
+        _uiState.update { it.copy(revealing = true) }
         viewModelScope.launch {
             val revealed = runCatching { repository.reveal(question.id) }
                 .onFailure { Timber.w(it, "quiz reveal %d failed", question.id) }

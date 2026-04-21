@@ -13,6 +13,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -62,6 +63,13 @@ class PlacesViewModel @Inject constructor(
     // stubs; hiding them by default gives the list a much higher
     // signal-to-noise ratio.
     private val qualityFilter = MutableStateFlow(true)
+    // Flip-switch between the backend's distance-ascending order and a
+    // client-side random shuffle. Random mode is stable per session —
+    // the order only changes when the user re-toggles the switch, taps
+    // refresh, or a new page arrives. That way scrolling never scrambles
+    // what the user has already seen.
+    private val randomOrder = MutableStateFlow(false)
+    private val shuffleSeed = MutableStateFlow(System.currentTimeMillis())
     private val rawPlaces = MutableStateFlow<List<Place>>(emptyList())
     private val loading = MutableStateFlow(false)
     private val loadingMore = MutableStateFlow(false)
@@ -74,6 +82,20 @@ class PlacesViewModel @Inject constructor(
 
     private val heading: StateFlow<Float> = headingSensor.headings()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), initialValue = 0f)
+
+    // Places list reshaped by the user's order preference. Raw
+    // backend results are always distance-ascending; flipping random
+    // mode pipes them through a seeded shuffle before the UI sees
+    // them. The seed is fixed per session so scrolling doesn't
+    // reshuffle mid-list — only a toggle or an explicit re-shuffle
+    // changes the ordering.
+    private val orderedPlaces: Flow<List<Place>> = combine(
+        rawPlaces,
+        randomOrder,
+        shuffleSeed,
+    ) { places, random, seed ->
+        if (random) places.shuffled(kotlin.random.Random(seed)) else places
+    }
 
     private val hiddenCategories: StateFlow<Set<PlaceCategory>> = placesSettings.hiddenCategories
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), initialValue = emptySet())
@@ -89,10 +111,10 @@ class PlacesViewModel @Inject constructor(
         selectedCategory,
         coneDegrees,
         radiusMeters,
-        rawPlaces,
+        orderedPlaces,
         combine(
             searchQuery,
-            qualityFilter,
+            combine(qualityFilter, randomOrder) { qf, ro -> qf to ro },
             heading,
             loading,
             combine(
@@ -104,10 +126,11 @@ class PlacesViewModel @Inject constructor(
             ) { e, lm, cm, hidden, ordered ->
                 ErrorLoadingHidden(e, lm, cm, hidden, ordered)
             },
-        ) { q, qf, h, l, elh ->
+        ) { q, qfRo, h, l, elh ->
             CombinedExtras(
                 searchQuery = q,
-                qualityFilter = qf,
+                qualityFilter = qfRo.first,
+                randomOrder = qfRo.second,
                 heading = h,
                 loading = l,
                 error = elh.error,
@@ -118,7 +141,14 @@ class PlacesViewModel @Inject constructor(
             )
         },
     ) { category, cone, radius, places, extras ->
-        val directionFiltered = filterByDirection(places, extras.heading, cone)
+        // Direction cone filter is skipped in random mode — shuffling
+        // and then hiding by direction would mask results arbitrarily
+        // and defeat the point of "see everything, in a random order".
+        val visibleForRender = if (extras.randomOrder) {
+            places
+        } else {
+            filterByDirection(places, extras.heading, cone)
+        }
         // Both search and quality filter run server-side now — the
         // `q`, `min_rating`, `min_reviews` params in refresh() do
         // the work. Only direction is applied client-side because
@@ -128,9 +158,10 @@ class PlacesViewModel @Inject constructor(
             radiusMeters = radius,
             coneDegrees = cone,
             heading = extras.heading,
-            places = directionFiltered,
+            places = visibleForRender,
             searchQuery = extras.searchQuery,
             qualityFilter = extras.qualityFilter,
+            randomOrder = extras.randomOrder,
             loading = extras.loading,
             loadingMore = extras.loadingMore,
             canLoadMore = extras.canLoadMore,
@@ -148,6 +179,7 @@ class PlacesViewModel @Inject constructor(
     private data class CombinedExtras(
         val searchQuery: String,
         val qualityFilter: Boolean,
+        val randomOrder: Boolean,
         val heading: Float,
         val loading: Boolean,
         val error: String?,
@@ -220,6 +252,21 @@ class PlacesViewModel @Inject constructor(
         refresh()
     }
 
+    // Toggle between the backend's distance-ordered response and a
+    // client-side random shuffle. Turning random mode on or tapping
+    // shuffle again both bump the seed so the order changes; turning
+    // it off reverts to the original distance ordering without any
+    // re-fetch.
+    fun setRandomOrder(enabled: Boolean) {
+        randomOrder.value = enabled
+        if (enabled) shuffleSeed.value = System.currentTimeMillis()
+    }
+
+    fun reshuffle() {
+        if (!randomOrder.value) randomOrder.value = true
+        shuffleSeed.value = System.currentTimeMillis()
+    }
+
     // Reset every filter back to its default — "All" category, the
     // unconstrained 180° direction cone, 5 km radius, the default
     // quality gate on, and an empty search box. One fresh fetch
@@ -230,6 +277,7 @@ class PlacesViewModel @Inject constructor(
         coneDegrees.value = 180f
         radiusMeters.value = 5_000
         qualityFilter.value = true
+        randomOrder.value = false
         searchQuery.value = ""
         refresh(force = true)
     }
@@ -506,6 +554,11 @@ data class PlacesUiState(
     val places: List<Place> = emptyList(),
     val searchQuery: String = "",
     val qualityFilter: Boolean = true,
+    // When true, the Places list is shown in a client-side random
+    // order instead of the backend's distance-ascending sort. The
+    // cone filter is skipped while in this mode because filtering by
+    // direction on a shuffled list would hide arbitrary rows.
+    val randomOrder: Boolean = false,
     val loading: Boolean = false,
     // True while the endless-scroll path is fetching the next page.
     // Distinct from `loading` (first load / query change) so the UI

@@ -379,10 +379,17 @@ private fun PlayingView(
             color = MaterialTheme.colorScheme.onSurface,
         )
 
-        // Options — render from revealed when available (so the
-        // letter→text mapping matches the revealed correctness),
-        // otherwise from the question fetched in /quiz.
-        val optionsToRender = revealed?.options ?: question.options
+        // Options — use the revealed copy when available (matches
+        // the letter→text mapping the user sees here; the server
+        // randomises on every call) and trim to four: the correct
+        // answer plus three stable distractors seeded by the
+        // question id. If the reveal prefetch failed for this
+        // question we fall back to all eight options from /quiz.
+        val optionsToRender = buildQuizOptions(
+            revealed = revealed,
+            fallback = question.options,
+            seed = question.id.toLong(),
+        )
         optionsToRender.forEach { option ->
             OptionCard(
                 option = option,
@@ -569,6 +576,36 @@ private fun typeLabel(type: QuestionType) = when (type) {
     QuestionType.Knowledge -> "Knowledge"
     QuestionType.Analytical -> "Analytical"
     QuestionType.ProblemSolving -> "Problem solving"
+}
+
+// Picks four options to show for one question: the correct answer
+// plus three randomly-chosen distractors, reshuffled into stable
+// order so the letters A–D (or whichever the server emitted) keep
+// positions across recompositions.
+//
+// Seeded by the question id → two successive frames of the same
+// question render the same four options. Different questions get
+// different subsets because the seed differs. If the reveal
+// prefetch failed (revealed == null) we fall through to the full
+// eight-option list so the user still has something to pick.
+private const val OPTIONS_PER_QUESTION: Int = 4
+
+private fun buildQuizOptions(
+    revealed: Question?,
+    fallback: List<QuizOption>,
+    seed: Long,
+): List<QuizOption> {
+    if (revealed == null) return fallback
+    val options = revealed.options
+    if (options.size <= OPTIONS_PER_QUESTION) return options
+    val correct = options.firstOrNull { it.isCorrect == true } ?: return options
+    val wrong = options.filter { it.isCorrect != true }
+    val rng = kotlin.random.Random(seed)
+    val distractors = wrong.shuffled(rng).take(OPTIONS_PER_QUESTION - 1)
+    // Reshuffle correct + distractors together so the correct
+    // answer isn't always in the same slot; use a derived seed so
+    // this shuffle is *also* stable per question.
+    return (listOf(correct) + distractors).shuffled(kotlin.random.Random(seed xor 0x5F3759DFL))
 }
 
 // ------------------------------------------------------------------

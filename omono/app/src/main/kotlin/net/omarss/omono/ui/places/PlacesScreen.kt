@@ -257,6 +257,11 @@ fun PlacesRoute(
                     enabled = state.qualityFilter,
                     onChange = viewModel::setQualityFilter,
                 )
+                RandomOrderRow(
+                    enabled = state.randomOrder,
+                    onChange = viewModel::setRandomOrder,
+                    onShuffle = viewModel::reshuffle,
+                )
             }
         }
 
@@ -744,6 +749,49 @@ private fun QualityFilterRow(enabled: Boolean, onChange: (Boolean) -> Unit) {
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+        }
+        Switch(checked = enabled, onCheckedChange = onChange)
+    }
+}
+
+// Toggle between the server's distance-ascending ordering and a
+// stable client-side shuffle. When random is on a small "Shuffle"
+// button surfaces so the user can re-randomise without toggling off
+// and back on. Random mode intentionally suppresses the cone filter
+// (see ViewModel) because direction-filtering a shuffled list would
+// hide rows at random — counter-productive for "show me everything,
+// in a surprising order".
+@Composable
+private fun RandomOrderRow(
+    enabled: Boolean,
+    onChange: (Boolean) -> Unit,
+    onShuffle: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = "Random order",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Text(
+                text = if (enabled) {
+                    "Shuffled — cone filter suspended"
+                } else {
+                    "Nearest first (default)"
+                },
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        if (enabled) {
+            TextButton(onClick = onShuffle) { Text("Shuffle") }
+            Spacer(Modifier.size(4.dp))
         }
         Switch(checked = enabled, onCheckedChange = onChange)
     }
