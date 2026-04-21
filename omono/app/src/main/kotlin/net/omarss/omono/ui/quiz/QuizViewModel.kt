@@ -125,6 +125,14 @@ class QuizViewModel @Inject constructor(
         _uiState.update { it.copy(questionCount = count.coerceIn(1, 50)) }
     }
 
+    fun setTopicSearch(query: String) {
+        _uiState.update { it.copy(topicSearch = query) }
+    }
+
+    fun clearTopics() {
+        _uiState.update { it.copy(selectedTopics = emptySet()) }
+    }
+
     fun start() {
         val state = _uiState.value
         if (state.loadingQuestions) return
@@ -266,6 +274,7 @@ data class QuizUiState(
     val topics: List<Topic> = emptyList(),
     val selectedSubjects: Set<String> = emptySet(),
     val selectedTopics: Set<String> = emptySet(),
+    val topicSearch: String = "",
     val questionType: QuestionType = QuestionType.Any,
     val questionCount: Int = 10,
     val questions: List<Question> = emptyList(),

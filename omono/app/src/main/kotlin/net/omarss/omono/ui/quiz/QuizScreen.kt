@@ -23,6 +23,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -95,6 +96,8 @@ fun QuizRoute(
                 onToggleSubject = viewModel::toggleSubject,
                 onClearSubjects = viewModel::clearSubjects,
                 onToggleTopic = viewModel::toggleTopic,
+                onClearTopics = viewModel::clearTopics,
+                onTopicSearchChange = viewModel::setTopicSearch,
                 onTypeChange = viewModel::setQuestionType,
                 onCountChange = viewModel::setQuestionCount,
                 onStart = viewModel::start,
@@ -124,6 +127,8 @@ private fun SetupView(
     onToggleSubject: (String) -> Unit,
     onClearSubjects: () -> Unit,
     onToggleTopic: (String) -> Unit,
+    onClearTopics: () -> Unit,
+    onTopicSearchChange: (String) -> Unit,
     onTypeChange: (QuestionType) -> Unit,
     onCountChange: (Int) -> Unit,
     onStart: () -> Unit,
@@ -168,36 +173,15 @@ private fun SetupView(
 
         // Topics (appear only when ≥1 subject is chosen) -------------
         if (state.selectedSubjects.isNotEmpty()) {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(
-                    text = "Topics",
-                    style = MaterialTheme.typography.labelLarge,
-                )
-                Text(
-                    text = if (state.selectedTopics.isEmpty()) {
-                        "Optional — tap one or more to combine (OR)."
-                    } else {
-                        "${state.selectedTopics.size} selected · any match"
-                    },
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                if (state.loadingTopics) {
-                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-                } else if (state.topics.isEmpty()) {
-                    Text(
-                        text = "No topics available.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                } else {
-                    TopicChipFlow(
-                        topics = state.topics.map { it.slug to it.title },
-                        selected = state.selectedTopics,
-                        onToggle = onToggleTopic,
-                    )
-                }
-            }
+            TopicsPicker(
+                topics = state.topics,
+                selected = state.selectedTopics,
+                searchQuery = state.topicSearch,
+                loading = state.loadingTopics,
+                onSearchChange = onTopicSearchChange,
+                onToggle = onToggleTopic,
+                onClear = onClearTopics,
+            )
         }
 
         // Type -------------------------------------------------------
@@ -309,29 +293,175 @@ private fun SubjectChipFlow(
     }
 }
 
+// Richer topic picker — a single search field filters the long
+// topic list; selected topics sit in their own always-visible pill
+// strip so the user can scan their picks + remove any with a tap,
+// without hunting through a 200-chip scroll. Topic chips are sorted
+// by popularity (question_count descending) so the most-likely picks
+// are at the leading edge.
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun TopicChipFlow(
-    topics: List<Pair<String, String>>,
+private fun TopicsPicker(
+    topics: List<net.omarss.omono.feature.quiz.Topic>,
     selected: Set<String>,
+    searchQuery: String,
+    loading: Boolean,
+    onSearchChange: (String) -> Unit,
     onToggle: (String) -> Unit,
+    onClear: () -> Unit,
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        topics.forEach { (slug, title) ->
-            FilterChip(
-                selected = slug in selected,
-                onClick = { onToggle(slug) },
-                label = { Text(title) },
-                colors = FilterChipDefaults.filterChipColors(),
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = "Topics",
+                style = MaterialTheme.typography.labelLarge,
+                modifier = Modifier.weight(1f),
+            )
+            if (selected.isNotEmpty()) {
+                TextButton(onClick = onClear) { Text("Clear") }
+            }
+        }
+        Text(
+            text = if (selected.isEmpty()) {
+                "Optional — tap one or more to combine (OR)."
+            } else {
+                "${selected.size} selected · any match"
+            },
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
+        // Selected-topics pill strip, always visible so the user's
+        // current picks stay on screen even if they've scrolled the
+        // big chip row or filtered it with the search box.
+        if (selected.isNotEmpty()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                selected.forEach { slug ->
+                    FilterChip(
+                        selected = true,
+                        onClick = { onToggle(slug) },
+                        label = { Text(slug) },
+                        trailingIcon = {
+                            Icon(
+                                imageVector = Icons.Filled.Close,
+                                contentDescription = "Remove $slug",
+                                modifier = Modifier.size(14.dp),
+                            )
+                        },
+                        colors = FilterChipDefaults.filterChipColors(),
+                    )
+                }
+            }
+        }
+
+        androidx.compose.material3.OutlinedTextField(
+            value = searchQuery,
+            onValueChange = onSearchChange,
+            modifier = Modifier.fillMaxWidth(),
+            placeholder = { Text("Search topics") },
+            leadingIcon = {
+                Icon(
+                    imageVector = Icons.Filled.Search,
+                    contentDescription = null,
+                )
+            },
+            trailingIcon = if (searchQuery.isNotEmpty()) {
+                {
+                    androidx.compose.material3.IconButton(onClick = { onSearchChange("") }) {
+                        Icon(
+                            imageVector = Icons.Filled.Close,
+                            contentDescription = "Clear search",
+                        )
+                    }
+                }
+            } else null,
+            singleLine = true,
+        )
+
+        if (loading) {
+            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+            return@Column
+        }
+
+        // Filter + sort. Matching is substring (case-insensitive) on
+        // both slug and title so a user searching "rbac" finds
+        // rbac-authentication etc., but they can also search
+        // human-readable words since many titles carry natural text.
+        val query = searchQuery.trim().lowercase()
+        val filtered = topics
+            .asSequence()
+            .filter {
+                query.isEmpty() ||
+                    it.slug.lowercase().contains(query) ||
+                    it.title.lowercase().contains(query)
+            }
+            .sortedWith(
+                compareByDescending<net.omarss.omono.feature.quiz.Topic> { it.slug in selected }
+                    .thenByDescending { it.questionCount }
+                    .thenBy { it.title },
+            )
+            .take(MAX_TOPIC_CHIPS_SHOWN)
+            .toList()
+
+        if (filtered.isEmpty()) {
+            Text(
+                text = if (topics.isEmpty()) {
+                    "No topics available for this subject."
+                } else {
+                    "No topics match \"$searchQuery\"."
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            return@Column
+        }
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            filtered.forEach { topic ->
+                FilterChip(
+                    selected = topic.slug in selected,
+                    onClick = { onToggle(topic.slug) },
+                    label = {
+                        Text(
+                            text = if (topic.questionCount > 0) {
+                                "${topic.title} · ${topic.questionCount}"
+                            } else {
+                                topic.title
+                            },
+                        )
+                    },
+                    colors = FilterChipDefaults.filterChipColors(),
+                )
+            }
+        }
+
+        // Hint when the user's query narrowed but more exist. The
+        // chip row already caps at MAX_TOPIC_CHIPS_SHOWN so a
+        // runaway subject with ~200 topics doesn't explode the row.
+        if (topics.size > filtered.size && query.isNotEmpty().not()) {
+            Text(
+                text = "Showing the top ${filtered.size} — refine with search to see more.",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }
 }
+
+// Max chips rendered in a single row. 40 is thumb-scrollable
+// without feeling endless; anything past that should be reached
+// via the search box.
+private const val MAX_TOPIC_CHIPS_SHOWN: Int = 40
 
 // ------------------------------------------------------------------
 // Playing
@@ -417,25 +547,31 @@ private fun PlayingView(
             }
         }
 
-        revealed?.explanation?.takeIf { it.isNotBlank() }?.let { explanation ->
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-                ),
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = "Explanation",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        text = explanation,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
+        // Explanation only appears after the user has picked. The
+        // reveal (with explanation) is prefetched at quiz start for
+        // latency — rendering it unconditionally would spoil the
+        // answer before the user has a chance to think.
+        if (picked != null) {
+            revealed?.explanation?.takeIf { it.isNotBlank() }?.let { explanation ->
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    ),
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            text = "Explanation",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            text = explanation,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                    }
                 }
             }
         }
