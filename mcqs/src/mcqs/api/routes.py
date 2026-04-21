@@ -92,16 +92,34 @@ async def topics(
     )
 
 
-def _row_to_question(r: dict, *, hide_answer: bool = False) -> Question:
+def _row_to_question(
+    r: dict,
+    *,
+    hide_answer: bool = False,
+    option_count: int | None = None,
+) -> Question:
     # Shuffle on every retrieval and re-letter A..H — the DB letter is
     # the LLM's emission order, which has positional bias we don't want
     # to leak to consumers. Every request sees a fresh permutation, so
     # two calls for the same question return different orderings.
+    #
+    # `option_count` (used by /quiz) trims the 8-option store down to a
+    # smaller set: always the correct option + (option_count - 1)
+    # random distractors, then shuffled together so the correct slot is
+    # not positionally predictable.
     stored = list(r["options"])
+    if option_count is not None and option_count < len(stored):
+        correct = [o for o in stored if o.get("is_correct")]
+        distractors = [o for o in stored if not o.get("is_correct")]
+        take = max(0, option_count - len(correct))
+        sampled = random.sample(distractors, min(take, len(distractors)))
+        stored = correct + sampled
     random.shuffle(stored)
+
+    letters = _OUTPUT_LETTERS[: len(stored)]
     opts = [
         Option(
-            letter=_OUTPUT_LETTERS[i],
+            letter=letters[i],
             text=o["text"],
             is_correct=None if hide_answer else bool(o["is_correct"]),
         )
@@ -213,6 +231,18 @@ async def quiz(
     ] = None,
     type: Annotated[str | None, Query(max_length=32)] = None,  # noqa: A002
     count: Annotated[int, Query(ge=1, le=50)] = 10,
+    options: Annotated[
+        int,
+        Query(
+            ge=2,
+            le=8,
+            description=(
+                "How many options per question to return (quiz mode). "
+                "Correct answer is always included, the rest are random "
+                "distractors. Default 4."
+            ),
+        ),
+    ] = 4,
 ) -> QuizResponse:
     if type is not None and type not in VALID_TYPES:
         raise HTTPException(
@@ -234,5 +264,8 @@ async def quiz(
     return QuizResponse(
         subject=subject_echo,
         type=type,  # type: ignore[arg-type]
-        questions=[_row_to_question(r, hide_answer=True) for r in rows],
+        questions=[
+            _row_to_question(r, hide_answer=True, option_count=options)
+            for r in rows
+        ],
     )
