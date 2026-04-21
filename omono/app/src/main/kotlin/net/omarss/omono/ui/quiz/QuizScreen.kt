@@ -175,9 +175,9 @@ private fun SetupView(
                 )
                 Text(
                     text = if (state.selectedTopics.isEmpty()) {
-                        "Optional — any question in the chosen subjects."
+                        "Optional — tap one or more to combine (OR)."
                     } else {
-                        "${state.selectedTopics.size} selected"
+                        "${state.selectedTopics.size} selected · any match"
                     },
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -390,12 +390,14 @@ private fun PlayingView(
             fallback = question.options,
             seed = question.id.toLong(),
         )
+        val hasPicked = picked != null
         optionsToRender.forEach { option ->
             OptionCard(
                 option = option,
                 picked = picked == option.letter,
+                hasPicked = hasPicked,
                 correctLetter = state.currentRevealedCorrectLetter,
-                enabled = picked == null,
+                enabled = !hasPicked,
                 onPick = { onPick(option.letter) },
             )
         }
@@ -480,33 +482,36 @@ private fun MetaPill(text: String) {
     )
 }
 
-// Option card: tinted green/red when revealed, neutral surface
-// before. Leading A–H badge so the letter is always visible; trailing
-// check/close appears once correctness is known.
+// Option card: neutral surface before the user picks, tinted
+// green/red after. Correct/incorrect tinting is gated on the
+// user actually committing to an answer — answers are prefetched
+// at quiz start for latency reasons, but the card must stay opaque
+// to which one is correct until the user has chosen.
 @Composable
 private fun OptionCard(
     option: QuizOption,
     picked: Boolean,
+    hasPicked: Boolean,
     correctLetter: String?,
     enabled: Boolean,
     onPick: () -> Unit,
 ) {
-    val revealed = option.isCorrect != null
     val isCorrectOption = option.isCorrect == true
     val isPickedAndCorrect = picked && isCorrectOption
-    val isPickedAndWrong = picked && revealed && !isCorrectOption
+    val isPickedAndWrong = picked && !isCorrectOption
 
     val containerColor = when {
+        !hasPicked -> MaterialTheme.colorScheme.surfaceContainerHighest
         isPickedAndCorrect -> Color(0xFFDCFCE7) // emerald 100
         isPickedAndWrong -> Color(0xFFFEE2E2) // red 100
-        revealed && option.letter == correctLetter -> Color(0xFFDCFCE7) // reveal correct even if user was wrong
-        picked -> MaterialTheme.colorScheme.secondaryContainer
+        option.letter == correctLetter -> Color(0xFFDCFCE7) // reveal correct when user picked wrong
         else -> MaterialTheme.colorScheme.surfaceContainerHighest
     }
     val borderColor = when {
+        !hasPicked -> Color.Transparent
         isPickedAndCorrect -> Color(0xFF10B981) // emerald 500
         isPickedAndWrong -> Color(0xFFDC2626) // red 600
-        revealed && option.letter == correctLetter -> Color(0xFF10B981)
+        option.letter == correctLetter -> Color(0xFF10B981)
         else -> Color.Transparent
     }
 
@@ -549,23 +554,25 @@ private fun OptionCard(
                 color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.weight(1f),
             )
-            when {
-                isPickedAndCorrect -> Icon(
-                    imageVector = Icons.Filled.Check,
-                    contentDescription = "Correct",
-                    tint = Color(0xFF10B981),
-                )
-                isPickedAndWrong -> Icon(
-                    imageVector = Icons.Filled.Close,
-                    contentDescription = "Incorrect",
-                    tint = Color(0xFFDC2626),
-                )
-                revealed && option.letter == correctLetter -> Icon(
-                    imageVector = Icons.Filled.Check,
-                    contentDescription = "Correct answer",
-                    tint = Color(0xFF10B981),
-                )
-                else -> Unit
+            if (hasPicked) {
+                when {
+                    isPickedAndCorrect -> Icon(
+                        imageVector = Icons.Filled.Check,
+                        contentDescription = "Correct",
+                        tint = Color(0xFF10B981),
+                    )
+                    isPickedAndWrong -> Icon(
+                        imageVector = Icons.Filled.Close,
+                        contentDescription = "Incorrect",
+                        tint = Color(0xFFDC2626),
+                    )
+                    option.letter == correctLetter -> Icon(
+                        imageVector = Icons.Filled.Check,
+                        contentDescription = "Correct answer",
+                        tint = Color(0xFF10B981),
+                    )
+                    else -> Unit
+                }
             }
         }
     }

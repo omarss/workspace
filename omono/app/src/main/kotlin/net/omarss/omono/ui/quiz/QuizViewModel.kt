@@ -60,14 +60,14 @@ class QuizViewModel @Inject constructor(
         _uiState.update { state ->
             val current = state.selectedSubjects
             val next = if (slug in current) current - slug else current + slug
-            state.copy(
-                selectedSubjects = next,
-                // Topics depend on the chosen subject set — when it
-                // changes, reset the topic selection and re-fetch
-                // the topic list for the new subjects.
-                selectedTopics = emptySet(),
-                topics = emptyList(),
-            )
+            // Keep the user's topic picks across subject changes —
+            // the backend's `topic=` filter works cross-subject, so
+            // a chosen topic stays meaningful even when the subject
+            // set shifts underneath it. The topics chip list
+            // refreshes via refreshTopics(), but selected slugs are
+            // preserved (slugs the new subjects don't tag just
+            // disappear from the row but still apply to the query).
+            state.copy(selectedSubjects = next)
         }
         refreshTopics()
     }
