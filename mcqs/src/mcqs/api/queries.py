@@ -166,26 +166,46 @@ def get_question(conn: Connection, qid: int) -> dict[str, Any] | None:
 def random_quiz(
     conn: Connection,
     *,
-    subject: str,
+    subjects: list[str] | None,
+    topics: list[str] | None,
     qtype: str | None,
     count: int,
 ) -> list[dict[str, Any]]:
-    params: list[Any] = [subject]
-    where = ["q.subject_slug = %s"]
+    """Random sample.
+
+    * `subjects=None` → no subject filter (bank-wide). A non-empty list
+      restricts to those subject slugs.
+    * `topics=None` → no topic filter. A non-empty list matches
+      questions tagged with ANY of the slugs (a single question can
+      span topics, so ANY is the right default).
+    """
+    params: list[Any] = []
+    where: list[str] = []
+
+    if subjects:
+        where.append("q.subject_slug = ANY(%s::text[])")
+        params.append(subjects)
+
+    if topics:
+        where.append(
+            "EXISTS (SELECT 1 FROM question_topics qt JOIN topics t ON t.id = qt.topic_id "
+            "WHERE qt.question_id = q.id AND t.slug = ANY(%s::text[]))"
+        )
+        params.append(topics)
+
     if qtype is not None:
         where.append("q.question_type = %s::question_type")
         params.append(qtype)
 
-    # TABLESAMPLE would be cheaper, but it skews tiny tables.
-    # ORDER BY random() is fine up to 50k rows which we won't exceed
-    # per (subject, type) for the foreseeable future.
-    sql = (
-        _QUESTION_BASE
-        + " WHERE "
-        + " AND ".join(where)
-        + " ORDER BY random() LIMIT %s"
-    )
+    sql = _QUESTION_BASE
+    if where:
+        sql += " WHERE " + " AND ".join(where)
+    # ORDER BY random() is fine up to ~50k rows per filter — we're
+    # nowhere near that. TABLESAMPLE was considered but skews tiny
+    # subjects badly.
+    sql += " ORDER BY random() LIMIT %s"
     params.append(count)
+
     with conn.cursor(row_factory=dict_row) as cur:
         cur.execute(sql, params)
         return list(cur.fetchall())

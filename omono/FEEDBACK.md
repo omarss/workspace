@@ -700,3 +700,271 @@ an added flag:
 
 Client uses `snapped` to skip trusting the speed limit (display "~90
 km/h" instead of "90 km/h") while still surfacing the road name.
+
+---
+
+## 10. `mcqs` — sibling service at `/v1/mcq` (2026-04-21)
+
+A second API has gone live on the **same host (`api.omarss.net`)** behind
+the **same auth pattern** but a **different shared secret** and a
+different k3s Deployment.
+
+**TL;DR for omono**
+
+- New base path: `/v1/mcq/…`
+- New header value: `X-Api-Key: <MCQS_API_KEY>` (different from
+  `GPLACES_API_KEY` — do NOT reuse it)
+- Read-only surface. Nothing here affects the places / roads / search
+  flows you already have.
+
+Wire it up only if you want to add an in-app quiz / study feature. The
+places app is untouched.
+
+### 10.1 Base URL
+
+| Env | URL | Notes |
+|---|---|---|
+| Local | `http://127.0.0.1:8000/v1/mcq/…` | `mcqs serve` |
+| LAN | `http://192.168.100.10:8000/v1/mcq/…` | same host as gplaces |
+| Production | `https://api.omarss.net/v1/mcq/…` | k3s `api-mcqs`, NodePort 30802 |
+
+Android emulator quirk (`10.0.2.2` alias) is identical to gplaces.
+
+Put the key in `omono/local.properties` as `mcqs.api.key` (new
+property, alongside `gplaces.api.key`). Base URL can reuse
+`api.base.url` if you add a path switch in the client, or add
+`mcqs.api.url`.
+
+### 10.2 API key (shared secret)
+
+```
+MCQS_API_KEY=9a097defbf229225b593ab5dc8a1f79176461dbb4ae97b9a39a6dad479ef8a0c
+```
+
+Independent of `GPLACES_API_KEY`. Same `X-Api-Key` header, same
+`hmac.compare_digest` check on the server. Missing/wrong → `401
+{"error":"unauthorized"}`.
+
+### 10.3 Data model
+
+Three question types:
+
+| `type` | Tests |
+|---|---|
+| `knowledge` | Literal recall from docs (defaults, flags, versions) |
+| `analytical` | Why / trade-offs / how components interact |
+| `problem_solving` | Scenario → best documented action |
+
+Every question has:
+
+- **Exactly 8 options**, lettered A–H, **one correct**
+- **Option order is randomised on every call.** Two successive requests
+  for the same question id return different letter→text mappings
+- `difficulty` 1–5
+- 1–3 `topics` (free-form lowercase slugs; can span multiple topics
+  per question)
+- A `round` number — later rounds add more questions; the bank only
+  grows
+
+The generator runs continuously (`scripts/run-forever.sh` on the host),
+so `/health` counts climb over time.
+
+### 10.4 Endpoints
+
+All require `X-Api-Key: $MCQS_API_KEY` except `/health`.
+
+#### `GET /v1/mcq/health` — public
+
+```json
+{"status":"ok","subjects":43,"questions":1720}
+```
+
+Use this as a reachability / warmth probe. `subjects` = 43 always (the
+number of top-level docs-bundle directories); `questions` grows.
+
+#### `GET /v1/mcq/subjects` — list of subjects
+
+```json
+{
+  "subjects": [
+    {
+      "slug": "apple-pay",
+      "title": "Apple Pay",
+      "description": null,
+      "total_questions": 330,
+      "counts_by_type": {
+        "knowledge": 110,
+        "analytical": 110,
+        "problem_solving": 110
+      },
+      "rounds_covered": 2
+    },
+    { ... }
+  ]
+}
+```
+
+Use `slug` values as the `subject=` filter on other endpoints. `title`
+is display-friendly ("Apple Pay", "Spring Boot 4").
+
+#### `GET /v1/mcq/topics?subject=<slug>` — topics within a subject
+
+```json
+{
+  "subject": "pnpm",
+  "topics": [
+    {"slug":"workspace", "title":"workspace", "question_count":42},
+    {"slug":"dependency-resolution", "title":"dependency-resolution", "question_count":37}
+  ]
+}
+```
+
+Topic slugs feed into the `topic=` filter on `/quiz` and `/questions`.
+
+#### `GET /v1/mcq/quiz` — **primary consumer endpoint**
+
+Random sample for a quiz screen. **Answers are hidden** in this
+response: `is_correct` is `null` on every option and `explanation` is
+`null` on every question. Fetch `/questions/{id}` once the user has
+chosen, to show the correct option + explanation.
+
+Query params:
+
+| Param | Meaning |
+|---|---|
+| `subject` | Omit, `all`, or comma-separated slugs. `pnpm` = one subject, `pnpm,argocd` = either, missing = **bank-wide** |
+| `topic` | Omit, or comma-separated slugs. Matches questions tagged with ANY of them. Works cross-subject |
+| `type` | `knowledge` / `analytical` / `problem_solving` (optional; any if omitted) |
+| `count` | 1–50, default 10 |
+
+Examples:
+
+```bash
+# bank-wide random, 10 questions, any type
+curl -s -H "X-Api-Key: $KEY" 'https://api.omarss.net/v1/mcq/quiz?count=10'
+
+# two subjects, problem-solving only
+curl -s -H "X-Api-Key: $KEY" 'https://api.omarss.net/v1/mcq/quiz?subject=argocd,kubernetes&type=problem_solving&count=5'
+
+# by topic, any subject that tags it
+curl -s -H "X-Api-Key: $KEY" 'https://api.omarss.net/v1/mcq/quiz?topic=rbac,authentication&count=5'
+```
+
+Response:
+
+```json
+{
+  "subject": "argocd,kubernetes",
+  "type": "problem_solving",
+  "questions": [
+    {
+      "id": 1661,
+      "subject": "argocd",
+      "type": "problem_solving",
+      "round": 2,
+      "difficulty": 3,
+      "stem": "A team notices …",
+      "options": [
+        {"letter":"A","text":"…","is_correct": null},
+        {"letter":"B","text":"…","is_correct": null},
+        {"letter":"C","text":"…","is_correct": null},
+        {"letter":"D","text":"…","is_correct": null},
+        {"letter":"E","text":"…","is_correct": null},
+        {"letter":"F","text":"…","is_correct": null},
+        {"letter":"G","text":"…","is_correct": null},
+        {"letter":"H","text":"…","is_correct": null}
+      ],
+      "explanation": null,
+      "topics": ["rollouts","sync-strategy"],
+      "created_at": "2026-04-21T02:11:07.413Z"
+    }
+  ]
+}
+```
+
+Note: top-level `"subject"` echoes the filter you sent (or `null` if
+you sent none / `all`). `questions[i].subject` is the actual
+per-question subject.
+
+#### `GET /v1/mcq/questions/{id}` — reveal the answer
+
+Call this after the user picks their option. Response is the same
+shape as `/quiz` questions **but with `is_correct` populated on every
+option and `explanation` populated**. Option order is still
+randomised on each call — the `id` plus `text` is the stable
+identifier, not the `letter`.
+
+```json
+{
+  "id": 1661,
+  "subject": "argocd",
+  "type": "problem_solving",
+  "round": 2,
+  "difficulty": 3,
+  "stem": "…",
+  "options": [
+    {"letter":"A","text":"…","is_correct": false},
+    {"letter":"B","text":"…","is_correct": true},
+    …
+  ],
+  "explanation": "The documented fix is …",
+  "topics": ["rollouts","sync-strategy"],
+  "created_at": "2026-04-21T02:11:07.413Z"
+}
+```
+
+404 if the id doesn't exist.
+
+#### `GET /v1/mcq/questions` — paginated listing (admin / catalogue)
+
+Filterable bulk listing. Random order by default — each call returns a
+different page. Useful for browsing, not for stable addressing.
+
+Query params (all optional):
+
+| Param | Notes |
+|---|---|
+| `subject` | single slug |
+| `type` | enum |
+| `topic` | single slug |
+| `difficulty` | 1–5 |
+| `round` | round number |
+| `limit` | ≤100, default 25 |
+| `offset` | 0–10000 |
+
+Response carries `pagination.has_more` — a `limit+1` fetch determines
+it without a second COUNT query. All-option `is_correct` IS present
+here (unlike `/quiz`).
+
+### 10.5 Client behaviour hints
+
+- **Don't cache** questions keyed by id-only; cache should include the
+  randomised option letters as part of the record, not as a lookup key
+- **Don't re-letter** the options client-side — the server did that
+- **Retry 5xx** with exponential backoff (bank is live + under
+  continuous write load from the generator; transient errors are rare
+  but possible)
+- **401 is a key mismatch**, not a rate limit — no rate limiting
+  implemented yet
+
+### 10.6 Out of scope (not implemented)
+
+- User scoring / history endpoints — all state is client-side
+- Admin endpoints for question rewriting — questions are produced
+  offline, rewrites would require regeneration
+- Push notifications when new questions arrive — you'd poll
+  `/health.questions` if needed
+
+---
+
+## Lockstep notes
+
+- `api.omarss.net` is now **shared** between `api-places` (30801) and
+  `api-mcqs` (30802). Nginx vhost is one file —
+  `homelab/nginx/api.omarss.net.conf` — so redeploying it from either
+  service's `make deploy-nginx` reloads the other too. That's fine;
+  just be aware.
+- Certbot's injected 443 listener is clobbered on every `apply-nginx`
+  or `deploy-nginx` — re-run `sudo certbot --nginx -d api.omarss.net`
+  afterward. (No Let's Encrypt API call; certbot reuses the cached
+  cert.)

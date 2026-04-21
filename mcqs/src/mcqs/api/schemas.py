@@ -71,8 +71,14 @@ class QuestionsResponse(BaseModel):
 
 
 class QuizResponse(BaseModel):
-    subject: str
-    type: QuestionType | None
+    subject: str | None = Field(
+        default=None,
+        description=(
+            "Echo of the subjects filter. Null means the sample was "
+            "bank-wide; a single slug or comma-joined list otherwise."
+        ),
+    )
+    type: QuestionType | None = None
     questions: list[Question]
 
 

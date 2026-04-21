@@ -166,10 +166,51 @@ async def get_question(_: AuthDep, qid: int) -> Question:
     return _row_to_question(row)
 
 
+def _parse_csv(raw: str | None) -> list[str] | None:
+    """Comma-separated slug list → lowercased list (or None).
+
+    Accepts `None`, `""`, or `"all"` as "no filter". Anything else is
+    split on commas, trimmed, lowercased, and deduped while preserving
+    order so the SQL `ANY(...)` array stays small and predictable.
+    """
+    if raw is None:
+        return None
+    raw = raw.strip()
+    if not raw or raw.lower() == "all":
+        return None
+    seen: set[str] = set()
+    out: list[str] = []
+    for part in raw.split(","):
+        s = part.strip().lower()
+        if s and s not in seen:
+            seen.add(s)
+            out.append(s)
+    return out or None
+
+
 @router.get("/quiz", response_model=QuizResponse)
 async def quiz(
     _: AuthDep,
-    subject: Annotated[str, Query(min_length=1, max_length=80)],
+    subject: Annotated[
+        str | None,
+        Query(
+            max_length=800,
+            description=(
+                "Omit or pass 'all' for a bank-wide random sample. "
+                "Comma-separated slugs filter to those subjects."
+            ),
+        ),
+    ] = None,
+    topic: Annotated[
+        str | None,
+        Query(
+            max_length=800,
+            description=(
+                "Optional comma-separated topic slugs. A question matches "
+                "if it is tagged with ANY of them."
+            ),
+        ),
+    ] = None,
     type: Annotated[str | None, Query(max_length=32)] = None,  # noqa: A002
     count: Annotated[int, Query(ge=1, le=50)] = 10,
 ) -> QuizResponse:
@@ -178,10 +219,20 @@ async def quiz(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"type must be one of: {sorted(VALID_TYPES)}",
         )
+    subjects = _parse_csv(subject)
+    topics = _parse_csv(topic)
+
     with connection() as conn:
-        rows = queries.random_quiz(conn, subject=subject, qtype=type, count=count)
+        rows = queries.random_quiz(
+            conn, subjects=subjects, topics=topics, qtype=type, count=count
+        )
+
+    # Echo back whichever filter the client sent, normalised. `None`
+    # means "bank-wide / any topic"; a joined list reflects the actual
+    # subjects/topics that were in scope.
+    subject_echo = ",".join(subjects) if subjects else None
     return QuizResponse(
-        subject=subject,
+        subject=subject_echo,
         type=type,  # type: ignore[arg-type]
         questions=[_row_to_question(r, hide_answer=True) for r in rows],
     )
