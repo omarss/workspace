@@ -13,6 +13,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Payments
+import androidx.compose.material.icons.filled.Quiz
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material3.Icon
@@ -41,6 +42,7 @@ import net.omarss.omono.ui.OmonoMainRoute
 import net.omarss.omono.ui.compass.CompassRoute
 import net.omarss.omono.ui.finance.FinanceDashboardRoute
 import net.omarss.omono.ui.places.PlacesRoute
+import net.omarss.omono.ui.quiz.QuizRoute
 import net.omarss.omono.ui.settings.SettingsRoute
 
 @AndroidEntryPoint
@@ -81,6 +83,9 @@ class MainActivity : ComponentActivity() {
                         composable(Destination.Compass.route) {
                             CompassRoute(contentPadding = PaddingValues(0.dp))
                         }
+                        composable(Destination.Quiz.route) {
+                            QuizRoute(contentPadding = PaddingValues(0.dp))
+                        }
                         composable(Destination.Settings.route) {
                             SettingsRoute(contentPadding = PaddingValues(0.dp))
                         }
@@ -102,6 +107,7 @@ private enum class Destination(
     Finance(route = "finance", label = "Finance", icon = Icons.Filled.Payments),
     Places(route = "places", label = "Places", icon = Icons.Filled.LocationOn),
     Compass(route = "compass", label = "Compass", icon = Icons.Filled.Explore),
+    Quiz(route = "quiz", label = "Quiz", icon = Icons.Filled.Quiz),
     Settings(route = "settings", label = "Settings", icon = Icons.Filled.Settings),
 }
 

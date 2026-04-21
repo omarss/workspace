@@ -98,6 +98,7 @@ dependencies {
     implementation(projects.feature.speed)
     implementation(projects.feature.spending)
     implementation(projects.feature.places)
+    implementation(projects.feature.quiz)
     implementation(projects.feature.selfupdate)
 
     implementation(libs.androidx.core.ktx)
