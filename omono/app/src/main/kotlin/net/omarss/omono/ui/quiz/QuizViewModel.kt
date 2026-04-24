@@ -86,22 +86,37 @@ class QuizViewModel @Inject constructor(
         val subjects = _uiState.value.selectedSubjects
         if (subjects.isEmpty()) return
         viewModelScope.launch {
-            _uiState.update { it.copy(loadingTopics = true) }
+            _uiState.update { it.copy(loadingTopics = true, topicsError = null) }
             // Topics endpoint is single-subject only, so when the
             // user picks multiple subjects we fan-out in sequence
             // and merge. Each topic slug shows once even if two
             // subjects tag it — the backend matches cross-subject
             // on the `topic=` filter anyway.
             val merged = LinkedHashMap<String, Topic>()
+            var anySucceeded = false
             for (subject in subjects) {
                 val fetched = runCatching { repository.topics(subject) }
                     .onFailure { Timber.w(it, "quiz topics load failed for %s", subject) }
                     .getOrNull()
-                    .orEmpty()
-                for (topic in fetched) merged.putIfAbsent(topic.slug, topic)
+                if (fetched != null) {
+                    anySucceeded = true
+                    for (topic in fetched) merged.putIfAbsent(topic.slug, topic)
+                }
+            }
+            // Distinguish "really empty" from "every fetch failed" so
+            // the UI can show a retryable error instead of an
+            // identical "no topics" message when the network is down.
+            val topicsError = if (!anySucceeded) {
+                "Couldn't load topics. Check your connection and retry."
+            } else {
+                null
             }
             _uiState.update {
-                it.copy(loadingTopics = false, topics = merged.values.toList())
+                it.copy(
+                    loadingTopics = false,
+                    topics = merged.values.toList(),
+                    topicsError = topicsError,
+                )
             }
         }
     }
@@ -275,6 +290,7 @@ data class QuizUiState(
     val selectedSubjects: Set<String> = emptySet(),
     val selectedTopics: Set<String> = emptySet(),
     val topicSearch: String = "",
+    val topicsError: String? = null,
     val questionType: QuestionType = QuestionType.Any,
     val questionCount: Int = 10,
     val questions: List<Question> = emptyList(),

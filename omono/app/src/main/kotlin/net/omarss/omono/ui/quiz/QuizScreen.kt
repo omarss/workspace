@@ -178,6 +178,7 @@ private fun SetupView(
                 selected = state.selectedTopics,
                 searchQuery = state.topicSearch,
                 loading = state.loadingTopics,
+                errorMessage = state.topicsError,
                 onSearchChange = onTopicSearchChange,
                 onToggle = onToggleTopic,
                 onClear = onClearTopics,
@@ -306,6 +307,7 @@ private fun TopicsPicker(
     selected: Set<String>,
     searchQuery: String,
     loading: Boolean,
+    errorMessage: String?,
     onSearchChange: (String) -> Unit,
     onToggle: (String) -> Unit,
     onClear: () -> Unit,
@@ -385,6 +387,17 @@ private fun TopicsPicker(
 
         if (loading) {
             LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+            return@Column
+        }
+
+        // Network / server error — surface it so the user can tell
+        // "couldn't fetch" apart from "this subject just has no topics".
+        if (errorMessage != null) {
+            Text(
+                text = errorMessage,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
             return@Column
         }
 
