@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import rikka.shizuku.Shizuku
 import timber.log.Timber
 import javax.inject.Inject
@@ -137,15 +138,36 @@ class InternetGovernor @Inject constructor(
         return true
     }
 
+    // Binder calls to the Shizuku user-service are blocking IPC — if
+    // the user-service has hung or the Shizuku manager crashed, a naked
+    // call can sit forever. Wrap every caller-visible call in a
+    // bounded timeout so the app returns to `false` (ungoverned)
+    // rather than stalling whichever coroutine asked.
+    //
+    // `withTimeoutOrNull` only cancels at suspension points; the blocking
+    // binder call itself won't be interrupted. We accept that — the
+    // coroutine continues on its own, the caller sees `false` and
+    // recovers, and the worst case is a single orphaned binder call
+    // rather than an indefinite user-visible hang.
     suspend fun disableInternet(): Boolean = withContext(Dispatchers.IO) {
-        runSvc("wifi", "disable") && runSvc("data", "disable")
+        withTimeoutOrNull(SVC_CALL_TIMEOUT_MS) {
+            runSvc("wifi", "disable") && runSvc("data", "disable")
+        } ?: run {
+            Timber.w("disableInternet timed out after %d ms", SVC_CALL_TIMEOUT_MS)
+            false
+        }
     }
 
     suspend fun enableInternet(): Boolean = withContext(Dispatchers.IO) {
         // Re-enable in reverse order — mobile data first so the user
         // is connected sooner on the fallback path while Wi-Fi
         // reassociates.
-        runSvc("data", "enable") && runSvc("wifi", "enable")
+        withTimeoutOrNull(SVC_CALL_TIMEOUT_MS) {
+            runSvc("data", "enable") && runSvc("wifi", "enable")
+        } ?: run {
+            Timber.w("enableInternet timed out after %d ms", SVC_CALL_TIMEOUT_MS)
+            false
+        }
     }
 
     private fun runSvc(subsystem: String, action: String): Boolean {
@@ -195,5 +217,11 @@ class InternetGovernor @Inject constructor(
         // user-service process with the new class definitions instead
         // of reusing the old one.
         const val USER_SERVICE_VERSION = 1
+
+        // Upper bound for a `svc` toggle pair. `svc wifi|data …` is
+        // typically sub-second on a healthy Shizuku; 5 s is loose
+        // enough not to trigger on a slow handset and tight enough
+        // that a hung user-service can't stall a drive for long.
+        const val SVC_CALL_TIMEOUT_MS: Long = 5_000L
     }
 }
