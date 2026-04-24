@@ -1,6 +1,6 @@
 [project]
 name = "mcqs"
-version = "0.1.0"
+version = "0.1.1"
 description = "Ingest vrtx-ai/docs-bundle, generate MCQ question banks with Claude, serve over FastAPI."
 requires-python = ">=3.12"
 dependencies = [
