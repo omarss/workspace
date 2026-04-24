@@ -6,8 +6,9 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
 import timber.log.Timber
@@ -90,6 +91,11 @@ class SpeedFeature @Inject constructor(
     // limit) reliably do.
     private var consecutiveOverSamples: Int = 0
 
+    // Latest value of settings.alertOnOverLimit, kept fresh by a tiny
+    // collector attached in start(). Avoids a DataStore round-trip on
+    // every GPS sample inside the rising-edge hot path.
+    @Volatile private var alertOnOverLimitEnabled: Boolean = true
+
     override fun start(scope: CoroutineScope): Flow<FeatureState> {
         // Each new GPS sample triggers a (cached, distance-throttled)
         // speed-limit lookup and feeds the trip recorder so trip history
@@ -131,6 +137,12 @@ class SpeedFeature @Inject constructor(
         // Wi-Fi + mobile data at the drive boundaries.
         driveInternetGate.attach(scope)
 
+        // Keep the alert toggle's current value cached so maybeAlert
+        // can read it without suspending on DataStore once per GPS tick.
+        settings.alertOnOverLimit
+            .onEach { alertOnOverLimitEnabled = it }
+            .launchIn(scope)
+
         return combine(locationsWithLimit, settings.unit) { (mps, limit), unit ->
             maybeAlert(mps, limit)
             formatSpeedState(mps, unit, limit)
@@ -168,7 +180,7 @@ class SpeedFeature @Inject constructor(
     // rising-edge check still applies so a sustained over-limit run
     // plays exactly one alert at the moment the threshold was crossed
     // for real.
-    private suspend fun maybeAlert(mps: Float, limitKmh: Float?) {
+    private fun maybeAlert(mps: Float, limitKmh: Float?) {
         val speedKmh = SpeedUnit.KmH.fromMetersPerSecond(mps)
         val isOverNow = limitKmh != null && speedKmh > limitKmh
         consecutiveOverSamples = if (isOverNow) consecutiveOverSamples + 1 else 0
@@ -178,7 +190,7 @@ class SpeedFeature @Inject constructor(
         // Fire on the rising edge, but only if the debounced state
         // agrees the user is *really* over — otherwise a 1-sample
         // spike's rising edge alone would trigger the tone.
-        if (rising && debouncedOverLimit && settings.alertOnOverLimit.first()) {
+        if (rising && debouncedOverLimit && alertOnOverLimitEnabled) {
             alertPlayer.alert()
         }
     }
