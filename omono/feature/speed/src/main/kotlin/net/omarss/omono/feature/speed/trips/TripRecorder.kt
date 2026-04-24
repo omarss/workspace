@@ -29,29 +29,43 @@ class TripRecorder @Inject constructor(
     // single failed insert doesn't cancel the recorder.
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
+    // Both onLocation and finalizeCurrent mutate `current`. They're
+    // invoked from different threads (onLocation runs on whatever
+    // dispatcher collects the location Flow; finalizeCurrent is called
+    // from SpeedFeature.stop() on the caller's thread). Without this
+    // lock a stop racing with an in-flight sample can double-finalize
+    // or drop the trip entirely.
+    private val lock = Any()
     private var current: TripBuilder? = null
 
     fun onLocation(snapshot: LocationSnapshot, nowMs: Long = System.currentTimeMillis()) {
-        val trip = current
-        if (trip == null) {
-            if (snapshot.speedMps >= MOVE_THRESHOLD_MPS) {
-                current = TripBuilder(startAtMs = nowMs).also { it.record(snapshot, nowMs) }
-                Timber.d("Trip started")
+        synchronized(lock) {
+            val trip = current
+            if (trip == null) {
+                if (snapshot.speedMps >= MOVE_THRESHOLD_MPS) {
+                    current = TripBuilder(startAtMs = nowMs).also { it.record(snapshot, nowMs) }
+                    Timber.d("Trip started")
+                }
+                return
             }
-            return
-        }
 
-        trip.record(snapshot, nowMs)
+            trip.record(snapshot, nowMs)
 
-        // Auto-finalize if stationary too long.
-        if (nowMs - trip.lastMoveAtMs > IDLE_FINALIZE_MS) {
-            finalizeCurrent("idle timeout")
+            // Auto-finalize if stationary too long.
+            if (nowMs - trip.lastMoveAtMs > IDLE_FINALIZE_MS) {
+                finalizeCurrentLocked("idle timeout")
+            }
         }
     }
 
     // Called by SpeedFeature.stop() so the trip is saved when the user
     // manually stops tracking, not just on idle timeout.
     fun finalizeCurrent(reason: String = "manual stop") {
+        synchronized(lock) { finalizeCurrentLocked(reason) }
+    }
+
+    // Must be called with `lock` held.
+    private fun finalizeCurrentLocked(reason: String) {
         val trip = current ?: return
         current = null
         if (trip.distanceMeters < MIN_DISTANCE_M) {
