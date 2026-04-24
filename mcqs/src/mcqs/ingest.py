@@ -99,30 +99,48 @@ def _ingest_file(
 
     with conn.cursor() as cur:
         cur.execute(
-            "SELECT id, content_hash FROM source_docs WHERE subject_slug=%s AND rel_path=%s",
+            "SELECT id, content_hash, content_text IS NOT NULL "
+            "FROM source_docs WHERE subject_slug=%s AND rel_path=%s",
             (subject.slug, rel_path),
         )
         row = cur.fetchone()
 
-        if row and row[1] == content_hash:
+        # Fast path: hash is unchanged AND the content_text column is
+        # already populated → nothing to re-chunk, nothing to backfill.
+        # Rows left over from before migration 0003 have content_text
+        # NULL, so we fall through to the text-read path below just
+        # long enough to populate it.
+        if row and row[1] == content_hash and row[2]:
             stats.unchanged += 1
             return
 
         text = _decode(raw)
         mime = _guess_mime(abs_path)
 
+        # Backfill case: hash unchanged but content_text is NULL. Just
+        # populate the text column and skip re-chunking — the existing
+        # chunk rows still reflect this content_hash.
+        if row and row[1] == content_hash:
+            cur.execute(
+                "UPDATE source_docs SET content_text=%s WHERE id=%s",
+                (text, row[0]),
+            )
+            stats.unchanged += 1
+            return
+
         cur.execute(
             """
-            INSERT INTO source_docs (subject_slug, rel_path, content_hash, byte_size, mime, indexed_at)
-            VALUES (%s, %s, %s, %s, %s, now())
+            INSERT INTO source_docs (subject_slug, rel_path, content_hash, byte_size, mime, content_text, indexed_at)
+            VALUES (%s, %s, %s, %s, %s, %s, now())
             ON CONFLICT (subject_slug, rel_path) DO UPDATE SET
               content_hash = EXCLUDED.content_hash,
               byte_size    = EXCLUDED.byte_size,
               mime         = EXCLUDED.mime,
+              content_text = EXCLUDED.content_text,
               indexed_at   = now()
             RETURNING id
             """,
-            (subject.slug, rel_path, content_hash, size, mime),
+            (subject.slug, rel_path, content_hash, size, mime, text),
         )
         source_id = cur.fetchone()[0]
 
