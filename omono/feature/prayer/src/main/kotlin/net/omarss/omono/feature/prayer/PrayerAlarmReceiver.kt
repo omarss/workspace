@@ -50,8 +50,8 @@ class PrayerAlarmReceiver : BroadcastReceiver() {
                 if (snap.notifyEachPrayer) {
                     notifier.notify(context, kind, atEpochMs)
                 }
-                if (kind == PrayerKind.Fajr && snap.playAthanAtFajr) {
-                    athanPlayer.playRandom()
+                if (shouldPlayAthan(kind, snap)) {
+                    athanPlayer.play(snap.athanSelection)
                 }
 
                 // Refresh the schedule. Compute tomorrow's day if the

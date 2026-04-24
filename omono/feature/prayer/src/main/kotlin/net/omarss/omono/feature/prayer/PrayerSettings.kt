@@ -18,6 +18,7 @@ private val METHOD_KEY = stringPreferencesKey("prayer.method")
 private val MADHAB_KEY = stringPreferencesKey("prayer.madhab")
 private val NOTIFY_KEY = booleanPreferencesKey("prayer.notify_each")
 private val ATHAN_KEY = booleanPreferencesKey("prayer.athan_at_fajr")
+private val ATHAN_SELECTION_KEY = stringPreferencesKey("prayer.athan_selection")
 
 @Singleton
 class PrayerSettingsRepository @Inject constructor(
@@ -39,17 +40,23 @@ class PrayerSettingsRepository @Inject constructor(
         prefs[ATHAN_KEY] ?: true
     }
 
-    // Convenience combine for downstream code that needs all four in
-    // one snapshot — the repository uses this to avoid holding four
-    // independent coroutines.
+    // Random = rotate; Specific = pin one filename. Default Random.
+    val athanSelection: Flow<AthanSelection> = context.omonoDataStore.data.map { prefs ->
+        AthanSelection.fromStorage(prefs[ATHAN_SELECTION_KEY])
+    }
+
+    // Convenience combine for downstream code that needs all fields
+    // in one snapshot — the repository uses this to avoid holding
+    // independent coroutines per field.
     val snapshot: Flow<PrayerSettingsSnapshot> = combine(
-        method, madhab, notifyEachPrayer, playAthanAtFajr,
-    ) { m, mh, notify, athan ->
+        method, madhab, notifyEachPrayer, playAthanAtFajr, athanSelection,
+    ) { m, mh, notify, athan, selection ->
         PrayerSettingsSnapshot(
             method = m,
             madhab = mh,
             notifyEachPrayer = notify,
             playAthanAtFajr = athan,
+            athanSelection = selection,
         )
     }
 
@@ -67,5 +74,11 @@ class PrayerSettingsRepository @Inject constructor(
 
     suspend fun setPlayAthanAtFajr(enabled: Boolean) {
         context.omonoDataStore.edit { it[ATHAN_KEY] = enabled }
+    }
+
+    suspend fun setAthanSelection(selection: AthanSelection) {
+        context.omonoDataStore.edit {
+            it[ATHAN_SELECTION_KEY] = AthanSelection.toStorage(selection)
+        }
     }
 }

@@ -62,9 +62,45 @@ enum class PrayerMadhab(val display: String) {
     }
 }
 
+// How the Fajr athan is picked from whatever files the user has
+// dropped into the athans directory. `Random` is the default — it
+// rotates through whatever's present. `Specific(fileName)` pins a
+// single filename; if that file is missing on disk (e.g. the user
+// deleted it) the player falls back to Random.
+sealed interface AthanSelection {
+    data object Random : AthanSelection
+    data class Specific(val fileName: String) : AthanSelection
+
+    companion object {
+        fun fromStorage(raw: String?): AthanSelection = when {
+            raw.isNullOrBlank() || raw == RANDOM_TOKEN -> Random
+            raw.startsWith(SPECIFIC_PREFIX) -> Specific(raw.removePrefix(SPECIFIC_PREFIX))
+            else -> Random
+        }
+
+        fun toStorage(selection: AthanSelection): String = when (selection) {
+            Random -> RANDOM_TOKEN
+            is Specific -> SPECIFIC_PREFIX + selection.fileName
+        }
+
+        private const val RANDOM_TOKEN = "random"
+        private const val SPECIFIC_PREFIX = "file:"
+    }
+}
+
 data class PrayerSettingsSnapshot(
     val method: PrayerCalculationMethod = PrayerCalculationMethod.UmmAlQura,
     val madhab: PrayerMadhab = PrayerMadhab.Shafi,
     val notifyEachPrayer: Boolean = true,
     val playAthanAtFajr: Boolean = true,
+    val athanSelection: AthanSelection = AthanSelection.Random,
 )
+
+// Pure guard for whether the athan should play on a given alarm
+// firing. Extracted so the test suite can lock the Fajr-only rule
+// without instantiating the BroadcastReceiver. Rule:
+//   * Athan plays only at Fajr.
+//   * Athan plays only if the user hasn't disabled it.
+// Any drift from those two constraints is a regression.
+fun shouldPlayAthan(kind: PrayerKind, settings: PrayerSettingsSnapshot): Boolean =
+    kind == PrayerKind.Fajr && settings.playAthanAtFajr

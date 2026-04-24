@@ -5,6 +5,7 @@ import android.media.AudioAttributes
 import android.media.MediaPlayer
 import android.media.RingtoneManager
 import android.net.Uri
+import android.provider.OpenableColumns
 import dagger.hilt.android.qualifiers.ApplicationContext
 import timber.log.Timber
 import java.io.File
@@ -48,23 +49,98 @@ class AthanPlayer @Inject constructor(
             ?.toList().orEmpty()
     }
 
-    // Fire-and-forget athan playback. Returns true if playback
-    // started successfully (bundled file found OR default alarm sound
-    // available). `false` means the device has no athan and no
-    // default — extremely unlikely on a real Android.
-    fun playRandom(): Boolean {
+    // Fire-and-forget athan playback. `selection` decides *which*
+    // file from the pool plays:
+    //   * Random — one of the available files, uniformly at random.
+    //   * Specific(name) — the named file, falling back to Random
+    //     when the pinned file has been deleted since the setting
+    //     was written.
+    // When the pool is empty the device's default alarm sound fires
+    // so the user never silently misses a Fajr. Returns false only
+    // if the platform has no default alarm sound either (extremely
+    // unlikely on a real Android device).
+    fun play(selection: AthanSelection = AthanSelection.Random): Boolean {
         stop()
         val pool = availableAthans()
-        val player = if (pool.isNotEmpty()) {
-            val chosen = pool.random()
-            Timber.i("AthanPlayer: playing user file %s", chosen.name)
+        val chosen: File? = when {
+            pool.isEmpty() -> null
+            selection is AthanSelection.Specific ->
+                pool.firstOrNull { it.name == selection.fileName } ?: pool.random()
+            else -> pool.random()
+        }
+        val player = if (chosen != null) {
+            Timber.i("AthanPlayer: playing %s", chosen.name)
             startFromFile(chosen) ?: startFromDefault()
         } else {
-            Timber.i("AthanPlayer: no user files in %s, using default alarm sound", athansDirectory())
+            Timber.i("AthanPlayer: no user files in %s, using default alarm", athansDirectory())
             startFromDefault()
         }
         current = player
         return player != null
+    }
+
+    // Back-compat shim — `playRandom()` was the original name. Kept
+    // so the alarm receiver's existing call site doesn't churn.
+    @Deprecated(
+        "Use play(AthanSelection) directly; kept for call-site compatibility.",
+        ReplaceWith("play(AthanSelection.Random)"),
+    )
+    fun playRandom(): Boolean = play(AthanSelection.Random)
+
+    // Copies the content behind a SAF uri (ACTION_OPEN_DOCUMENT
+    // result) into the athans directory. The filename comes from
+    // the original document's display name when available, else a
+    // timestamp-based fallback. Returns the copied File on success.
+    //
+    // The copy is necessary because SAF uris can be revoked at any
+    // time (user removes permission, app process dies, etc.); by
+    // the time Fajr alarm fires the permission may be gone. Keeping
+    // a local copy under the app's own files dir sidesteps that.
+    fun importFromUri(uri: Uri): File? {
+        val name = queryDisplayName(uri)
+            ?: "athan-${System.currentTimeMillis()}.mp3"
+        val target = File(athansDirectory(), sanitizeFileName(name))
+        return runCatching {
+            context.contentResolver.openInputStream(uri).use { input ->
+                if (input == null) error("could not open uri")
+                target.outputStream().use { output -> input.copyTo(output) }
+            }
+            target
+        }.onFailure {
+            Timber.w(it, "AthanPlayer: import failed for %s", uri)
+            target.delete()
+        }.getOrNull()
+    }
+
+    fun deleteAthan(file: File): Boolean {
+        if (!file.exists()) return false
+        val withinDir = try {
+            file.canonicalPath.startsWith(athansDirectory().canonicalPath)
+        } catch (_: Exception) {
+            false
+        }
+        if (!withinDir) {
+            Timber.w("AthanPlayer: refusing to delete outside athans dir: %s", file)
+            return false
+        }
+        return runCatching { file.delete() }.getOrDefault(false)
+    }
+
+    private fun queryDisplayName(uri: Uri): String? {
+        return runCatching {
+            context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
+                ?.use { cursor ->
+                    if (cursor.moveToFirst()) cursor.getString(0) else null
+                }
+        }.getOrNull()
+    }
+
+    private fun sanitizeFileName(name: String): String {
+        // Keep alphanumerics, dashes, underscores, dots, spaces — strip
+        // everything else so a weird SAF display name doesn't produce
+        // a path that breaks on other filesystems / shell tools.
+        val cleaned = name.replace(Regex("[^A-Za-z0-9._\\- ]+"), "_").trim()
+        return cleaned.ifEmpty { "athan.mp3" }
     }
 
     fun stop() {
