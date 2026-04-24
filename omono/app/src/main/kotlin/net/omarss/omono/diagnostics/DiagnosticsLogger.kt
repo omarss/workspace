@@ -6,8 +6,9 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import timber.log.Timber
 import java.io.File
 import java.io.IOException
-import java.text.SimpleDateFormat
-import java.util.Date
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -33,7 +34,12 @@ class DiagnosticsLogger @Inject constructor(
     private val current: File get() = File(logDir, "app.log")
     private val rolled: File get() = File(logDir, "app.1.log")
     private val lock = Any()
-    private val lineFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.ROOT)
+    // DateTimeFormatter is thread-safe, unlike SimpleDateFormat — lines
+    // are built outside the file-write synchronized block so multiple
+    // threads can reach the formatter concurrently.
+    private val lineFormat: DateTimeFormatter = DateTimeFormatter
+        .ofPattern("yyyy-MM-dd HH:mm:ss.SSS", Locale.ROOT)
+        .withZone(ZoneId.systemDefault())
 
     override fun log(priority: Int, tag: String?, message: String, t: Throwable?) {
         if (priority < Log.INFO) return // keep the file lean — debug/verbose noise stays in logcat
@@ -77,7 +83,7 @@ class DiagnosticsLogger @Inject constructor(
         message: String,
         t: Throwable?,
     ): String {
-        val ts = lineFormat.format(Date())
+        val ts = lineFormat.format(Instant.now())
         val level = when (priority) {
             Log.VERBOSE -> "V"
             Log.DEBUG -> "D"
