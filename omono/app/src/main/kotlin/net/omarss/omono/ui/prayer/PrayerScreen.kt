@@ -50,6 +50,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import net.omarss.omono.feature.prayer.AthanItem
 import net.omarss.omono.feature.prayer.AthanSelection
 import net.omarss.omono.feature.prayer.PrayerCalculationMethod
 import net.omarss.omono.feature.prayer.PrayerKind
@@ -116,7 +117,6 @@ fun PrayerRoute(
                 onSelect = viewModel::selectAthan,
                 onDelete = viewModel::deleteAthan,
                 onAddFile = { importLauncher.launch(arrayOf("audio/*")) },
-                athansDir = viewModel.athansDirectory().absolutePath,
             )
         }
     }
@@ -293,9 +293,8 @@ private fun AthanPickerCard(
     onPreview: () -> Unit,
     onStop: () -> Unit,
     onSelect: (AthanSelection) -> Unit,
-    onDelete: (File) -> Unit,
+    onDelete: (AthanItem) -> Unit,
     onAddFile: () -> Unit,
-    athansDir: String,
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -311,22 +310,22 @@ private fun AthanPickerCard(
                 fontWeight = FontWeight.SemiBold,
             )
             Text(
-                text = "Played only at Fajr prayer. Pick one to play every day, " +
-                    "or leave on Random to rotate. Add your favourite recordings " +
-                    "with the button below — they're copied into omono's own " +
-                    "storage so the Fajr alarm works offline.",
+                text = "Played only at Fajr — never at any other prayer. " +
+                    "Volume fades in over 15 seconds from soft to loud. Pick " +
+                    "one to play every day, or leave on Random to rotate. Add " +
+                    "your favourite recordings with the ➕ button — they're " +
+                    "copied into omono's own storage so the Fajr alarm works " +
+                    "offline.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
-            // Random row — always present. Highlighted when the
-            // current selection isn't a pinned file.
             val randomSelected = state.athanSelection is AthanSelection.Random
             AthanRow(
                 selected = randomSelected,
                 primary = "Random",
                 secondary = when {
-                    state.availableAthans.isEmpty() -> "No files yet — uses the system alarm sound at Fajr."
+                    state.availableAthans.isEmpty() -> "No recordings yet — uses the default alarm sound at Fajr."
                     state.availableAthans.size == 1 -> "1 recording available."
                     else -> "${state.availableAthans.size} recordings in rotation."
                 },
@@ -336,23 +335,27 @@ private fun AthanPickerCard(
 
             if (state.availableAthans.isNotEmpty()) {
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                state.availableAthans.forEach { file ->
+                state.availableAthans.forEach { item ->
                     val pinned = state.athanSelection is AthanSelection.Specific &&
-                        (state.athanSelection as AthanSelection.Specific).fileName == file.name
-                    AthanRow(
-                        selected = pinned,
-                        primary = file.nameWithoutExtension,
-                        secondary = humanReadableSize(file.length()),
-                        icon = null,
-                        onClick = { onSelect(AthanSelection.Specific(file.name)) },
-                        trailing = {
-                            IconButton(onClick = { onDelete(file) }) {
+                        (state.athanSelection as AthanSelection.Specific).fileName == item.identifier
+                    val (secondary, trailing) = when (item) {
+                        is AthanItem.Bundled -> "Bundled · Public domain" to null
+                        is AthanItem.Local -> humanReadableSize(item.file.length()) to @Composable {
+                            IconButton(onClick = { onDelete(item) }) {
                                 Icon(
                                     imageVector = Icons.Filled.Delete,
-                                    contentDescription = "Delete ${file.name}",
+                                    contentDescription = "Delete ${item.displayName}",
                                 )
                             }
-                        },
+                        }
+                    }
+                    AthanRow(
+                        selected = pinned,
+                        primary = item.displayName,
+                        secondary = secondary,
+                        icon = null,
+                        onClick = { onSelect(AthanSelection.Specific(item.identifier)) },
+                        trailing = trailing,
                     )
                 }
             }
@@ -376,12 +379,6 @@ private fun AthanPickerCard(
                     Text("Stop")
                 }
             }
-
-            Text(
-                text = "Storage: $athansDir",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
         }
     }
 }

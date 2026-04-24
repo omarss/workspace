@@ -1,0 +1,16 @@
+Bundled athan recording — source and license.
+
+The single bundled recording below is Fajr-specific (includes the
+line "as-salatu khayrun min an-nawm" — prayer is better than sleep —
+recited twice after the shahadahs, which only appears in the Fajr
+adhan). Shipped so the app has a day-one playable athan before the
+user imports their own.
+
+    doha_fajr.mp3    Fajr adhan — Public Domain 1.0
+      Source: https://archive.org/details/adhan.recordings.from.doha.qatar
+      Recorded in Doha, Qatar (2013–2014) and placed in the public
+      domain by the uploader via CC Public Domain Mark 1.0.
+
+Users add more Fajr recordings via the "Add audio file" button in
+the Prayer tab. The app plays whichever is selected (or a random
+one from the available pool) only at Fajr time.

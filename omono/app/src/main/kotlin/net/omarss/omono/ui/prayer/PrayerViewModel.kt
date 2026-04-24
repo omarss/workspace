@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import net.omarss.omono.feature.prayer.AthanItem
 import net.omarss.omono.feature.prayer.AthanPlayer
 import net.omarss.omono.feature.prayer.AthanSelection
 import net.omarss.omono.feature.prayer.PrayerCalculationMethod
@@ -149,15 +150,19 @@ class PrayerViewModel @Inject constructor(
         }
     }
 
-    fun deleteAthan(file: File) {
+    // Only Local items are deletable; Bundled items live in the APK
+    // and can't be removed at runtime. The UI only shows a delete
+    // button on Local rows, so this silently no-ops for Bundled.
+    fun deleteAthan(item: AthanItem) {
+        if (item !is AthanItem.Local) return
         viewModelScope.launch {
-            val ok = withContext(Dispatchers.IO) { athanPlayer.deleteAthan(file) }
+            val ok = withContext(Dispatchers.IO) { athanPlayer.deleteAthan(item.file) }
             if (ok) {
-                // If the deleted file was pinned, drop the pin so the
-                // player auto-rolls back to Random on next Fajr
-                // instead of silently playing the default alarm tone.
+                // If the deleted item was pinned, drop the pin so
+                // the player auto-rolls back to Random on the next
+                // Fajr instead of silently falling through.
                 val sel = _state.value.athanSelection
-                if (sel is AthanSelection.Specific && sel.fileName == file.name) {
+                if (sel is AthanSelection.Specific && sel.fileName == item.identifier) {
                     settings.setAthanSelection(AthanSelection.Random)
                 }
                 refreshAthansList()
@@ -167,8 +172,8 @@ class PrayerViewModel @Inject constructor(
 
     private fun refreshAthansList() {
         viewModelScope.launch(Dispatchers.IO) {
-            val files = athanPlayer.availableAthans()
-            _state.update { it.copy(availableAthans = files) }
+            val items = athanPlayer.availableAthans()
+            _state.update { it.copy(availableAthans = items) }
         }
     }
 
@@ -238,7 +243,7 @@ data class PrayerUiState(
     val locationLabel: String? = null,
     val method: PrayerCalculationMethod = PrayerCalculationMethod.UmmAlQura,
     val athanSelection: AthanSelection = AthanSelection.Random,
-    val availableAthans: List<File> = emptyList(),
+    val availableAthans: List<AthanItem> = emptyList(),
     val permissionDenied: Boolean = false,
     val now: Long = System.currentTimeMillis(),
 ) {
