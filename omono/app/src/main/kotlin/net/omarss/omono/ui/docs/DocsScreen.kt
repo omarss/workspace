@@ -20,7 +20,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Article
 import androidx.compose.material.icons.automirrored.filled.MenuBook
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.SkipNext
@@ -34,6 +36,7 @@ import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -117,8 +120,16 @@ fun DocsRoute(
         }
 
         when (state.view) {
-            DocsView.Subjects -> SubjectsView(state, viewModel::openSubject)
-            DocsView.Docs -> DocListView(state, viewModel::openDoc)
+            DocsView.Subjects -> SubjectsView(
+                state = state,
+                onSearchChange = viewModel::setSubjectsSearch,
+                onTap = viewModel::openSubject,
+            )
+            DocsView.Docs -> DocListView(
+                state = state,
+                onSearchChange = viewModel::setDocsSearch,
+                onTap = viewModel::openDoc,
+            )
             DocsView.Reader -> ReaderView(
                 state = state,
                 ttsState = ttsState,
@@ -146,6 +157,7 @@ private fun docsTitle(state: DocsUiState): String = when (state.view) {
 @Composable
 private fun SubjectsView(
     state: DocsUiState,
+    onSearchChange: (String) -> Unit,
     onTap: (DocSubject) -> Unit,
 ) {
     if (state.loadingSubjects && state.subjects.isEmpty()) {
@@ -160,40 +172,55 @@ private fun SubjectsView(
         )
         return
     }
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        items(state.subjects, key = { it.slug }) { subject ->
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                onClick = { onTap(subject) },
-                colors = CardDefaults.elevatedCardColors(),
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(14.dp),
-                    verticalAlignment = Alignment.CenterVertically,
+    val filtered = state.filteredSubjects
+    Column(modifier = Modifier.fillMaxSize()) {
+        DocsSearchBar(
+            value = state.subjectsSearch,
+            placeholder = "Search subjects",
+            onChange = onSearchChange,
+        )
+        if (filtered.isEmpty()) {
+            EmptyState(
+                title = "No matches",
+                body = "No subject matches \"${state.subjectsSearch}\".",
+            )
+            return@Column
+        }
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            items(filtered, key = { it.slug }) { subject ->
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = { onTap(subject) },
+                    colors = CardDefaults.elevatedCardColors(),
                 ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.MenuBook,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                    )
-                    Spacer(Modifier.width(12.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = subject.title,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold,
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.MenuBook,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
                         )
-                        Text(
-                            text = subjectSubtitle(subject),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
+                        Spacer(Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = subject.title,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                            Text(
+                                text = subjectSubtitle(subject),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                     }
                 }
             }
@@ -210,6 +237,7 @@ private fun subjectSubtitle(subject: DocSubject): String = when {
 @Composable
 private fun DocListView(
     state: DocsUiState,
+    onSearchChange: (String) -> Unit,
     onTap: (DocSummary) -> Unit,
 ) {
     if (state.loadingDocs && state.docs.isEmpty()) {
@@ -224,12 +252,26 @@ private fun DocListView(
         )
         return
     }
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        items(state.docs, key = { "${it.subject}/${it.id}" }) { doc ->
+    val filtered = state.filteredDocs
+    Column(modifier = Modifier.fillMaxSize()) {
+        DocsSearchBar(
+            value = state.docsSearch,
+            placeholder = "Search docs",
+            onChange = onSearchChange,
+        )
+        if (filtered.isEmpty()) {
+            EmptyState(
+                title = "No matches",
+                body = "No doc matches \"${state.docsSearch}\".",
+            )
+            return@Column
+        }
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            items(filtered, key = { "${it.subject}/${it.id}" }) { doc ->
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 onClick = { onTap(doc) },
@@ -263,6 +305,7 @@ private fun DocListView(
                         }
                     }
                 }
+            }
             }
         }
     }
@@ -429,6 +472,39 @@ private fun TtsPill(
             }
         }
     }
+}
+
+// Bar that lives above the subjects / docs list. Pure visual — the
+// caller owns the state and the filter is applied in the ViewModel.
+@Composable
+private fun DocsSearchBar(
+    value: String,
+    placeholder: String,
+    onChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onChange,
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        placeholder = { Text(placeholder) },
+        leadingIcon = {
+            Icon(
+                imageVector = Icons.Filled.Search,
+                contentDescription = null,
+            )
+        },
+        trailingIcon = if (value.isNotEmpty()) {
+            {
+                IconButton(onClick = { onChange("") }) {
+                    Icon(Icons.Filled.Close, contentDescription = "Clear search")
+                }
+            }
+        } else null,
+        singleLine = true,
+    )
 }
 
 @Composable

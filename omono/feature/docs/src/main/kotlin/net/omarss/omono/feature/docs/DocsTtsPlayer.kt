@@ -7,8 +7,12 @@ import android.os.Looper
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import timber.log.Timber
 import java.util.Locale
@@ -46,6 +50,21 @@ class DocsTtsPlayer @Inject constructor(
     // active block.
     private val _currentIndex = MutableStateFlow<Int?>(null)
     val currentIndex: StateFlow<Int?> = _currentIndex.asStateFlow()
+
+    // Fires exactly once when the queue finishes reading on its own
+    // (last utterance's onDone landed without a user-initiated stop).
+    // Distinct from Speaking → Idle which can also mean "stopped by
+    // the user" — auto-advance only chains on a real finish.
+    private val _finished = MutableSharedFlow<Unit>(
+        extraBufferCapacity = 4,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST,
+    )
+    val finished: SharedFlow<Unit> = _finished.asSharedFlow()
+
+    // Name of the engine voice to prefer on every (re)init. null means
+    // "let the player pick the highest-quality one". Exposed as a
+    // setter so the ViewModel can mirror the persisted setting.
+    @Volatile private var preferredVoiceName: String? = null
 
     private val handler = Handler(Looper.getMainLooper())
     private var tts: TextToSpeech? = null
@@ -134,6 +153,58 @@ class DocsTtsPlayer @Inject constructor(
         runCatching { tts?.setSpeechRate(rate) }
     }
 
+    // Persisted voice selection from Settings. Applied on the next
+    // engine init and also immediately if the engine is already ready
+    // — voice changes land on the next `speak()` call, so the user
+    // hears the new voice on the next block without restarting.
+    fun setPreferredVoiceName(name: String?) {
+        preferredVoiceName = name
+        val engine = tts
+        if (engine != null && engineReady) {
+            runCatching { applyPreferredVoice(engine) }
+        }
+    }
+
+    // Returns the list of installed voices that match the device
+    // locale and don't require network audio. The Settings screen
+    // uses this to render the picker. Each entry carries (engineName,
+    // displayHint) so the list is readable by a human who isn't an
+    // engineer.
+    data class InstalledVoice(
+        val name: String,
+        val displayHint: String,
+        val quality: Int,
+    )
+
+    fun listVoices(): List<InstalledVoice> {
+        val engine = tts
+        val voices = runCatching { engine?.voices?.toList() }.getOrNull().orEmpty()
+        if (voices.isEmpty()) return emptyList()
+        val target = Locale.getDefault()
+        return voices
+            .asSequence()
+            .filter {
+                !it.isNetworkConnectionRequired &&
+                    it.locale.language == target.language
+            }
+            .sortedWith(
+                compareByDescending<android.speech.tts.Voice> { it.quality }
+                    .thenBy { it.name },
+            )
+            .map { v ->
+                InstalledVoice(
+                    name = v.name,
+                    displayHint = buildString {
+                        append(v.locale.displayName)
+                        if (v.quality >= 400) append(" · high quality")
+                        else if (v.quality >= 300) append(" · standard")
+                    },
+                    quality = v.quality,
+                )
+            }
+            .toList()
+    }
+
     fun release() {
         stopInternal()
         runCatching { tts?.shutdown() }
@@ -194,33 +265,46 @@ class DocsTtsPlayer @Inject constructor(
     //   * has a non-zero quality rank.
     // Falls through silently if the engine doesn't expose voices, or
     // nothing matches — the platform default stays in place.
+    //
+    // If `preferredVoiceName` is set, tries that first; falls back to
+    // the quality-based pick if the preferred voice is missing (e.g.
+    // user uninstalled its language pack since they chose it).
     private fun selectBestVoice(engine: TextToSpeech) {
-        runCatching {
-            val voices = engine.voices?.toList().orEmpty()
-            if (voices.isEmpty()) return
-            val target = Locale.getDefault()
-            val candidates = voices.filter { v ->
-                // isNetworkConnectionRequired=true means the voice
-                // needs to fetch audio on each speak() — bad for a
-                // driver-assist app on mobile data.
-                !v.isNetworkConnectionRequired &&
-                    (
-                        v.locale.language == target.language &&
-                            (v.locale.country.isEmpty() || v.locale.country == target.country)
-                        )
-            }
-            val best = candidates.maxByOrNull { it.quality }
-                ?: voices.firstOrNull { it.locale.language == target.language }
-            if (best != null) {
-                val result = engine.setVoice(best)
-                if (result == TextToSpeech.SUCCESS) {
-                    Timber.d(
-                        "DocsTtsPlayer: selected voice %s (quality=%d, locale=%s)",
-                        best.name, best.quality, best.locale,
-                    )
-                }
-            }
-        }.onFailure { Timber.w(it, "DocsTtsPlayer: voice selection failed") }
+        runCatching { applyPreferredVoice(engine) }
+            .onFailure { Timber.w(it, "DocsTtsPlayer: voice selection failed") }
+    }
+
+    private fun applyPreferredVoice(engine: TextToSpeech) {
+        val voices = engine.voices?.toList().orEmpty()
+        if (voices.isEmpty()) return
+        val target = Locale.getDefault()
+
+        // 1. Honour the user's persisted choice if the engine still
+        //    exposes it by that name.
+        val pinned = preferredVoiceName?.let { name ->
+            voices.firstOrNull { it.name == name }
+        }
+        if (pinned != null) {
+            val r = engine.setVoice(pinned)
+            Timber.d("DocsTtsPlayer: using preferred voice %s (result=%d)", pinned.name, r)
+            return
+        }
+
+        // 2. Auto-pick — highest quality offline voice for the locale.
+        val candidates = voices.filter { v ->
+            !v.isNetworkConnectionRequired &&
+                v.locale.language == target.language &&
+                (v.locale.country.isEmpty() || v.locale.country == target.country)
+        }
+        val best = candidates.maxByOrNull { it.quality }
+            ?: voices.firstOrNull { it.locale.language == target.language }
+        if (best != null) {
+            engine.setVoice(best)
+            Timber.d(
+                "DocsTtsPlayer: auto-picked voice %s (quality=%d, locale=%s)",
+                best.name, best.quality, best.locale,
+            )
+        }
     }
 
     private val progressListener = object : UtteranceProgressListener() {
@@ -277,6 +361,10 @@ class DocsTtsPlayer @Inject constructor(
             _currentIndex.value = null
             utterances = emptyList()
             cursor = 0
+            // Natural-completion signal — only fires here, never in
+            // stop() or release(), so auto-advance can chain without
+            // also chaining on a manual stop.
+            _finished.tryEmit(Unit)
             return
         }
         cursor = next
