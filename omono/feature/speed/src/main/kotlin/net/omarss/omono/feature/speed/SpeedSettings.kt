@@ -23,8 +23,33 @@ private val DISABLE_INTERNET_WHILE_DRIVING_KEY =
     booleanPreferencesKey("speed.disable_internet_while_driving")
 private val VOICE_ALERTS_ENABLED_KEY = booleanPreferencesKey("speed.voice_alerts_enabled")
 private val VOICE_ALERT_LANGUAGE_KEY = stringPreferencesKey("speed.voice_alert_language")
+private val ALERT_MODE_KEY = stringPreferencesKey("speed.alert_mode")
+// Legacy flag — kept only to migrate users who had "vibrate only" on
+// before the AlertMode enum existed. Read once per Flow emission and
+// merged into the effective AlertMode below. Never written anymore.
 private val VIBRATE_ONLY_KEY = booleanPreferencesKey("speed.vibrate_only")
 private val FUN_MODE_KEY = booleanPreferencesKey("speed.fun_mode")
+
+// Three-way alert rendering mode. Replaces the old `vibrateOnly`
+// boolean with a proper enum so we can offer a "Beep only" middle
+// ground — audible but without the voice layer, for users who find
+// the spoken phrase too chatty but still want to hear the alert.
+enum class AlertMode {
+    /** Voice (if enabled) + loud beep + vibration. The default. */
+    Default,
+
+    /** Loud beep + vibration only — voice is suppressed. */
+    BeepOnly,
+
+    /** Vibration pattern only — beep and voice both suppressed. */
+    VibrateOnly,
+    ;
+
+    companion object {
+        fun fromStorage(raw: String?): AlertMode =
+            entries.firstOrNull { it.name == raw } ?: Default
+    }
+}
 
 @Singleton
 class SpeedSettingsRepository @Inject constructor(
@@ -70,12 +95,19 @@ class SpeedSettingsRepository @Inject constructor(
         VoiceAlertLanguage.fromStorage(prefs[VOICE_ALERT_LANGUAGE_KEY])
     }
 
-    // Replaces every audible alert (beep + TTS) with a vibration
-    // pattern. For use in quiet places (meetings, mosques, late
-    // night) where the user still wants the feedback. Off by
-    // default — audible alerts are safer for driving.
-    val vibrateOnly: Flow<Boolean> = context.omonoDataStore.data.map { prefs ->
-        prefs[VIBRATE_ONLY_KEY] ?: false
+    // Three-way rendering: full (voice + beep), beep-only (no voice),
+    // or vibrate-only. Reads the new enum key if present; otherwise
+    // falls back to the legacy `vibrate_only` boolean so upgrades
+    // don't silently drop a user's prior "vibrate only" choice.
+    val alertMode: Flow<AlertMode> = context.omonoDataStore.data.map { prefs ->
+        val stored = prefs[ALERT_MODE_KEY]
+        if (stored != null) {
+            AlertMode.fromStorage(stored)
+        } else if (prefs[VIBRATE_ONLY_KEY] == true) {
+            AlertMode.VibrateOnly
+        } else {
+            AlertMode.Default
+        }
     }
 
     // "Fun mode" — instead of the canned "Slow down, please" voice
@@ -111,8 +143,13 @@ class SpeedSettingsRepository @Inject constructor(
         context.omonoDataStore.edit { it[VOICE_ALERT_LANGUAGE_KEY] = language.name }
     }
 
-    suspend fun setVibrateOnly(enabled: Boolean) {
-        context.omonoDataStore.edit { it[VIBRATE_ONLY_KEY] = enabled }
+    suspend fun setAlertMode(mode: AlertMode) {
+        context.omonoDataStore.edit { prefs ->
+            prefs[ALERT_MODE_KEY] = mode.name
+            // Clear the legacy boolean so a later downgrade can't
+            // resurrect it and re-disagree with the enum.
+            prefs.remove(VIBRATE_ONLY_KEY)
+        }
     }
 
     suspend fun setFunMode(enabled: Boolean) {

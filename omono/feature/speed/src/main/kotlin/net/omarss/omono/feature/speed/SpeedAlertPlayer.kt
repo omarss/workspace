@@ -73,15 +73,15 @@ class SpeedAlertPlayer @Inject constructor(
         }.onFailure { Timber.w(it, "Vibrator init failed") }.getOrNull()
     }
 
-    // Settings scope — subscribes to vibrateOnly so alert() / loop
-    // paths read the current flag without re-querying DataStore on
-    // every tick.
+    // Settings scope — subscribes to alertMode so alert() / loop paths
+    // read the current rendering choice without re-querying DataStore
+    // on every tick.
     private val settingsScope = CoroutineScope(Dispatchers.Main.immediate + SupervisorJob())
-    @Volatile private var vibrateOnly: Boolean = false
+    @Volatile private var alertMode: AlertMode = AlertMode.Default
 
     init {
-        settings.vibrateOnly
-            .onEach { vibrateOnly = it }
+        settings.alertMode
+            .onEach { alertMode = it }
             .launchIn(settingsScope)
     }
     private val notificationManager by lazy {
@@ -118,31 +118,58 @@ class SpeedAlertPlayer @Inject constructor(
     // the call audio would cause more confusion than the limit breach.
     fun alert(phrase: VoiceAlertPhrase = VoiceAlertPhrase.OVER_LIMIT) {
         if (isInCall()) return
-        if (vibrateOnly) {
-            // Vibrate-only overrides both voice and beep — a
-            // two-pulse pattern that's distinct from notification
-            // vibrations the phone might already be producing.
-            vibrate(SHORT_ALERT_PATTERN)
-            return
-        }
-        val spoke = voiceAlertPlayer.speakOnce(phrase) {
-            playTone(ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD, TONE_DURATION_MS)
-        }
-        if (!spoke) {
-            // Voice disabled or TTS unavailable — beep immediately so
-            // the driver isn't left guessing.
-            playTone(ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD, TONE_DURATION_MS)
+        when (alertMode) {
+            AlertMode.VibrateOnly -> {
+                // Haptic-only — a two-pulse pattern distinct from any
+                // notification vibration the phone might already be
+                // producing. Accompanying beep/voice are suppressed.
+                vibrate(SHORT_ALERT_PATTERN)
+            }
+            AlertMode.BeepOnly -> {
+                // Tone without voice. Vibration rides alongside so
+                // the haptic cue still lands — the removed layer is
+                // the spoken phrase, not the tactile feedback.
+                vibrate(SHORT_ALERT_PATTERN)
+                playTone(ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD, TONE_DURATION_MS)
+            }
+            AlertMode.Default -> {
+                val spoke = voiceAlertPlayer.speakOnce(phrase) {
+                    playTone(ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD, TONE_DURATION_MS)
+                }
+                if (!spoke) {
+                    // Voice disabled or TTS unavailable — beep
+                    // immediately so the driver isn't left guessing.
+                    playTone(ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD, TONE_DURATION_MS)
+                }
+                // Haptic always accompanies the audible alert in
+                // Default mode — belt-and-braces for a driver with
+                // the radio up.
+                vibrate(SHORT_ALERT_PATTERN)
+            }
         }
     }
 
     // Fire-and-forget vibration. Pattern is `[delay, on, off, on, ...]`
-    // millis; amplitude defaults so the call works on both pre- and
-    // post-Oreo vibrator APIs.
+    // millis. We drive every "on" slot at max amplitude (255) so the
+    // haptic is unmissable on a driver's leg through a pocket or
+    // strap — the previous DEFAULT_AMPLITUDE path rendered on some
+    // handsets as a barely-there buzz. Off slots get amplitude 0 so
+    // the phone is silent between pulses instead of faintly humming.
     private fun vibrate(pattern: LongArray) {
         val v = vibrator ?: return
         runCatching {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                v.vibrate(VibrationEffect.createWaveform(pattern, -1))
+                val amplitudes = IntArray(pattern.size) { idx ->
+                    // pattern layout: [delay, on, off, on, off, ...]
+                    // index 0 is the leading delay (always silent);
+                    // odd indexes are "on" slots; even > 0 are "off".
+                    // 255 is the createWaveform max (scale 1..255).
+                    if (idx == 0 || idx % 2 == 0) 0 else MAX_AMPLITUDE
+                }
+                // Use the explicit-amplitude overload so devices that
+                // support variable haptics render our "on" slots at
+                // full strength instead of their engine default.
+                v.vibrate(VibrationEffect.createWaveform(pattern, amplitudes, -1))
             } else {
                 @Suppress("DEPRECATION")
                 v.vibrate(pattern, -1)
@@ -162,7 +189,7 @@ class SpeedAlertPlayer @Inject constructor(
     // firing steadily so they stay nagged. Falls back to pure-beep
     // when voice isn't available.
     fun startBeeping(phrase: VoiceAlertPhrase = VoiceAlertPhrase.PHONE_USE) {
-        if (vibrateOnly) {
+        if (alertMode == AlertMode.VibrateOnly) {
             // Vibrate-only loop — runs a repeating pulse on the
             // handler rather than the tone/voice runnables. Stays
             // clear of the audio stream entirely.
@@ -174,6 +201,10 @@ class SpeedAlertPlayer @Inject constructor(
         // stream volume raised for the duration of the loop.
         handler.removeCallbacks(restoreRunnable)
         snapshotAndBypass()
+        // currentLoopPhrase doubles as the "is the loop running"
+        // sentinel — stopBeeping() clears it to break the runnable —
+        // so set it even in BeepOnly mode. The loop body reads
+        // alertMode separately to decide whether to actually speak.
         currentLoopPhrase = phrase
         // First tick always speaks so the user hears the phrase the
         // moment they start being distracted.
@@ -219,7 +250,10 @@ class SpeedAlertPlayer @Inject constructor(
         override fun run() {
             val phrase = currentLoopPhrase ?: return
             val now = System.currentTimeMillis()
-            val shouldSpeak = now - lastSpokenAtMillis >= VOICE_INTERVAL_MS
+            // In BeepOnly mode the voice layer is suppressed — the
+            // loop still plays tones + vibrations, just without TTS.
+            val shouldSpeak = alertMode == AlertMode.Default &&
+                now - lastSpokenAtMillis >= VOICE_INTERVAL_MS
             var spoke = false
             if (shouldSpeak) {
                 spoke = voiceAlertPlayer.speakOnce(phrase) {
@@ -312,6 +346,10 @@ class SpeedAlertPlayer @Inject constructor(
 
     private companion object {
         const val MAX_VOLUME = 100
+
+        // createWaveform amplitudes run 1..255; anything lower feels
+        // weak on strap or in a pocket, so we always drive at the top.
+        const val MAX_AMPLITUDE = 255
         const val MIN_INTERVAL_MS = 3_000L
         const val TONE_DURATION_MS = 1_200
         const val BEEP_TONE_DURATION_MS = 400

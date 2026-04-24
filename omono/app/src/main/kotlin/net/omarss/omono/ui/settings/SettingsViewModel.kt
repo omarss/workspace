@@ -15,6 +15,8 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import net.omarss.omono.core.common.SpeedUnit
 import net.omarss.omono.diagnostics.DiagnosticsLogger
+import net.omarss.omono.feature.docs.DocsTtsPlayer
+import net.omarss.omono.feature.speed.AlertMode
 import net.omarss.omono.feature.speed.ForegroundAppDetector
 import net.omarss.omono.feature.speed.InternetGovernor
 import net.omarss.omono.feature.speed.SpeedSettingsRepository
@@ -46,6 +48,7 @@ class SettingsViewModel @Inject constructor(
     private val foregroundApp: ForegroundAppDetector,
     private val diagnosticsLogger: DiagnosticsLogger,
     private val appSettings: AppSettingsRepository,
+    private val docsTtsPlayer: DocsTtsPlayer,
 ) : ViewModel() {
 
     // Shizuku governor lifecycle is managed at the Application level —
@@ -82,16 +85,24 @@ class SettingsViewModel @Inject constructor(
     private val voiceFlow: Flow<VoiceSettings> = combine(
         speedSettings.voiceAlertsEnabled,
         speedSettings.voiceAlertLanguage,
-        speedSettings.vibrateOnly,
+        speedSettings.alertMode,
         speedSettings.funMode,
-    ) { enabled, lang, vibrate, fun_ -> VoiceSettings(enabled, lang, vibrate, fun_) }
+    ) { enabled, lang, mode, fun_ -> VoiceSettings(enabled, lang, mode, fun_) }
+
+    private val docsFlow: Flow<DocsSettings> = combine(
+        appSettings.docsAutoAdvance,
+        appSettings.docsTtsVoiceName,
+    ) { autoAdvance, voiceName ->
+        DocsSettings(autoAdvance = autoAdvance, voiceName = voiceName)
+    }
 
     val uiState: StateFlow<SettingsUiState> = combine(
         baseFlow,
         accessFlow,
         voiceFlow,
         appSettings.theme,
-    ) { base, access, voice, theme ->
+        docsFlow,
+    ) { base, access, voice, theme, docs ->
         SettingsUiState(
             unit = base.unit,
             alertOnOverLimit = base.alertOnOverLimit,
@@ -102,9 +113,11 @@ class SettingsViewModel @Inject constructor(
             monthlyBudgetSar = base.monthlyBudgetSar,
             voiceAlertsEnabled = voice.enabled,
             voiceAlertLanguage = voice.language,
-            vibrateOnly = voice.vibrateOnly,
+            alertMode = voice.alertMode,
             funMode = voice.funMode,
             theme = theme,
+            docsAutoAdvance = docs.autoAdvance,
+            docsTtsVoiceName = docs.voiceName,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -147,8 +160,8 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { speedSettings.setVoiceAlertLanguage(language) }
     }
 
-    fun setVibrateOnly(enabled: Boolean) {
-        viewModelScope.launch { speedSettings.setVibrateOnly(enabled) }
+    fun setAlertMode(mode: AlertMode) {
+        viewModelScope.launch { speedSettings.setAlertMode(mode) }
     }
 
     fun setFunMode(enabled: Boolean) {
@@ -158,6 +171,21 @@ class SettingsViewModel @Inject constructor(
     fun setTheme(preference: ThemePreference) {
         viewModelScope.launch { appSettings.setTheme(preference) }
     }
+
+    fun setDocsAutoAdvance(enabled: Boolean) {
+        viewModelScope.launch { appSettings.setDocsAutoAdvance(enabled) }
+    }
+
+    fun setDocsTtsVoiceName(name: String?) {
+        viewModelScope.launch { appSettings.setDocsTtsVoiceName(name) }
+    }
+
+    // Snapshot of the TTS engine's installed voices. Empty if the
+    // engine hasn't initialised yet — the Docs screen brings it up
+    // on first open, so the Settings picker populates once the user
+    // has played at least one doc.
+    fun availableDocsVoices(): List<DocsTtsPlayer.InstalledVoice> =
+        docsTtsPlayer.listVoices()
 
     fun setMonthlyBudget(budgetSar: Double) {
         viewModelScope.launch { spendingSettings.setMonthlyBudgetSar(budgetSar) }
@@ -211,8 +239,13 @@ class SettingsViewModel @Inject constructor(
     private data class VoiceSettings(
         val enabled: Boolean,
         val language: VoiceAlertLanguage,
-        val vibrateOnly: Boolean,
+        val alertMode: AlertMode,
         val funMode: Boolean,
+    )
+
+    private data class DocsSettings(
+        val autoAdvance: Boolean,
+        val voiceName: String?,
     )
 
     private companion object {
@@ -230,9 +263,11 @@ data class SettingsUiState(
     val monthlyBudgetSar: Double = 0.0,
     val voiceAlertsEnabled: Boolean = true,
     val voiceAlertLanguage: VoiceAlertLanguage = VoiceAlertLanguage.Auto,
-    val vibrateOnly: Boolean = false,
+    val alertMode: AlertMode = AlertMode.Default,
     val funMode: Boolean = false,
     val theme: ThemePreference = ThemePreference.Auto,
+    val docsAutoAdvance: Boolean = true,
+    val docsTtsVoiceName: String? = null,
 )
 
 sealed interface DiagnosticsShareEvent {

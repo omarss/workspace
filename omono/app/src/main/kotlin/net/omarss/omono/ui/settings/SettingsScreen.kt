@@ -49,6 +49,8 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import net.omarss.omono.core.common.SpeedUnit
+import net.omarss.omono.feature.docs.DocsTtsPlayer
+import net.omarss.omono.feature.speed.AlertMode
 import net.omarss.omono.feature.speed.InternetGovernor
 import net.omarss.omono.feature.speed.VoiceAlertLanguage
 import net.omarss.omono.settings.ThemePreference
@@ -164,12 +166,9 @@ fun SettingsRoute(
                     onLanguageChange = viewModel::setVoiceAlertLanguage,
                 )
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                AlertSettingRow(
-                    title = "Vibrate only",
-                    subtitle = "Replace beeps and voice with a vibration pattern. " +
-                        "Useful for quiet places; loses the audible cue.",
-                    enabled = state.vibrateOnly,
-                    onChange = viewModel::setVibrateOnly,
+                AlertModeRow(
+                    mode = state.alertMode,
+                    onChange = viewModel::setAlertMode,
                 )
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 AlertSettingRow(
@@ -193,6 +192,22 @@ fun SettingsRoute(
                     readiness = state.shizukuReadiness,
                     onChange = viewModel::setDisableInternetWhileDriving,
                     onRequestPermission = viewModel::requestShizukuPermission,
+                )
+            }
+
+            SectionCard(title = "Docs reader") {
+                AlertSettingRow(
+                    title = "Auto-advance",
+                    subtitle = "When a doc finishes, open the next doc in the same " +
+                        "subject and keep reading.",
+                    enabled = state.docsAutoAdvance,
+                    onChange = viewModel::setDocsAutoAdvance,
+                )
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                DocsVoicePickerRow(
+                    selectedVoiceName = state.docsTtsVoiceName,
+                    availableVoicesProvider = viewModel::availableDocsVoices,
+                    onSelect = viewModel::setDocsTtsVoiceName,
                 )
             }
 
@@ -306,6 +321,155 @@ private fun UnitPicker(current: SpeedUnit, onSelect: (SpeedUnit) -> Unit) {
                 onClick = { onSelect(unit) },
                 shape = SegmentedButtonDefaults.itemShape(index, options.size),
             ) { Text(unit.label) }
+        }
+    }
+}
+
+// Docs-reader voice picker. Tapping opens a dialog listing installed
+// offline voices with a readable hint next to each. The "Auto" entry
+// clears the pinned voice so the player falls back to its
+// quality-based auto-pick.
+@Composable
+private fun DocsVoicePickerRow(
+    selectedVoiceName: String?,
+    availableVoicesProvider: () -> List<DocsTtsPlayer.InstalledVoice>,
+    onSelect: (String?) -> Unit,
+) {
+    var showDialog by remember { mutableStateOf(false) }
+    var voices by remember { mutableStateOf<List<DocsTtsPlayer.InstalledVoice>>(emptyList()) }
+
+    SettingsActionRow(
+        title = "Reader voice",
+        subtitle = selectedVoiceName?.let { "Pinned: $it" }
+            ?: "Auto — highest-quality offline voice for your language.",
+        onClick = {
+            voices = availableVoicesProvider()
+            showDialog = true
+        },
+    )
+    if (showDialog) {
+        AlertDialog(
+            onDismissRequest = { showDialog = false },
+            confirmButton = {
+                TextButton(onClick = { showDialog = false }) { Text("Close") }
+            },
+            title = { Text("Reader voice") },
+            text = {
+                Column(
+                    modifier = Modifier.verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    VoiceOption(
+                        label = "Auto",
+                        hint = "Highest-quality offline voice for your language.",
+                        selected = selectedVoiceName == null,
+                        onClick = {
+                            onSelect(null)
+                            showDialog = false
+                        },
+                    )
+                    if (voices.isEmpty()) {
+                        Text(
+                            text = "Open the Docs tab once to load available voices.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 8.dp),
+                        )
+                    } else {
+                        voices.forEach { v ->
+                            VoiceOption(
+                                label = v.name,
+                                hint = v.displayHint,
+                                selected = v.name == selectedVoiceName,
+                                onClick = {
+                                    onSelect(v.name)
+                                    showDialog = false
+                                },
+                            )
+                        }
+                    }
+                }
+            },
+        )
+    }
+}
+
+@Composable
+private fun VoiceOption(
+    label: String,
+    hint: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = if (selected) androidx.compose.ui.text.font.FontWeight.SemiBold else null,
+            )
+            if (hint.isNotBlank()) {
+                Text(
+                    text = hint,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        if (selected) {
+            Text(
+                text = "•",
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
+    }
+}
+
+@Composable
+private fun AlertModeRow(
+    mode: AlertMode,
+    onChange: (AlertMode) -> Unit,
+) {
+    Column {
+        Text(
+            text = "Alert rendering",
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        Text(
+            text = when (mode) {
+                AlertMode.Default -> "Voice, beep, and vibration — the full alert."
+                AlertMode.BeepOnly -> "Beep + vibration, no spoken phrase."
+                AlertMode.VibrateOnly -> "Vibration only — silent for quiet places."
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        val options = AlertMode.entries
+        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+            options.forEachIndexed { index, candidate ->
+                SegmentedButton(
+                    selected = mode == candidate,
+                    onClick = { onChange(candidate) },
+                    shape = SegmentedButtonDefaults.itemShape(index, options.size),
+                ) {
+                    Text(
+                        when (candidate) {
+                            AlertMode.Default -> "Full"
+                            AlertMode.BeepOnly -> "Beep only"
+                            AlertMode.VibrateOnly -> "Vibrate"
+                        },
+                    )
+                }
+            }
         }
     }
 }
