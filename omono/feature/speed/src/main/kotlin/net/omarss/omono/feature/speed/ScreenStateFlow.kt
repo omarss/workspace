@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.os.PowerManager
+import androidx.core.content.ContextCompat
 import androidx.core.content.getSystemService
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -37,7 +38,16 @@ fun Context.screenOnFlow(): Flow<Boolean> = callbackFlow {
         addAction(Intent.ACTION_SCREEN_ON)
         addAction(Intent.ACTION_SCREEN_OFF)
     }
-    registerReceiver(receiver, filter)
+    // Apps targeting API 34+ must declare whether a context-registered
+    // receiver is exported. SCREEN_ON/OFF are protected system
+    // broadcasts (exempt today) but we flag explicitly so a future
+    // lint/target-SDK bump doesn't silently start crashing here.
+    ContextCompat.registerReceiver(
+        this@screenOnFlow,
+        receiver,
+        filter,
+        ContextCompat.RECEIVER_NOT_EXPORTED,
+    )
 
     awaitClose { runCatching { unregisterReceiver(receiver) } }
 }
