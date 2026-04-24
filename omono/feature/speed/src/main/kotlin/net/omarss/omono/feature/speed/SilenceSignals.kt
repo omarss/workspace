@@ -155,4 +155,10 @@ private const val STILL_VARIANCE_THRESHOLD: Double = 0.05
 // very smooth roads / in a well-suspended vehicle. After the
 // window expires with no motion the guard de-arms and beeping
 // stops; the next bump or pickup re-arms within a sample (~60 ms).
-private const val STILL_HOLD_MS: Long = 8_000L
+//
+// Dropped from 8 s to 3 s on user feedback — the longer window made
+// the distraction loop feel like it "kept beeping" for ages after
+// putting the phone down. 3 s is still enough to coast through the
+// worst between-bump lulls a dashboard mount sees at highway speed
+// without releasing prematurely.
+private const val STILL_HOLD_MS: Long = 3_000L
