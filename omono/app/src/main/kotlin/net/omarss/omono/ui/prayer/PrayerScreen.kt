@@ -339,7 +339,8 @@ private fun AthanPickerCard(
                     val pinned = state.athanSelection is AthanSelection.Specific &&
                         (state.athanSelection as AthanSelection.Specific).fileName == item.identifier
                     val (secondary, trailing) = when (item) {
-                        is AthanItem.Bundled -> "Bundled · Public domain" to null
+                        is AthanItem.Bundled ->
+                            (item.credit ?: "Bundled") to null
                         is AthanItem.Local -> humanReadableSize(item.file.length()) to @Composable {
                             IconButton(onClick = { onDelete(item) }) {
                                 Icon(

@@ -1,16 +1,49 @@
-Bundled athan recording — source and license.
+Bundled athan recordings — sources and licenses.
 
-The single bundled recording below is Fajr-specific (includes the
-line "as-salatu khayrun min an-nawm" — prayer is better than sleep —
-recited twice after the shahadahs, which only appears in the Fajr
-adhan). Shipped so the app has a day-one playable athan before the
-user imports their own.
+Only one bundled recording (doha_fajr.mp3) carries the Fajr-specific
+"as-salatu khayrun min an-nawm" line that distinguishes Fajr from
+the other four daily calls. The remaining seven are generic adhan
+performances; they still play only at Fajr time per the app's
+schedule but lack the Fajr-specific phrase.
 
-    doha_fajr.mp3    Fajr adhan — Public Domain 1.0
-      Source: https://archive.org/details/adhan.recordings.from.doha.qatar
-      Recorded in Doha, Qatar (2013–2014) and placed in the public
-      domain by the uploader via CC Public Domain Mark 1.0.
+## Public Domain
+
+All six Public Domain recordings below are free to copy, modify,
+and redistribute. No attribution is legally required; the metadata
+is preserved here so the origin is never lost when files are
+shared outside the app.
+
+  doha_fajr.mp3         Fajr adhan       Public Domain 1.0
+  doha_dhuhr.mp3        Dhuhr adhan      Public Domain 1.0
+  doha_asr.mp3          Asr adhan        Public Domain 1.0
+  doha_maghrib.mp3      Maghrib adhan    Public Domain 1.0
+  doha_isha.mp3         Isha adhan       Public Domain 1.0
+    Source:  https://archive.org/details/adhan.recordings.from.doha.qatar
+    Recorded in Doha, Qatar (2013–2014) and placed in the public
+    domain by the uploader via CC Public Domain Mark 1.0.
+
+  sabah_fakhri.mp3      Call to prayer   Public Domain (PD-1923)
+    Source:  https://commons.wikimedia.org/wiki/File:Call_to_prayer_by_Sabah_Fakhry.mp3
+    Recorded in 1985 by Sabah Fakhri (1933–2021), Syrian classical
+    singer and composer. Wikimedia Commons hosts it as PD-1923/
+    PD-old based on first-publication date.
+
+## Creative Commons Attribution-ShareAlike 4.0
+
+The two CC-BY-SA files require attribution to the original author
+and share-alike on any derivatives. omono's Prayer tab attaches
+these attribution lines inline when the file is selected.
+
+  aaqib_azeez.mp3       The Adhan        CC-BY-SA 4.0
+    Author:  Aaqib Azeez
+    Source:  https://commons.wikimedia.org/wiki/File:The_Adhan_-_Muslim_Call_to_Prayer.mp3
+    License: https://creativecommons.org/licenses/by-sa/4.0/
+
+  mahfoudou.oga         Islamic call      CC-BY-SA 4.0
+    Author:  Mahfoudou
+    Source:  https://commons.wikimedia.org/wiki/File:Islamic_call_to_worship.oga
+    License: https://creativecommons.org/licenses/by-sa/4.0/
 
 Users add more Fajr recordings via the "Add audio file" button in
 the Prayer tab. The app plays whichever is selected (or a random
-one from the available pool) only at Fajr time.
+one from the pool) only at Fajr time.

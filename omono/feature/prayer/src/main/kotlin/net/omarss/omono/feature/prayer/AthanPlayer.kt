@@ -27,16 +27,27 @@ sealed interface AthanItem {
     // pinned selection survives restarts.
     val identifier: String
 
-    data class Bundled(val assetPath: String) : AthanItem {
+    // Optional per-item attribution. Rendered inline when the user
+    // has a CC-BY-SA file selected — legally required by the
+    // license and nice-to-have for the public-domain ones too.
+    val credit: String?
+
+    data class Bundled(
+        val assetPath: String,
+        override val credit: String? = null,
+    ) : AthanItem {
         override val displayName: String
             get() = assetPath.substringAfterLast('/').substringBeforeLast('.')
-                .replace('_', ' ').trim()
+                .replace('_', ' ')
+                .replaceFirstChar { it.titlecase() }
+                .trim()
         override val identifier: String get() = "bundled:$assetPath"
     }
 
     data class Local(val file: File) : AthanItem {
         override val displayName: String get() = file.nameWithoutExtension
         override val identifier: String get() = "local:${file.name}"
+        override val credit: String? get() = null
     }
 }
 
@@ -80,9 +91,17 @@ class AthanPlayer @Inject constructor(
     fun availableAthans(): List<AthanItem> {
         val bundled = runCatching {
             context.assets.list(BUNDLED_DIR)?.toList().orEmpty()
-                .filter { it.endsWith(".mp3", ignoreCase = true) }
+                .filter { name ->
+                    val ext = name.substringAfterLast('.', "").lowercase()
+                    ext in SUPPORTED_EXTS
+                }
                 .sorted()
-                .map { name -> AthanItem.Bundled(assetPath = "$BUNDLED_DIR/$name") }
+                .map { name ->
+                    AthanItem.Bundled(
+                        assetPath = "$BUNDLED_DIR/$name",
+                        credit = BUNDLED_CREDITS[name],
+                    )
+                }
         }.onFailure { Timber.w(it, "AthanPlayer: listing bundled assets failed") }
             .getOrNull().orEmpty()
         val local = availableLocalFiles().map { AthanItem.Local(it) }
@@ -310,7 +329,7 @@ class AthanPlayer @Inject constructor(
     private companion object {
         const val DIRECTORY_NAME = "athans"
         const val BUNDLED_DIR = "athans"
-        val SUPPORTED_EXTS = setOf("mp3", "ogg", "m4a", "aac", "wav", "flac", "opus")
+        val SUPPORTED_EXTS = setOf("mp3", "ogg", "oga", "m4a", "aac", "wav", "flac", "opus")
 
         // Fade parameters. 15 s from 10% to 100% is the same ramp
         // most gentle-wake alarm clocks use — long enough to avoid
@@ -319,5 +338,22 @@ class AthanPlayer @Inject constructor(
         const val FADE_START_VOLUME: Float = 0.10f
         const val FADE_DURATION_MS: Long = 15_000L
         const val FADE_STEPS: Int = 60
+
+        // Per-file attribution metadata for the bundled set. Keys
+        // are asset filenames inside BUNDLED_DIR; values render
+        // under the file row in the picker. Public-domain entries
+        // are kept brief; CC-BY-SA entries include the author and
+        // license name so the legally-required attribution is
+        // satisfied purely by having the picker open.
+        val BUNDLED_CREDITS: Map<String, String> = mapOf(
+            "doha_fajr.mp3" to "Fajr adhan · Doha, Qatar · Public Domain",
+            "doha_dhuhr.mp3" to "Dhuhr adhan · Doha, Qatar · Public Domain",
+            "doha_asr.mp3" to "Asr adhan · Doha, Qatar · Public Domain",
+            "doha_maghrib.mp3" to "Maghrib adhan · Doha, Qatar · Public Domain",
+            "doha_isha.mp3" to "Isha adhan · Doha, Qatar · Public Domain",
+            "sabah_fakhri.mp3" to "Sabah Fakhri (1985) · Public Domain",
+            "aaqib_azeez.mp3" to "Aaqib Azeez · CC-BY-SA 4.0",
+            "mahfoudou.oga" to "Mahfoudou · CC-BY-SA 4.0",
+        )
     }
 }
