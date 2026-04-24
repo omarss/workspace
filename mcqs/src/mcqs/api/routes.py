@@ -13,13 +13,16 @@ from __future__ import annotations
 import random
 from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, HTTPException, Path, Query, status
 
 from ..config import settings
 from ..db import connection
 from . import queries
 from .deps import AuthDep
 from .schemas import (
+    Doc,
+    DocListResponse,
+    DocSummary,
     HealthResponse,
     Option,
     Pagination,
@@ -73,6 +76,7 @@ async def subjects(_: AuthDep) -> SubjectsResponse:
                     "problem_solving": r["problem_solving"],
                 },
                 rounds_covered=r["rounds_covered"],
+                doc_count=r.get("doc_count", 0),
             )
             for r in rows
         ]
@@ -204,6 +208,70 @@ def _parse_csv(raw: str | None) -> list[str] | None:
             seen.add(s)
             out.append(s)
     return out or None
+
+
+# ---------------------------------------------------------------------------
+# Docs browsing — contract in omono/FEEDBACK.md §11
+# ---------------------------------------------------------------------------
+
+
+@router.get("/docs", response_model=DocListResponse)
+async def docs_list(
+    _: AuthDep,
+    subject: Annotated[str, Query(min_length=1, max_length=80)],
+) -> DocListResponse:
+    with connection() as conn:
+        if not queries.subject_exists(conn, subject):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="subject not found",
+            )
+        rows = queries.list_docs(conn, subject=subject)
+    return DocListResponse(
+        subject=subject,
+        docs=[
+            DocSummary(
+                id=str(r["id"]),
+                title=r["title"],
+                path=r["rel_path"],
+                size_bytes=r["byte_size"],
+                updated_at=r["indexed_at"],
+            )
+            for r in rows
+        ],
+    )
+
+
+@router.get("/docs/{subject}/{doc_id}", response_model=Doc)
+async def docs_fetch(
+    _: AuthDep,
+    subject: Annotated[str, Path(min_length=1, max_length=80)],
+    doc_id: Annotated[int, Path(ge=1)],
+) -> Doc:
+    with connection() as conn:
+        # Separate 404s for subject-vs-doc so a client that typo'd a
+        # subject slug gets a clear "subject not found" signal rather
+        # than a misleading "doc not found".
+        if not queries.subject_exists(conn, subject):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="subject not found",
+            )
+        row = queries.get_doc(conn, subject=subject, doc_id=doc_id)
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="doc not found",
+        )
+    return Doc(
+        id=str(row["id"]),
+        subject=row["subject_slug"],
+        title=row["title"],
+        path=row["rel_path"],
+        markdown=row["content_text"],
+        size_bytes=row["byte_size"],
+        updated_at=row["indexed_at"],
+    )
 
 
 @router.get("/quiz", response_model=QuizResponse)

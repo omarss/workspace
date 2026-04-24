@@ -8,6 +8,7 @@ response models.
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from psycopg import Connection
@@ -24,7 +25,7 @@ def health(conn: Connection) -> dict[str, int]:
 
 
 def list_subjects(conn: Connection) -> list[dict[str, Any]]:
-    """One row per subject with total + per-type counts and round coverage."""
+    """One row per subject with total + per-type counts, round coverage, and doc_count."""
     sql = """
     SELECT
       s.slug,
@@ -34,7 +35,8 @@ def list_subjects(conn: Connection) -> list[dict[str, Any]]:
       COALESCE(q.knowledge, 0)       AS knowledge,
       COALESCE(q.analytical, 0)      AS analytical,
       COALESCE(q.problem_solving, 0) AS problem_solving,
-      COALESCE(q.rounds_covered, 0)  AS rounds_covered
+      COALESCE(q.rounds_covered, 0)  AS rounds_covered,
+      COALESCE(d.doc_count, 0)       AS doc_count
     FROM subjects s
     LEFT JOIN (
       SELECT
@@ -47,11 +49,106 @@ def list_subjects(conn: Connection) -> list[dict[str, Any]]:
       FROM questions
       GROUP BY subject_slug
     ) q ON q.subject_slug = s.slug
+    LEFT JOIN (
+      -- Only count docs that have been fully backfilled with content_text;
+      -- stale rows (file deleted upstream) stay in the table but aren't
+      -- exposed to the docs endpoints, so their count would mislead.
+      SELECT subject_slug, COUNT(*) AS doc_count
+      FROM source_docs
+      WHERE content_text IS NOT NULL
+      GROUP BY subject_slug
+    ) d ON d.subject_slug = s.slug
     ORDER BY s.slug ASC
     """
     with conn.cursor(row_factory=dict_row) as cur:
         cur.execute(sql)
         return list(cur.fetchall())
+
+
+# ---------------------------------------------------------------------------
+# Docs browsing (§11 of omono/FEEDBACK.md)
+# ---------------------------------------------------------------------------
+
+# A doc's display title falls through a cascade: Hugo/Jekyll YAML
+# frontmatter (`title: …` inside a leading `---` block) first, then
+# the first Markdown ATX H1, then the filename stem. The Kubernetes
+# corpus in particular is Hugo-style `.html` files with frontmatter
+# and no `# Heading`; without the frontmatter branch they'd all
+# collapse to "index" titles and be indistinguishable in the list.
+_FRONTMATTER_RE = re.compile(r"\A---\s*\n(.*?)\n---\s*\n", re.DOTALL)
+_FRONTMATTER_TITLE_RE = re.compile(r"^title:\s*(.+?)\s*$", re.MULTILINE)
+_H1_RE = re.compile(r"^\s*#\s+(.+?)\s*#*\s*$", re.MULTILINE)
+
+
+def _extract_title(content_text: str | None, rel_path: str) -> str:
+    """Best-effort display title for a source doc."""
+    if content_text:
+        # YAML frontmatter wins if present and carries a `title` key.
+        fm = _FRONTMATTER_RE.match(content_text)
+        if fm:
+            t = _FRONTMATTER_TITLE_RE.search(fm.group(1))
+            if t:
+                title = t.group(1).strip().strip("\"'")
+                if title:
+                    return title
+        h = _H1_RE.search(content_text)
+        if h:
+            return h.group(1).strip()
+    stem = rel_path.rsplit("/", 1)[-1]
+    if "." in stem:
+        stem = stem.rsplit(".", 1)[0]
+    # For Hugo-style _index / index filenames the parent folder name
+    # carries the semantics. Walk up until we hit a non-index segment.
+    if stem in {"index", "_index"}:
+        parts = rel_path.rsplit("/", 2)
+        if len(parts) >= 2 and parts[-2]:
+            return parts[-2]
+    return stem or rel_path
+
+
+def list_docs(conn: Connection, *, subject: str) -> list[dict[str, Any]]:
+    """All docs for `subject` that have a populated body.
+
+    Stale rows (file deleted upstream, content_text left NULL because
+    the ingest source disappeared before backfill) are filtered out so
+    the list never advertises something the fetch endpoint would 404 on.
+    """
+    sql = """
+    SELECT id, rel_path, byte_size, indexed_at, content_text
+    FROM source_docs
+    WHERE subject_slug = %s AND content_text IS NOT NULL
+    ORDER BY rel_path ASC
+    """
+    with conn.cursor(row_factory=dict_row) as cur:
+        cur.execute(sql, (subject,))
+        rows = list(cur.fetchall())
+    # Title extraction runs on the already-decoded body; drop the bulky
+    # content_text from the payload so the list response stays tiny.
+    for r in rows:
+        r["title"] = _extract_title(r.get("content_text"), r["rel_path"])
+        r.pop("content_text", None)
+    return rows
+
+
+def get_doc(conn: Connection, *, subject: str, doc_id: int) -> dict[str, Any] | None:
+    sql = """
+    SELECT id, subject_slug, rel_path, byte_size, indexed_at, content_text
+    FROM source_docs
+    WHERE subject_slug = %s AND id = %s AND content_text IS NOT NULL
+    """
+    with conn.cursor(row_factory=dict_row) as cur:
+        cur.execute(sql, (subject, doc_id))
+        row = cur.fetchone()
+    if row is None:
+        return None
+    row["title"] = _extract_title(row.get("content_text"), row["rel_path"])
+    return row
+
+
+def subject_exists(conn: Connection, slug: str) -> bool:
+    with conn.cursor() as cur:
+        cur.execute("SELECT 1 FROM subjects WHERE slug = %s", (slug,))
+        return cur.fetchone() is not None
 
 
 def list_topics(conn: Connection, *, subject: str) -> list[dict[str, Any]]:

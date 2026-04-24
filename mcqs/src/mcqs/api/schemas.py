@@ -23,6 +23,11 @@ class SubjectSummary(BaseModel):
     total_questions: int
     counts_by_type: dict[str, int]
     rounds_covered: int
+    # Per omono/FEEDBACK.md §11.2 — number of source docs under this
+    # subject that the /v1/mcq/docs endpoints will serve. 0 when no
+    # docs have been ingested (or none have been backfilled with
+    # `content_text` yet).
+    doc_count: int = 0
 
 
 class SubjectsResponse(BaseModel):
@@ -86,3 +91,35 @@ class HealthResponse(BaseModel):
     status: Literal["ok"]
     subjects: int
     questions: int
+
+
+# ---------------------------------------------------------------------------
+# Docs browsing — spec in omono/FEEDBACK.md §11
+# ---------------------------------------------------------------------------
+
+
+class DocSummary(BaseModel):
+    # `id` is the numeric source_docs primary key rendered as a string
+    # so JS / Kotlin clients don't have to worry about 53-bit int
+    # ceilings. (The omono client reads this field as a string
+    # already.)
+    id: str
+    title: str
+    path: str
+    size_bytes: int
+    updated_at: datetime
+
+
+class DocListResponse(BaseModel):
+    subject: str
+    docs: list[DocSummary]
+
+
+class Doc(BaseModel):
+    id: str
+    subject: str
+    title: str
+    path: str
+    markdown: str
+    size_bytes: int
+    updated_at: datetime

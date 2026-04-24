@@ -1,9 +1,10 @@
 """FastAPI app factory + uvicorn entry.
 
 Exposed routes live under `/v1/mcq/...`. `/v1/mcq/health` is public; every
-other endpoint requires `X-Api-Key`. Docs (`/v1/mcq/docs`, `/v1/mcq/redoc`,
-`/v1/mcq/openapi.json`) describe the surface only — every data endpoint
-still enforces auth, so exposing the schema itself leaks nothing sensitive.
+other endpoint requires `X-Api-Key`. The OpenAPI surface description is
+served at `/v1/mcq/api-docs` (Swagger UI), `/v1/mcq/redoc`, and
+`/v1/mcq/openapi.json` — the `api-docs` name leaves `/v1/mcq/docs/*` free
+for the source-docs browsing endpoints consumed by omono.
 """
 
 from __future__ import annotations
@@ -28,7 +29,7 @@ def create_app() -> FastAPI:
             "Three question types: knowledge / analytical / problem_solving. "
             "Questions can be tagged with multiple topics within a subject."
         ),
-        docs_url="/v1/mcq/docs",
+        docs_url="/v1/mcq/api-docs",
         redoc_url="/v1/mcq/redoc",
         openapi_url="/v1/mcq/openapi.json",
     )
