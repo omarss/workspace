@@ -154,18 +154,27 @@ class SpeedRepository @Inject constructor(
                     // it as GPS noise and hold the previous value. A
                     // true hard-brake / launch event still passes
                     // because it takes several samples to ramp up.
+                    //
+                    // Non-finite samples (NaN / infinity) would sneak
+                    // past the comparison — `NaN > 0f` and `abs(x - NaN)
+                    // > anything` both evaluate to false — and poison
+                    // `lastAcceptedMps` so every subsequent delta is
+                    // also NaN. Reject them outright and hold `prev`.
                     val prev = lastAcceptedMps
-                    val trustedSpeed = if (
+                    val trustedSpeed = when {
+                        !filteredSpeed.isFinite() -> {
+                            Timber.w("Rejecting non-finite speed sample: %s", filteredSpeed)
+                            prev
+                        }
                         filteredSpeed > 0f &&
-                        kotlin.math.abs(filteredSpeed - prev) > MAX_SPEED_JUMP_MPS
-                    ) {
-                        Timber.d(
-                            "Rejecting speed spike: %.1f → %.1f m/s",
-                            prev, filteredSpeed,
-                        )
-                        prev
-                    } else {
-                        filteredSpeed
+                            kotlin.math.abs(filteredSpeed - prev) > MAX_SPEED_JUMP_MPS -> {
+                            Timber.d(
+                                "Rejecting speed spike: %.1f → %.1f m/s",
+                                prev, filteredSpeed,
+                            )
+                            prev
+                        }
+                        else -> filteredSpeed
                     }
                     lastAcceptedMps = trustedSpeed
                     _currentSpeedMps.value = trustedSpeed
