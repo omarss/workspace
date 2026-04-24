@@ -99,6 +99,7 @@ dependencies {
     implementation(projects.feature.spending)
     implementation(projects.feature.places)
     implementation(projects.feature.quiz)
+    implementation(projects.feature.docs)
     implementation(projects.feature.selfupdate)
 
     implementation(libs.androidx.core.ktx)

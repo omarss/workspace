@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Payments
@@ -40,6 +41,7 @@ import net.omarss.omono.settings.AppSettingsViewModel
 import net.omarss.omono.settings.ThemePreference
 import net.omarss.omono.ui.OmonoMainRoute
 import net.omarss.omono.ui.compass.CompassRoute
+import net.omarss.omono.ui.docs.DocsRoute
 import net.omarss.omono.ui.finance.FinanceDashboardRoute
 import net.omarss.omono.ui.places.PlacesRoute
 import net.omarss.omono.ui.quiz.QuizRoute
@@ -86,6 +88,9 @@ class MainActivity : ComponentActivity() {
                         composable(Destination.Quiz.route) {
                             QuizRoute(contentPadding = PaddingValues(0.dp))
                         }
+                        composable(Destination.Docs.route) {
+                            DocsRoute(contentPadding = PaddingValues(0.dp))
+                        }
                         composable(Destination.Settings.route) {
                             SettingsRoute(contentPadding = PaddingValues(0.dp))
                         }
@@ -108,6 +113,7 @@ private enum class Destination(
     Places(route = "places", label = "Places", icon = Icons.Filled.LocationOn),
     Compass(route = "compass", label = "Compass", icon = Icons.Filled.Explore),
     Quiz(route = "quiz", label = "Quiz", icon = Icons.Filled.Quiz),
+    Docs(route = "docs", label = "Docs", icon = Icons.AutoMirrored.Filled.MenuBook),
     Settings(route = "settings", label = "Settings", icon = Icons.Filled.Settings),
 }
 
