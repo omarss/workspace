@@ -15,19 +15,30 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Mosque
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -39,8 +50,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import net.omarss.omono.feature.prayer.AthanSelection
+import net.omarss.omono.feature.prayer.PrayerCalculationMethod
 import net.omarss.omono.feature.prayer.PrayerKind
 import net.omarss.omono.feature.prayer.PrayerTime
+import java.io.File
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -53,6 +67,17 @@ fun PrayerRoute(
     viewModel: PrayerViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+
+    // Document-picker contract. "audio/*" mime filter so the system
+    // picker only surfaces audio files. We take a persistable URI
+    // grant because we copy bytes into the app's own storage — the
+    // grant isn't strictly necessary post-copy, but requesting it
+    // doesn't hurt and handles OEM pickers that delay delivery.
+    val importLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        if (uri != null) viewModel.importAthanFromUri(uri)
+    }
 
     Column(
         modifier = Modifier
@@ -81,14 +106,59 @@ fun PrayerRoute(
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            LocationAndMethodRow(state)
             NextPrayerCard(state)
             PrayerList(state)
-            AthanCard(
+            AthanPickerCard(
+                state = state,
                 onPreview = viewModel::playAthanPreview,
                 onStop = viewModel::stopAthanPreview,
+                onSelect = viewModel::selectAthan,
+                onDelete = viewModel::deleteAthan,
+                onAddFile = { importLauncher.launch(arrayOf("audio/*")) },
                 athansDir = viewModel.athansDirectory().absolutePath,
             )
         }
+    }
+}
+
+// Location chip + Umm al-Qura badge at the top of the Prayer tab.
+// Answers "where am I computing from?" and "which method?" in one
+// glance — both questions the user explicitly asked to have visible
+// on this screen at all times.
+@Composable
+private fun LocationAndMethodRow(state: PrayerUiState) {
+    val fix = state.lastFix
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        AssistChip(
+            onClick = {},
+            label = {
+                Text(
+                    text = when {
+                        state.locationLabel != null -> state.locationLabel!!
+                        fix != null -> "%.4f, %.4f".format(fix.first, fix.second)
+                        else -> "Locating…"
+                    },
+                )
+            },
+            leadingIcon = {
+                Icon(
+                    imageVector = Icons.Filled.LocationOn,
+                    contentDescription = null,
+                    modifier = Modifier.width(18.dp),
+                )
+            },
+            colors = AssistChipDefaults.assistChipColors(),
+        )
+        AssistChip(
+            onClick = {},
+            label = { Text(state.method.display) },
+            colors = AssistChipDefaults.assistChipColors(),
+        )
     }
 }
 
@@ -211,10 +281,20 @@ private fun PrayerRow(time: PrayerTime, highlighted: Boolean) {
     }
 }
 
+// Fajr athan picker. Lists whatever recordings the user has imported
+// plus a "Random" virtual row at the top. Radio-style single-select
+// persists the choice so the alarm receiver plays the same file at
+// the next Fajr. An "Add audio file" button opens the system SAF
+// picker so the user can source from any app (Files / Drive / local
+// media / downloads).
 @Composable
-private fun AthanCard(
+private fun AthanPickerCard(
+    state: PrayerUiState,
     onPreview: () -> Unit,
     onStop: () -> Unit,
+    onSelect: (AthanSelection) -> Unit,
+    onDelete: (File) -> Unit,
+    onAddFile: () -> Unit,
     athansDir: String,
 ) {
     Card(
@@ -231,18 +311,60 @@ private fun AthanCard(
                 fontWeight = FontWeight.SemiBold,
             )
             Text(
-                text = "Drop your preferred athan recordings (.mp3, .ogg, " +
-                    ".m4a, .opus) into the folder below. A random file is " +
-                    "picked at Fajr each day. Works entirely offline.",
+                text = "Played only at Fajr prayer. Pick one to play every day, " +
+                    "or leave on Random to rotate. Add your favourite recordings " +
+                    "with the button below — they're copied into omono's own " +
+                    "storage so the Fajr alarm works offline.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Text(
-                text = athansDir,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+
+            // Random row — always present. Highlighted when the
+            // current selection isn't a pinned file.
+            val randomSelected = state.athanSelection is AthanSelection.Random
+            AthanRow(
+                selected = randomSelected,
+                primary = "Random",
+                secondary = when {
+                    state.availableAthans.isEmpty() -> "No files yet — uses the system alarm sound at Fajr."
+                    state.availableAthans.size == 1 -> "1 recording available."
+                    else -> "${state.availableAthans.size} recordings in rotation."
+                },
+                icon = { Icon(Icons.Filled.Shuffle, contentDescription = null) },
+                onClick = { onSelect(AthanSelection.Random) },
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+
+            if (state.availableAthans.isNotEmpty()) {
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                state.availableAthans.forEach { file ->
+                    val pinned = state.athanSelection is AthanSelection.Specific &&
+                        (state.athanSelection as AthanSelection.Specific).fileName == file.name
+                    AthanRow(
+                        selected = pinned,
+                        primary = file.nameWithoutExtension,
+                        secondary = humanReadableSize(file.length()),
+                        icon = null,
+                        onClick = { onSelect(AthanSelection.Specific(file.name)) },
+                        trailing = {
+                            IconButton(onClick = { onDelete(file) }) {
+                                Icon(
+                                    imageVector = Icons.Filled.Delete,
+                                    contentDescription = "Delete ${file.name}",
+                                )
+                            }
+                        },
+                    )
+                }
+            }
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                FilledIconButton(onClick = onAddFile) {
+                    Icon(Icons.Filled.Add, contentDescription = "Add audio file")
+                }
                 OutlinedButton(onClick = onPreview) {
                     Icon(Icons.Filled.PlayArrow, contentDescription = null)
                     Spacer(Modifier.width(6.dp))
@@ -254,7 +376,61 @@ private fun AthanCard(
                     Text("Stop")
                 }
             }
+
+            Text(
+                text = "Storage: $athansDir",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
+    }
+}
+
+@Composable
+private fun AthanRow(
+    selected: Boolean,
+    primary: String,
+    secondary: String?,
+    icon: (@Composable () -> Unit)?,
+    onClick: () -> Unit,
+    trailing: (@Composable () -> Unit)? = null,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        RadioButton(selected = selected, onClick = onClick)
+        if (icon != null) {
+            icon()
+            Spacer(Modifier.width(6.dp))
+        }
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = primary,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+            )
+            if (secondary != null) {
+                Text(
+                    text = secondary,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        trailing?.invoke()
+    }
+}
+
+private fun humanReadableSize(bytes: Long): String {
+    val kb = bytes / 1024.0
+    return when {
+        bytes < 1024L -> "$bytes B"
+        kb < 1024.0 -> "%.0f kB".format(kb)
+        else -> "%.1f MB".format(kb / 1024.0)
     }
 }
 

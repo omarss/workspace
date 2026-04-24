@@ -1,8 +1,13 @@
 package net.omarss.omono.ui.prayer
 
+import android.content.Context
+import android.location.Geocoder
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -11,7 +16,10 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import net.omarss.omono.feature.prayer.AthanPlayer
+import net.omarss.omono.feature.prayer.AthanSelection
+import net.omarss.omono.feature.prayer.PrayerCalculationMethod
 import net.omarss.omono.feature.prayer.PrayerDayTimes
 import net.omarss.omono.feature.prayer.PrayerKind
 import net.omarss.omono.feature.prayer.PrayerLocationCache
@@ -23,6 +31,7 @@ import timber.log.Timber
 import java.io.File
 import java.time.LocalDate
 import java.time.ZoneId
+import java.util.Locale
 import javax.inject.Inject
 
 // Owns the prayer-times screen. Collects the shared AppLocationStream
@@ -32,6 +41,7 @@ import javax.inject.Inject
 // times for their usual location.
 @HiltViewModel
 class PrayerViewModel @Inject constructor(
+    @param:ApplicationContext private val context: Context,
     private val locationStream: AppLocationStream,
     private val locationCache: PrayerLocationCache,
     private val settings: PrayerSettingsRepository,
@@ -54,6 +64,22 @@ class PrayerViewModel @Inject constructor(
                 recompute(seeded.latitude, seeded.longitude)
             }
         }
+        // Mirror the persisted athan selection + current method badge
+        // into UI state so the Prayer tab renders without another
+        // suspend per render.
+        viewModelScope.launch {
+            settings.snapshot.collect { snap ->
+                _state.update {
+                    it.copy(
+                        athanSelection = snap.athanSelection,
+                        method = snap.method,
+                    )
+                }
+            }
+        }
+        // Poll the athans directory so the file list + pickability
+        // update after an import / delete without a rotation tap.
+        refreshAthansList()
         // Stream fresh GPS fixes — each update saves to the cache and
         // recomputes + reschedules. Fires only when the user's moved
         // far enough to matter (AppLocationStream's own filter is
@@ -94,7 +120,7 @@ class PrayerViewModel @Inject constructor(
     }
 
     fun playAthanPreview() {
-        athanPlayer.playRandom()
+        athanPlayer.play(_state.value.athanSelection)
     }
 
     fun stopAthanPreview() {
@@ -102,6 +128,49 @@ class PrayerViewModel @Inject constructor(
     }
 
     fun athansDirectory(): File = athanPlayer.athansDirectory()
+
+    // Pick a specific file by name, or Random to rotate. Persisted
+    // immediately so a reboot / app kill keeps the choice.
+    fun selectAthan(selection: AthanSelection) {
+        viewModelScope.launch { settings.setAthanSelection(selection) }
+    }
+
+    // Called after the SAF document-picker returns a content:// uri.
+    // AthanPlayer.importFromUri copies the bytes into the app's own
+    // athans directory so the Fajr alarm receiver can read them even
+    // after the SAF permission has been revoked.
+    fun importAthanFromUri(uri: Uri) {
+        viewModelScope.launch {
+            val copied = withContext(Dispatchers.IO) { athanPlayer.importFromUri(uri) }
+            if (copied != null) {
+                Timber.i("imported athan %s", copied.name)
+                refreshAthansList()
+            }
+        }
+    }
+
+    fun deleteAthan(file: File) {
+        viewModelScope.launch {
+            val ok = withContext(Dispatchers.IO) { athanPlayer.deleteAthan(file) }
+            if (ok) {
+                // If the deleted file was pinned, drop the pin so the
+                // player auto-rolls back to Random on next Fajr
+                // instead of silently playing the default alarm tone.
+                val sel = _state.value.athanSelection
+                if (sel is AthanSelection.Specific && sel.fileName == file.name) {
+                    settings.setAthanSelection(AthanSelection.Random)
+                }
+                refreshAthansList()
+            }
+        }
+    }
+
+    private fun refreshAthansList() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val files = athanPlayer.availableAthans()
+            _state.update { it.copy(availableAthans = files) }
+        }
+    }
 
     private fun recompute(lat: Double, lon: Double) {
         recomputeJob?.cancel()
@@ -130,14 +199,46 @@ class PrayerViewModel @Inject constructor(
                         now = System.currentTimeMillis(),
                     )
                 }
+                // Reverse-geocode on a background dispatcher — the
+                // Geocoder call blocks for up to a few seconds the
+                // first time it's used, and we don't want that to
+                // delay the prayer-list render.
+                resolveLocationLabel(lat, lon)
             }
         }
+    }
+
+    private fun resolveLocationLabel(lat: Double, lon: Double) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val label = runCatching {
+                val geocoder = Geocoder(context, Locale.getDefault())
+                @Suppress("DEPRECATION")
+                val results = geocoder.getFromLocation(lat, lon, 1)
+                val first = results?.firstOrNull()
+                buildLocationLabel(first)
+            }.getOrNull()
+            if (label != null) {
+                _state.update { it.copy(locationLabel = label) }
+            }
+        }
+    }
+
+    private fun buildLocationLabel(address: android.location.Address?): String? {
+        if (address == null) return null
+        val locality = address.locality ?: address.subAdminArea
+        val country = address.countryName
+        return listOfNotNull(locality, country).joinToString(", ")
+            .takeIf { it.isNotBlank() }
     }
 }
 
 data class PrayerUiState(
     val today: PrayerDayTimes? = null,
     val lastFix: Pair<Double, Double>? = null,
+    val locationLabel: String? = null,
+    val method: PrayerCalculationMethod = PrayerCalculationMethod.UmmAlQura,
+    val athanSelection: AthanSelection = AthanSelection.Random,
+    val availableAthans: List<File> = emptyList(),
     val permissionDenied: Boolean = false,
     val now: Long = System.currentTimeMillis(),
 ) {
