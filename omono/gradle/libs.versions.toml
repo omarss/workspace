@@ -56,6 +56,12 @@ shizuku = "13.1.5"
 # 2.7.0+ fixes "unexpected jvm signature V" crash with KSP2.
 room = "2.7.0"
 
+# Islamic prayer time calculation — MIT, astronomical algorithms
+# from Meeus, entirely offline. Using the Java branch (not adhan2
+# KMP) because adhan2 0.0.6 targets Java 21 bytecode and our toolchain
+# is pinned at Java 17; the Java API is API-stable and small.
+adhan = "1.2.1"
+
 # Testing
 junit = "4.13.2"
 androidxTestExt = "1.2.1"
@@ -119,6 +125,9 @@ shizuku-provider = { group = "dev.rikka.shizuku", name = "provider", version.ref
 androidx-room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "room" }
 androidx-room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "room" }
 androidx-room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
+
+# Islamic prayer times
+adhan = { group = "com.batoulapps.adhan", name = "adhan", version.ref = "adhan" }
 
 # Testing
 junit = { group = "junit", name = "junit", version.ref = "junit" }

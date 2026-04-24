@@ -8,4 +8,7 @@ object OmonoNotificationChannels {
 
     const val SELF_UPDATE_CHANNEL_ID: String = "omono.self_update"
     const val SELF_UPDATE_CHANNEL_NAME: String = "App updates"
+
+    const val PRAYER_CHANNEL_ID: String = "omono.prayer"
+    const val PRAYER_CHANNEL_NAME: String = "Prayer times"
 }

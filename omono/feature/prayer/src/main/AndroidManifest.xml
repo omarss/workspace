@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Prayer alarms fire at each day's prayer times. SCHEDULE_EXACT_ALARM
+         is required on Android 12+ for precise-to-the-minute alarm delivery;
+         the prayer tab surfaces the system "Alarms & reminders" toggle
+         when the user hasn't granted it. -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+
+    <application>
+        <!-- Wakes the device at a scheduled prayer time to post the
+             notification (and play the Fajr athan). Kept exported=false
+             because only our own AlarmManager fires it. -->
+        <receiver
+            android:name="net.omarss.omono.feature.prayer.PrayerAlarmReceiver"
+            android:exported="false" />
+    </application>
+
+</manifest>
