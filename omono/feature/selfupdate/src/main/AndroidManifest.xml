@@ -7,4 +7,19 @@
          before it tries to install. -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
+    <application>
+        <!-- Receives the `PackageInstaller.Session.commit` status callback,
+             most importantly STATUS_PENDING_USER_ACTION, and launches the
+             system confirmation dialog. Declared statically (not
+             registered dynamically) because an explicit-component
+             PendingIntent doesn't reliably dispatch to a dynamically
+             registered receiver on Android 14+ — the install dialog
+             simply never appeared. `exported="false"` because this is an
+             app-internal callback and should not be reachable by other
+             apps. -->
+        <receiver
+            android:name="net.omarss.omono.feature.selfupdate.InstallResultReceiver"
+            android:exported="false" />
+    </application>
+
 </manifest>

@@ -4,11 +4,9 @@ import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.content.IntentFilter
 import android.content.pm.PackageInstaller
 import android.os.Build
 import android.provider.Settings
-import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import dagger.hilt.android.qualifiers.ApplicationContext
 import timber.log.Timber
@@ -64,7 +62,6 @@ class ApkInstaller @Inject constructor(
             return
         }
 
-        ensureReceiver()
         runCatching {
             packageInstaller.openSession(sessionId).use { session ->
                 apk.inputStream().use { input ->
@@ -73,6 +70,12 @@ class ApkInstaller @Inject constructor(
                         session.fsync(output)
                     }
                 }
+                // Explicit-component intent to the manifest-declared
+                // receiver. A dynamically-registered receiver does
+                // NOT reliably receive these callbacks on Android
+                // 14+ — the install dialog simply never appears —
+                // so this path only works with the static receiver
+                // in feature/selfupdate's AndroidManifest.xml.
                 val intent = Intent(context, InstallResultReceiver::class.java).apply {
                     action = INSTALL_ACTION
                     setPackage(context.packageName)
@@ -85,25 +88,6 @@ class ApkInstaller @Inject constructor(
             Timber.e(it, "install session commit failed")
             runCatching { packageInstaller.abandonSession(sessionId) }
         }
-    }
-
-    // The Session API needs a BroadcastReceiver to deliver status
-    // updates. STATUS_PENDING_USER_ACTION arrives on Android 8+ with a
-    // follow-up intent the system wants us to launch — that's the
-    // actual "Install" confirmation dialog the user sees.
-    private var receiverRegistered = false
-
-    private fun ensureReceiver() {
-        if (receiverRegistered) return
-        val filter = IntentFilter(INSTALL_ACTION)
-        val flags = ContextCompat.RECEIVER_NOT_EXPORTED
-        ContextCompat.registerReceiver(
-            context,
-            InstallResultReceiver(),
-            filter,
-            flags,
-        )
-        receiverRegistered = true
     }
 
     internal companion object {
