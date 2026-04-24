@@ -171,28 +171,35 @@ enum class SecondaryDestination(
     ),
 }
 
-// Standard bottom-nav pattern: single-top per tab, pop back to the
-// graph's start when leaving a tab, restore the tab's own back-stack
-// state when the user returns to it.
+// Bottom-nav pattern: single-top per tab, pop back to the graph's
+// start when leaving a tab, restore the tab's own back-stack state
+// when the user returns to it.
+//
+// "More" is special: tapping it always opens the More screen, even
+// if the user is currently inside a secondary destination (Finance /
+// Compass / Quiz / Docs / Settings). The previous build short-
+// circuited that tap because "More" was considered selected while
+// inside its children — which left the user unable to jump between
+// secondaries without a Back press first. The fix is to treat a
+// secondary-page "More" tap as a navigation *to* More, not a no-op.
 @Composable
 private fun OmonoBottomNav(navController: NavHostController) {
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination
     NavigationBar {
         Destination.entries.forEach { dest ->
-            // "More" also counts as selected when the user is inside
-            // one of the secondary destinations it links to — gives
-            // a clear breadcrumb back.
-            val secondaryRoutes = if (dest == Destination.More) {
-                SecondaryDestination.entries.map { it.route }.toSet()
-            } else emptySet()
-            val selected = currentRoute?.hierarchy?.any {
-                it.route == dest.route || it.route in secondaryRoutes
-            } == true
+            val inSecondary = dest == Destination.More &&
+                currentRoute?.hierarchy?.any { it.route in SECONDARY_ROUTES } == true
+            val onRoute = currentRoute?.hierarchy?.any { it.route == dest.route } == true
+            // Visual selection still lights up More while in a
+            // secondary — that breadcrumb is helpful — but onClick
+            // below navigates anyway instead of short-circuiting.
+            val selected = onRoute || inSecondary
             NavigationBarItem(
                 selected = selected,
                 onClick = {
-                    if (!selected) {
+                    val sameTopLevel = onRoute
+                    if (!sameTopLevel) {
                         navController.navigate(dest.route) {
                             popUpTo(navController.graph.findStartDestination().id) {
                                 saveState = true
@@ -208,3 +215,6 @@ private fun OmonoBottomNav(navController: NavHostController) {
         }
     }
 }
+
+private val SECONDARY_ROUTES: Set<String> =
+    SecondaryDestination.entries.map { it.route }.toSet()
