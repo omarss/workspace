@@ -106,13 +106,27 @@ class SelfUpdateRepository @Inject constructor(
             }
         }
 
+        // Refuse to trust a download with no publisher-side checksum.
+        // Before, a manifest missing sha256 would silently skip this
+        // check and install whatever came down the wire.
         val expected = info.latest.sha256
-        if (expected.isNotBlank()) {
-            val actual = target.sha256Hex()
-            if (!actual.equals(expected, ignoreCase = true)) {
-                target.delete()
-                throw IOException("checksum mismatch: expected $expected, got $actual")
-            }
+        if (expected.isBlank()) {
+            target.delete()
+            throw IOException("manifest missing sha256; refusing to install")
+        }
+        val actual = target.sha256Hex()
+        if (!actual.equals(expected, ignoreCase = true)) {
+            target.delete()
+            throw IOException("checksum mismatch: expected $expected, got $actual")
+        }
+        // Paranoia floor — a real APK is comfortably above 500 KB.
+        // Anything smaller is almost certainly a truncated / error
+        // payload that happened to checksum-match an equally short
+        // manifest value.
+        if (target.length() < MIN_APK_BYTES) {
+            val actualSize = target.length()
+            target.delete()
+            throw IOException("APK too small ($actualSize bytes); refusing to install")
         }
         emit(DownloadState.InProgress(100))
         emit(DownloadState.Done(target))
@@ -133,6 +147,11 @@ sealed interface DownloadState {
     data class InProgress(val percent: Int) : DownloadState
     data class Done(val apk: File) : DownloadState
 }
+
+// Smallest plausible release APK, in bytes. The real omono APK runs
+// ~10-30 MB depending on features; 500 KB is comfortably below that
+// and above anything that could be an error payload or stub.
+private const val MIN_APK_BYTES: Long = 500L * 1024L
 
 private fun File.sha256Hex(): String {
     val digest = MessageDigest.getInstance("SHA-256")
