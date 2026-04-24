@@ -967,6 +967,174 @@ here (unlike `/quiz`).
 
 ---
 
+## 11. `mcqs` — docs browsing endpoints (2026-04-24)
+
+**Status:** 🟠 **requested by omono ≥ v0.44** (this document is the spec —
+the Android side ships against this contract with graceful 404 /
+"endpoint not yet available" degradation until the backend implements
+it). The app renders a "Docs coming soon" banner until the endpoint
+returns 200.
+
+### 11.1 Motivation
+
+The mcqs generator produces questions from a **docs-bundle**: 43
+per-subject directories of Markdown files. Today the app only sees the
+derived questions. A docs-browsing surface inside omono lets the user:
+
+1. Read the source docs each subject was built from (prose, not Q&A).
+2. Feed the content to the on-device `TextToSpeech` for a "read it to
+   me" while-driving mode.
+
+Docs are already under API-key control on the mcqs deployment, so
+exposing them is a read-only view over the same corpus that feeds
+/v1/mcq/subjects. Same `X-Api-Key` as every other mcqs endpoint.
+
+### 11.2 `GET /v1/mcq/docs/subjects` — subjects with doc counts
+
+Optional — if implementing, keep the shape identical to `/v1/mcq/subjects`
+and add one field:
+
+```json
+{
+  "subjects": [
+    {
+      "slug": "apple-pay",
+      "title": "Apple Pay",
+      "description": null,
+      "total_questions": 330,
+      "counts_by_type": {...},
+      "rounds_covered": 2,
+      "doc_count": 18
+    }
+  ]
+}
+```
+
+If `doc_count` is instead merged into the existing `/v1/mcq/subjects`
+response, that works too — omono reads the same field from either URL.
+**Preferred**: merge into `/v1/mcq/subjects` and skip the standalone
+path. Less surface to maintain.
+
+### 11.3 `GET /v1/mcq/docs` — list docs in a subject
+
+```
+GET /v1/mcq/docs?subject=<slug>
+X-Api-Key: <same key as /v1/places>
+```
+
+Query params:
+
+| Param     | Notes                                                     |
+|-----------|-----------------------------------------------------------|
+| `subject` | **Required.** Subject slug (`apple-pay`, `argocd`, …).    |
+
+Response `200 OK`:
+
+```json
+{
+  "subject": "argocd",
+  "docs": [
+    {
+      "id": "getting-started",
+      "title": "Getting started",
+      "path": "docs/getting-started.md",
+      "size_bytes": 5823,
+      "updated_at": "2026-04-21T02:11:07.413Z"
+    }
+  ],
+  "source": "mcqs",
+  "generated_at": "..."
+}
+```
+
+- **`id`** — stable identifier usable in the fetch URL. Typically the
+  filename stem (no `.md`). Must round-trip through `GET /v1/mcq/docs/{subject}/{id}`.
+- **`title`** — human-readable display title. Prefer the first `# H1`
+  in the document; fall back to the filename.
+- **`path`** — original path within the docs-bundle. Informational
+  only; clients don't rebuild URLs from it.
+- **`size_bytes`** — raw Markdown byte size. Lets the UI show a
+  "this is a long read" hint.
+- **`updated_at`** — last file mtime. Not strictly required; omono
+  uses it to show "updated today / 2 days ago" in the list.
+
+Subject not found → `404 {"error":"subject not found"}` (matches
+`/v1/mcq/topics` convention).
+
+Unknown `subject` or malformed param → `400 {"error":"..."}`.
+
+### 11.4 `GET /v1/mcq/docs/{subject}/{id}` — fetch doc markdown
+
+```
+GET /v1/mcq/docs/{subject}/{id}
+X-Api-Key: <same key>
+```
+
+Response `200 OK`:
+
+```json
+{
+  "id": "getting-started",
+  "subject": "argocd",
+  "title": "Getting started",
+  "path": "docs/getting-started.md",
+  "markdown": "# Getting started\n\nArgoCD watches a Git repo ...",
+  "size_bytes": 5823,
+  "updated_at": "2026-04-21T02:11:07.413Z"
+}
+```
+
+- **`markdown`** is the raw file content, unmodified. Include the `#
+  H1` line if present — the client renders it as the heading.
+- **Character set**: always UTF-8. Include a `Content-Type:
+  application/json; charset=utf-8`.
+- **`path` + `id` + `subject`** — the round-trip identifiers so the
+  client can cache by `(subject, id)`.
+
+Doc not found → `404 {"error":"doc not found"}`. Subject not found →
+`404 {"error":"subject not found"}`.
+
+### 11.5 Size and caching
+
+- No server-side pagination — docs are usually < 50 KB each. A single
+  GET is fine.
+- Respond with `ETag: "<sha256-of-markdown>"` and honour `If-None-Match`
+  on the fetch endpoint so the client's in-memory cache can revalidate
+  cheaply while roaming off-Wi-Fi. The client falls back to a plain
+  200 fetch if the header is absent.
+
+### 11.6 Security
+
+Same `X-Api-Key` check as every other `/v1/mcq/*` and `/v1/places`
+endpoint. No new scopes. No per-document ACLs — either the caller has
+the key or they don't.
+
+### 11.7 Implementation hints (non-binding)
+
+- The file tree is presumably something like
+  `docs-bundles/{subject}/{id}.md`. Glob + sort by `updated_at`
+  descending is a fine default ordering for `/v1/mcq/docs`.
+- Cache the parsed H1 title in memory across requests — re-reading
+  every file on every `/docs` list call is wasteful with 43 subjects.
+- Once this ships, bump `/v1/mcq/health` to include `docs_total` so
+  omono has a reachability probe without listing every subject.
+
+### 11.8 Client behaviour (omono side, already coded)
+
+- Sends `Accept: application/json`.
+- Reads `id` + `markdown` + `title` only; every other field is
+  optional in the client parser.
+- On `404` for `/v1/mcq/docs` with any subject → shows "Docs coming
+  soon" banner; the rest of the quiz feature stays available.
+- On `401/403` → shows the same "backend not configured" empty state
+  as the quiz tab.
+- Caches the last-fetched doc body keyed by `(subject, id)` in memory
+  for the duration of the process. No disk cache yet.
+- Feeds the raw `markdown` through a client-side strip before passing
+  to `TextToSpeech` so the synth doesn't pronounce `#` or `**`.
+
+---
+
 ## Lockstep notes
 
 - `api.omarss.net` is now **shared** between `api-places` (30801) and
