@@ -21,28 +21,51 @@ class MarkdownToSpeechTest {
 
     @Test
     fun `drops images entirely and collapses the leftover gap`() {
-        // The image syntax is removed outright; the whitespace run
-        // it leaves behind collapses to a single space so the TTS
-        // engine doesn't read a 2-space pause.
         stripInlineMarkdown("before ![alt](/img.png) after") shouldBe "before after"
     }
 
     @Test
-    fun `utterances treat headings and lists as separate blocks`() {
+    fun `a blank-label link becomes literal link`() {
+        stripInlineMarkdown("see []( https://foo.com )") shouldBe "see link"
+    }
+
+    @Test
+    fun `bare urls in prose collapse to domain`() {
+        stripInlineMarkdown("deploy to https://api.omarss.net/v1/roads now") shouldBe
+            "deploy to link to api.omarss.net now"
+        stripInlineMarkdown("docs at www.kubernetes.io/docs") shouldBe
+            "docs at link to kubernetes.io"
+    }
+
+    @Test
+    fun `acronyms expand to spelled letters`() {
+        // API, URL, HTTP are the core ones.
+        stripInlineMarkdown("Hit the API via HTTP") shouldBe "Hit the A P I via H T T P"
+        // Substring matches inside identifiers must NOT fire.
+        stripInlineMarkdown("call api_key") shouldBe "call api_key"
+    }
+
+    @Test
+    fun `kubernetes numeronym is spoken as the word`() {
+        stripInlineMarkdown("run on k8s") shouldBe "run on kubernetes"
+    }
+
+    @Test
+    fun `utterances carry structural pause after each block`() {
         val md = """
             # Title
 
-            A **paragraph** here.
+            A paragraph.
 
             - item one
-            - item *two*
+            - item two
         """.trimIndent()
-        val utterances = markdownToUtterances(md)
-        utterances shouldHaveSize 4
-        utterances[0] shouldBe "Title"
-        utterances[1] shouldBe "A paragraph here."
-        utterances[2] shouldBe "item one"
-        utterances[3] shouldBe "item two"
+        val us = markdownToUtterances(md)
+        us shouldHaveSize 4
+        us[0] shouldBe Utterance("Title", silenceAfterMs = 700L)
+        us[1] shouldBe Utterance("A paragraph.", silenceAfterMs = 400L)
+        us[2] shouldBe Utterance("item one", silenceAfterMs = 250L)
+        us[3] shouldBe Utterance("item two", silenceAfterMs = 250L)
     }
 
     @Test
@@ -56,17 +79,24 @@ class MarkdownToSpeechTest {
 
             After.
         """.trimIndent()
-        val utterances = markdownToUtterances(md)
-        utterances shouldHaveSize 2
-        utterances[0] shouldBe "Before."
-        utterances[1] shouldBe "After."
+        val us = markdownToUtterances(md)
+        us shouldHaveSize 2
+        us[0].text shouldBe "Before."
+        us[1].text shouldBe "After."
     }
 
     @Test
-    fun `utterances flatten blockquotes into prose`() {
+    fun `utterances flatten blockquotes into one paragraph`() {
         val md = "> this was said\n> then this"
-        val utterances = markdownToUtterances(md)
-        utterances shouldHaveSize 1
-        utterances[0] shouldBe "this was said then this"
+        val us = markdownToUtterances(md)
+        us shouldHaveSize 1
+        us[0].text shouldBe "this was said then this"
+    }
+
+    @Test
+    fun `domain extraction trims trailing punctuation`() {
+        extractDomain("https://foo.com/bar.") shouldBe "foo.com"
+        extractDomain("https://foo.com/bar),") shouldBe "foo.com"
+        extractDomain("www.kubernetes.io") shouldBe "kubernetes.io"
     }
 }

@@ -17,6 +17,7 @@ import net.omarss.omono.feature.docs.DocSummary
 import net.omarss.omono.feature.docs.DocsRepository
 import net.omarss.omono.feature.docs.DocsTtsPlayer
 import net.omarss.omono.feature.docs.MarkdownBlock
+import net.omarss.omono.feature.docs.Utterance
 import net.omarss.omono.feature.docs.markdownToUtterances
 import net.omarss.omono.feature.docs.parseMarkdownBlocks
 import timber.log.Timber
@@ -187,7 +188,7 @@ enum class DocsView { Subjects, Docs, Reader }
 data class ReaderPayload(
     val doc: Doc,
     val blocks: List<MarkdownBlock>,
-    val utterances: List<String>,
+    val utterances: List<Utterance>,
 )
 
 data class DocsUiState(

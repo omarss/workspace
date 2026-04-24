@@ -51,7 +51,7 @@ class DocsTtsPlayer @Inject constructor(
     private var tts: TextToSpeech? = null
     private var engineReady: Boolean = false
 
-    @Volatile private var utterances: List<String> = emptyList()
+    @Volatile private var utterances: List<Utterance> = emptyList()
     @Volatile private var cursor: Int = 0
     @Volatile private var rate: Float = 1.0f
 
@@ -61,7 +61,7 @@ class DocsTtsPlayer @Inject constructor(
     // other than the start. Returns false only when the engine is
     // unavailable on this device — callers can use that to fall back
     // to a muted UI instead of showing phantom controls.
-    fun play(utterances: List<String>, fromIndex: Int = 0): Boolean {
+    fun play(utterances: List<Utterance>, fromIndex: Int = 0): Boolean {
         if (utterances.isEmpty()) return false
         this.utterances = utterances
         this.cursor = fromIndex.coerceIn(0, utterances.lastIndex)
@@ -169,11 +169,15 @@ class DocsTtsPlayer @Inject constructor(
                             .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
                             .build(),
                     )
-                    // Default to the device's current locale. Fall
-                    // through silently if it isn't supported — the
-                    // engine's built-in fallback will pick the best
-                    // available voice.
                     runCatching { engine.language = Locale.getDefault() }
+                    // Upgrade to the highest-quality voice the
+                    // installed engine offers for the current locale.
+                    // Modern Google TTS ships neural voices that
+                    // report `QUALITY_VERY_HIGH`; picking one of
+                    // those instead of the default roboty voice is
+                    // the single biggest quality win available
+                    // without leaving the platform engine.
+                    selectBestVoice(engine)
                     engine.setSpeechRate(rate)
                     engine.setOnUtteranceProgressListener(progressListener)
                 } else {
@@ -184,30 +188,70 @@ class DocsTtsPlayer @Inject constructor(
         }
     }
 
+    // Picks the highest-quality voice that:
+    //   * matches the device's default locale (language OR language+country),
+    //   * is not marked as a "network TTS" voice (we want offline), and
+    //   * has a non-zero quality rank.
+    // Falls through silently if the engine doesn't expose voices, or
+    // nothing matches — the platform default stays in place.
+    private fun selectBestVoice(engine: TextToSpeech) {
+        runCatching {
+            val voices = engine.voices?.toList().orEmpty()
+            if (voices.isEmpty()) return
+            val target = Locale.getDefault()
+            val candidates = voices.filter { v ->
+                // isNetworkConnectionRequired=true means the voice
+                // needs to fetch audio on each speak() — bad for a
+                // driver-assist app on mobile data.
+                !v.isNetworkConnectionRequired &&
+                    (
+                        v.locale.language == target.language &&
+                            (v.locale.country.isEmpty() || v.locale.country == target.country)
+                        )
+            }
+            val best = candidates.maxByOrNull { it.quality }
+                ?: voices.firstOrNull { it.locale.language == target.language }
+            if (best != null) {
+                val result = engine.setVoice(best)
+                if (result == TextToSpeech.SUCCESS) {
+                    Timber.d(
+                        "DocsTtsPlayer: selected voice %s (quality=%d, locale=%s)",
+                        best.name, best.quality, best.locale,
+                    )
+                }
+            }
+        }.onFailure { Timber.w(it, "DocsTtsPlayer: voice selection failed") }
+    }
+
     private val progressListener = object : UtteranceProgressListener() {
         override fun onStart(utteranceId: String?) {
-            val idx = utteranceId?.toIntOrNull() ?: return
+            val idx = parseTextId(utteranceId) ?: return
             handler.post { _currentIndex.value = idx }
         }
 
         override fun onDone(utteranceId: String?) {
             handler.post {
-                val idx = utteranceId?.toIntOrNull() ?: return@post
-                // Only advance if this callback matches the current
-                // cursor — otherwise it's a stale utterance from a
-                // previous queue that landed after stop().
                 if (_state.value != State.Speaking) return@post
-                if (idx != cursor) return@post
-                val next = idx + 1
-                if (next > utterances.lastIndex) {
-                    _state.value = State.Idle
-                    _currentIndex.value = null
-                    utterances = emptyList()
-                    cursor = 0
-                } else {
-                    cursor = next
-                    speakFromCursor()
+
+                // Two kinds of utteranceIds are in flight:
+                //   * "N"          — a spoken block at index N
+                //   * "sN"         — the trailing silence for block N
+                //
+                // We advance the cursor ONLY on the final event for
+                // the current block. If block N has a trailing
+                // silence queued, the text onDone fires first but we
+                // wait — the silence's onDone is the real boundary.
+                // If it doesn't, we advance from the text onDone.
+                val silenceIdx = parseSilenceId(utteranceId)
+                if (silenceIdx != null) {
+                    if (silenceIdx == cursor) advanceCursor(silenceIdx)
+                    return@post
                 }
+                val textIdx = parseTextId(utteranceId) ?: return@post
+                if (textIdx != cursor) return@post
+                val hadSilence = utterances.getOrNull(textIdx)?.silenceAfterMs ?: 0L
+                if (hadSilence <= 0L) advanceCursor(textIdx)
+                // else: wait for the silence onDone to advance.
             }
         }
 
@@ -226,21 +270,63 @@ class DocsTtsPlayer @Inject constructor(
         }
     }
 
+    private fun advanceCursor(finishedIndex: Int) {
+        val next = finishedIndex + 1
+        if (next > utterances.lastIndex) {
+            _state.value = State.Idle
+            _currentIndex.value = null
+            utterances = emptyList()
+            cursor = 0
+            return
+        }
+        cursor = next
+        speakFromCursor()
+    }
+
+    // Utterance-id helpers. The split lets onStart / onDone tell
+    // text boundaries apart from silence boundaries without each
+    // branch re-parsing the same string.
+    private fun parseTextId(id: String?): Int? =
+        id?.takeIf { !it.startsWith(SILENCE_ID_PREFIX) }?.toIntOrNull()
+
+    private fun parseSilenceId(id: String?): Int? =
+        id?.takeIf { it.startsWith(SILENCE_ID_PREFIX) }
+            ?.removePrefix(SILENCE_ID_PREFIX)?.toIntOrNull()
+
     private fun speakFromCursor() {
         val engine = tts ?: return
         if (!engineReady) return
-        val text = utterances.getOrNull(cursor) ?: return
+        val u = utterances.getOrNull(cursor) ?: return
         val utteranceId = cursor.toString()
         _currentIndex.value = cursor
         // Use QUEUE_FLUSH so a mid-sentence skip replaces the current
         // utterance immediately rather than stacking a second one
-        // behind it.
+        // behind it. The trailing silence is enqueued with QUEUE_ADD
+        // so it chains naturally and gets flushed by the next
+        // FLUSH — no bespoke cleanup needed.
         runCatching {
-            engine.speak(text, TextToSpeech.QUEUE_FLUSH, null, utteranceId)
+            engine.speak(u.text, TextToSpeech.QUEUE_FLUSH, null, utteranceId)
+            if (u.silenceAfterMs > 0L) {
+                // Silence utterance id is "s<idx>" — progressListener
+                // filters non-numeric ids, so these start/done events
+                // don't advance the cursor.
+                engine.playSilentUtterance(
+                    u.silenceAfterMs,
+                    TextToSpeech.QUEUE_ADD,
+                    SILENCE_ID_PREFIX + cursor,
+                )
+            }
         }.onFailure { Timber.w(it, "DocsTtsPlayer: speak failed") }
     }
 
     private fun stopInternal() {
         runCatching { tts?.stop() }
+    }
+
+    private companion object {
+        // Distinct prefix on silence-utterance IDs so progressListener
+        // can route callbacks without collapsing the two kinds of
+        // events onto the same advance path.
+        const val SILENCE_ID_PREFIX = "s"
     }
 }
