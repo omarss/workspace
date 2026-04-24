@@ -103,9 +103,18 @@ clean:
 	rm -rf .venv .ruff_cache .pytest_cache **/__pycache__
 
 # One-shot release — mirrors gplaces_parser's flow. Aborts on dirty tree.
-release:
+#
+# The dirty-tree check lives on a dependency target rather than inline
+# so bump-version.sh (which is wrapped in $(eval $(shell …)) and thus
+# expands at recipe-expansion time) runs only after the check has
+# passed. Inlining the check left the file dirty on every failed run,
+# which caused the next invocation to also fail — see commit history.
+.PHONY: _release-preflight
+_release-preflight:
 	@test -z "$$(git -C .. status --porcelain mcqs/)" \
 	  || (echo "working tree has uncommitted changes under mcqs/"; exit 1)
+
+release: _release-preflight
 	@echo ">> bumping version"
 	$(eval NEW_VERSION := $(shell ./scripts/bump-version.sh))
 	@test -n "$(NEW_VERSION)" || (echo "bump-version.sh did not return a version"; exit 2)
