@@ -100,6 +100,7 @@ dependencies {
     implementation(projects.feature.places)
     implementation(projects.feature.quiz)
     implementation(projects.feature.docs)
+    implementation(projects.feature.prayer)
     implementation(projects.feature.selfupdate)
 
     implementation(libs.androidx.core.ktx)
