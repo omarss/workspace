@@ -1,0 +1,21 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: ivr-dev
+
+resources:
+  - ../../base
+
+# Dev images live only in containerd; never let the kubelet try to pull them.
+images:
+  - name: localhost/ivr-api
+    newTag: dev
+
+patches:
+  - target:
+      kind: Deployment
+      name: api
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/imagePullPolicy
+        value: Never
