@@ -85,9 +85,7 @@ class PrayerViewModel @Inject constructor(
             }
         }
         // Reliability-mode mirror: when the user flips it on we kick
-        // the foreground service; when off, we stop it. Reading from
-        // a separate flow rather than the snapshot above because the
-        // settings combine is already at its 5-flow ceiling.
+        // the foreground service; when off, we stop it.
         viewModelScope.launch {
             settings.reliabilityMode.collect { enabled ->
                 _state.update { it.copy(reliabilityMode = enabled) }
@@ -96,6 +94,11 @@ class PrayerViewModel @Inject constructor(
                 } else {
                     PrayerKeepAliveService.stop(context)
                 }
+            }
+        }
+        viewModelScope.launch {
+            settings.requireChallengeToStop.collect { enabled ->
+                _state.update { it.copy(requireChallengeToStop = enabled) }
             }
         }
         // Re-check battery-optimisation status whenever the user
@@ -179,6 +182,10 @@ class PrayerViewModel @Inject constructor(
     // button on Local rows, so this silently no-ops for Bundled.
     fun setReliabilityMode(enabled: Boolean) {
         viewModelScope.launch { settings.setReliabilityMode(enabled) }
+    }
+
+    fun setRequireChallengeToStop(enabled: Boolean) {
+        viewModelScope.launch { settings.setRequireChallengeToStop(enabled) }
     }
 
     // True if the OS is currently exempting omono from battery
@@ -302,6 +309,7 @@ data class PrayerUiState(
     val athanSelection: AthanSelection = AthanSelection.Random,
     val availableAthans: List<AthanItem> = emptyList(),
     val reliabilityMode: Boolean = false,
+    val requireChallengeToStop: Boolean = false,
     val ignoringBatteryOptimisations: Boolean = true,
     val permissionDenied: Boolean = false,
     val now: Long = System.currentTimeMillis(),

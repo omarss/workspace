@@ -56,6 +56,13 @@
          page when the user has alerts enabled. -->
     <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
 
+    <!-- Prayer tab's Fajr dismiss gate launches a full-screen
+         activity over the lock screen via the notification's
+         setFullScreenIntent. Permission is automatic on older
+         Android; on 14+ users must grant it from Settings →
+         Apps → Special access → Full-screen notifications. -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+
     <!-- Distraction guard: detect the foreground app while driving so
          the "no phone while driving" beep can skip recognised
          navigation apps (Google Maps, Waze, Yango). This is a
@@ -122,6 +129,19 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Fajr dismiss gate — launches over the lock screen via
+             the prayer alarm's full-screen-intent notification.
+             showWhenLocked + turnScreenOn are set programmatically
+             in onCreate. excludeFromRecents so the task doesn't
+             sit in the user's recents after they dismiss. -->
+        <activity
+            android:name=".ui.prayer.challenge.AthanChallengeActivity"
+            android:exported="false"
+            android:launchMode="singleInstance"
+            android:excludeFromRecents="true"
+            android:showOnLockScreen="true"
+            android:theme="@style/Theme.Omono" />
 
         <service
             android:name="net.omarss.omono.core.service.FeatureHostService"

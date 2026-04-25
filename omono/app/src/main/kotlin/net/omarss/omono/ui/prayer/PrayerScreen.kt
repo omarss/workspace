@@ -135,6 +135,10 @@ fun PrayerRoute(
                 onToggle = viewModel::setReliabilityMode,
                 onLaunchBatteryOptSettings = viewModel::launchBatteryOptSettings,
             )
+            HardWakeCard(
+                enabled = state.requireChallengeToStop,
+                onToggle = viewModel::setRequireChallengeToStop,
+            )
             AthanPickerCard(
                 state = state,
                 onPreview = viewModel::playAthanPreview,
@@ -404,6 +408,44 @@ private fun ReliabilityCard(
                     )
                 }
             }
+        }
+    }
+}
+
+// Anti-snooze gate toggle. When on, the Fajr athan cannot be
+// dismissed without answering 3 multiple-choice questions (SAT,
+// Qiyas, or advanced math) correctly in a row. The gate launches
+// as a full-screen activity over the lock screen.
+@Composable
+private fun HardWakeCard(
+    enabled: Boolean,
+    onToggle: (Boolean) -> Unit,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.elevatedCardColors(),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Hard wake",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    text = "You can't silence the Fajr athan without answering " +
+                        "3 questions (SAT / Qiyas / math) in a row. Impossible " +
+                        "to sleep through.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Switch(checked = enabled, onCheckedChange = onToggle)
         }
     }
 }
