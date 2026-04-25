@@ -1,0 +1,48 @@
+# Build output
+/bin/
+/dist/
+/coverage.out
+/coverage.html
+*.test
+*.out
+
+# The parent workspace gitignore excludes build/. We need ours back.
+!/build/
+
+# In-project caches/configs that leak in when $HOME isn't set in the builder
+/.cache/
+/.config/
+
+# Claude Code per-project settings (local approvals etc.)
+/.claude/
+
+# Go
+go.work.sum
+
+# Editor
+.idea/
+.vscode/
+*.swp
+*~
+.DS_Store
+
+# Local env / secrets — NEVER commit
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.kubeconfig
+secrets/
+
+# Generated artefacts
+/api/gen/
+/internal/db/sqlc/
+/dist/
+
+# Container build context tarballs
+*.tar
+*.tar.gz
+
+# Local k3s/kubeconfig overrides
+kubeconfig.local
