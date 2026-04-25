@@ -339,21 +339,21 @@ class AthanPlayer @Inject constructor(
         const val FADE_DURATION_MS: Long = 15_000L
         const val FADE_STEPS: Int = 60
 
-        // Per-file attribution metadata for the bundled set. Keys
-        // are asset filenames inside BUNDLED_DIR; values render
-        // under the file row in the picker. Public-domain entries
-        // are kept brief; CC-BY-SA entries include the author and
-        // license name so the legally-required attribution is
-        // satisfied purely by having the picker open.
+        // Per-file attribution / source line for the bundled set.
+        // Keys are asset filenames inside BUNDLED_DIR; values render
+        // under the file row in the picker so the listener knows
+        // which muezzin or location they're hearing.
         val BUNDLED_CREDITS: Map<String, String> = mapOf(
-            "doha_fajr.mp3" to "Fajr adhan · Doha, Qatar · Public Domain",
-            "doha_dhuhr.mp3" to "Dhuhr adhan · Doha, Qatar · Public Domain",
-            "doha_asr.mp3" to "Asr adhan · Doha, Qatar · Public Domain",
-            "doha_maghrib.mp3" to "Maghrib adhan · Doha, Qatar · Public Domain",
-            "doha_isha.mp3" to "Isha adhan · Doha, Qatar · Public Domain",
-            "sabah_fakhri.mp3" to "Sabah Fakhri (1985) · Public Domain",
-            "aaqib_azeez.mp3" to "Aaqib Azeez · CC-BY-SA 4.0",
-            "mahfoudou.oga" to "Mahfoudou · CC-BY-SA 4.0",
+            "abdullah_baafif_haram.mp3" to "Sheikh Abdullah Ba'afif · Masjid Al Haram",
+            "ali_ahmed_mulla_makkah.mp3" to "Sheikh Ali Ahmed Mulla · Mecca",
+            "ali_mullah_friday_2014.mp3" to "Sheikh Ali Mullah · 7 March 2014",
+            "al_aqsa_jerusalem.mp3" to "Masjid Al Aqsa · Jerusalem",
+            "emotional_adhan.mp3" to "\"Most beautiful azan in the world\"",
+            "makkah_fajr.mp3" to "Fajr from Makkah",
+            "mohammed_amin.mp3" to "Mohammed Amin",
+            "most_beautiful_fajr.mp3" to "Generic \"Most Beautiful Fajr Adhan\"",
+            "raad_al_kurdi.mp3" to "Raad Muhammad Al Kurdi",
+            "soothing_fajr_dawn.mp3" to "Soothing Islamic call to prayer",
         )
     }
 }
