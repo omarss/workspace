@@ -11,10 +11,19 @@ import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
 
-// Schedules AlarmManager alarms at each prayer time. Uses exact
-// alarms where possible (API 31+ needs SCHEDULE_EXACT_ALARM granted)
-// and falls back to setAndAllowWhileIdle when not permitted — the
-// fallback can delay by up to 10 minutes but still fires.
+// Schedules AlarmManager alarms at each prayer time using the
+// `setAlarmClock` API — the same priority that real alarm-clock apps
+// use. setAlarmClock is the only AlarmManager path that's:
+//   * exempt from Doze (fires at the exact wall-clock time even
+//     after the device has been idle for hours, which Fajr always is)
+//   * not throttled by app-standby buckets (the 9-minute floor that
+//     setExactAndAllowWhileIdle falls into)
+//   * surfaced as a real alarm icon on the lock screen, with a
+//     show-intent that re-opens the app when tapped.
+//
+// Falls back to setAndAllowWhileIdle on the rare device that's
+// denied SCHEDULE_EXACT_ALARM. The fallback can drift by ±10 min
+// but at least still fires through Doze.
 //
 // Each prayer has a distinct PendingIntent request code so rescheduling
 // one (e.g. when the user's location moved) replaces just that prayer's
@@ -56,15 +65,16 @@ class PrayerScheduler @Inject constructor(
                 manager.canScheduleExactAlarms()
             runCatching {
                 if (canExact) {
-                    manager.setExactAndAllowWhileIdle(
-                        AlarmManager.RTC_WAKEUP,
-                        time.atEpochMs,
-                        pending,
-                    )
+                    // setAlarmClock takes both the firing PendingIntent
+                    // and a show-intent that opens when the user taps
+                    // the alarm icon on the lock screen.
+                    val show = launchAppPendingIntent()
+                    val info = AlarmManager.AlarmClockInfo(time.atEpochMs, show)
+                    manager.setAlarmClock(info, pending)
                 } else {
                     // Inexact fallback — ±10 min drift, but still fires
-                    // through Doze. Acceptable until the user grants
-                    // SCHEDULE_EXACT_ALARM from Settings.
+                    // through Doze. Triggered only when the user has
+                    // explicitly denied SCHEDULE_EXACT_ALARM.
                     manager.setAndAllowWhileIdle(
                         AlarmManager.RTC_WAKEUP,
                         time.atEpochMs,
@@ -73,6 +83,20 @@ class PrayerScheduler @Inject constructor(
                 }
             }.onFailure { Timber.w(it, "failed to schedule %s", time.kind) }
         }
+    }
+
+    // PendingIntent that opens the app when the user taps the alarm
+    // clock icon on the lock screen. Uses the package's launch intent
+    // so feature/prayer doesn't need a hard dependency on MainActivity.
+    private fun launchAppPendingIntent(): PendingIntent? {
+        val launch = context.packageManager.getLaunchIntentForPackage(context.packageName)
+            ?: return null
+        return PendingIntent.getActivity(
+            context,
+            SHOW_REQ_CODE,
+            launch,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
     }
 
     fun cancelAll() {
@@ -108,5 +132,6 @@ class PrayerScheduler @Inject constructor(
         const val EXTRA_KIND = "kind"
         const val EXTRA_EPOCH_MS = "at"
         private const val REQ_CODE_BASE = 7300
+        private const val SHOW_REQ_CODE = 7299
     }
 }
