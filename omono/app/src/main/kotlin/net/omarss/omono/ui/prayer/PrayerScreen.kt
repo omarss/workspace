@@ -22,11 +22,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Mosque
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.WarningAmber
+import androidx.compose.material3.Switch
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Card
@@ -42,6 +45,7 @@ import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -49,6 +53,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import net.omarss.omono.feature.prayer.AthanItem
 import net.omarss.omono.feature.prayer.AthanSelection
@@ -78,6 +85,19 @@ fun PrayerRoute(
         ActivityResultContracts.OpenDocument(),
     ) { uri ->
         if (uri != null) viewModel.importAthanFromUri(uri)
+    }
+
+    // Returning from the system battery-optimisation deep-link
+    // doesn't fire onActivityResult — it's an open-ended Settings
+    // page. Re-check the status on every ON_RESUME so the chip
+    // updates the moment the user grants the exemption.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) viewModel.refreshBatteryOptStatus()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     Column(
@@ -110,6 +130,11 @@ fun PrayerRoute(
             LocationAndMethodRow(state)
             NextPrayerCard(state)
             PrayerList(state)
+            ReliabilityCard(
+                state = state,
+                onToggle = viewModel::setReliabilityMode,
+                onLaunchBatteryOptSettings = viewModel::launchBatteryOptSettings,
+            )
             AthanPickerCard(
                 state = state,
                 onPreview = viewModel::playAthanPreview,
@@ -287,6 +312,102 @@ private fun PrayerRow(time: PrayerTime, highlighted: Boolean) {
 // the next Fajr. An "Add audio file" button opens the system SAF
 // picker so the user can source from any app (Files / Drive / local
 // media / downloads).
+// Reliability card: surface the two levers that fix "athan didn't
+// fire" in practice — battery-optimisation exemption (most often
+// the actual culprit) and the optional always-on foreground service
+// for OEMs that kill background processes regardless of doze.
+@Composable
+private fun ReliabilityCard(
+    state: PrayerUiState,
+    onToggle: (Boolean) -> Unit,
+    onLaunchBatteryOptSettings: () -> Unit,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.elevatedCardColors(),
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(
+                text = "Reliability",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+
+            // Reliability-mode toggle. Foreground service holds the
+            // process resident across overnight idle — the belt-and-
+            // braces fix for OEM aggressive kills.
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Reliability mode",
+                        style = MaterialTheme.typography.titleSmall,
+                    )
+                    Text(
+                        text = "Keeps a low-priority background notification " +
+                            "so Fajr fires even if the OS would otherwise kill " +
+                            "the app overnight. Costs one notification slot.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Switch(checked = state.reliabilityMode, onCheckedChange = onToggle)
+            }
+
+            // Battery-optimisation status. When the app is *not*
+            // exempted, surface a CTA — this is the single most
+            // common cause of an alarm not firing on schedule.
+            if (!state.ignoringBatteryOptimisations) {
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(onClick = onLaunchBatteryOptSettings)
+                        .padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.WarningAmber,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error,
+                    )
+                    Spacer(Modifier.width(10.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Battery optimisation is active",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                        Text(
+                            text = "Tap to whitelist omono. Without this, Doze can " +
+                                "delay or silence Fajr entirely.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            } else {
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Filled.Bolt,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = "Battery optimisation exempt — alarms fire on schedule.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+    }
+}
+
 @Composable
 private fun AthanPickerCard(
     state: PrayerUiState,

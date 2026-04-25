@@ -19,6 +19,7 @@ private val MADHAB_KEY = stringPreferencesKey("prayer.madhab")
 private val NOTIFY_KEY = booleanPreferencesKey("prayer.notify_each")
 private val ATHAN_KEY = booleanPreferencesKey("prayer.athan_at_fajr")
 private val ATHAN_SELECTION_KEY = stringPreferencesKey("prayer.athan_selection")
+private val RELIABILITY_KEY = booleanPreferencesKey("prayer.reliability_mode")
 
 @Singleton
 class PrayerSettingsRepository @Inject constructor(
@@ -45,6 +46,17 @@ class PrayerSettingsRepository @Inject constructor(
         AthanSelection.fromStorage(prefs[ATHAN_SELECTION_KEY])
     }
 
+    // "Reliability mode" — when on, omono runs a low-priority
+    // foreground service that keeps the app process alive across
+    // overnight idle periods so AlarmManager can fire reliably even
+    // on aggressive OEMs (Samsung / Xiaomi / Huawei) that kill
+    // background processes. Off by default — most users on stock
+    // Android don't need it, and the persistent notification it
+    // posts costs UX visibility.
+    val reliabilityMode: Flow<Boolean> = context.omonoDataStore.data.map { prefs ->
+        prefs[RELIABILITY_KEY] ?: false
+    }
+
     // Convenience combine for downstream code that needs all fields
     // in one snapshot — the repository uses this to avoid holding
     // independent coroutines per field.
@@ -57,6 +69,10 @@ class PrayerSettingsRepository @Inject constructor(
             notifyEachPrayer = notify,
             playAthanAtFajr = athan,
             athanSelection = selection,
+            // reliabilityMode is read separately in the ViewModel
+            // because combine's overload limit is 5; default false
+            // so the snapshot is never lying about the current state.
+            reliabilityMode = false,
         )
     }
 
@@ -80,5 +96,9 @@ class PrayerSettingsRepository @Inject constructor(
         context.omonoDataStore.edit {
             it[ATHAN_SELECTION_KEY] = AthanSelection.toStorage(selection)
         }
+    }
+
+    suspend fun setReliabilityMode(enabled: Boolean) {
+        context.omonoDataStore.edit { it[RELIABILITY_KEY] = enabled }
     }
 }

@@ -94,6 +94,7 @@ data class PrayerSettingsSnapshot(
     val notifyEachPrayer: Boolean = true,
     val playAthanAtFajr: Boolean = true,
     val athanSelection: AthanSelection = AthanSelection.Random,
+    val reliabilityMode: Boolean = false,
 )
 
 // Pure guard for whether the athan should play on a given alarm

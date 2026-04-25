@@ -8,6 +8,14 @@
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
 
+    <!-- Reliability-mode foreground service. `specialUse` is the right
+         category here because the service does no real work — it only
+         exists to hold the process alive so AlarmManager can fire on
+         aggressive OEMs. Required on Android 14+ along with the
+         attribution string declared as a property of the <service>. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+
     <application>
         <!-- Wakes the device at a scheduled prayer time to post the
              notification (and play the Fajr athan). Kept exported=false
@@ -15,6 +23,16 @@
         <receiver
             android:name="net.omarss.omono.feature.prayer.PrayerAlarmReceiver"
             android:exported="false" />
+
+        <!-- Keep-alive service for reliability mode. -->
+        <service
+            android:name="net.omarss.omono.feature.prayer.PrayerKeepAliveService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Keeps the process alive so AlarmManager can fire prayer alarms on aggressive OEMs that would otherwise silence them overnight." />
+        </service>
     </application>
 
 </manifest>

@@ -1,8 +1,13 @@
 package net.omarss.omono.ui.prayer
 
 import android.content.Context
+import android.content.Intent
 import android.location.Geocoder
 import android.net.Uri
+import android.os.PowerManager
+import android.provider.Settings
+import androidx.core.content.getSystemService
+import androidx.core.net.toUri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -22,6 +27,7 @@ import net.omarss.omono.feature.prayer.AthanPlayer
 import net.omarss.omono.feature.prayer.AthanSelection
 import net.omarss.omono.feature.prayer.PrayerCalculationMethod
 import net.omarss.omono.feature.prayer.PrayerDayTimes
+import net.omarss.omono.feature.prayer.PrayerKeepAliveService
 import net.omarss.omono.feature.prayer.PrayerKind
 import net.omarss.omono.feature.prayer.PrayerLocationCache
 import net.omarss.omono.feature.prayer.PrayerScheduler
@@ -78,6 +84,24 @@ class PrayerViewModel @Inject constructor(
                 }
             }
         }
+        // Reliability-mode mirror: when the user flips it on we kick
+        // the foreground service; when off, we stop it. Reading from
+        // a separate flow rather than the snapshot above because the
+        // settings combine is already at its 5-flow ceiling.
+        viewModelScope.launch {
+            settings.reliabilityMode.collect { enabled ->
+                _state.update { it.copy(reliabilityMode = enabled) }
+                if (enabled) {
+                    PrayerKeepAliveService.start(context)
+                } else {
+                    PrayerKeepAliveService.stop(context)
+                }
+            }
+        }
+        // Re-check battery-optimisation status whenever the user
+        // returns to the tab — they might have just granted it via
+        // the system Settings deep-link below.
+        refreshBatteryOptStatus()
         // Poll the athans directory so the file list + pickability
         // update after an import / delete without a rotation tap.
         refreshAthansList()
@@ -153,6 +177,39 @@ class PrayerViewModel @Inject constructor(
     // Only Local items are deletable; Bundled items live in the APK
     // and can't be removed at runtime. The UI only shows a delete
     // button on Local rows, so this silently no-ops for Bundled.
+    fun setReliabilityMode(enabled: Boolean) {
+        viewModelScope.launch { settings.setReliabilityMode(enabled) }
+    }
+
+    // True if the OS is currently exempting omono from battery
+    // optimisations — without that exemption Doze can deliver alarms
+    // late on most OEMs even with setAlarmClock.
+    fun refreshBatteryOptStatus() {
+        val pm = context.getSystemService<PowerManager>() ?: return
+        val ignoring = runCatching {
+            pm.isIgnoringBatteryOptimizations(context.packageName)
+        }.getOrDefault(false)
+        _state.update { it.copy(ignoringBatteryOptimisations = ignoring) }
+    }
+
+    // Deep-link the user to the system-Settings page where they can
+    // grant the exemption. Falls back to the generic battery-saver
+    // settings page on devices that refuse the targeted intent.
+    fun launchBatteryOptSettings() {
+        val targeted = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+            data = "package:${context.packageName}".toUri()
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        val started = runCatching { context.startActivity(targeted) }.isSuccess
+        if (!started) {
+            val generic = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            runCatching { context.startActivity(generic) }
+                .onFailure { Timber.w(it, "battery-opt settings deep-link failed") }
+        }
+    }
+
     fun deleteAthan(item: AthanItem) {
         if (item !is AthanItem.Local) return
         viewModelScope.launch {
@@ -244,6 +301,8 @@ data class PrayerUiState(
     val method: PrayerCalculationMethod = PrayerCalculationMethod.UmmAlQura,
     val athanSelection: AthanSelection = AthanSelection.Random,
     val availableAthans: List<AthanItem> = emptyList(),
+    val reliabilityMode: Boolean = false,
+    val ignoringBatteryOptimisations: Boolean = true,
     val permissionDenied: Boolean = false,
     val now: Long = System.currentTimeMillis(),
 ) {
