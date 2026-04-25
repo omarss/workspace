@@ -29,11 +29,10 @@ RUN_OPTS := --rm \
             --userns=keep-id \
             -v $(ROOT):/work:Z \
             -v $(GOCACHE_HOST):/cache/go-build:Z \
-            -v $(GOPKG_HOST):/cache/go-pkg:Z \
+            -v $(GOPKG_HOST):/go/pkg:Z \
             -w /work \
             -e HOME=/tmp \
             -e GOCACHE=/cache/go-build \
-            -e GOMODCACHE=/cache/go-pkg/mod \
             -e GOFLAGS=-buildvcs=false
 
 IN_BUILDER       := $(PODMAN) run $(RUN_OPTS) -e CGO_ENABLED=0 -t $(BUILDER_IMAGE)
