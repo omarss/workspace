@@ -20,6 +20,7 @@ private val NOTIFY_KEY = booleanPreferencesKey("prayer.notify_each")
 private val ATHAN_KEY = booleanPreferencesKey("prayer.athan_at_fajr")
 private val ATHAN_SELECTION_KEY = stringPreferencesKey("prayer.athan_selection")
 private val RELIABILITY_KEY = booleanPreferencesKey("prayer.reliability_mode")
+private val CHALLENGE_KEY = booleanPreferencesKey("prayer.require_challenge")
 
 @Singleton
 class PrayerSettingsRepository @Inject constructor(
@@ -57,24 +58,54 @@ class PrayerSettingsRepository @Inject constructor(
         prefs[RELIABILITY_KEY] ?: false
     }
 
+    // Anti-snooze gate: when on, the Fajr athan cannot be dismissed
+    // until the user answers FAJR_CHALLENGE_REQUIRED questions
+    // correctly in a row. Off by default — opt in via the Prayer
+    // tab. Off for users who just want a normal alarm; on for users
+    // who sleep through everything short of an exam.
+    val requireChallengeToStop: Flow<Boolean> = context.omonoDataStore.data.map { prefs ->
+        prefs[CHALLENGE_KEY] ?: false
+    }
+
     // Convenience combine for downstream code that needs all fields
-    // in one snapshot — the repository uses this to avoid holding
-    // independent coroutines per field.
-    val snapshot: Flow<PrayerSettingsSnapshot> = combine(
+    // in one snapshot. combine's public overloads top out at 5
+    // flows, so we split into two halves and merge.
+    private val coreSnapshot: Flow<CoreSnapshot> = combine(
         method, madhab, notifyEachPrayer, playAthanAtFajr, athanSelection,
     ) { m, mh, notify, athan, selection ->
+        CoreSnapshot(m, mh, notify, athan, selection)
+    }
+
+    private val modesSnapshot: Flow<ModesSnapshot> = combine(
+        reliabilityMode, requireChallengeToStop,
+    ) { rel, challenge -> ModesSnapshot(rel, challenge) }
+
+    val snapshot: Flow<PrayerSettingsSnapshot> = combine(
+        coreSnapshot, modesSnapshot,
+    ) { core, modes ->
         PrayerSettingsSnapshot(
-            method = m,
-            madhab = mh,
-            notifyEachPrayer = notify,
-            playAthanAtFajr = athan,
-            athanSelection = selection,
-            // reliabilityMode is read separately in the ViewModel
-            // because combine's overload limit is 5; default false
-            // so the snapshot is never lying about the current state.
-            reliabilityMode = false,
+            method = core.method,
+            madhab = core.madhab,
+            notifyEachPrayer = core.notifyEachPrayer,
+            playAthanAtFajr = core.playAthanAtFajr,
+            athanSelection = core.athanSelection,
+            reliabilityMode = modes.reliabilityMode,
+            requireChallengeToStop = modes.requireChallenge,
         )
     }
+
+    private data class CoreSnapshot(
+        val method: PrayerCalculationMethod,
+        val madhab: PrayerMadhab,
+        val notifyEachPrayer: Boolean,
+        val playAthanAtFajr: Boolean,
+        val athanSelection: AthanSelection,
+    )
+
+    private data class ModesSnapshot(
+        val reliabilityMode: Boolean,
+        val requireChallenge: Boolean,
+    )
 
     suspend fun setMethod(method: PrayerCalculationMethod) {
         context.omonoDataStore.edit { it[METHOD_KEY] = method.name }
@@ -100,5 +131,9 @@ class PrayerSettingsRepository @Inject constructor(
 
     suspend fun setReliabilityMode(enabled: Boolean) {
         context.omonoDataStore.edit { it[RELIABILITY_KEY] = enabled }
+    }
+
+    suspend fun setRequireChallengeToStop(enabled: Boolean) {
+        context.omonoDataStore.edit { it[CHALLENGE_KEY] = enabled }
     }
 }

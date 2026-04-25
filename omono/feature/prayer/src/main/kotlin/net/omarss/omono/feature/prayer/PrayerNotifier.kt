@@ -2,7 +2,10 @@ package net.omarss.omono.feature.prayer
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
+import android.content.ComponentName
 import android.content.Context
+import android.content.Intent
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.getSystemService
@@ -49,7 +52,12 @@ class PrayerNotifier @Inject constructor(
         manager.createNotificationChannel(channel)
     }
 
-    fun notify(context: Context, kind: PrayerKind, atEpochMs: Long) {
+    fun notify(
+        context: Context,
+        kind: PrayerKind,
+        atEpochMs: Long,
+        fullScreenChallenge: Boolean = false,
+    ) {
         ensureChannel()
         val manager = NotificationManagerCompat.from(context)
         val title = when (kind) {
@@ -61,7 +69,7 @@ class PrayerNotifier @Inject constructor(
             PrayerKind.Isha -> "العشاء · Isha"
         }
         val formatted = timeFormatter.format(Instant.ofEpochMilli(atEpochMs))
-        val notification = NotificationCompat.Builder(
+        val builder = NotificationCompat.Builder(
             context,
             OmonoNotificationChannels.PRAYER_CHANNEL_ID,
         )
@@ -73,17 +81,67 @@ class PrayerNotifier @Inject constructor(
             .setAutoCancel(true)
             .setWhen(atEpochMs)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .build()
+
+        // Fajr + challenge-to-stop is on → attach a full-screen-intent
+        // that launches the challenge activity over the lock screen.
+        // Android uses this as a heads-up fallback on unlocked screens
+        // and as a direct-launch trigger on locked screens.
+        if (fullScreenChallenge) {
+            val fsi = challengeFullScreenIntent(context)
+            if (fsi != null) {
+                builder.setFullScreenIntent(fsi, true)
+                builder.setContentIntent(fsi)
+                // Ongoing so the user can't swipe it away before the
+                // gate has been passed — only the challenge activity
+                // dismisses it (via manager.cancel after success).
+                builder.setOngoing(true)
+            }
+        }
 
         val notificationId = NOTIFICATION_ID_BASE + kind.ordinal
         runCatching {
-            manager.notify(notificationId, notification)
+            manager.notify(notificationId, builder.build())
         }.onFailure {
             Timber.w(it, "PrayerNotifier: post failed (kind=%s)", kind)
         }
     }
 
+    // Dismiss the Fajr-challenge notification — called by the
+    // AthanChallengeActivity once the user clears the gate, so the
+    // notification shade cleans up along with the athan stopping.
+    fun cancel(context: Context, kind: PrayerKind) {
+        val manager = NotificationManagerCompat.from(context)
+        runCatching { manager.cancel(NOTIFICATION_ID_BASE + kind.ordinal) }
+    }
+
+    // Builds a PendingIntent that opens the challenge activity.
+    // Uses an explicit ComponentName so the feature/prayer module
+    // doesn't need a compile-time reference to the app module's
+    // activity class. The fully-qualified name is stable — if we
+    // ever rename the activity we update the string here and the
+    // manifest in lock-step.
+    private fun challengeFullScreenIntent(context: Context): PendingIntent? {
+        val intent = Intent().apply {
+            component = ComponentName(
+                context.packageName,
+                CHALLENGE_ACTIVITY_CLASS,
+            )
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+        }
+        return runCatching {
+            PendingIntent.getActivity(
+                context,
+                CHALLENGE_REQUEST_CODE,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            )
+        }.getOrNull()
+    }
+
     private companion object {
         const val NOTIFICATION_ID_BASE = 7400
+        const val CHALLENGE_REQUEST_CODE = 7402
+        const val CHALLENGE_ACTIVITY_CLASS =
+            "net.omarss.omono.ui.prayer.challenge.AthanChallengeActivity"
     }
 }

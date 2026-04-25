@@ -47,10 +47,19 @@ class PrayerAlarmReceiver : BroadcastReceiver() {
             try {
                 val snap = settings.snapshot.first()
 
-                if (snap.notifyEachPrayer) {
-                    notifier.notify(context, kind, atEpochMs)
+                val playingAthanForFajr = shouldPlayAthan(kind, snap)
+                if (snap.notifyEachPrayer || playingAthanForFajr) {
+                    notifier.notify(
+                        context = context,
+                        kind = kind,
+                        atEpochMs = atEpochMs,
+                        // Full-screen-intent only for Fajr, only when
+                        // the user has opted into the challenge gate.
+                        fullScreenChallenge = playingAthanForFajr &&
+                            snap.requireChallengeToStop,
+                    )
                 }
-                if (shouldPlayAthan(kind, snap)) {
+                if (playingAthanForFajr) {
                     athanPlayer.play(snap.athanSelection)
                 }
 
