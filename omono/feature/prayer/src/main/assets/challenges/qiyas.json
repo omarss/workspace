@@ -1,0 +1,135 @@
+{
+  "_comment": "Qiyas (GAT-style) aptitude questions — verbal analogies, vocabulary, quantitative reasoning. Mix of Arabic and English items; all options use only the text the TTS-free challenge UI renders verbatim.",
+  "challenges": [
+    {
+      "id": "qiyas-verbal-001",
+      "category": "Qiyas",
+      "stem": "كتاب : قراءة :: طعام : ؟",
+      "options": ["طبخ", "أكل", "شراء", "تجهيز"],
+      "correct": 1,
+      "explanation": "كما يُستخدم الكتاب للقراءة، يُستخدم الطعام للأكل."
+    },
+    {
+      "id": "qiyas-verbal-002",
+      "category": "Qiyas",
+      "stem": "مفتاح : قفل :: كلمة سر : ؟",
+      "options": ["حساب", "شبكة", "جهاز", "بوابة"],
+      "correct": 0,
+      "explanation": "المفتاح يفتح القفل؛ كلمة السر تفتح الحساب."
+    },
+    {
+      "id": "qiyas-verbal-003",
+      "category": "Qiyas",
+      "stem": "Choose the word nearest in meaning to جَذِل:",
+      "options": ["حزين", "فرِح", "غضبان", "متردد"],
+      "correct": 1,
+      "explanation": "الجَذِل هو الفَرِح (مسرور)."
+    },
+    {
+      "id": "qiyas-verbal-004",
+      "category": "Qiyas",
+      "stem": "أي من الكلمات التالية عكس يسر؟",
+      "options": ["سهولة", "عسر", "راحة", "سكون"],
+      "correct": 1,
+      "explanation": "اليُسر عكسه العُسر."
+    },
+    {
+      "id": "qiyas-verbal-005",
+      "category": "Qiyas",
+      "stem": "أكمل القياس: شاعر : قصيدة :: رسّام : ؟",
+      "options": ["لوحة", "قلم", "ألوان", "معرض"],
+      "correct": 0,
+      "explanation": "الشاعر ينتج قصيدة؛ الرسّام ينتج لوحة."
+    },
+    {
+      "id": "qiyas-verbal-006",
+      "category": "Qiyas",
+      "stem": "ما معنى كلمة (تَجاهَل)؟",
+      "options": [
+        "أدرك بسرعة",
+        "أظهر عدم المعرفة",
+        "علم اليقين",
+        "وعَى الأمر"
+      ],
+      "correct": 1,
+      "explanation": "تجاهل = تظاهر بعدم معرفته."
+    },
+    {
+      "id": "qiyas-verbal-007",
+      "category": "Qiyas",
+      "stem": "أي من الأزواج التالية ليس له نفس العلاقة؟",
+      "options": [
+        "شمس : نهار",
+        "قمر : ليل",
+        "نجم : كوكب",
+        "فجر : صلاة"
+      ],
+      "correct": 2,
+      "explanation": "نجم وكوكب ليسا علاقة سبب-وقت مثل البقية."
+    },
+    {
+      "id": "qiyas-quant-001",
+      "category": "Qiyas",
+      "stem": "إذا كان 3 عمال ينجزون عملًا في 6 أيام، فكم يومًا يحتاج 9 عمال لإنجاز نفس العمل بنفس الكفاءة؟",
+      "options": ["يومان", "ثلاثة أيام", "18 يومًا", "يوم واحد"],
+      "correct": 0,
+      "explanation": "ثلاثة أضعاف العمّال → ثلث الزمن، 6 ÷ 3 = 2 يومًا."
+    },
+    {
+      "id": "qiyas-quant-002",
+      "category": "Qiyas",
+      "stem": "متتالية: 2, 6, 12, 20, 30, ... الحد التالي هو:",
+      "options": ["40", "42", "36", "44"],
+      "correct": 1,
+      "explanation": "الفروقات: 4, 6, 8, 10, 12 → 30 + 12 = 42."
+    },
+    {
+      "id": "qiyas-quant-003",
+      "category": "Qiyas",
+      "stem": "طلبية خصمها 15% ثم 15% على السعر المخفّض. إجمالي الخصم من السعر الأصلي أقرب إلى:",
+      "options": ["30%", "27.75%", "15%", "32%"],
+      "correct": 1,
+      "explanation": "0.85 × 0.85 = 0.7225 ⇒ خصم 27.75% تقريبًا."
+    },
+    {
+      "id": "qiyas-quant-004",
+      "category": "Qiyas",
+      "stem": "إذا كان متوسط خمسة أعداد هو 12 ومتوسط أربعة منها هو 10، فما العدد الخامس؟",
+      "options": ["10", "18", "20", "22"],
+      "correct": 2,
+      "explanation": "المجموع 60 ومجموع الأربعة 40 ⇒ الخامس 20."
+    },
+    {
+      "id": "qiyas-quant-005",
+      "category": "Qiyas",
+      "stem": "إذا كان ا + ب = 12 وب + ج = 20 وا + ج = 14، فما قيمة ا؟",
+      "options": ["3", "8", "6", "2"],
+      "correct": 0,
+      "explanation": "مجموع المعادلات: 2(ا+ب+ج)=46 ⇒ ا+ب+ج=23 ⇒ ا = 23 − 20 = 3."
+    },
+    {
+      "id": "qiyas-quant-006",
+      "category": "Qiyas",
+      "stem": "مثلث زواياه بنسبة 2 : 3 : 4. قياس أكبر زاوية:",
+      "options": ["60°", "72°", "80°", "90°"],
+      "correct": 2,
+      "explanation": "الزوايا 40° و60° و80° مجموعها 180°."
+    },
+    {
+      "id": "qiyas-quant-007",
+      "category": "Qiyas",
+      "stem": "سيارة قطعت 240 كم في 3 ساعات. سرعتها المتوسطة (كم/س):",
+      "options": ["60", "75", "80", "90"],
+      "correct": 2,
+      "explanation": "240 ÷ 3 = 80."
+    },
+    {
+      "id": "qiyas-quant-008",
+      "category": "Qiyas",
+      "stem": "إذا كانت س : ص = 3 : 4 و ص : ع = 5 : 6، فإن س : ع تساوي:",
+      "options": ["3 : 8", "5 : 8", "15 : 24", "2 : 3"],
+      "correct": 1,
+      "explanation": "س : ص : ع = 15 : 20 : 24 ⇒ س : ع = 15 : 24 = 5 : 8."
+    }
+  ]
+}

@@ -1,0 +1,130 @@
+{
+  "_comment": "Starter pool of SAT-level challenges. Schema: id (unique string), category (Sat|Qiyas|Math), stem, options (array of strings), correct (0-based index into options), explanation (optional). Add more entries to expand the pool; the ChallengeRepository unions every *.json under assets/challenges/.",
+  "challenges": [
+    {
+      "id": "sat-math-001",
+      "category": "Sat",
+      "stem": "If 3x − 7 = 2x + 5, what is the value of x?",
+      "options": ["-2", "5", "12", "−12"],
+      "correct": 2,
+      "explanation": "Subtract 2x: x − 7 = 5, so x = 12."
+    },
+    {
+      "id": "sat-math-002",
+      "category": "Sat",
+      "stem": "A circle has radius 7. Its area is closest to:",
+      "options": ["14π", "28π", "49π", "98π"],
+      "correct": 2,
+      "explanation": "Area = πr² = π·49."
+    },
+    {
+      "id": "sat-math-003",
+      "category": "Sat",
+      "stem": "The line y = −2x + 6 crosses the x-axis at what value?",
+      "options": ["0", "3", "6", "-3"],
+      "correct": 1,
+      "explanation": "Set y = 0: 0 = −2x + 6 ⇒ x = 3."
+    },
+    {
+      "id": "sat-math-004",
+      "category": "Sat",
+      "stem": "In a right triangle the legs are 5 and 12. The hypotenuse is:",
+      "options": ["13", "17", "15", "√119"],
+      "correct": 0,
+      "explanation": "5² + 12² = 169 = 13²."
+    },
+    {
+      "id": "sat-math-005",
+      "category": "Sat",
+      "stem": "If 2^x = 32, then x =",
+      "options": ["3", "4", "5", "6"],
+      "correct": 2,
+      "explanation": "32 = 2^5."
+    },
+    {
+      "id": "sat-math-006",
+      "category": "Sat",
+      "stem": "The average of 4 consecutive integers is 7.5. The largest integer is:",
+      "options": ["7", "8", "9", "10"],
+      "correct": 2,
+      "explanation": "Four consecutive ints averaging 7.5 are 6,7,8,9."
+    },
+    {
+      "id": "sat-math-007",
+      "category": "Sat",
+      "stem": "A shirt is marked down 20% then 25% of the marked-down price. The total discount from the original is:",
+      "options": ["40%", "45%", "35%", "50%"],
+      "correct": 0,
+      "explanation": "0.80 × 0.75 = 0.60, a 40% total discount."
+    },
+    {
+      "id": "sat-math-008",
+      "category": "Sat",
+      "stem": "If f(x) = x² − 4x + 3, f(5) =",
+      "options": ["3", "8", "12", "23"],
+      "correct": 1,
+      "explanation": "25 − 20 + 3 = 8."
+    },
+    {
+      "id": "sat-math-009",
+      "category": "Sat",
+      "stem": "A bag has 3 red and 7 blue marbles. The probability of drawing a red is:",
+      "options": ["3/7", "7/10", "3/10", "1/3"],
+      "correct": 2,
+      "explanation": "3 red out of 10 total marbles."
+    },
+    {
+      "id": "sat-verbal-001",
+      "category": "Sat",
+      "stem": "The scientist's arguments were _____; despite hours of debate, no one could find a flaw in her reasoning.",
+      "options": ["tenuous", "impeccable", "verbose", "derivative"],
+      "correct": 1,
+      "explanation": "\"Impeccable\" — flawless — fits the \"no one could find a flaw\" clause."
+    },
+    {
+      "id": "sat-verbal-002",
+      "category": "Sat",
+      "stem": "Choose the word most nearly opposite in meaning to AUSTERE:",
+      "options": ["ornate", "severe", "stoic", "minimal"],
+      "correct": 0,
+      "explanation": "Austere means plain / unadorned; ornate is its opposite."
+    },
+    {
+      "id": "sat-verbal-003",
+      "category": "Sat",
+      "stem": "The committee was initially _____ about the proposal, but after further study its members grew enthusiastic.",
+      "options": ["effusive", "skeptical", "reverent", "jubilant"],
+      "correct": 1,
+      "explanation": "Skeptical → enthusiastic is the attitude shift the sentence sets up."
+    },
+    {
+      "id": "sat-verbal-004",
+      "category": "Sat",
+      "stem": "Which word best fills the blank: \"The politician's speech was criticized as _____; it said much but committed to nothing.\"",
+      "options": ["equivocal", "didactic", "laconic", "eloquent"],
+      "correct": 0,
+      "explanation": "Equivocal = ambiguous / non-committal."
+    },
+    {
+      "id": "sat-verbal-005",
+      "category": "Sat",
+      "stem": "The best synonym for MITIGATE is:",
+      "options": ["worsen", "alleviate", "confirm", "expand"],
+      "correct": 1,
+      "explanation": "Mitigate = reduce or soften."
+    },
+    {
+      "id": "sat-reading-001",
+      "category": "Sat",
+      "stem": "Passage: \"Unlike mammals, reptiles do not regulate their body temperature internally; they rely on external heat sources.\" A reptile seeking sunshine is best described as:",
+      "options": [
+        "endothermic",
+        "homeothermic",
+        "ectothermic",
+        "poikilothermic by defect"
+      ],
+      "correct": 2,
+      "explanation": "Relying on external heat = ectothermic."
+    }
+  ]
+}
