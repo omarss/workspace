@@ -37,7 +37,8 @@ secrets/
 
 # Generated artefacts
 /api/gen/
-/internal/store/sqlc/
+# Note: sqlc-generated Go (internal/store/*.go) is committed so reviewers can
+# diff types and clones don't need sqlc to build.
 
 # Container build context tarballs
 *.tar

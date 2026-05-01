@@ -78,8 +78,11 @@ test: builder  ## unit tests with race detector
 	$(IN_BUILDER_TEST) go test -race -shuffle=on -count=1 ./...
 
 .PHONY: test-int
-test-int: builder  ## integration tests (testcontainers, requires podman socket)
-	$(IN_BUILDER_TEST) go test -tags=integration -race -count=1 ./...
+test-int: builder  ## integration tests against the dev DB (run `make db-up migrate-up` first)
+	$(PODMAN) run $(RUN_OPTS) --network=host -e CGO_ENABLED=1 \
+	    -e PROMPTER_TEST_DB_DSN="$(DEV_DB_DSN)" \
+	    -t $(BUILDER_IMAGE) \
+	    go test -tags=integration -race -count=1 ./...
 
 .PHONY: cover
 cover: builder  ## test coverage
@@ -100,6 +103,56 @@ build: $(addprefix build-,$(SERVICES))  ## build all service binaries
 .PHONY: run-api
 run-api: build-api  ## run the api binary locally on :8080
 	./bin/api
+
+# ---- database & sqlc ----------------------------------------------------------
+# Default DSN points at the dev container started by `make db-up`. Production
+# overrides come from the Kubernetes secret.
+DEV_DB_NAME    := prompter
+DEV_DB_USER    := prompter
+DEV_DB_PASS    := prompter-dev
+DEV_DB_PORT    := 55432
+DEV_DB_DSN     := postgres://$(DEV_DB_USER):$(DEV_DB_PASS)@127.0.0.1:$(DEV_DB_PORT)/$(DEV_DB_NAME)?sslmode=disable
+DEV_DB_DSN_INNER := postgres://$(DEV_DB_USER):$(DEV_DB_PASS)@host.containers.internal:$(DEV_DB_PORT)/$(DEV_DB_NAME)?sslmode=disable
+DEV_DB_CONTAINER := prompter-dev-pg
+
+.PHONY: db-up
+db-up:  ## start a dev Postgres 18 container on $(DEV_DB_PORT)
+	@$(PODMAN) inspect $(DEV_DB_CONTAINER) >/dev/null 2>&1 && \
+	    $(PODMAN) start $(DEV_DB_CONTAINER) || \
+	    $(PODMAN) run -d --name $(DEV_DB_CONTAINER) \
+	        -e POSTGRES_DB=$(DEV_DB_NAME) \
+	        -e POSTGRES_USER=$(DEV_DB_USER) \
+	        -e POSTGRES_PASSWORD=$(DEV_DB_PASS) \
+	        -p $(DEV_DB_PORT):5432 \
+	        docker.io/library/postgres:18-alpine
+	@echo "waiting for $(DEV_DB_CONTAINER)…"
+	@for i in $$(seq 1 30); do \
+	    $(PODMAN) exec $(DEV_DB_CONTAINER) pg_isready -U $(DEV_DB_USER) -d $(DEV_DB_NAME) >/dev/null 2>&1 && break; \
+	    sleep 1; \
+	done
+
+.PHONY: db-down
+db-down:  ## stop the dev Postgres container (data preserved)
+	-$(PODMAN) stop $(DEV_DB_CONTAINER)
+
+.PHONY: db-reset
+db-reset:  ## destroy and recreate the dev Postgres container
+	-$(PODMAN) rm -f $(DEV_DB_CONTAINER)
+	$(MAKE) db-up
+
+.PHONY: migrate-up
+migrate-up: builder  ## apply all pending migrations to the dev database
+	$(PODMAN) run $(RUN_OPTS) --network=host -e CGO_ENABLED=0 -t $(BUILDER_IMAGE) \
+	    migrate -path db/migrations -database "$(DEV_DB_DSN)" up
+
+.PHONY: migrate-down
+migrate-down: builder  ## roll back one migration on the dev database
+	$(PODMAN) run $(RUN_OPTS) --network=host -e CGO_ENABLED=0 -t $(BUILDER_IMAGE) \
+	    migrate -path db/migrations -database "$(DEV_DB_DSN)" down 1
+
+.PHONY: sqlc-gen
+sqlc-gen: builder  ## regenerate internal/store from db/migrations + db/queries
+	$(IN_BUILDER) sqlc generate
 
 # ---- container images for k3s -------------------------------------------------
 define IMAGE_SERVICE
