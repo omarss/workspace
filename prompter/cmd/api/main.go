@@ -17,12 +17,16 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/omarss/prompter/internal/api/server"
 	"github.com/omarss/prompter/internal/auth"
 	"github.com/omarss/prompter/internal/config"
+	"github.com/omarss/prompter/internal/inference"
 	"github.com/omarss/prompter/internal/store"
+	"github.com/omarss/prompter/internal/submissions"
+	"github.com/omarss/prompter/pkg/llm/together"
 	"github.com/omarss/prompter/pkg/notifier"
 	"github.com/omarss/prompter/pkg/notifier/devlog"
 	"github.com/omarss/prompter/pkg/notifier/resend"
@@ -78,8 +82,27 @@ func run(logger *slog.Logger) error {
 	}
 	authH := auth.NewHandler(otp, sess, cookie, logger)
 
+	// Inference + submissions wiring. The Together client may carry an
+	// empty API key in dev; calls then fail at the provider boundary, but
+	// listing models and submitting work without a real key.
+	togetherClient := together.New(cfg.TogetherAPIKey)
+	infSvc := inference.NewService(togetherClient, q, "Output only the requested artifact, no explanation.")
+	infH := inference.NewHandler(infSvc, logger)
+
+	subSvc := submissions.NewService(q, nil)
+	subH := submissions.NewHandler(subSvc, logger)
+
 	r := server.New(server.Config{Version: cfg.Version})
-	r.Route("/api", authH.Mount)
+	r.Route("/api", func(api chi.Router) {
+		authH.Mount(api)
+		infH.Mount(api)
+
+		// Routes below require a session.
+		api.Group(func(api chi.Router) {
+			api.Use(auth.RequireSession(sess, cookie.Name))
+			api.Route("/submissions", subH.Mount)
+		})
+	})
 
 	srv := &http.Server{
 		Addr:              cfg.HTTPAddr,

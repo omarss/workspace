@@ -21,16 +21,33 @@ type Querier interface {
 	// provider_ref is the Twilio Verify SID; Twilio holds the secret on the SMS path.
 	CreateSMSOTPChallenge(ctx context.Context, arg CreateSMSOTPChallengeParams) (OtpChallenge, error)
 	CreateSession(ctx context.Context, arg CreateSessionParams) (Session, error)
+	CreateSubmission(ctx context.Context, arg CreateSubmissionParams) (Submission, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
+	// "active" means within the active_from/active_to window. The window is
+	// enforced here so handler code never has to think about it.
+	GetActiveChallengeByID(ctx context.Context, id uuid.UUID) (Challenge, error)
 	GetActiveModelBySlug(ctx context.Context, slug string) (Model, error)
 	GetActiveSessionByRefreshHash(ctx context.Context, refreshHash string) (Session, error)
+	GetChallengeByID(ctx context.Context, id uuid.UUID) (Challenge, error)
+	GetChallengeBySlug(ctx context.Context, slug string) (Challenge, error)
 	GetModelBySlug(ctx context.Context, slug string) (Model, error)
 	GetOTPChallengeByID(ctx context.Context, id uuid.UUID) (OtpChallenge, error)
+	GetSubmissionByIDForUser(ctx context.Context, arg GetSubmissionByIDForUserParams) (Submission, error)
+	// Resolves the daily-mode challenge for today's date in UTC.
+	GetTodayDailyChallenge(ctx context.Context) (Challenge, error)
 	GetUserByEmail(ctx context.Context, email *string) (User, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (User, error)
 	GetUserByPhone(ctx context.Context, phone *string) (User, error)
 	IncrementOTPAttempts(ctx context.Context, id uuid.UUID) (OtpChallenge, error)
 	ListActiveModels(ctx context.Context) ([]Model, error)
+	// Practice mode: every active challenge for a modality, paged by recency.
+	ListPracticeChallenges(ctx context.Context, arg ListPracticeChallengesParams) ([]Challenge, error)
+	ListUserSubmissions(ctx context.Context, arg ListUserSubmissionsParams) ([]Submission, error)
+	MarkSubmissionFailed(ctx context.Context, arg MarkSubmissionFailedParams) (Submission, error)
+	MarkSubmissionGraded(ctx context.Context, arg MarkSubmissionGradedParams) (Submission, error)
+	// Worker poll path. SKIP LOCKED makes multiple workers safe.
+	PickAndLockQueuedSubmission(ctx context.Context) (Submission, error)
+	RejectSubmission(ctx context.Context, arg RejectSubmissionParams) (Submission, error)
 	RevokeAllUserSessions(ctx context.Context, userID uuid.UUID) error
 	RevokeSession(ctx context.Context, id uuid.UUID) error
 	TouchUserLastLogin(ctx context.Context, id uuid.UUID) error

@@ -52,6 +52,11 @@ type Config struct {
 	TwilioAccountSID       string
 	TwilioAuthToken        string
 	TwilioVerifyServiceSID string
+
+	// Together.ai inference API key. Empty in dev means model listing works
+	// but actual prompt runs will fail at the provider boundary — fine for
+	// validating the surface, not enough to play the game.
+	TogetherAPIKey string
 }
 
 // Load reads the config from the environment. Unknown values fall back to
@@ -78,6 +83,8 @@ func Load() (Config, error) {
 		TwilioAccountSID:       os.Getenv("PROMPTER_TWILIO_ACCOUNT_SID"),
 		TwilioAuthToken:        os.Getenv("PROMPTER_TWILIO_AUTH_TOKEN"),
 		TwilioVerifyServiceSID: os.Getenv("PROMPTER_TWILIO_VERIFY_SERVICE_SID"),
+
+		TogetherAPIKey: os.Getenv("PROMPTER_TOGETHER_API_KEY"),
 	}
 
 	if raw := os.Getenv("PROMPTER_READ_HEADER_TIMEOUT"); raw != "" {
