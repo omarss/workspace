@@ -22,12 +22,15 @@ type Querier interface {
 	CreateSMSOTPChallenge(ctx context.Context, arg CreateSMSOTPChallengeParams) (OtpChallenge, error)
 	CreateSession(ctx context.Context, arg CreateSessionParams) (Session, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
+	GetActiveModelBySlug(ctx context.Context, slug string) (Model, error)
 	GetActiveSessionByRefreshHash(ctx context.Context, refreshHash string) (Session, error)
+	GetModelBySlug(ctx context.Context, slug string) (Model, error)
 	GetOTPChallengeByID(ctx context.Context, id uuid.UUID) (OtpChallenge, error)
 	GetUserByEmail(ctx context.Context, email *string) (User, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (User, error)
 	GetUserByPhone(ctx context.Context, phone *string) (User, error)
 	IncrementOTPAttempts(ctx context.Context, id uuid.UUID) (OtpChallenge, error)
+	ListActiveModels(ctx context.Context) ([]Model, error)
 	RevokeAllUserSessions(ctx context.Context, userID uuid.UUID) error
 	RevokeSession(ctx context.Context, id uuid.UUID) error
 	TouchUserLastLogin(ctx context.Context, id uuid.UUID) error
