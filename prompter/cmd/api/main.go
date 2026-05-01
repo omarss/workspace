@@ -1,13 +1,15 @@
 // Command api serves the prompter HTTP API.
 //
-// The binary stays small on purpose: it loads config, builds the router from
-// internal/api/server, and runs an http.Server with sensible production
-// timeouts. All routing and business logic lives in internal/.
+// The binary stays small on purpose: it loads config, opens the Postgres
+// pool, builds the auth and session services, and runs an http.Server with
+// production-sane timeouts. All routing and business logic lives in
+// internal/.
 package main
 
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -15,8 +17,16 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
+
 	"github.com/omarss/prompter/internal/api/server"
+	"github.com/omarss/prompter/internal/auth"
 	"github.com/omarss/prompter/internal/config"
+	"github.com/omarss/prompter/internal/store"
+	"github.com/omarss/prompter/pkg/notifier"
+	"github.com/omarss/prompter/pkg/notifier/devlog"
+	"github.com/omarss/prompter/pkg/notifier/resend"
+	"github.com/omarss/prompter/pkg/notifier/twilio"
 )
 
 func main() {
@@ -39,7 +49,37 @@ func run(logger *slog.Logger) error {
 		return err
 	}
 
+	bootCtx, bootCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer bootCancel()
+
+	pool, err := pgxpool.New(bootCtx, cfg.DatabaseDSN)
+	if err != nil {
+		return fmt.Errorf("pgxpool: %w", err)
+	}
+	defer pool.Close()
+	if err := pool.Ping(bootCtx); err != nil {
+		return fmt.Errorf("pg ping: %w", err)
+	}
+
+	q := store.New(pool)
+	emailer := buildEmailSender(cfg, logger)
+	smser := buildSMSVerifier(cfg, logger)
+
+	otp := auth.NewOTPService(q, emailer, smser, auth.OTPConfig{TTL: cfg.OTPTTL}, nil)
+	sess := auth.NewSessionService(q, auth.SessionConfig{TTL: cfg.SessionTTL}, nil)
+
+	cookie := auth.CookieConfig{
+		Name:     cfg.CookieName,
+		Path:     "/",
+		Domain:   cfg.CookieDomain,
+		Secure:   cfg.CookieSecure,
+		SameSite: cfg.CookieSameSite,
+		HTTPOnly: true,
+	}
+	authH := auth.NewHandler(otp, sess, cookie, logger)
+
 	r := server.New(server.Config{Version: cfg.Version})
+	r.Route("/api", authH.Mount)
 
 	srv := &http.Server{
 		Addr:              cfg.HTTPAddr,
@@ -72,6 +112,26 @@ func run(logger *slog.Logger) error {
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-
 	return srv.Shutdown(shutdownCtx)
+}
+
+// buildEmailSender returns the production Resend client when an API key is
+// configured; otherwise a dev logger that prints OTP codes. The dev path
+// must NEVER reach production: it leaks secrets.
+func buildEmailSender(cfg config.Config, logger *slog.Logger) notifier.EmailSender {
+	if cfg.ResendAPIKey != "" {
+		logger.Info("email sender", "provider", "resend", "from", cfg.ResendFrom)
+		return resend.New(cfg.ResendAPIKey, cfg.ResendFrom)
+	}
+	logger.Warn("email sender", "provider", "devlog", "warning", "OTP codes will appear in logs — dev only")
+	return devlog.NewEmailSender(logger)
+}
+
+func buildSMSVerifier(cfg config.Config, logger *slog.Logger) notifier.SMSVerifier {
+	if cfg.TwilioAccountSID != "" {
+		logger.Info("sms verifier", "provider", "twilio", "service_sid", cfg.TwilioVerifyServiceSID)
+		return twilio.NewVerifyClient(cfg.TwilioAccountSID, cfg.TwilioAuthToken, cfg.TwilioVerifyServiceSID)
+	}
+	logger.Warn("sms verifier", "provider", "devlog", "warning", "any code matching the dev fixture is accepted")
+	return devlog.NewSMSVerifier(logger, "")
 }

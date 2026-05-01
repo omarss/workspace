@@ -40,16 +40,17 @@ type Model struct {
 }
 
 type OtpChallenge struct {
-	ID         uuid.UUID          `json:"id"`
-	Channel    string             `json:"channel"`
-	Identifier string             `json:"identifier"`
-	CodeHash   string             `json:"code_hash"`
-	Attempts   int32              `json:"attempts"`
-	ExpiresAt  pgtype.Timestamptz `json:"expires_at"`
-	ConsumedAt pgtype.Timestamptz `json:"consumed_at"`
-	Ip         *string            `json:"ip"`
-	Ua         *string            `json:"ua"`
-	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+	ID          uuid.UUID          `json:"id"`
+	Channel     string             `json:"channel"`
+	Identifier  string             `json:"identifier"`
+	CodeHash    *string            `json:"code_hash"`
+	ProviderRef *string            `json:"provider_ref"`
+	Attempts    int32              `json:"attempts"`
+	ExpiresAt   pgtype.Timestamptz `json:"expires_at"`
+	ConsumedAt  pgtype.Timestamptz `json:"consumed_at"`
+	Ip          *string            `json:"ip"`
+	Ua          *string            `json:"ua"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
 }
 
 type Rating struct {

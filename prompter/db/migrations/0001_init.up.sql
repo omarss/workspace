@@ -18,19 +18,29 @@ CREATE TABLE users (
     CONSTRAINT users_identifier_present CHECK (email IS NOT NULL OR phone IS NOT NULL)
 );
 
--- One-time-password challenges. The plaintext code never lands here — only
--- a bcrypt hash. `attempts` caps brute-force; `expires_at` enforces TTL.
+-- One-time-password challenges. The plaintext code never lands here. The
+-- two channels store the verification secret differently:
+--   email: we own the secret, code_hash = bcrypt(code).
+--   sms:   Twilio Verify owns the secret, provider_ref = Verify SID.
+-- Exactly one of the two columns is set, enforced by a CHECK constraint.
+-- `attempts` caps brute-force on the email path; Twilio caps it on the SMS path.
 CREATE TABLE otp_challenges (
-    id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    channel     text NOT NULL CHECK (channel IN ('email','sms')),
-    identifier  text NOT NULL,
-    code_hash   text NOT NULL,
-    attempts    int  NOT NULL DEFAULT 0,
-    expires_at  timestamptz NOT NULL,
-    consumed_at timestamptz,
-    ip          text,
-    ua          text,
-    created_at  timestamptz NOT NULL DEFAULT now()
+    id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    channel      text NOT NULL CHECK (channel IN ('email','sms')),
+    identifier   text NOT NULL,
+    code_hash    text,
+    provider_ref text,
+    attempts     int  NOT NULL DEFAULT 0,
+    expires_at   timestamptz NOT NULL,
+    consumed_at  timestamptz,
+    ip           text,
+    ua           text,
+    created_at   timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT otp_secret_present CHECK (
+        (channel = 'email' AND code_hash    IS NOT NULL AND provider_ref IS NULL)
+        OR
+        (channel = 'sms'   AND provider_ref IS NOT NULL AND code_hash    IS NULL)
+    )
 );
 -- Lookups during /verify use (identifier, channel) and discard already-consumed
 -- rows. Partial index keeps it small even after months of traffic.
