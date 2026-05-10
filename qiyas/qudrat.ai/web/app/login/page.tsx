@@ -20,24 +20,44 @@ export default function LoginPage() {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // normalizePhone turns Saudi-style local input into E.164. Accepts:
+  //   "0500000099"     → "+966500000099"
+  //   "500000099"      → "+966500000099"
+  //   "+966500000099"  → unchanged
+  //   "00966500000099" → "+966500000099"
+  // Whatever the user types ends up valid as long as it has a Saudi
+  // mobile number's worth of digits.
+  function normalizePhone(raw: string): string {
+    const trimmed = raw.replace(/[\s-]/g, '');
+    if (trimmed.startsWith('+')) return trimmed;
+    if (trimmed.startsWith('00')) return '+' + trimmed.slice(2);
+    const digits = trimmed.replace(/\D/g, '');
+    if (digits.startsWith('966')) return '+' + digits;
+    if (digits.startsWith('0')) return '+966' + digits.slice(1);
+    return '+966' + digits;
+  }
+
   async function start(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setPending(true);
     try {
+      const payload = channel === 'sms' ? normalizePhone(identifier) : identifier.trim();
       const res = await fetch('/api/auth/otp/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ channel, identifier }),
+        body: JSON.stringify({ channel, identifier: payload }),
         credentials: 'include',
       });
-      const body = await res.json();
+      const body = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError(body.error ?? 'فشل الإرسال');
+        setError(body.error ?? `فشل الإرسال (${res.status})`);
         return;
       }
       setChallengeId(body.challenge_id);
       setStep('verify');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'تعذر الاتصال بالخادم');
     } finally {
       setPending(false);
     }
@@ -97,16 +117,43 @@ export default function LoginPage() {
               بريد
             </button>
           </div>
-          <input
-            type={channel === 'sms' ? 'tel' : 'email'}
-            placeholder={channel === 'sms' ? '+9665XXXXXXXX' : 'name@example.com'}
-            value={identifier}
-            onChange={(e) => setIdentifier(e.target.value)}
-            dir="ltr"
-            required
-            className="w-full rounded-lg border border-neutral-300 bg-transparent px-4 py-3 text-lg dark:border-neutral-700"
-          />
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          {channel === 'sms' ? (
+            <div className="flex items-stretch overflow-hidden rounded-lg border border-neutral-300 dark:border-neutral-700">
+              <span
+                dir="ltr"
+                className="flex items-center bg-neutral-100 px-3 text-base text-neutral-600 dark:bg-neutral-900 dark:text-neutral-300"
+              >
+                +966
+              </span>
+              <input
+                type="tel"
+                inputMode="tel"
+                autoComplete="tel-national"
+                placeholder="5XXXXXXXX"
+                value={identifier}
+                onChange={(e) => setIdentifier(e.target.value)}
+                dir="ltr"
+                required
+                className="flex-1 bg-transparent px-4 py-3 text-lg outline-none"
+              />
+            </div>
+          ) : (
+            <input
+              type="email"
+              autoComplete="email"
+              placeholder="name@example.com"
+              value={identifier}
+              onChange={(e) => setIdentifier(e.target.value)}
+              dir="ltr"
+              required
+              className="w-full rounded-lg border border-neutral-300 bg-transparent px-4 py-3 text-lg dark:border-neutral-700"
+            />
+          )}
+          {error && (
+            <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950 dark:text-red-300">
+              {error}
+            </p>
+          )}
           <button
             type="submit"
             disabled={pending}
