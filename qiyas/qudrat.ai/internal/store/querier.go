@@ -11,6 +11,7 @@ import (
 )
 
 type Querier interface {
+	AcceptParentLink(ctx context.Context, arg AcceptParentLinkParams) error
 	// Used by the webhook handler when a payment lands. The webhook plumbing
 	// is out of Phase 9 scope but the persistence side is here so subsequent
 	// phases can flip status without a migration.
@@ -52,6 +53,8 @@ type Querier interface {
 	// each distractor was wrong). The item must be accepted.
 	GetItemForAttempt(ctx context.Context, id uuid.UUID) (Item, error)
 	GetOTPChallengeByID(ctx context.Context, id uuid.UUID) (OtpChallenge, error)
+	// Lookup that confirms a parent has consent to view a child's summary.
+	GetParentLinkForView(ctx context.Context, arg GetParentLinkForViewParams) (ParentLink, error)
 	GetUserByEmail(ctx context.Context, email *string) (User, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (User, error)
 	GetUserByPhone(ctx context.Context, phone *string) (User, error)
@@ -69,6 +72,7 @@ type Querier interface {
 	// Items with at least min_attempts answered. Calibration computes a
 	// per-item accuracy and stores it in items.difficulty_calibrated.
 	ItemsToCalibrate(ctx context.Context, minAttempts int32) ([]ItemsToCalibrateRow, error)
+	ListChildrenForParent(ctx context.Context, parentID uuid.UUID) ([]ListChildrenForParentRow, error)
 	ListItemChoices(ctx context.Context, itemID uuid.UUID) ([]ItemChoice, error)
 	// Same contract as ListItemChoices but with explicit name to avoid collision.
 	ListItemChoicesByID(ctx context.Context, itemID uuid.UUID) ([]ItemChoice, error)
@@ -97,7 +101,11 @@ type Querier interface {
 	// min_attempts answered. Drives the Weak Spot Drill.
 	PickWeakestSkillForUser(ctx context.Context, arg PickWeakestSkillForUserParams) (PickWeakestSkillForUserRow, error)
 	RecordEvent(ctx context.Context, arg RecordEventParams) error
+	// Parent kicks off the link by referencing the child's identifier
+	// (email/phone). The child still has to accept via /parent/links/{id}/accept.
+	RequestParentLink(ctx context.Context, arg RequestParentLinkParams) (ParentLink, error)
 	RevokeAllUserSessions(ctx context.Context, userID uuid.UUID) error
+	RevokeParentLink(ctx context.Context, arg RevokeParentLinkParams) error
 	RevokeSession(ctx context.Context, id uuid.UUID) error
 	// Used by the reviewer-LLM pass once it lands (Phase 7 stub for now).
 	SetItemQualityScore(ctx context.Context, arg SetItemQualityScoreParams) error
@@ -110,6 +118,10 @@ type Querier interface {
 	TouchSessionLastSeen(ctx context.Context, id uuid.UUID) error
 	TouchUserLastLogin(ctx context.Context, id uuid.UUID) error
 	UpdateItemCalibratedDifficulty(ctx context.Context, arg UpdateItemCalibratedDifficultyParams) error
+	// Aggregated read for the parent dashboard. Counts attempts in the last
+	// 7 days, average accuracy, and number of distinct days with activity
+	// (proxy for consistency).
+	WeeklySummaryForUser(ctx context.Context, userID uuid.UUID) (WeeklySummaryForUserRow, error)
 }
 
 var _ Querier = (*Queries)(nil)

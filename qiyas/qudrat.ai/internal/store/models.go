@@ -93,6 +93,16 @@ type OtpChallenge struct {
 	CreatedAt   pgtype.Timestamptz `json:"created_at"`
 }
 
+type ParentLink struct {
+	ID         uuid.UUID          `json:"id"`
+	ParentID   uuid.UUID          `json:"parent_id"`
+	ChildID    uuid.UUID          `json:"child_id"`
+	Status     string             `json:"status"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+	AcceptedAt pgtype.Timestamptz `json:"accepted_at"`
+	RevokedAt  pgtype.Timestamptz `json:"revoked_at"`
+}
+
 type ServedItem struct {
 	UserID   uuid.UUID          `json:"user_id"`
 	ItemID   uuid.UUID          `json:"item_id"`

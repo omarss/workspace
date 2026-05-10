@@ -20,12 +20,15 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/omarss/qudrat/internal/aifeatures"
 	"github.com/omarss/qudrat/internal/api/server"
 	"github.com/omarss/qudrat/internal/auth"
 	"github.com/omarss/qudrat/internal/billing"
 	"github.com/omarss/qudrat/internal/config"
+	"github.com/omarss/qudrat/internal/events"
 	"github.com/omarss/qudrat/internal/items"
 	"github.com/omarss/qudrat/internal/leaderboard"
+	"github.com/omarss/qudrat/internal/parent"
 	"github.com/omarss/qudrat/internal/review"
 	"github.com/omarss/qudrat/internal/store"
 	"github.com/omarss/qudrat/pkg/notifier"
@@ -86,6 +89,12 @@ func run(logger *slog.Logger) error {
 	billingSvc := billing.NewService(q, billing.DefaultTrialDailyAttempts)
 	billingH := billing.NewHandler(billingSvc, logger)
 
+	parentSvc := parent.NewService(q)
+	parentH := parent.NewHandler(parentSvc, logger)
+
+	eventSvc := events.NewService(q, logger)
+	aifeatH := aifeatures.NewHandler(eventSvc, logger)
+
 	itemsSvc := items.NewService(q).WithQuota(billingSvc)
 	itemsH := items.NewHandler(itemsSvc, logger)
 
@@ -111,6 +120,8 @@ func run(logger *slog.Logger) error {
 			lbH.Mount(api)
 			reviewH.Mount(api)
 			billingH.Mount(api)
+			parentH.Mount(api)
+			aifeatH.Mount(api)
 		})
 	})
 
