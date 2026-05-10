@@ -11,16 +11,37 @@ import (
 )
 
 type Querier interface {
+	ConsumeOTPChallenge(ctx context.Context, id uuid.UUID) error
 	CountAcceptedItems(ctx context.Context) (int64, error)
 	CountItems(ctx context.Context) (int64, error)
+	// Used as a lightweight rate-limiter on the start path. The caller decides
+	// the lookback window so the same query can serve "last minute" and
+	// "last hour" buckets.
+	CountRecentOTPChallengesForIdentifier(ctx context.Context, arg CountRecentOTPChallengesForIdentifierParams) (int32, error)
+	// code_hash carries bcrypt(code); we own the secret on the email path.
+	CreateEmailOTPChallenge(ctx context.Context, arg CreateEmailOTPChallengeParams) (OtpChallenge, error)
+	// provider_ref is the Twilio Verify SID; Twilio holds the secret on the SMS path.
+	CreateSMSOTPChallenge(ctx context.Context, arg CreateSMSOTPChallengeParams) (OtpChallenge, error)
+	CreateSession(ctx context.Context, arg CreateSessionParams) (Session, error)
+	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
+	GetActiveSessionByRefreshHash(ctx context.Context, refreshHash string) (Session, error)
 	GetItemByID(ctx context.Context, id uuid.UUID) (Item, error)
 	GetItemByNormalizedHash(ctx context.Context, normalizedTextHash string) (Item, error)
+	GetOTPChallengeByID(ctx context.Context, id uuid.UUID) (OtpChallenge, error)
+	GetUserByEmail(ctx context.Context, email *string) (User, error)
+	GetUserByID(ctx context.Context, id uuid.UUID) (User, error)
+	GetUserByPhone(ctx context.Context, phone *string) (User, error)
+	IncrementOTPAttempts(ctx context.Context, id uuid.UUID) (OtpChallenge, error)
 	InsertItem(ctx context.Context, arg InsertItemParams) (Item, error)
 	InsertItemChoice(ctx context.Context, arg InsertItemChoiceParams) error
 	InsertItemTag(ctx context.Context, arg InsertItemTagParams) error
 	ListItemChoices(ctx context.Context, itemID uuid.UUID) ([]ItemChoice, error)
 	ListItemTags(ctx context.Context, itemID uuid.UUID) ([]string, error)
 	ListItemsByTopic(ctx context.Context, arg ListItemsByTopicParams) ([]Item, error)
+	RevokeAllUserSessions(ctx context.Context, userID uuid.UUID) error
+	RevokeSession(ctx context.Context, id uuid.UUID) error
+	TouchSessionLastSeen(ctx context.Context, id uuid.UUID) error
+	TouchUserLastLogin(ctx context.Context, id uuid.UUID) error
 }
 
 var _ Querier = (*Queries)(nil)
