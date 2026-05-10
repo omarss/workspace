@@ -1,8 +1,9 @@
 // Command api serves the qudrat HTTP API.
 //
 // The binary stays small on purpose: it loads config, opens the Postgres
-// pool, builds the chi router, and runs an http.Server with production-sane
-// timeouts. Domain wiring (auth, items, attempts) lands in later phases.
+// pool, builds the auth services, and runs an http.Server with
+// production-sane timeouts. Domain wiring (items, attempts, leaderboards)
+// lands in later phases.
 package main
 
 import (
@@ -16,10 +17,17 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/omarss/qudrat/internal/api/server"
+	"github.com/omarss/qudrat/internal/auth"
 	"github.com/omarss/qudrat/internal/config"
+	"github.com/omarss/qudrat/internal/store"
+	"github.com/omarss/qudrat/pkg/notifier"
+	"github.com/omarss/qudrat/pkg/notifier/devlog"
+	"github.com/omarss/qudrat/pkg/notifier/resend"
+	"github.com/omarss/qudrat/pkg/notifier/twilio"
 )
 
 func main() {
@@ -54,9 +62,29 @@ func run(logger *slog.Logger) error {
 		return fmt.Errorf("pg ping: %w", err)
 	}
 
+	q := store.New(pool)
+	emailer := buildEmailSender(cfg, logger)
+	smser := buildSMSVerifier(cfg, logger)
+
+	otp := auth.NewOTPService(q, emailer, smser, auth.OTPConfig{TTL: cfg.OTPTTL}, nil)
+	sess := auth.NewSessionService(q, auth.SessionConfig{TTL: cfg.SessionTTL}, nil)
+
+	cookie := auth.CookieConfig{
+		Name:     cfg.CookieName,
+		Path:     "/",
+		Domain:   cfg.CookieDomain,
+		Secure:   cfg.CookieSecure,
+		SameSite: cfg.CookieSameSite,
+		HTTPOnly: true,
+	}
+	authH := auth.NewHandler(otp, sess, cookie, logger)
+
 	r := server.New(server.Config{
 		Version: cfg.Version,
 		DB:      pool,
+	})
+	r.Route("/api", func(api chi.Router) {
+		authH.Mount(api)
 	})
 
 	srv := &http.Server{
@@ -91,4 +119,28 @@ func run(logger *slog.Logger) error {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	return srv.Shutdown(shutdownCtx)
+}
+
+// buildEmailSender returns the production Resend client when an API key is
+// configured; otherwise a dev logger that prints OTP codes. The dev path
+// must NEVER reach production: it leaks secrets.
+func buildEmailSender(cfg config.Config, logger *slog.Logger) notifier.EmailSender {
+	if cfg.ResendAPIKey != "" {
+		logger.Info("email sender", "provider", "resend", "from", cfg.ResendFrom)
+		return resend.New(cfg.ResendAPIKey, cfg.ResendFrom)
+	}
+	logger.Warn("email sender", "provider", "devlog", "warning", "OTP codes will appear in logs — dev only")
+	return devlog.NewEmailSender(logger)
+}
+
+// buildSMSVerifier returns the production Twilio Verify client when its
+// triple of creds is configured; otherwise a dev verifier that accepts a
+// fixed code. Same warning as above — dev path must not reach production.
+func buildSMSVerifier(cfg config.Config, logger *slog.Logger) notifier.SMSVerifier {
+	if cfg.TwilioAccountSID != "" {
+		logger.Info("sms verifier", "provider", "twilio", "service_sid", cfg.TwilioVerifyServiceSID)
+		return twilio.NewVerifyClient(cfg.TwilioAccountSID, cfg.TwilioAuthToken, cfg.TwilioVerifyServiceSID)
+	}
+	logger.Warn("sms verifier", "provider", "devlog", "warning", "any code matching the dev fixture is accepted")
+	return devlog.NewSMSVerifier(logger, "")
 }
