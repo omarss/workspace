@@ -13,6 +13,7 @@ import (
 type Querier interface {
 	ConsumeOTPChallenge(ctx context.Context, id uuid.UUID) error
 	CountAcceptedItems(ctx context.Context) (int64, error)
+	CountAttemptsForUser(ctx context.Context, userID uuid.UUID) (int32, error)
 	CountItems(ctx context.Context) (int64, error)
 	// Used as a lightweight rate-limiter on the start path. The caller decides
 	// the lookback window so the same query can serve "last minute" and
@@ -27,19 +28,40 @@ type Querier interface {
 	GetActiveSessionByRefreshHash(ctx context.Context, refreshHash string) (Session, error)
 	GetItemByID(ctx context.Context, id uuid.UUID) (Item, error)
 	GetItemByNormalizedHash(ctx context.Context, normalizedTextHash string) (Item, error)
+	// Returns the full item row including correct_answer + explanation. Callers
+	// compare the user's choice to correct_answer in code rather than at the SQL
+	// layer so they can return the same row to the client (with the answer + why
+	// each distractor was wrong). The item must be accepted.
+	GetItemForAttempt(ctx context.Context, id uuid.UUID) (Item, error)
 	GetOTPChallengeByID(ctx context.Context, id uuid.UUID) (OtpChallenge, error)
 	GetUserByEmail(ctx context.Context, email *string) (User, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (User, error)
 	GetUserByPhone(ctx context.Context, phone *string) (User, error)
 	IncrementOTPAttempts(ctx context.Context, id uuid.UUID) (OtpChallenge, error)
+	// One row per answered item per user. choice_key + correct are nullable to
+	// support a "served but skipped" path later (Phase 4 mistake-clinic).
+	InsertAttempt(ctx context.Context, arg InsertAttemptParams) (Attempt, error)
 	InsertItem(ctx context.Context, arg InsertItemParams) (Item, error)
 	InsertItemChoice(ctx context.Context, arg InsertItemChoiceParams) error
 	InsertItemTag(ctx context.Context, arg InsertItemTagParams) error
 	ListItemChoices(ctx context.Context, itemID uuid.UUID) ([]ItemChoice, error)
+	// Same contract as ListItemChoices but with explicit name to avoid collision.
+	ListItemChoicesByID(ctx context.Context, itemID uuid.UUID) ([]ItemChoice, error)
 	ListItemTags(ctx context.Context, itemID uuid.UUID) ([]string, error)
 	ListItemsByTopic(ctx context.Context, arg ListItemsByTopicParams) ([]Item, error)
+	ListRecentAttemptsForUser(ctx context.Context, arg ListRecentAttemptsForUserParams) ([]ListRecentAttemptsForUserRow, error)
+	// Idempotent: ON CONFLICT DO NOTHING means re-serving (e.g. retry after a
+	// network error) doesn't fail. The PRIMARY KEY (user_id,item_id) covers it.
+	MarkItemServed(ctx context.Context, arg MarkItemServedParams) error
+	// Returns up to limit_count accepted items the user has never been served.
+	// Filters by exam_type/section/topic if provided (NULL = no filter).
+	// Random ordering keeps practice fresh; for ~10k items the cost is fine.
+	PickUnservedItemsForUser(ctx context.Context, arg PickUnservedItemsForUserParams) ([]PickUnservedItemsForUserRow, error)
 	RevokeAllUserSessions(ctx context.Context, userID uuid.UUID) error
 	RevokeSession(ctx context.Context, id uuid.UUID) error
+	// Per-topic accuracy + counts for the user. Drives the weakness heatmap
+	// (spec §4 #8). LIMIT keeps the payload bounded.
+	SummarizeMasteryByTopic(ctx context.Context, arg SummarizeMasteryByTopicParams) ([]SummarizeMasteryByTopicRow, error)
 	TouchSessionLastSeen(ctx context.Context, id uuid.UUID) error
 	TouchUserLastLogin(ctx context.Context, id uuid.UUID) error
 }
