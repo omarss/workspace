@@ -1,15 +1,18 @@
 -- name: PickUnservedItemsForUser :many
 -- Returns up to limit_count accepted items the user has never been served.
--- Filters by exam_type/section/topic if provided (NULL = no filter).
--- Random ordering keeps practice fresh; for ~10k items the cost is fine.
+-- Filters by exam_type/section/topic/skill/difficulty if provided
+-- (NULL = no filter). Random ordering keeps practice fresh; for ~10k items
+-- the cost is fine.
 SELECT i.id, i.exam_type, i.section, i.subject, i.grade_level, i.unit, i.topic,
        i.skill, i.cognitive_level, i.difficulty_target, i.question_archetype,
        i.question_text, i.estimated_time_seconds
 FROM items i
 WHERE i.status = 'accepted'
-  AND (sqlc.narg('exam_type')::text IS NULL OR i.exam_type = sqlc.narg('exam_type'))
-  AND (sqlc.narg('section')::text   IS NULL OR i.section   = sqlc.narg('section'))
-  AND (sqlc.narg('topic')::text     IS NULL OR i.topic     = sqlc.narg('topic'))
+  AND (sqlc.narg('exam_type')::text         IS NULL OR i.exam_type         = sqlc.narg('exam_type'))
+  AND (sqlc.narg('section')::text           IS NULL OR i.section           = sqlc.narg('section'))
+  AND (sqlc.narg('topic')::text             IS NULL OR i.topic             = sqlc.narg('topic'))
+  AND (sqlc.narg('skill')::text             IS NULL OR i.skill             = sqlc.narg('skill'))
+  AND (sqlc.narg('difficulty_target')::text IS NULL OR i.difficulty_target = sqlc.narg('difficulty_target'))
   AND NOT EXISTS (
       SELECT 1 FROM served_items s
       WHERE s.user_id = sqlc.arg('user_id')
@@ -17,6 +20,49 @@ WHERE i.status = 'accepted'
   )
 ORDER BY random()
 LIMIT sqlc.arg('limit_count');
+
+-- name: PickWeakestSkillForUser :one
+-- Returns the user's weakest skill (lowest accuracy) with at least
+-- min_attempts answered. Drives the Weak Spot Drill.
+SELECT i.skill,
+       COUNT(*)::int                                  AS attempts,
+       AVG(CASE WHEN a.correct THEN 1.0 ELSE 0.0 END) AS accuracy
+FROM attempts a
+JOIN items   i ON i.id = a.item_id
+WHERE a.user_id = $1
+  AND a.correct IS NOT NULL
+GROUP BY i.skill
+HAVING COUNT(*) >= $2
+ORDER BY accuracy ASC, attempts DESC
+LIMIT 1;
+
+-- name: PickMistakeClinicItems :many
+-- Items in the same skills as items the user has recently gotten wrong,
+-- excluding everything the user has already been served. Backs the
+-- Mistake Clinic session type — same concept, fresh question.
+WITH wrong_skills AS (
+    SELECT i.skill, MAX(a.served_at) AS recent
+    FROM attempts a
+    JOIN items   i ON i.id = a.item_id
+    WHERE a.user_id = $1
+      AND a.correct = false
+    GROUP BY i.skill
+    ORDER BY recent DESC
+    LIMIT 5
+)
+SELECT i.id, i.exam_type, i.section, i.subject, i.grade_level, i.unit, i.topic,
+       i.skill, i.cognitive_level, i.difficulty_target, i.question_archetype,
+       i.question_text, i.estimated_time_seconds
+FROM items i
+WHERE i.status = 'accepted'
+  AND i.skill IN (SELECT skill FROM wrong_skills)
+  AND NOT EXISTS (
+      SELECT 1 FROM served_items s
+      WHERE s.user_id = $1
+        AND s.item_id = i.id
+  )
+ORDER BY random()
+LIMIT $2;
 
 -- name: MarkItemServed :exec
 -- Idempotent: ON CONFLICT DO NOTHING means re-serving (e.g. retry after a

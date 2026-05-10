@@ -1,6 +1,7 @@
 package items
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"log/slog"
@@ -32,39 +33,57 @@ func NewHandler(svc *Service, logger *slog.Logger) *Handler {
 // Mount registers the routes onto r. The caller decides the prefix
 // (typically /api, behind RequireSession).
 func (h *Handler) Mount(r chi.Router) {
-	r.Get("/sessions/quick-boost", h.quickBoost)
+	r.Get("/sessions/quick-boost", h.session("quick-boost", h.svc.QuickBoost))
+	r.Get("/sessions/weak-spot-drill", h.session("weak-spot-drill", h.svc.WeakSpotDrill))
+	r.Get("/sessions/mixed-sprint", h.session("mixed-sprint", h.svc.MixedSprint))
+	r.Get("/sessions/boss-fight", h.session("boss-fight", h.svc.BossFight))
+	r.Get("/sessions/mock-exam", h.session("mock-exam", h.svc.MockExam))
+	r.Get("/sessions/mistake-clinic", h.session("mistake-clinic", h.svc.MistakeClinic))
 	r.Post("/attempts", h.submitAttempt)
 	r.Get("/me/history", h.history)
 	r.Get("/me/mastery", h.mastery)
 }
 
-// quickBoost: GET /sessions/quick-boost?count=5&exam_type=qudurat&section=quantitative&topic=…
-func (h *Handler) quickBoost(w http.ResponseWriter, r *http.Request) {
-	user, ok := auth.UserFrom(r.Context())
-	if !ok {
-		writeError(w, http.StatusUnauthorized, "unauthorized")
-		return
-	}
-	q := r.URL.Query()
-	count, _ := strconv.Atoi(q.Get("count"))
-	res, err := h.svc.QuickBoost(r.Context(), QuickBoostParams{
-		UserID:   user.ID,
-		Count:    count,
-		ExamType: q.Get("exam_type"),
-		Section:  q.Get("section"),
-		Topic:    q.Get("topic"),
-	})
-	if err != nil {
-		switch {
-		case errors.Is(err, ErrNoQuestionsForQuery):
-			writeError(w, http.StatusNotFound, "no unanswered questions match the filter")
-		default:
-			h.logger.Error("quick-boost", "err", err, "user", user.ID)
-			writeError(w, http.StatusInternalServerError, "internal error")
+// session returns a chi handler that runs `build` for the authenticated
+// user, parsing the standard query parameters (count, exam_type, section,
+// topic, skill, difficulty) into SessionParams. Every session type uses
+// the same input shape and the same response shape, so this avoids six
+// near-identical handler bodies.
+func (h *Handler) session(name string, build func(context.Context, SessionParams) ([]ServedItem, error)) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		user, ok := auth.UserFrom(r.Context())
+		if !ok {
+			writeError(w, http.StatusUnauthorized, "unauthorized")
+			return
 		}
-		return
+		q := r.URL.Query()
+		count, _ := strconv.Atoi(q.Get("count"))
+		res, err := build(r.Context(), SessionParams{
+			UserID:     user.ID,
+			Count:      count,
+			ExamType:   q.Get("exam_type"),
+			Section:    q.Get("section"),
+			Topic:      q.Get("topic"),
+			Skill:      q.Get("skill"),
+			Difficulty: q.Get("difficulty"),
+		})
+		if err != nil {
+			switch {
+			case errors.Is(err, ErrNoQuestionsForQuery):
+				writeError(w, http.StatusNotFound, "no unanswered questions match the filter")
+			case errors.Is(err, ErrNotEnoughHistory):
+				writeError(w, http.StatusUnprocessableEntity, "not enough history for this session type — try quick-boost first")
+			default:
+				h.logger.Error("session", "type", name, "err", err, "user", user.ID)
+				writeError(w, http.StatusInternalServerError, "internal error")
+			}
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{
+			"session_type": name,
+			"items":        res,
+		})
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"items": res})
 }
 
 type attemptReq struct {

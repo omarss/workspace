@@ -26,6 +26,8 @@ var (
 // it here lets tests substitute an in-memory fake without depending on pgx.
 type Store interface {
 	PickUnservedItemsForUser(ctx context.Context, arg store.PickUnservedItemsForUserParams) ([]store.PickUnservedItemsForUserRow, error)
+	PickWeakestSkillForUser(ctx context.Context, arg store.PickWeakestSkillForUserParams) (store.PickWeakestSkillForUserRow, error)
+	PickMistakeClinicItems(ctx context.Context, arg store.PickMistakeClinicItemsParams) ([]store.PickMistakeClinicItemsRow, error)
 	MarkItemServed(ctx context.Context, arg store.MarkItemServedParams) error
 	GetItemForAttempt(ctx context.Context, id uuid.UUID) (store.Item, error)
 	ListItemChoicesByID(ctx context.Context, itemID uuid.UUID) ([]store.ItemChoice, error)
@@ -44,37 +46,148 @@ func NewService(s Store) *Service {
 	return &Service{store: s}
 }
 
-// QuickBoostParams narrows the practice batch.
-//
-// Empty filter strings translate to "any value" — exposed to the user as
-// query parameters; the SQL passes them as nullable narg.
-type QuickBoostParams struct {
-	UserID   uuid.UUID
-	Count    int
-	ExamType string
-	Section  string
-	Topic    string
+// SessionParams is the union of filter knobs every session-type builder
+// understands. Each builder sets the fields it cares about; the rest stay
+// zero-valued and translate to "no filter" at the SQL boundary.
+type SessionParams struct {
+	UserID     uuid.UUID
+	Count      int
+	ExamType   string
+	Section    string
+	Topic      string
+	Skill      string
+	Difficulty string // "easy" | "medium" | "hard" | ""
 }
 
 // QuickBoost picks Count unserved items for the user (filtered if asked),
 // marks each as served, and returns them — without correct_answer or
 // explanation. Practice can resume even if the user never POSTs an attempt:
-// the served_items rows mean the user won't see the same item again, but
-// they keep the option to re-encounter the *concept* via a sibling item.
-func (s *Service) QuickBoost(ctx context.Context, p QuickBoostParams) ([]ServedItem, error) {
-	if p.Count <= 0 {
-		p.Count = 5
-	}
-	if p.Count > 50 {
-		p.Count = 50 // sane upper bound; the 5-question UX cap is client-side.
-	}
+// the served_items rows mean the user won't see the same item again.
+func (s *Service) QuickBoost(ctx context.Context, p SessionParams) ([]ServedItem, error) {
+	return s.pickAndServe(ctx, p, defaultCount(p.Count, 5))
+}
 
+// BossFight serves only `hard` items. Difficulty filter overrides whatever
+// the caller passed. Default count 8 (~10 min sprint).
+func (s *Service) BossFight(ctx context.Context, p SessionParams) ([]ServedItem, error) {
+	p.Difficulty = "hard"
+	return s.pickAndServe(ctx, p, defaultCount(p.Count, 8))
+}
+
+// MixedSprint is a 15-question filtered set with no difficulty bias —
+// the back-end relies on the random ordering and the writer's intended
+// difficulty distribution to keep things mixed. Phase 8 calibration will
+// upgrade this to weighted sampling per the user's mastery curve.
+func (s *Service) MixedSprint(ctx context.Context, p SessionParams) ([]ServedItem, error) {
+	p.Difficulty = "" // explicitly mixed
+	return s.pickAndServe(ctx, p, defaultCount(p.Count, 15))
+}
+
+// minAttemptsForWeakSpot is the floor of attempts per skill required for
+// the Weak Spot picker to consider it. Below this the accuracy estimate
+// is too noisy to act on.
+const minAttemptsForWeakSpot = 5
+
+// ErrNotEnoughHistory is returned by adaptive sessions that need historical
+// signal (mastery, mistake patterns) when the user is too new to provide it.
+var ErrNotEnoughHistory = errors.New("items: not enough attempt history for adaptive session")
+
+// WeakSpotDrill picks the user's weakest skill (≥ minAttemptsForWeakSpot
+// attempts) and serves Count unserved items in it. Returns
+// ErrNotEnoughHistory when no skill clears the floor.
+func (s *Service) WeakSpotDrill(ctx context.Context, p SessionParams) ([]ServedItem, error) {
+	row, err := s.store.PickWeakestSkillForUser(ctx, store.PickWeakestSkillForUserParams{
+		UserID:  p.UserID,
+		Column2: minAttemptsForWeakSpot,
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrNotEnoughHistory
+		}
+		return nil, fmt.Errorf("weakest skill: %w", err)
+	}
+	p.Skill = row.Skill
+	return s.pickAndServe(ctx, p, defaultCount(p.Count, 10))
+}
+
+// MistakeClinic surfaces fresh items in skills the user has recently
+// gotten wrong. Same concept, different question — never the one they
+// already missed. Returns ErrNotEnoughHistory when the user has zero
+// recorded mistakes.
+func (s *Service) MistakeClinic(ctx context.Context, p SessionParams) ([]ServedItem, error) {
+	count := defaultCount(p.Count, 10)
+	rows, err := s.store.PickMistakeClinicItems(ctx, store.PickMistakeClinicItemsParams{
+		UserID: p.UserID,
+		Limit:  safeInt32(count),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("mistake clinic pick: %w", err)
+	}
+	if len(rows) == 0 {
+		return nil, ErrNotEnoughHistory
+	}
+	return s.markAndDecorate(ctx, p.UserID, mistakeRowsAsPick(rows))
+}
+
+// MockExam composes a session of `count` items (default 60) per the spec
+// difficulty mix: 35% easy / 45% medium / 20% hard, scoped to the given
+// exam_type/section. The split is approximate; rounding goes to medium so
+// "60" yields 21+27+12 and the user always gets at least the hard slice.
+func (s *Service) MockExam(ctx context.Context, p SessionParams) ([]ServedItem, error) {
+	count := defaultCount(p.Count, 60)
+	easy := count * 35 / 100
+	hard := count * 20 / 100
+	medium := count - easy - hard
+
+	out := make([]ServedItem, 0, count)
+	for _, bucket := range []struct {
+		diff string
+		n    int
+	}{
+		{"easy", easy},
+		{"medium", medium},
+		{"hard", hard},
+	} {
+		if bucket.n == 0 {
+			continue
+		}
+		bp := p
+		bp.Difficulty = bucket.diff
+		bp.Count = bucket.n
+		got, err := s.pickAndServe(ctx, bp, bucket.n)
+		if err != nil {
+			// Out of items in one bucket isn't fatal — it just yields a
+			// shorter exam than requested. Other buckets still attempt.
+			if errors.Is(err, ErrNoQuestionsForQuery) {
+				continue
+			}
+			return nil, err
+		}
+		out = append(out, got...)
+	}
+	if len(out) == 0 {
+		return nil, ErrNoQuestionsForQuery
+	}
+	return out, nil
+}
+
+// pickAndServe is the shared helper for every session builder that uses
+// the multi-filter PickUnservedItemsForUser path.
+func (s *Service) pickAndServe(ctx context.Context, p SessionParams, count int) ([]ServedItem, error) {
+	if count <= 0 {
+		count = 5
+	}
+	if count > 100 {
+		count = 100
+	}
 	rows, err := s.store.PickUnservedItemsForUser(ctx, store.PickUnservedItemsForUserParams{
-		UserID:     p.UserID,
-		LimitCount: safeInt32(p.Count),
-		ExamType:   nullableStr(p.ExamType),
-		Section:    nullableStr(p.Section),
-		Topic:      nullableStr(p.Topic),
+		UserID:           p.UserID,
+		LimitCount:       safeInt32(count),
+		ExamType:         nullableStr(p.ExamType),
+		Section:          nullableStr(p.Section),
+		Topic:            nullableStr(p.Topic),
+		Skill:            nullableStr(p.Skill),
+		DifficultyTarget: nullableStr(p.Difficulty),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("pick: %w", err)
@@ -82,18 +195,19 @@ func (s *Service) QuickBoost(ctx context.Context, p QuickBoostParams) ([]ServedI
 	if len(rows) == 0 {
 		return nil, ErrNoQuestionsForQuery
 	}
+	return s.markAndDecorate(ctx, p.UserID, rows)
+}
 
+// markAndDecorate marks every row served and attaches choices.
+func (s *Service) markAndDecorate(ctx context.Context, userID uuid.UUID, rows []store.PickUnservedItemsForUserRow) ([]ServedItem, error) {
 	out := make([]ServedItem, 0, len(rows))
 	for _, r := range rows {
 		choices, err := s.store.ListItemChoicesByID(ctx, r.ID)
 		if err != nil {
 			return nil, fmt.Errorf("choices: %w", err)
 		}
-		// Mark served BEFORE returning. If the call after this fails the
-		// user might see one fewer item but no double-serves; better than
-		// the opposite.
 		if err := s.store.MarkItemServed(ctx, store.MarkItemServedParams{
-			UserID: p.UserID,
+			UserID: userID,
 			ItemID: r.ID,
 		}); err != nil {
 			return nil, fmt.Errorf("mark served: %w", err)
@@ -101,6 +215,28 @@ func (s *Service) QuickBoost(ctx context.Context, p QuickBoostParams) ([]ServedI
 		out = append(out, toServedItem(r, choices))
 	}
 	return out, nil
+}
+
+// mistakeRowsAsPick converts the mistake-clinic row shape (which sqlc
+// generates as a separate struct because the SQL has a CTE) into the
+// shared PickUnservedItemsForUserRow shape so the same decorate path can
+// fan out to it.
+func mistakeRowsAsPick(in []store.PickMistakeClinicItemsRow) []store.PickUnservedItemsForUserRow {
+	out := make([]store.PickUnservedItemsForUserRow, len(in))
+	for i, r := range in {
+		out[i] = store.PickUnservedItemsForUserRow(r)
+	}
+	return out
+}
+
+func defaultCount(requested, fallback int) int {
+	if requested <= 0 {
+		return fallback
+	}
+	if requested > 100 {
+		return 100
+	}
+	return requested
 }
 
 // AttemptInput is what the client sends on POST /api/attempts.

@@ -236,30 +236,118 @@ func (q *Queries) MarkItemServed(ctx context.Context, arg MarkItemServedParams) 
 	return err
 }
 
+const pickMistakeClinicItems = `-- name: PickMistakeClinicItems :many
+WITH wrong_skills AS (
+    SELECT i.skill, MAX(a.served_at) AS recent
+    FROM attempts a
+    JOIN items   i ON i.id = a.item_id
+    WHERE a.user_id = $1
+      AND a.correct = false
+    GROUP BY i.skill
+    ORDER BY recent DESC
+    LIMIT 5
+)
+SELECT i.id, i.exam_type, i.section, i.subject, i.grade_level, i.unit, i.topic,
+       i.skill, i.cognitive_level, i.difficulty_target, i.question_archetype,
+       i.question_text, i.estimated_time_seconds
+FROM items i
+WHERE i.status = 'accepted'
+  AND i.skill IN (SELECT skill FROM wrong_skills)
+  AND NOT EXISTS (
+      SELECT 1 FROM served_items s
+      WHERE s.user_id = $1
+        AND s.item_id = i.id
+  )
+ORDER BY random()
+LIMIT $2
+`
+
+type PickMistakeClinicItemsParams struct {
+	UserID uuid.UUID `json:"user_id"`
+	Limit  int32     `json:"limit"`
+}
+
+type PickMistakeClinicItemsRow struct {
+	ID                   uuid.UUID `json:"id"`
+	ExamType             string    `json:"exam_type"`
+	Section              string    `json:"section"`
+	Subject              string    `json:"subject"`
+	GradeLevel           string    `json:"grade_level"`
+	Unit                 string    `json:"unit"`
+	Topic                string    `json:"topic"`
+	Skill                string    `json:"skill"`
+	CognitiveLevel       string    `json:"cognitive_level"`
+	DifficultyTarget     string    `json:"difficulty_target"`
+	QuestionArchetype    string    `json:"question_archetype"`
+	QuestionText         string    `json:"question_text"`
+	EstimatedTimeSeconds int32     `json:"estimated_time_seconds"`
+}
+
+// Items in the same skills as items the user has recently gotten wrong,
+// excluding everything the user has already been served. Backs the
+// Mistake Clinic session type — same concept, fresh question.
+func (q *Queries) PickMistakeClinicItems(ctx context.Context, arg PickMistakeClinicItemsParams) ([]PickMistakeClinicItemsRow, error) {
+	rows, err := q.db.Query(ctx, pickMistakeClinicItems, arg.UserID, arg.Limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []PickMistakeClinicItemsRow
+	for rows.Next() {
+		var i PickMistakeClinicItemsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ExamType,
+			&i.Section,
+			&i.Subject,
+			&i.GradeLevel,
+			&i.Unit,
+			&i.Topic,
+			&i.Skill,
+			&i.CognitiveLevel,
+			&i.DifficultyTarget,
+			&i.QuestionArchetype,
+			&i.QuestionText,
+			&i.EstimatedTimeSeconds,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const pickUnservedItemsForUser = `-- name: PickUnservedItemsForUser :many
 SELECT i.id, i.exam_type, i.section, i.subject, i.grade_level, i.unit, i.topic,
        i.skill, i.cognitive_level, i.difficulty_target, i.question_archetype,
        i.question_text, i.estimated_time_seconds
 FROM items i
 WHERE i.status = 'accepted'
-  AND ($1::text IS NULL OR i.exam_type = $1)
-  AND ($2::text   IS NULL OR i.section   = $2)
-  AND ($3::text     IS NULL OR i.topic     = $3)
+  AND ($1::text         IS NULL OR i.exam_type         = $1)
+  AND ($2::text           IS NULL OR i.section           = $2)
+  AND ($3::text             IS NULL OR i.topic             = $3)
+  AND ($4::text             IS NULL OR i.skill             = $4)
+  AND ($5::text IS NULL OR i.difficulty_target = $5)
   AND NOT EXISTS (
       SELECT 1 FROM served_items s
-      WHERE s.user_id = $4
+      WHERE s.user_id = $6
         AND s.item_id = i.id
   )
 ORDER BY random()
-LIMIT $5
+LIMIT $7
 `
 
 type PickUnservedItemsForUserParams struct {
-	ExamType   *string   `json:"exam_type"`
-	Section    *string   `json:"section"`
-	Topic      *string   `json:"topic"`
-	UserID     uuid.UUID `json:"user_id"`
-	LimitCount int32     `json:"limit_count"`
+	ExamType         *string   `json:"exam_type"`
+	Section          *string   `json:"section"`
+	Topic            *string   `json:"topic"`
+	Skill            *string   `json:"skill"`
+	DifficultyTarget *string   `json:"difficulty_target"`
+	UserID           uuid.UUID `json:"user_id"`
+	LimitCount       int32     `json:"limit_count"`
 }
 
 type PickUnservedItemsForUserRow struct {
@@ -279,13 +367,16 @@ type PickUnservedItemsForUserRow struct {
 }
 
 // Returns up to limit_count accepted items the user has never been served.
-// Filters by exam_type/section/topic if provided (NULL = no filter).
-// Random ordering keeps practice fresh; for ~10k items the cost is fine.
+// Filters by exam_type/section/topic/skill/difficulty if provided
+// (NULL = no filter). Random ordering keeps practice fresh; for ~10k items
+// the cost is fine.
 func (q *Queries) PickUnservedItemsForUser(ctx context.Context, arg PickUnservedItemsForUserParams) ([]PickUnservedItemsForUserRow, error) {
 	rows, err := q.db.Query(ctx, pickUnservedItemsForUser,
 		arg.ExamType,
 		arg.Section,
 		arg.Topic,
+		arg.Skill,
+		arg.DifficultyTarget,
 		arg.UserID,
 		arg.LimitCount,
 	)
@@ -319,6 +410,40 @@ func (q *Queries) PickUnservedItemsForUser(ctx context.Context, arg PickUnserved
 		return nil, err
 	}
 	return items, nil
+}
+
+const pickWeakestSkillForUser = `-- name: PickWeakestSkillForUser :one
+SELECT i.skill,
+       COUNT(*)::int                                  AS attempts,
+       AVG(CASE WHEN a.correct THEN 1.0 ELSE 0.0 END) AS accuracy
+FROM attempts a
+JOIN items   i ON i.id = a.item_id
+WHERE a.user_id = $1
+  AND a.correct IS NOT NULL
+GROUP BY i.skill
+HAVING COUNT(*) >= $2
+ORDER BY accuracy ASC, attempts DESC
+LIMIT 1
+`
+
+type PickWeakestSkillForUserParams struct {
+	UserID  uuid.UUID   `json:"user_id"`
+	Column2 interface{} `json:"column_2"`
+}
+
+type PickWeakestSkillForUserRow struct {
+	Skill    string  `json:"skill"`
+	Attempts int32   `json:"attempts"`
+	Accuracy float64 `json:"accuracy"`
+}
+
+// Returns the user's weakest skill (lowest accuracy) with at least
+// min_attempts answered. Drives the Weak Spot Drill.
+func (q *Queries) PickWeakestSkillForUser(ctx context.Context, arg PickWeakestSkillForUserParams) (PickWeakestSkillForUserRow, error) {
+	row := q.db.QueryRow(ctx, pickWeakestSkillForUser, arg.UserID, arg.Column2)
+	var i PickWeakestSkillForUserRow
+	err := row.Scan(&i.Skill, &i.Attempts, &i.Accuracy)
+	return i, err
 }
 
 const summarizeMasteryByTopic = `-- name: SummarizeMasteryByTopic :many

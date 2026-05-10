@@ -53,10 +53,18 @@ type Querier interface {
 	// Idempotent: ON CONFLICT DO NOTHING means re-serving (e.g. retry after a
 	// network error) doesn't fail. The PRIMARY KEY (user_id,item_id) covers it.
 	MarkItemServed(ctx context.Context, arg MarkItemServedParams) error
+	// Items in the same skills as items the user has recently gotten wrong,
+	// excluding everything the user has already been served. Backs the
+	// Mistake Clinic session type — same concept, fresh question.
+	PickMistakeClinicItems(ctx context.Context, arg PickMistakeClinicItemsParams) ([]PickMistakeClinicItemsRow, error)
 	// Returns up to limit_count accepted items the user has never been served.
-	// Filters by exam_type/section/topic if provided (NULL = no filter).
-	// Random ordering keeps practice fresh; for ~10k items the cost is fine.
+	// Filters by exam_type/section/topic/skill/difficulty if provided
+	// (NULL = no filter). Random ordering keeps practice fresh; for ~10k items
+	// the cost is fine.
 	PickUnservedItemsForUser(ctx context.Context, arg PickUnservedItemsForUserParams) ([]PickUnservedItemsForUserRow, error)
+	// Returns the user's weakest skill (lowest accuracy) with at least
+	// min_attempts answered. Drives the Weak Spot Drill.
+	PickWeakestSkillForUser(ctx context.Context, arg PickWeakestSkillForUserParams) (PickWeakestSkillForUserRow, error)
 	RevokeAllUserSessions(ctx context.Context, userID uuid.UUID) error
 	RevokeSession(ctx context.Context, id uuid.UUID) error
 	// Per-topic accuracy + counts for the user. Drives the weakness heatmap
