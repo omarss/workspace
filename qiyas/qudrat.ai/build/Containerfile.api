@@ -1,0 +1,16 @@
+# Multi-stage build for the qudrat api service. The builder image compiles
+# a static binary; the final image is distroless and contains only the
+# binary plus CA roots — no shell, no package manager, no source.
+FROM localhost/qudrat-builder:dev AS build
+ARG VERSION=dev
+WORKDIR /work
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+RUN go build -trimpath -ldflags="-s -w -X main.version=${VERSION}" -o /out/api ./cmd/api
+
+FROM gcr.io/distroless/static-debian12:nonroot
+COPY --from=build /out/api /api
+USER 65532:65532
+EXPOSE 8080
+ENTRYPOINT ["/api"]

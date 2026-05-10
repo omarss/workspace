@@ -1,0 +1,14 @@
+# Multi-stage build for the qudrat worker (placeholder in Phase 1; real
+# job consumer wires up in Phase 4).
+FROM localhost/qudrat-builder:dev AS build
+ARG VERSION=dev
+WORKDIR /work
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+RUN go build -trimpath -ldflags="-s -w -X main.version=${VERSION}" -o /out/worker ./cmd/worker
+
+FROM gcr.io/distroless/static-debian12:nonroot
+COPY --from=build /out/worker /worker
+USER 65532:65532
+ENTRYPOINT ["/worker"]

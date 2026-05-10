@@ -1,0 +1,29 @@
+version: "2"
+
+# sqlc reads `schema` to learn types and `queries` to generate Go functions.
+# Generated code lands in `internal/store` so callers import a single package.
+sql:
+  - engine: "postgresql"
+    queries: "db/queries"
+    schema: "db/migrations"
+    gen:
+      go:
+        package: "store"
+        out: "internal/store"
+        sql_package: "pgx/v5"
+        emit_json_tags: true
+        emit_interface: true
+        emit_exact_table_names: false
+        emit_pointers_for_null_types: true
+        # UUIDs surface as github.com/google/uuid.UUID for ergonomics.
+        # Without this, sqlc with pgx/v5 returns [16]byte, which is awkward
+        # to JSON-encode and compare.
+        overrides:
+          - db_type: "uuid"
+            go_type: "github.com/google/uuid.UUID"
+          - db_type: "uuid"
+            nullable: true
+            go_type:
+              type: "UUID"
+              import: "github.com/google/uuid"
+              pointer: true
