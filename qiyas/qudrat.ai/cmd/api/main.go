@@ -24,6 +24,7 @@ import (
 	"github.com/omarss/qudrat/internal/auth"
 	"github.com/omarss/qudrat/internal/config"
 	"github.com/omarss/qudrat/internal/items"
+	"github.com/omarss/qudrat/internal/leaderboard"
 	"github.com/omarss/qudrat/internal/store"
 	"github.com/omarss/qudrat/pkg/notifier"
 	"github.com/omarss/qudrat/pkg/notifier/devlog"
@@ -83,6 +84,9 @@ func run(logger *slog.Logger) error {
 	itemsSvc := items.NewService(q)
 	itemsH := items.NewHandler(itemsSvc, logger)
 
+	lbSvc := leaderboard.NewService(q)
+	lbH := leaderboard.NewHandler(lbSvc, logger)
+
 	r := server.New(server.Config{
 		Version: cfg.Version,
 		DB:      pool,
@@ -94,6 +98,7 @@ func run(logger *slog.Logger) error {
 		api.Group(func(api chi.Router) {
 			api.Use(auth.RequireSession(sess, cookie.Name))
 			itemsH.Mount(api)
+			lbH.Mount(api)
 		})
 	})
 

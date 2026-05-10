@@ -37,6 +37,10 @@ type Querier interface {
 	GetUserByEmail(ctx context.Context, email *string) (User, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (User, error)
 	GetUserByPhone(ctx context.Context, phone *string) (User, error)
+	// Week-over-week accuracy delta. Rewards growth, not raw skill — the
+	// safe-leaderboard goal from spec §22 rule 5. min_attempts gates noisy
+	// readings from very small samples.
+	ImprovementLeaderboard(ctx context.Context, arg ImprovementLeaderboardParams) ([]ImprovementLeaderboardRow, error)
 	IncrementOTPAttempts(ctx context.Context, id uuid.UUID) (OtpChallenge, error)
 	// One row per answered item per user. choice_key + correct are nullable to
 	// support a "served but skipped" path later (Phase 4 mistake-clinic).
@@ -53,6 +57,10 @@ type Querier interface {
 	// Idempotent: ON CONFLICT DO NOTHING means re-serving (e.g. retry after a
 	// network error) doesn't fail. The PRIMARY KEY (user_id,item_id) covers it.
 	MarkItemServed(ctx context.Context, arg MarkItemServedParams) error
+	// Top users by accuracy. Restricted to opt-in users with at least
+	// min_attempts answered (spec §22 rule 8: don't rank tiny samples).
+	// Phone is never selected; nickname is the only public identifier.
+	MasteryLeaderboard(ctx context.Context, arg MasteryLeaderboardParams) ([]MasteryLeaderboardRow, error)
 	// Items in the same skills as items the user has recently gotten wrong,
 	// excluding everything the user has already been served. Backs the
 	// Mistake Clinic session type — same concept, fresh question.
@@ -67,6 +75,8 @@ type Querier interface {
 	PickWeakestSkillForUser(ctx context.Context, arg PickWeakestSkillForUserParams) (PickWeakestSkillForUserRow, error)
 	RevokeAllUserSessions(ctx context.Context, userID uuid.UUID) error
 	RevokeSession(ctx context.Context, id uuid.UUID) error
+	SetLeaderboardOptIn(ctx context.Context, arg SetLeaderboardOptInParams) error
+	SetUserNickname(ctx context.Context, arg SetUserNicknameParams) error
 	// Per-topic accuracy + counts for the user. Drives the weakness heatmap
 	// (spec §4 #8). LIMIT keeps the payload bounded.
 	SummarizeMasteryByTopic(ctx context.Context, arg SummarizeMasteryByTopicParams) ([]SummarizeMasteryByTopicRow, error)

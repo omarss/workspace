@@ -109,11 +109,12 @@ type SimilarityCluster struct {
 }
 
 type User struct {
-	ID          uuid.UUID          `json:"id"`
-	Email       *string            `json:"email"`
-	Phone       *string            `json:"phone"`
-	Nickname    string             `json:"nickname"`
-	CreatedAt   pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
-	LastLoginAt pgtype.Timestamptz `json:"last_login_at"`
+	ID               uuid.UUID          `json:"id"`
+	Email            *string            `json:"email"`
+	Phone            *string            `json:"phone"`
+	Nickname         string             `json:"nickname"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
+	LastLoginAt      pgtype.Timestamptz `json:"last_login_at"`
+	LeaderboardOptIn bool               `json:"leaderboard_opt_in"`
 }
