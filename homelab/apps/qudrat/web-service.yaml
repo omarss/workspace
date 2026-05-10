@@ -1,0 +1,21 @@
+# NodePort 30804 — host nginx proxies / → here, /api/* → qudrat-api (30803).
+# 30801 → api-places, 30802 → api-mcqs, 30803 → qudrat-api, 30804 → qudrat-web.
+apiVersion: v1
+kind: Service
+metadata:
+  name: qudrat-web
+  namespace: qudrat
+  labels:
+    app.kubernetes.io/name: qudrat
+    app.kubernetes.io/component: web
+spec:
+  type: NodePort
+  selector:
+    app.kubernetes.io/name: qudrat
+    app.kubernetes.io/component: web
+  ports:
+    - name: http
+      port: 3000
+      targetPort: http
+      nodePort: 30804
+      protocol: TCP
