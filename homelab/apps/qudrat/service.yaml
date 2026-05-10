@@ -1,0 +1,22 @@
+# NodePort 30803 so the host nginx reverse-proxy can reach the pod at
+# http://127.0.0.1:30803 without an Ingress or LB.
+# 30801 → api-places, 30802 → api-mcqs, 30803 → qudrat (this file).
+apiVersion: v1
+kind: Service
+metadata:
+  name: qudrat-api
+  namespace: qudrat
+  labels:
+    app.kubernetes.io/name: qudrat
+    app.kubernetes.io/component: api
+spec:
+  type: NodePort
+  selector:
+    app.kubernetes.io/name: qudrat
+    app.kubernetes.io/component: api
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+      nodePort: 30803
+      protocol: TCP

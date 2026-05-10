@@ -29,9 +29,11 @@ apply-nginx:
 	sudo cp nginx/swet.omarss.net.conf /etc/nginx/sites-available/swet.omarss.net
 	sudo cp nginx/sync.omarss.net.conf /etc/nginx/sites-available/sync.omarss.net
 	sudo cp nginx/apps.omarss.net.conf /etc/nginx/sites-available/apps.omarss.net
+	sudo cp nginx/qudrat.omarss.net.conf /etc/nginx/sites-available/qudrat.omarss.net
 	sudo ln -sf /etc/nginx/sites-available/swet.omarss.net /etc/nginx/sites-enabled/
 	sudo ln -sf /etc/nginx/sites-available/sync.omarss.net /etc/nginx/sites-enabled/
 	sudo ln -sf /etc/nginx/sites-available/apps.omarss.net /etc/nginx/sites-enabled/
+	sudo ln -sf /etc/nginx/sites-available/qudrat.omarss.net /etc/nginx/sites-enabled/
 	sudo nginx -t && sudo systemctl reload nginx
 
 # One-shot full setup for the apps.omarss.net APK host:
