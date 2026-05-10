@@ -125,8 +125,8 @@ export default function LoginPage() {
           <input
             type="text"
             inputMode="numeric"
-            pattern="[0-9]{6}"
-            placeholder="000000"
+            pattern="[0-9]{4,8}"
+            placeholder="رمز التحقق"
             value={code}
             onChange={(e) => setCode(e.target.value)}
             dir="ltr"

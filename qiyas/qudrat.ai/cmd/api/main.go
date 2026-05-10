@@ -171,6 +171,15 @@ func buildEmailSender(cfg config.Config, logger *slog.Logger) notifier.EmailSend
 	return devlog.NewEmailSender(logger)
 }
 
+// devOTPHint returns the configured fixed OTP for log output, or the
+// devlog default when nothing is configured.
+func devOTPHint(cfg config.Config) string {
+	if cfg.DevFixedOTP != "" {
+		return cfg.DevFixedOTP
+	}
+	return devlog.DefaultSMSCode
+}
+
 // buildSMSVerifier returns the production Twilio Verify client when its
 // triple of creds is configured; otherwise a dev verifier that accepts a
 // fixed code. Same warning as above — dev path must not reach production.
@@ -179,6 +188,7 @@ func buildSMSVerifier(cfg config.Config, logger *slog.Logger) notifier.SMSVerifi
 		logger.Info("sms verifier", "provider", "twilio", "service_sid", cfg.TwilioVerifyServiceSID)
 		return twilio.NewVerifyClient(cfg.TwilioAccountSID, cfg.TwilioAuthToken, cfg.TwilioVerifyServiceSID)
 	}
-	logger.Warn("sms verifier", "provider", "devlog", "warning", "any code matching the dev fixture is accepted")
-	return devlog.NewSMSVerifier(logger, "")
+	logger.Warn("sms verifier", "provider", "devlog", "warning", "any code matching the dev fixture is accepted",
+		"fixed_code", devOTPHint(cfg))
+	return devlog.NewSMSVerifier(logger, cfg.DevFixedOTP)
 }

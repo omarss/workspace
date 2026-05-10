@@ -58,6 +58,12 @@ type Config struct {
 	TwilioAccountSID       string
 	TwilioAuthToken        string
 	TwilioVerifyServiceSID string
+
+	// DevFixedOTP overrides the devlog fixed-code for both SMS and email
+	// when the production providers are not configured. Useful for QA on
+	// a deployed environment without access to logs. Leave empty in
+	// production — the dev paths must NEVER be reachable there.
+	DevFixedOTP string
 }
 
 // Load reads the config from the environment. Unknown values fall back to
@@ -85,6 +91,8 @@ func Load() (Config, error) {
 		TwilioAccountSID:       os.Getenv("QUDRAT_TWILIO_ACCOUNT_SID"),
 		TwilioAuthToken:        os.Getenv("QUDRAT_TWILIO_AUTH_TOKEN"),
 		TwilioVerifyServiceSID: os.Getenv("QUDRAT_TWILIO_VERIFY_SERVICE_SID"),
+
+		DevFixedOTP: os.Getenv("QUDRAT_DEV_FIXED_OTP"),
 	}
 
 	if raw := os.Getenv("QUDRAT_READ_HEADER_TIMEOUT"); raw != "" {
