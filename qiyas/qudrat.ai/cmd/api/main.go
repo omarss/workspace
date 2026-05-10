@@ -22,6 +22,7 @@ import (
 
 	"github.com/omarss/qudrat/internal/api/server"
 	"github.com/omarss/qudrat/internal/auth"
+	"github.com/omarss/qudrat/internal/billing"
 	"github.com/omarss/qudrat/internal/config"
 	"github.com/omarss/qudrat/internal/items"
 	"github.com/omarss/qudrat/internal/leaderboard"
@@ -82,7 +83,10 @@ func run(logger *slog.Logger) error {
 	}
 	authH := auth.NewHandler(otp, sess, cookie, logger)
 
-	itemsSvc := items.NewService(q)
+	billingSvc := billing.NewService(q, billing.DefaultTrialDailyAttempts)
+	billingH := billing.NewHandler(billingSvc, logger)
+
+	itemsSvc := items.NewService(q).WithQuota(billingSvc)
 	itemsH := items.NewHandler(itemsSvc, logger)
 
 	lbSvc := leaderboard.NewService(q)
@@ -106,6 +110,7 @@ func run(logger *slog.Logger) error {
 			itemsH.Mount(api)
 			lbH.Mount(api)
 			reviewH.Mount(api)
+			billingH.Mount(api)
 		})
 	})
 

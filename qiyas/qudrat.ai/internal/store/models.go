@@ -117,6 +117,21 @@ type SimilarityCluster struct {
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
 }
 
+type Subscription struct {
+	ID          uuid.UUID          `json:"id"`
+	UserID      uuid.UUID          `json:"user_id"`
+	Plan        string             `json:"plan"`
+	Status      string             `json:"status"`
+	Provider    *string            `json:"provider"`
+	ProviderRef *string            `json:"provider_ref"`
+	StartedAt   pgtype.Timestamptz `json:"started_at"`
+	RenewedAt   pgtype.Timestamptz `json:"renewed_at"`
+	ExpiresAt   pgtype.Timestamptz `json:"expires_at"`
+	CancelledAt pgtype.Timestamptz `json:"cancelled_at"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+}
+
 type User struct {
 	ID               uuid.UUID          `json:"id"`
 	Email            *string            `json:"email"`

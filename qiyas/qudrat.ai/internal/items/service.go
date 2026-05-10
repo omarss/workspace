@@ -36,14 +36,30 @@ type Store interface {
 	ListRecentAttemptsForUser(ctx context.Context, arg store.ListRecentAttemptsForUserParams) ([]store.ListRecentAttemptsForUserRow, error)
 }
 
+// QuotaChecker is a hook the billing service plugs into. It returns
+// billing.ErrQuotaExceeded when the user has hit the trial daily cap.
+// Items uses an interface so it doesn't import internal/billing — keeps
+// the dependency direction clean.
+type QuotaChecker interface {
+	CheckAttemptQuota(ctx context.Context, userID uuid.UUID) error
+}
+
 // Service is the read/write entrypoint for the item bank.
 type Service struct {
 	store Store
+	quota QuotaChecker // nullable; nil means "no quota enforcement"
 }
 
-// NewService wires the dependency.
+// NewService wires the store dependency. Use WithQuota to attach a
+// billing-side gate.
 func NewService(s Store) *Service {
 	return &Service{store: s}
+}
+
+// WithQuota attaches a QuotaChecker that gates SubmitAttempt.
+func (s *Service) WithQuota(q QuotaChecker) *Service {
+	s.quota = q
+	return s
 }
 
 // SessionParams is the union of filter knobs every session-type builder
@@ -265,9 +281,18 @@ type AttemptResult struct {
 // correct_answer, persists the attempt, and returns the explanation. The
 // no-repeat rule is enforced upstream by served_items + ItemFilter, so we
 // don't need to re-check here — but ChoiceKey is validated to be A-D.
+//
+// If a QuotaChecker is attached (via WithQuota), the trial daily cap is
+// enforced BEFORE the item is fetched — failing fast with the billing
+// error short-circuits the read load.
 func (s *Service) SubmitAttempt(ctx context.Context, p AttemptInput) (AttemptResult, error) {
 	if !validChoice(p.ChoiceKey) {
 		return AttemptResult{}, ErrInvalidChoice
+	}
+	if s.quota != nil {
+		if err := s.quota.CheckAttemptQuota(ctx, p.UserID); err != nil {
+			return AttemptResult{}, err
+		}
 	}
 
 	item, err := s.store.GetItemForAttempt(ctx, p.ItemID)

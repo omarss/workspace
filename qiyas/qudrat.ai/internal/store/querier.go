@@ -11,9 +11,17 @@ import (
 )
 
 type Querier interface {
+	// Used by the webhook handler when a payment lands. The webhook plumbing
+	// is out of Phase 9 scope but the persistence side is here so subsequent
+	// phases can flip status without a migration.
+	ActivatePaidSubscription(ctx context.Context, arg ActivatePaidSubscriptionParams) error
+	CancelSubscription(ctx context.Context, id uuid.UUID) error
 	ConsumeOTPChallenge(ctx context.Context, id uuid.UUID) error
 	CountAcceptedItems(ctx context.Context) (int64, error)
 	CountAttemptsForUser(ctx context.Context, userID uuid.UUID) (int32, error)
+	// Used by the trial-quota gate. answered_at is the timestamp the user
+	// actually committed an answer; only counted answers consume quota.
+	CountAttemptsToday(ctx context.Context, userID uuid.UUID) (int32, error)
 	CountEventsByTypeSince(ctx context.Context, arg CountEventsByTypeSinceParams) (int32, error)
 	CountItems(ctx context.Context) (int64, error)
 	CountItemsNeedingReview(ctx context.Context) (int32, error)
@@ -26,8 +34,12 @@ type Querier interface {
 	// provider_ref is the Twilio Verify SID; Twilio holds the secret on the SMS path.
 	CreateSMSOTPChallenge(ctx context.Context, arg CreateSMSOTPChallengeParams) (OtpChallenge, error)
 	CreateSession(ctx context.Context, arg CreateSessionParams) (Session, error)
+	CreateTrialSubscription(ctx context.Context, userID uuid.UUID) (Subscription, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	GetActiveSessionByRefreshHash(ctx context.Context, refreshHash string) (Session, error)
+	// Most recent active row for the user. Returns no rows if the user has
+	// never been issued a subscription (trial or otherwise).
+	GetCurrentSubscription(ctx context.Context, userID uuid.UUID) (Subscription, error)
 	// Near-dup detector: returns the first accepted item that matches BOTH
 	// concept_fingerprint AND solution_fingerprint. Empty fingerprints don't
 	// count (they're the placeholder in items not authored by the new pipeline).

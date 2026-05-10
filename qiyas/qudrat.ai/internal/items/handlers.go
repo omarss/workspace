@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/omarss/qudrat/internal/auth"
+	"github.com/omarss/qudrat/internal/billing"
 )
 
 // Handler exposes the item-bank HTTP surface. All routes assume the request
@@ -118,6 +119,8 @@ func (h *Handler) submitAttempt(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusNotFound, "item not found")
 		case errors.Is(err, ErrInvalidChoice):
 			writeError(w, http.StatusBadRequest, "choice_key must be A, B, C, or D")
+		case errors.Is(err, billing.ErrQuotaExceeded):
+			writeError(w, http.StatusPaymentRequired, "trial daily quota exceeded — subscribe to continue")
 		default:
 			h.logger.Error("submit attempt", "err", err, "user", user.ID, "item", req.ItemID)
 			writeError(w, http.StatusInternalServerError, "internal error")
