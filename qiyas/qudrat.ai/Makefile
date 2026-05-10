@@ -16,6 +16,7 @@ ROOT                    := $(CURDIR)
 GOCACHE_HOST            := $(HOME)/.cache/qudrat-go-build
 GOPKG_HOST              := $(HOME)/.cache/qudrat-go-pkg
 SERVICES                := api worker importer
+WEB_IMAGE               := localhost/qudrat/web:dev
 NAMESPACE               := qudrat
 HOMELAB_DIR             := $(abspath $(ROOT)/../../homelab)
 QUESTIONS_DIR           := $(abspath $(ROOT)/../questions)
@@ -187,7 +188,28 @@ endef
 $(foreach svc,$(SERVICES),$(eval $(call IMAGE_SERVICE,$(svc))))
 
 .PHONY: images
-images: image-api image-worker image-importer  ## build all service images
+images: image-api image-worker image-importer image-web  ## build all service images
+
+# ---- web (Next.js) ------------------------------------------------------------
+.PHONY: image-web
+image-web:  ## build qudrat web image (Next.js standalone)
+	$(PODMAN) build -t $(WEB_IMAGE) -f build/Containerfile.web .
+
+.PHONY: image-load-web
+image-load-web: image-web  ## import web image into k3s containerd
+	$(PODMAN) save $(WEB_IMAGE) | sudo k3s ctr images import -
+
+.PHONY: web-dev
+web-dev:  ## run Next.js dev server on :3000 (proxies /api → 127.0.0.1:8080)
+	cd web && pnpm dev
+
+.PHONY: web-build
+web-build:  ## production build of the Next.js client
+	cd web && pnpm install --frozen-lockfile=false && pnpm build
+
+.PHONY: web-typecheck
+web-typecheck:  ## tsc --noEmit in web/
+	cd web && pnpm typecheck
 
 # ---- k3s deployment -----------------------------------------------------------
 .PHONY: ns

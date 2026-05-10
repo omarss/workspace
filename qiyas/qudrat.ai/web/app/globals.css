@@ -1,0 +1,28 @@
+@import "tailwindcss";
+
+@source "./**/*.{ts,tsx,css}";
+
+/* Arabic fonts come from Google Fonts via next/font in layout.tsx so the
+   only browser-side surface is preloaded subsets. */
+
+:root {
+  color-scheme: light dark;
+}
+
+html {
+  /* Lock the language + direction at the document root so Tailwind's
+     RTL utilities (ms-, me-, ps-, pe-) flip without per-component opt-in. */
+  --primary: oklch(0.55 0.18 256);
+}
+
+body {
+  background: white;
+  color: #111;
+}
+
+@media (prefers-color-scheme: dark) {
+  body {
+    background: #0a0a0a;
+    color: #f5f5f5;
+  }
+}
