@@ -21,6 +21,15 @@ type Attempt struct {
 	AnsweredAt  pgtype.Timestamptz `json:"answered_at"`
 }
 
+type Event struct {
+	ID        uuid.UUID          `json:"id"`
+	EventType string             `json:"event_type"`
+	UserID    *uuid.UUID         `json:"user_id"`
+	ItemID    *uuid.UUID         `json:"item_id"`
+	Payload   []byte             `json:"payload"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+}
+
 type Item struct {
 	ID                      uuid.UUID          `json:"id"`
 	Status                  string             `json:"status"`

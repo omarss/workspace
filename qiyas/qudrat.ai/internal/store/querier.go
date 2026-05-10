@@ -14,6 +14,7 @@ type Querier interface {
 	ConsumeOTPChallenge(ctx context.Context, id uuid.UUID) error
 	CountAcceptedItems(ctx context.Context) (int64, error)
 	CountAttemptsForUser(ctx context.Context, userID uuid.UUID) (int32, error)
+	CountEventsByTypeSince(ctx context.Context, arg CountEventsByTypeSinceParams) (int32, error)
 	CountItems(ctx context.Context) (int64, error)
 	CountItemsNeedingReview(ctx context.Context) (int32, error)
 	// Used as a lightweight rate-limiter on the start path. The caller decides
@@ -53,6 +54,9 @@ type Querier interface {
 	InsertItem(ctx context.Context, arg InsertItemParams) (Item, error)
 	InsertItemChoice(ctx context.Context, arg InsertItemChoiceParams) error
 	InsertItemTag(ctx context.Context, arg InsertItemTagParams) error
+	// Items with at least min_attempts answered. Calibration computes a
+	// per-item accuracy and stores it in items.difficulty_calibrated.
+	ItemsToCalibrate(ctx context.Context, minAttempts int32) ([]ItemsToCalibrateRow, error)
 	ListItemChoices(ctx context.Context, itemID uuid.UUID) ([]ItemChoice, error)
 	// Same contract as ListItemChoices but with explicit name to avoid collision.
 	ListItemChoicesByID(ctx context.Context, itemID uuid.UUID) ([]ItemChoice, error)
@@ -60,6 +64,7 @@ type Querier interface {
 	ListItemsByTopic(ctx context.Context, arg ListItemsByTopicParams) ([]Item, error)
 	ListItemsNeedingReview(ctx context.Context, arg ListItemsNeedingReviewParams) ([]ListItemsNeedingReviewRow, error)
 	ListRecentAttemptsForUser(ctx context.Context, arg ListRecentAttemptsForUserParams) ([]ListRecentAttemptsForUserRow, error)
+	ListRecentEventsByType(ctx context.Context, arg ListRecentEventsByTypeParams) ([]Event, error)
 	// Idempotent: ON CONFLICT DO NOTHING means re-serving (e.g. retry after a
 	// network error) doesn't fail. The PRIMARY KEY (user_id,item_id) covers it.
 	MarkItemServed(ctx context.Context, arg MarkItemServedParams) error
@@ -79,6 +84,7 @@ type Querier interface {
 	// Returns the user's weakest skill (lowest accuracy) with at least
 	// min_attempts answered. Drives the Weak Spot Drill.
 	PickWeakestSkillForUser(ctx context.Context, arg PickWeakestSkillForUserParams) (PickWeakestSkillForUserRow, error)
+	RecordEvent(ctx context.Context, arg RecordEventParams) error
 	RevokeAllUserSessions(ctx context.Context, userID uuid.UUID) error
 	RevokeSession(ctx context.Context, id uuid.UUID) error
 	// Used by the reviewer-LLM pass once it lands (Phase 7 stub for now).
@@ -91,6 +97,7 @@ type Querier interface {
 	SummarizeMasteryByTopic(ctx context.Context, arg SummarizeMasteryByTopicParams) ([]SummarizeMasteryByTopicRow, error)
 	TouchSessionLastSeen(ctx context.Context, id uuid.UUID) error
 	TouchUserLastLogin(ctx context.Context, id uuid.UUID) error
+	UpdateItemCalibratedDifficulty(ctx context.Context, arg UpdateItemCalibratedDifficultyParams) error
 }
 
 var _ Querier = (*Queries)(nil)
