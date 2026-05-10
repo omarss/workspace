@@ -1,0 +1,9 @@
+DROP TABLE IF EXISTS attempts;
+DROP TABLE IF EXISTS served_items;
+DROP TABLE IF EXISTS item_tags;
+DROP TABLE IF EXISTS item_choices;
+DROP TABLE IF EXISTS items;
+DROP TABLE IF EXISTS similarity_clusters;
+DROP TABLE IF EXISTS sessions;
+DROP TABLE IF EXISTS otp_challenges;
+DROP TABLE IF EXISTS users;
