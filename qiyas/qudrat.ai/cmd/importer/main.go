@@ -284,6 +284,32 @@ func insertOne(ctx context.Context, tx pgx.Tx, q rawQuestion) error {
 		estimated = 60
 	}
 
+	// Near-dup gate (spec §9.2): if (concept_fingerprint, solution_fingerprint)
+	// already match an existing accepted item, the new item is meaningfully a
+	// dupe. Insert it as 'needs_review' so a human can decide whether the
+	// novelty justifies keeping. Pure-hash collisions (normalized_text_hash)
+	// are still rejected upstream by the UNIQUE constraint.
+	status := "accepted"
+	if q.ConceptFingerprint != "" && q.SolutionFingerprint != "" {
+		var existingID string
+		err := tx.QueryRow(ctx,
+			`SELECT id FROM items
+              WHERE status = 'accepted'
+                AND concept_fingerprint  = $1
+                AND solution_fingerprint = $2
+              LIMIT 1`,
+			q.ConceptFingerprint, q.SolutionFingerprint,
+		).Scan(&existingID)
+		switch {
+		case err == nil:
+			status = "needs_review"
+		case errors.Is(err, pgx.ErrNoRows):
+			// no near-dup
+		default:
+			return fmt.Errorf("near-dup lookup: %w", err)
+		}
+	}
+
 	const insertItem = `
 INSERT INTO items (
     status, exam_type, section, subject, grade_level, unit, topic, skill,
@@ -294,7 +320,7 @@ INSERT INTO items (
     source, novelty_notes
 )
 VALUES (
-    'accepted', $1, $2, $3, $4, $5, $5, $6,
+    $21, $1, $2, $3, $4, $5, $5, $6,
     $7, $8, $9,
     $10, $11, $12, $13,
     $14, $15, $16,
@@ -312,6 +338,7 @@ RETURNING id
 		q.ConceptFingerprint, q.SolutionFingerprint, q.SurfaceFingerprint,
 		normalizedHash, stemHash, choicesHash,
 		q.NoveltyNotes,
+		status,
 	)
 	if err := row.Scan(&itemID); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {

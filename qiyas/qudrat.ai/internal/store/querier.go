@@ -15,6 +15,7 @@ type Querier interface {
 	CountAcceptedItems(ctx context.Context) (int64, error)
 	CountAttemptsForUser(ctx context.Context, userID uuid.UUID) (int32, error)
 	CountItems(ctx context.Context) (int64, error)
+	CountItemsNeedingReview(ctx context.Context) (int32, error)
 	// Used as a lightweight rate-limiter on the start path. The caller decides
 	// the lookback window so the same query can serve "last minute" and
 	// "last hour" buckets.
@@ -26,6 +27,10 @@ type Querier interface {
 	CreateSession(ctx context.Context, arg CreateSessionParams) (Session, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	GetActiveSessionByRefreshHash(ctx context.Context, refreshHash string) (Session, error)
+	// Near-dup detector: returns the first accepted item that matches BOTH
+	// concept_fingerprint AND solution_fingerprint. Empty fingerprints don't
+	// count (they're the placeholder in items not authored by the new pipeline).
+	GetItemByConceptSolutionFingerprint(ctx context.Context, arg GetItemByConceptSolutionFingerprintParams) (Item, error)
 	GetItemByID(ctx context.Context, id uuid.UUID) (Item, error)
 	GetItemByNormalizedHash(ctx context.Context, normalizedTextHash string) (Item, error)
 	// Returns the full item row including correct_answer + explanation. Callers
@@ -53,6 +58,7 @@ type Querier interface {
 	ListItemChoicesByID(ctx context.Context, itemID uuid.UUID) ([]ItemChoice, error)
 	ListItemTags(ctx context.Context, itemID uuid.UUID) ([]string, error)
 	ListItemsByTopic(ctx context.Context, arg ListItemsByTopicParams) ([]Item, error)
+	ListItemsNeedingReview(ctx context.Context, arg ListItemsNeedingReviewParams) ([]ListItemsNeedingReviewRow, error)
 	ListRecentAttemptsForUser(ctx context.Context, arg ListRecentAttemptsForUserParams) ([]ListRecentAttemptsForUserRow, error)
 	// Idempotent: ON CONFLICT DO NOTHING means re-serving (e.g. retry after a
 	// network error) doesn't fail. The PRIMARY KEY (user_id,item_id) covers it.
@@ -75,6 +81,9 @@ type Querier interface {
 	PickWeakestSkillForUser(ctx context.Context, arg PickWeakestSkillForUserParams) (PickWeakestSkillForUserRow, error)
 	RevokeAllUserSessions(ctx context.Context, userID uuid.UUID) error
 	RevokeSession(ctx context.Context, id uuid.UUID) error
+	// Used by the reviewer-LLM pass once it lands (Phase 7 stub for now).
+	SetItemQualityScore(ctx context.Context, arg SetItemQualityScoreParams) error
+	SetItemStatus(ctx context.Context, arg SetItemStatusParams) error
 	SetLeaderboardOptIn(ctx context.Context, arg SetLeaderboardOptInParams) error
 	SetUserNickname(ctx context.Context, arg SetUserNicknameParams) error
 	// Per-topic accuracy + counts for the user. Drives the weakness heatmap

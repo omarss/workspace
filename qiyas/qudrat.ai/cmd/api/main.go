@@ -25,6 +25,7 @@ import (
 	"github.com/omarss/qudrat/internal/config"
 	"github.com/omarss/qudrat/internal/items"
 	"github.com/omarss/qudrat/internal/leaderboard"
+	"github.com/omarss/qudrat/internal/review"
 	"github.com/omarss/qudrat/internal/store"
 	"github.com/omarss/qudrat/pkg/notifier"
 	"github.com/omarss/qudrat/pkg/notifier/devlog"
@@ -87,6 +88,9 @@ func run(logger *slog.Logger) error {
 	lbSvc := leaderboard.NewService(q)
 	lbH := leaderboard.NewHandler(lbSvc, logger)
 
+	reviewSvc := review.NewService(q)
+	reviewH := review.NewHandler(reviewSvc, logger)
+
 	r := server.New(server.Config{
 		Version: cfg.Version,
 		DB:      pool,
@@ -94,11 +98,14 @@ func run(logger *slog.Logger) error {
 	r.Route("/api", func(api chi.Router) {
 		authH.Mount(api)
 
-		// Routes below require a session.
+		// Routes below require a session. Admin routes (review/*) will
+		// gain a role check in Phase 9; until then any logged-in user
+		// can reach them, which is fine on a single-tenant deploy.
 		api.Group(func(api chi.Router) {
 			api.Use(auth.RequireSession(sess, cookie.Name))
 			itemsH.Mount(api)
 			lbH.Mount(api)
+			reviewH.Mount(api)
 		})
 	})
 
