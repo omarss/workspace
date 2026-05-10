@@ -23,6 +23,7 @@ import (
 	"github.com/omarss/qudrat/internal/api/server"
 	"github.com/omarss/qudrat/internal/auth"
 	"github.com/omarss/qudrat/internal/config"
+	"github.com/omarss/qudrat/internal/items"
 	"github.com/omarss/qudrat/internal/store"
 	"github.com/omarss/qudrat/pkg/notifier"
 	"github.com/omarss/qudrat/pkg/notifier/devlog"
@@ -79,12 +80,21 @@ func run(logger *slog.Logger) error {
 	}
 	authH := auth.NewHandler(otp, sess, cookie, logger)
 
+	itemsSvc := items.NewService(q)
+	itemsH := items.NewHandler(itemsSvc, logger)
+
 	r := server.New(server.Config{
 		Version: cfg.Version,
 		DB:      pool,
 	})
 	r.Route("/api", func(api chi.Router) {
 		authH.Mount(api)
+
+		// Routes below require a session.
+		api.Group(func(api chi.Router) {
+			api.Use(auth.RequireSession(sess, cookie.Name))
+			itemsH.Mount(api)
+		})
 	})
 
 	srv := &http.Server{
