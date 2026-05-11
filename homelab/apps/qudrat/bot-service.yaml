@@ -1,0 +1,22 @@
+# NodePort 30805 — host nginx proxies /webhooks/twilio/* → here.
+# 30801 → api-places, 30802 → api-mcqs, 30803 → qudrat-api, 30804 → qudrat-web,
+# 30805 → qudrat-bot.
+apiVersion: v1
+kind: Service
+metadata:
+  name: qudrat-bot
+  namespace: qudrat
+  labels:
+    app.kubernetes.io/name: qudrat
+    app.kubernetes.io/component: bot
+spec:
+  type: NodePort
+  selector:
+    app.kubernetes.io/name: qudrat
+    app.kubernetes.io/component: bot
+  ports:
+    - name: http
+      port: 8081
+      targetPort: http
+      nodePort: 30805
+      protocol: TCP
