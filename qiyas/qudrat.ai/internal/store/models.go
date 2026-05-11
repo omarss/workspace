@@ -30,6 +30,14 @@ type Event struct {
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
 }
 
+type ExternalUser struct {
+	Channel    string             `json:"channel"`
+	ExternalID string             `json:"external_id"`
+	UserID     uuid.UUID          `json:"user_id"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+	LastSeenAt pgtype.Timestamptz `json:"last_seen_at"`
+}
+
 type Item struct {
 	ID                      uuid.UUID          `json:"id"`
 	Status                  string             `json:"status"`

@@ -32,6 +32,10 @@ type Querier interface {
 	CountRecentOTPChallengesForIdentifier(ctx context.Context, arg CountRecentOTPChallengesForIdentifierParams) (int32, error)
 	// code_hash carries bcrypt(code); we own the secret on the email path.
 	CreateEmailOTPChallenge(ctx context.Context, arg CreateEmailOTPChallengeParams) (OtpChallenge, error)
+	// Used inside a transaction with LinkExternalUser when the (channel,
+	// external_id) doesn't resolve. Nickname is intentionally empty — the bot
+	// learns it later if the user volunteers one.
+	CreateExternalUser(ctx context.Context) (User, error)
 	// provider_ref is the Twilio Verify SID; Twilio holds the secret on the SMS path.
 	CreateSMSOTPChallenge(ctx context.Context, arg CreateSMSOTPChallengeParams) (OtpChallenge, error)
 	CreateSession(ctx context.Context, arg CreateSessionParams) (Session, error)
@@ -41,6 +45,7 @@ type Querier interface {
 	// Most recent active row for the user. Returns no rows if the user has
 	// never been issued a subscription (trial or otherwise).
 	GetCurrentSubscription(ctx context.Context, userID uuid.UUID) (Subscription, error)
+	GetExternalUser(ctx context.Context, arg GetExternalUserParams) (User, error)
 	// Near-dup detector: returns the first accepted item that matches BOTH
 	// concept_fingerprint AND solution_fingerprint. Empty fingerprints don't
 	// count (they're the placeholder in items not authored by the new pipeline).
@@ -72,6 +77,9 @@ type Querier interface {
 	// Items with at least min_attempts answered. Calibration computes a
 	// per-item accuracy and stores it in items.difficulty_calibrated.
 	ItemsToCalibrate(ctx context.Context, minAttempts int32) ([]ItemsToCalibrateRow, error)
+	// Idempotent. Conflict on (channel, external_id) bumps last_seen_at so we
+	// have a cheap activity heartbeat.
+	LinkExternalUser(ctx context.Context, arg LinkExternalUserParams) error
 	ListChildrenForParent(ctx context.Context, parentID uuid.UUID) ([]ListChildrenForParentRow, error)
 	ListItemChoices(ctx context.Context, itemID uuid.UUID) ([]ItemChoice, error)
 	// Same contract as ListItemChoices but with explicit name to avoid collision.

@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/omarss/qudrat/internal/aifeatures"
@@ -75,6 +76,9 @@ func run(logger *slog.Logger) error {
 
 	otp := auth.NewOTPService(q, emailer, smser, auth.OTPConfig{TTL: cfg.OTPTTL}, nil)
 	sess := auth.NewSessionService(q, auth.SessionConfig{TTL: cfg.SessionTTL}, nil)
+	ext := auth.NewExternalService(q, pool, func(tx pgx.Tx) auth.ExternalStore {
+		return store.New(tx)
+	})
 
 	cookie := auth.CookieConfig{
 		Name:     cfg.CookieName,
@@ -85,6 +89,7 @@ func run(logger *slog.Logger) error {
 		HTTPOnly: true,
 	}
 	authH := auth.NewHandler(otp, sess, cookie, logger)
+	extH := auth.NewExternalHandler(ext, sess, cookie, cfg.BotAuthToken, logger)
 
 	billingSvc := billing.NewService(q, billing.DefaultTrialDailyAttempts)
 	billingH := billing.NewHandler(billingSvc, logger)
@@ -110,6 +115,7 @@ func run(logger *slog.Logger) error {
 	})
 	r.Route("/api", func(api chi.Router) {
 		authH.Mount(api)
+		extH.Mount(api)
 
 		// Routes below require a session. Admin routes (review/*) will
 		// gain a role check in Phase 9; until then any logged-in user

@@ -211,6 +211,32 @@ web-build:  ## production build of the Next.js client
 web-typecheck:  ## tsc --noEmit in web/
 	cd web && pnpm typecheck
 
+# ---- one-shot redeploy --------------------------------------------------------
+# `make redeploy`: rebuild → save → sudo-import → reapply nginx → reissue TLS
+# → force pod replace. Use after any code change. Sudo prompts once.
+.PHONY: save-tars
+save-tars: image-api image-web image-worker image-importer  ## save all images to /tmp/qudrat-*.tar
+	@for svc in api web worker importer; do \
+	    rm -f /tmp/qudrat-$$svc.tar; \
+	    $(PODMAN) save localhost/qudrat/$$svc:dev -o /tmp/qudrat-$$svc.tar; \
+	    echo "    /tmp/qudrat-$$svc.tar"; \
+	done
+
+.PHONY: redeploy
+redeploy: save-tars redeploy-quick  ## rebuild + redeploy (nginx + tls + force pod replace)
+
+.PHONY: redeploy-quick
+redeploy-quick:  ## redeploy from existing /tmp/qudrat-*.tar (skip rebuild)
+	sudo bash scripts/redeploy.sh
+	@echo "==> forcing pod replacement"
+	@for component in api web bot; do \
+	    if kubectl --context k3s-local -n qudrat get deploy "qudrat-$$component" >/dev/null 2>&1; then \
+	        kubectl --context k3s-local -n qudrat delete pod -l "app.kubernetes.io/component=$$component" --wait=false; \
+	        kubectl --context k3s-local -n qudrat rollout status "deploy/qudrat-$$component" --timeout=180s; \
+	    fi; \
+	done
+	@echo "done."
+
 # ---- k3s deployment -----------------------------------------------------------
 .PHONY: ns
 ns:  ## create the qudrat namespace

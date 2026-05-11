@@ -167,12 +167,12 @@ func (h *Handler) logout(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) me(w http.ResponseWriter, r *http.Request) {
-	c, err := r.Cookie(h.cookie.Name)
-	if err != nil {
+	token := bearerOrCookie(r, h.cookie.Name)
+	if token == "" {
 		writeError(w, http.StatusUnauthorized, "unauthorized")
 		return
 	}
-	res, err := h.session.Lookup(r.Context(), c.Value)
+	res, err := h.session.Lookup(r.Context(), token)
 	if err != nil {
 		writeError(w, http.StatusUnauthorized, "unauthorized")
 		return

@@ -1,0 +1,12 @@
+-- 0008_users_relax_identifier — drop the email-or-phone CHECK on users.
+--
+-- The original constraint reflected the OTP-only signup path: every user
+-- had to have either email or phone so the verify flow could land. Phase
+-- 7's bot path creates users from a (channel, external_id) pair instead
+-- — see external_users — so they legitimately have neither.
+--
+-- Identity uniqueness is still enforced:
+--   - OTP-path users have UNIQUE email + UNIQUE phone columns.
+--   - Bot-path users have a UNIQUE (channel, external_id) row in
+--     external_users that points at users.id.
+ALTER TABLE users DROP CONSTRAINT users_identifier_present;

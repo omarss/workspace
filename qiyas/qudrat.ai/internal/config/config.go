@@ -64,6 +64,12 @@ type Config struct {
 	// a deployed environment without access to logs. Leave empty in
 	// production — the dev paths must NEVER be reachable there.
 	DevFixedOTP string
+
+	// BotAuthToken gates the POST /api/auth/external endpoint. Empty
+	// disables the endpoint outright (returns 503). The bot binary
+	// passes this same value as `Authorization: Bearer <token>` on every
+	// call to /auth/external.
+	BotAuthToken string
 }
 
 // Load reads the config from the environment. Unknown values fall back to
@@ -92,7 +98,8 @@ func Load() (Config, error) {
 		TwilioAuthToken:        os.Getenv("QUDRAT_TWILIO_AUTH_TOKEN"),
 		TwilioVerifyServiceSID: os.Getenv("QUDRAT_TWILIO_VERIFY_SERVICE_SID"),
 
-		DevFixedOTP: os.Getenv("QUDRAT_DEV_FIXED_OTP"),
+		DevFixedOTP:  os.Getenv("QUDRAT_DEV_FIXED_OTP"),
+		BotAuthToken: os.Getenv("QUDRAT_BOT_AUTH_TOKEN"),
 	}
 
 	if raw := os.Getenv("QUDRAT_READ_HEADER_TIMEOUT"); raw != "" {
