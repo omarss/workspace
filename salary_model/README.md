@@ -22,11 +22,12 @@ observations and a confidence score.
 # 1) Install Python 3.12 and dependencies (uv handles both)
 make install
 
-# 2) Pull open KSA anchors (GASTAT / SAMA / World Bank) and build the training set
-make data
+# 2) Pull every public source we know about (KAPSARC live, GASTAT/HRDF/HRSD/Vision2030
+#    PDFs, World Bank, SAMA) and build the training set
+make fetch-all     # pulls anchors + 12+ PDF reports + best-effort open.data.gov.sa
+make data          # builds the versioned dataset snapshot
 
-# 3) Run the full iteration ladder (baseline -> LightGBM -> quantile -> conformal ->
-#    retrieval -> Optuna -> fairness debiasing -> Bayesian shrinkage)
+# 3) Run the full iteration ladder
 make iterate
 
 # 4) Inspect per-iteration metrics
@@ -36,6 +37,22 @@ ls reports/runs/
 make serve
 # POST http://localhost:8080/v1/predict
 ```
+
+### Periodic refresh (single command)
+
+```bash
+make refresh
+# = fetch-all + data + iterate + evaluate
+```
+
+This is the canonical way to bring the model up to date when GASTAT / KAPSARC / HRDF
+publish new data. Output:
+- new PDFs land under `data/reports/<source>/<year>/`
+- a fresh dataset snapshot in `data/processed/`
+- a new iteration run in `reports/runs/<RUN_ID>/`
+- the production bundle updated at `artifacts/model_bundle_latest.joblib`
+
+`make retrain` is the lighter version (just dataset + iterate, no fetch).
 
 All targets are idempotent. Re-running `make iterate` creates a new dated run under
 `reports/runs/` without touching previous ones.

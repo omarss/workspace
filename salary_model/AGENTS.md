@@ -80,7 +80,13 @@ Everything goes through the Makefile.
 
 ```bash
 make install            # uv-managed venv + pinned deps (Python 3.12)
-make data               # fetch open anchors + synthesize anchored observations
+make fetch-reports      # download published PDFs (HRDF/HRSD/GASTAT/MOF/Vision2030/etc.)
+make fetch-open-data    # best-effort pull from open.data.gov.sa (WAF; may need manual)
+make data-anchors       # refresh in-process anchor fetchers (KAPSARC live, World Bank, etc.)
+make fetch-all          # = anchors + reports + open-data, one command
+make data               # build the versioned dataset snapshot from fetched sources
+make retrain            # = data + iterate (rebuild + train, skip fetch)
+make refresh            # = fetch-all + data + iterate + evaluate (full pipeline)
 make iterate            # run the full iteration ladder, writes reports/runs/<RUN_ID>/
 make evaluate           # print summary.md of the latest run
 make fairness-audit     # print fairness.md of the latest run

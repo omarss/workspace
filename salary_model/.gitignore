@@ -33,6 +33,15 @@ mlartifacts/
 data/raw/
 data/interim/
 data/processed/
+# data/reports/ keeps tracked Markdown (the manual download targets and provenance)
+# but ignores the actual downloaded PDFs/CSVs and the per-run manifest.
+data/reports/**/*.pdf
+data/reports/**/*.csv
+data/reports/**/*.xlsx
+data/reports/**/*.xls
+data/reports/**/*.json
+data/reports/**/*.xml
+data/reports/**/manifest.jsonl
 !data/seed/
 *.parquet
 *.joblib

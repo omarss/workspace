@@ -75,12 +75,40 @@ check: lint typecheck test  ## All quality gates
 # ── Data ─────────────────────────────────────────────────────────────────────
 
 .PHONY: data
-data:  ## Fetch open data and build the training dataset
+data:  ## Fetch open data and build the training dataset (runs cleanup automatically)
 	$(PY) salary-model data build --seed $(SEED) --run-id $(RUN_ID)
 
+.PHONY: clean-data
+clean-data:  ## Run the cleanup pipeline on a raw Parquet (set INPUT=path/to/obs.parquet)
+	@if [ -z "$(INPUT)" ]; then echo "set INPUT=path/to/observations.parquet" && exit 1; fi
+	$(PY) salary-model data clean $(INPUT) $(if $(OUTPUT),--output-path $(OUTPUT))
+
 .PHONY: data-anchors
-data-anchors:  ## Refresh public anchor tables only (GASTAT/SAMA/World Bank)
+data-anchors:  ## Refresh public anchor tables only (GASTAT/SAMA/World Bank/KAPSARC)
 	$(PY) salary-model data fetch-anchors
+
+.PHONY: fetch-reports
+fetch-reports:  ## Download published PDF reports (HRDF/HRSD/GASTAT/MOF/Vision2030/KornFerry/SABIC)
+	bash scripts/fetch_pdf_reports.sh
+
+.PHONY: fetch-reports-force
+fetch-reports-force:  ## Re-download all PDFs even if already on disk
+	bash scripts/fetch_pdf_reports.sh --force
+
+.PHONY: fetch-open-data
+fetch-open-data:  ## Best-effort pull from open.data.gov.sa (WAF-protected; may need manual)
+	bash scripts/fetch_data_gov_sa.sh
+
+.PHONY: fetch-all
+fetch-all: data-anchors fetch-reports fetch-open-data  ## All external sources (live + PDFs + national portal)
+
+# ── Retrain / refresh end-to-end ─────────────────────────────────────────────
+
+.PHONY: retrain
+retrain: data iterate  ## Rebuild dataset and re-run the iteration ladder
+
+.PHONY: refresh
+refresh: fetch-all retrain evaluate  ## Full refresh: pull every source, rebuild, retrain, evaluate
 
 # ── Modeling ─────────────────────────────────────────────────────────────────
 
