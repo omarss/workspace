@@ -13,13 +13,31 @@ type Querier interface {
 	// rows when another concurrent request already claimed the slot (handler then
 	// calls GetIdempotencyRecord to fetch the cached state).
 	ClaimIdempotencyRecord(ctx context.Context, arg ClaimIdempotencyRecordParams) (IdempotencyRecord, error)
+	// Atomically marks the row consumed and returns it. Returns no rows if the
+	// state is already consumed or expired — the caller surfaces this as a 400
+	// "state-already-used" or "state-expired" problem.
+	ConsumeSocialLoginState(ctx context.Context, state string) (SocialLoginState, error)
+	// Inserts a fully-formed envelope row. The caller (PgxRepository) computes
+	// email_lookup_hash and runs the persistence walker to populate the
+	// envelope columns before binding the parameters.
+	CreatePlatformUser(ctx context.Context, arg CreatePlatformUserParams) (PlatformUser, error)
 	CreateTenant(ctx context.Context, arg CreateTenantParams) (Tenant, error)
+	DeleteExpiredSocialLoginStates(ctx context.Context) (int64, error)
 	ExpireIdempotencyRecords(ctx context.Context) error
 	FinishIdempotencyRecord(ctx context.Context, arg FinishIdempotencyRecordParams) error
 	GetIdempotencyRecord(ctx context.Context, arg GetIdempotencyRecordParams) (IdempotencyRecord, error)
+	GetPlatformUser(ctx context.Context, id string) (PlatformUser, error)
+	GetPlatformUserByEmailHash(ctx context.Context, arg GetPlatformUserByEmailHashParams) (PlatformUser, error)
+	GetPlatformUserByKeycloakID(ctx context.Context, keycloakUserID string) (PlatformUser, error)
 	GetTenant(ctx context.Context, id string) (Tenant, error)
 	GetTenantBySlug(ctx context.Context, slug string) (Tenant, error)
 	InsertOutboxEvent(ctx context.Context, arg InsertOutboxEventParams) (OutboxEvent, error)
+	InsertSocialLoginState(ctx context.Context, arg InsertSocialLoginStateParams) error
+	LinkIdentityProvider(ctx context.Context, arg LinkIdentityProviderParams) error
+	ListIdentityProviders(ctx context.Context, arg ListIdentityProvidersParams) ([]ListIdentityProvidersRow, error)
+	// Keyset pagination on (created_at DESC, id DESC). row_limit is limit+1 so
+	// the caller can detect has_more.
+	ListPlatformUsers(ctx context.Context, arg ListPlatformUsersParams) ([]PlatformUser, error)
 	// Keyset pagination on (created_at DESC, id DESC). Cursor passes the last
 	// emitted row's pair; the +1 returned row signals has_more (the handler
 	// trims and emits the cursor for the trailing row).
@@ -28,7 +46,17 @@ type Querier interface {
 	MarkOutboxFailed(ctx context.Context, arg MarkOutboxFailedParams) error
 	MarkOutboxPublished(ctx context.Context, id int64) error
 	SetDefaultOrganization(ctx context.Context, arg SetDefaultOrganizationParams) error
+	SetPlatformUserEmailVerified(ctx context.Context, arg SetPlatformUserEmailVerifiedParams) (PlatformUser, error)
+	// Disable/enable transitions go through here so the row_seq trigger fires
+	// and outbox subscribers see the change. Cannot transition out of 'deleted'.
+	SetPlatformUserStatus(ctx context.Context, arg SetPlatformUserStatusParams) (PlatformUser, error)
+	SoftDeletePlatformUser(ctx context.Context, arg SoftDeletePlatformUserParams) (PlatformUser, error)
 	SoftDeleteTenant(ctx context.Context, arg SoftDeleteTenantParams) (Tenant, error)
+	UnlinkIdentityProvider(ctx context.Context, arg UnlinkIdentityProviderParams) (int64, error)
+	// Patch name/phone envelope columns + metadata under optimistic concurrency.
+	// Each PII field updates the full five-column envelope set; the caller passes
+	// nil when the column should not change.
+	UpdatePlatformUser(ctx context.Context, arg UpdatePlatformUserParams) (PlatformUser, error)
 	// Optimistic concurrency: expected_row_seq must match the current row_seq,
 	// otherwise zero rows are returned and the service raises ErrETagMismatch.
 	UpdateTenant(ctx context.Context, arg UpdateTenantParams) (Tenant, error)

@@ -23,6 +23,14 @@ type IdempotencyRecord struct {
 	ExpiresAt       pgtype.Timestamptz `json:"expires_at"`
 }
 
+type IdentityProviderMapping struct {
+	PlatformUserID  string             `json:"platform_user_id"`
+	TenantID        string             `json:"tenant_id"`
+	Provider        string             `json:"provider"`
+	ExternalSubject string             `json:"external_subject"`
+	LinkedAt        pgtype.Timestamptz `json:"linked_at"`
+}
+
 type OutboxEvent struct {
 	ID               int64              `json:"id"`
 	EventID          string             `json:"event_id"`
@@ -37,8 +45,49 @@ type OutboxEvent struct {
 	LastError        *string            `json:"last_error"`
 }
 
+type PlatformUser struct {
+	ID              string             `json:"id"`
+	TenantID        string             `json:"tenant_id"`
+	EmailLookupHash []byte             `json:"email_lookup_hash"`
+	EmailCiphertext []byte             `json:"email_ciphertext"`
+	EmailWrappedDek string             `json:"email_wrapped_dek"`
+	EmailNonce      []byte             `json:"email_nonce"`
+	EmailKid        string             `json:"email_kid"`
+	EmailKeyVersion int32              `json:"email_key_version"`
+	EmailVerified   bool               `json:"email_verified"`
+	NameCiphertext  []byte             `json:"name_ciphertext"`
+	NameWrappedDek  *string            `json:"name_wrapped_dek"`
+	NameNonce       []byte             `json:"name_nonce"`
+	NameKid         *string            `json:"name_kid"`
+	NameKeyVersion  *int32             `json:"name_key_version"`
+	PhoneCiphertext []byte             `json:"phone_ciphertext"`
+	PhoneWrappedDek *string            `json:"phone_wrapped_dek"`
+	PhoneNonce      []byte             `json:"phone_nonce"`
+	PhoneKid        *string            `json:"phone_kid"`
+	PhoneKeyVersion *int32             `json:"phone_key_version"`
+	KeycloakUserID  string             `json:"keycloak_user_id"`
+	Status          string             `json:"status"`
+	Metadata        []byte             `json:"metadata"`
+	RowSeq          int64              `json:"row_seq"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
+	DeletedAt       pgtype.Timestamptz `json:"deleted_at"`
+}
+
 type SchemaBootstrapDataplane struct {
 	BootstrappedAt pgtype.Timestamptz `json:"bootstrapped_at"`
+}
+
+type SocialLoginState struct {
+	State          string             `json:"state"`
+	TenantID       string             `json:"tenant_id"`
+	PlatformUserID string             `json:"platform_user_id"`
+	Provider       string             `json:"provider"`
+	ReturnTo       string             `json:"return_to"`
+	Nonce          string             `json:"nonce"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	ExpiresAt      pgtype.Timestamptz `json:"expires_at"`
+	ConsumedAt     pgtype.Timestamptz `json:"consumed_at"`
 }
 
 type Tenant struct {
