@@ -231,3 +231,78 @@ ingest LinkedIn + Bayt + Greenhouse postings of the same role, resolve
 the company, cluster them, link granular skills, run AI detection,
 recompute the verdict, and search the cluster from multiple angles
 (English exact, synonym, typo, Arabic cross-language).
+
+---
+
+## Daily ops (the `make cycle` workflow)
+
+Once the schema is applied and `.env` carries `JCDB_DSN`, the day-to-day
+operation is three commands; everything else is composition.
+
+```bash
+make cycle          # daily — discover-ats → crawl-all → intelligence
+make cycle-light    # nightly — skip discovery for a faster crawl+enrich
+make cycle-heavy    # weekly  — refresh + validate proxy pool, then full cycle
+```
+
+Every step inside is idempotent. Safe to interrupt and re-run; safe to run
+twice in a row.
+
+### What `cycle` actually does
+
+| Stage              | Purpose                                                                                                           |
+| ---                | ---                                                                                                               |
+| `discover-ats`     | Probe every seeded company for Greenhouse / Lever / Workable / SuccessFactors boards. New tenants land in `company_source_profiles` so the next ATS crawler picks them up automatically. |
+| `crawl-all`        | Run every implemented crawler (Bayt, Greenhouse, Wuzzuf, Workable, …). Postings dedupe on `source + external_id`, so re-runs only insert genuinely new rows. |
+| `intelligence`     | Skill extraction → salary / experience / education recovery from free text → city backfill (alias-aware) → HTML-entity title cleanup → cross-source dedup + cluster merging. All idempotent. |
+
+### Inspect what landed
+
+```bash
+make data-stats           # cluster totals + per-source counts + coverage %
+make data-stats-riyadh    # last-30-days Riyadh postings, sorted by title
+```
+
+### Override the defaults per-run
+
+| Env var                      | Default | Effect                                  |
+| ---                          | ---     | ---                                     |
+| `JC_LOOKBACK_DAYS`           | 30      | Window the crawler filters to           |
+| `JC_BAYT_MAX_PAGES`          | 40      | Pages per Bayt search query             |
+| `JC_BAYT_QUERIES`            | (curated 18-keyword set) | CSV — override the default fan-out |
+| `JC_GREENHOUSE_BOARDS`       | (3 verified) | CSV — additional Greenhouse slugs |
+| `JC_WORKABLE_BOARDS`         | (3 verified) | CSV — additional Workable slugs   |
+| `JC_FETCH_TIMEOUT_S`         | 20      | Per-request timeout (seconds)           |
+| `JC_FETCH_MAX_CONCURRENCY`   | 3       | Parallel detail fetches per crawler     |
+
+### Proxy pool (for LinkedIn / Naukrigulf)
+
+```bash
+make proxies-refresh        # pull fresh lists from monosans/proxifly/TheSpeedX
+make proxies-validate       # probe each, blacklist the dead
+make proxies-stats          # current alive/blacklisted/success-rate
+```
+
+`pick()` automatically prefers proxies with proven prior successes — so
+the more `proxies-validate` you run, the curated set converges.
+
+### Phase-3 sources (bot-hostile)
+
+LinkedIn / Indeed / Glassdoor require residential proxies to be reliable.
+The local free-pool path can connect via TLS impersonation but typically
+gets IP-throttled within a handful of pages. These crawlers stay in the
+registry; expect ~0 yield unless you wire in residential routing.
+
+### Per-source convenience targets
+
+If you only want to refresh one source:
+
+```bash
+make crawl-bayt
+make crawl-greenhouse
+make crawl-workable
+make crawl-wuzzuf
+make intelligence            # always cheap to re-run
+```
+
+`make crawl-list` shows every registered slug (✓ = implemented, · = stub).

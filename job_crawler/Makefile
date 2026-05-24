@@ -408,3 +408,44 @@ cycle-light: crawl-all intelligence    ## Skip ATS auto-discovery (faster nightl
 
 cycle-heavy: proxies-refresh proxies-validate cycle  ## Refresh proxies first (weekly)
 	@echo "[cycle-heavy] done"
+
+# ---- Data stats: routine inspection in one shot -------------------------
+.PHONY: data-stats data-stats-riyadh
+
+data-stats:  ## Compact summary of cluster + per-source + coverage metrics
+	$(call _load_env)
+	@set -a; . ./.env; set +a; \
+	PGPASSWORD=$$JC_DB_PASSWORD psql -U job_crawler -h 127.0.0.1 -d job_crawler -X -tA -F'|' -c "\
+		SELECT 'clusters_total', COUNT(*)::text FROM jobs WHERE deleted_at IS NULL \
+		UNION ALL SELECT 'postings_total', COUNT(*)::text FROM job_postings \
+		UNION ALL SELECT 'companies', COUNT(*)::text FROM companies \
+		UNION ALL SELECT 'dedup_edges', COUNT(*)::text FROM posting_duplicate_edges \
+		UNION ALL SELECT 'job_skills', COUNT(*)::text FROM job_skills;"; \
+	echo "--- per source ---"; \
+	PGPASSWORD=$$JC_DB_PASSWORD psql -U job_crawler -h 127.0.0.1 -d job_crawler -X -tA -F'|' -c "\
+		SELECT s.slug, COUNT(p.id) FROM sources s LEFT JOIN job_postings p ON p.source_id=s.id GROUP BY s.slug ORDER BY 2 DESC;"; \
+	echo "--- cluster coverage %---"; \
+	PGPASSWORD=$$JC_DB_PASSWORD psql -U job_crawler -h 127.0.0.1 -d job_crawler -X -tA -F'|' -c "\
+		WITH c AS (SELECT j.* FROM jobs j WHERE j.deleted_at IS NULL) \
+		SELECT \
+			ROUND(COUNT(*) FILTER (WHERE city_id IS NOT NULL)*100.0/NULLIF(COUNT(*),0),1)::text || '% city', \
+			ROUND(COUNT(*) FILTER (WHERE company_id IS NOT NULL)*100.0/NULLIF(COUNT(*),0),1)::text || '% company', \
+			ROUND(COUNT(*) FILTER (WHERE salary_min IS NOT NULL)*100.0/NULLIF(COUNT(*),0),1)::text || '% salary', \
+			ROUND(COUNT(*) FILTER (WHERE min_experience_years IS NOT NULL)*100.0/NULLIF(COUNT(*),0),1)::text || '% experience', \
+			ROUND(COUNT(*) FILTER (WHERE min_education_level IS NOT NULL)*100.0/NULLIF(COUNT(*),0),1)::text || '% education' \
+		FROM c;"
+
+data-stats-riyadh:  ## Riyadh postings in the last 30 days, top 20 by title
+	$(call _load_env)
+	@set -a; . ./.env; set +a; \
+	PGPASSWORD=$$JC_DB_PASSWORD psql -U job_crawler -h 127.0.0.1 -d job_crawler -X -tA -F'|' -c "\
+		SELECT p.title, COALESCE(comp.name_en, p.raw_company_name, '-') AS company, s.slug, \
+		       to_char(p.posted_at, 'YYYY-MM-DD') \
+		FROM jobs j \
+		JOIN job_postings p ON p.id = j.canonical_posting_id \
+		JOIN sa_cities c ON c.id = j.city_id \
+		JOIN sources s ON s.id = p.source_id \
+		LEFT JOIN companies comp ON comp.id = p.company_id \
+		WHERE j.deleted_at IS NULL AND c.name_en = 'Riyadh' \
+		  AND (p.posted_at IS NULL OR p.posted_at >= now() - interval '30 days') \
+		ORDER BY p.title LIMIT 20;"
