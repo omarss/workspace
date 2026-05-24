@@ -1,0 +1,17 @@
+# Non-secret configuration shared by the API + every CronJob.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: job-crawler-config
+  namespace: job-crawler
+data:
+  # Pool sizing tuned for low-throughput personal use.
+  JCDB_POOL_MIN_SIZE: "2"
+  JCDB_POOL_MAX_SIZE: "10"
+  JCDB_STATEMENT_TIMEOUT_MS: "30000"
+  JCDB_APPLICATION_NAME: "job_crawler_k8s"
+  # Crawler-wide knobs (consumed by job_crawler.core.config when added).
+  JC_DEFAULT_USER_AGENT: "Mozilla/5.0 (compatible; jobs.omarss.net/0.1; +https://jobs.omarss.net)"
+  JC_FETCH_TIMEOUT_S: "20"
+  JC_FETCH_MAX_CONCURRENCY: "3"
+  JC_LOOKBACK_DAYS: "30"

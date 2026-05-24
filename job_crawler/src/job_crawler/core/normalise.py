@@ -1,0 +1,265 @@
+"""ParsedPosting → JobPostingUpsert + side-data dispatch.
+
+Centralised so per-source crawlers don't reinvent the same wiring.
+"""
+
+from __future__ import annotations
+
+import html
+import logging
+from typing import Final
+from uuid import UUID
+
+from job_crawler_db import (
+    ApplicationChannelKind,
+    JobCrawlerDB,
+    JobPostingUpsert,
+    SkillRequirement,
+)
+
+from .types import ApplicationChannelRaw, ParsedPosting, RawSkillRaw
+
+_LOG: Final = logging.getLogger("job_crawler.normalise")
+
+
+# Free-text aliases + sub-city neighborhoods → canonical sa_cities.name_en.
+# Bayt and a few other sources frequently emit raw_location values that are
+# neighborhoods (e.g. "An Narjis", "Al Olaya"), district names, or alternate
+# transliterations ("Jiddah", "Mecca"). The trigram lookup against
+# sa_cities can't bridge those, so we route them through a static map first.
+# Lowercased lookup. New entries: prefer real-world spellings observed in the
+# crawl_fetches sample over our internal canonical names.
+_CITY_ALIASES: Final[dict[str, str]] = {
+    # alt transliterations of Saudi cities
+    "jiddah": "Jeddah",
+    "mecca": "Makkah",
+    "medina": "Madinah",
+    "altaif": "Taif",
+    "al-taif": "Taif",
+    "al taif": "Taif",
+    "al khobar": "Khobar",
+    "al-khobar": "Khobar",
+    "al ahsa": "Hofuf (Al Hasa)",
+    "al-ahsa": "Hofuf (Al Hasa)",
+    "alkhafji": "Khobar",  # Khafji has no sa_cities row; nearest large city
+    "eastern province": "Dammam",
+    "al sharqia": "Dammam",
+    "ash sharqiyah": "Dammam",
+    # Riyadh neighborhoods — all map to Riyadh
+    "al olaya": "Riyadh", "al-olaya": "Riyadh", "olaya": "Riyadh",
+    "al malqa": "Riyadh", "al-malqa": "Riyadh",
+    "al malaz": "Riyadh", "al-malaz": "Riyadh",
+    "al narjis": "Riyadh", "an narjis": "Riyadh",
+    "al nakheel": "Riyadh", "an nakheel": "Riyadh",
+    "al nahdah": "Riyadh", "an nahdah": "Riyadh",
+    "al naseem": "Riyadh", "an naseem": "Riyadh",
+    "al naim": "Riyadh", "an naim": "Riyadh",
+    "al nuzhah": "Riyadh", "an nuzhah": "Riyadh",
+    "al sahafah": "Riyadh", "as sahafah": "Riyadh",
+    "al saadah": "Riyadh", "as saadah": "Riyadh",
+    "al safa": "Riyadh", "as-safa": "Riyadh", "as safa": "Riyadh",
+    "al sulaymaniyah": "Riyadh", "as sulaymaniyah": "Riyadh",
+    "al suwaydi": "Riyadh", "as suwaydi": "Riyadh",
+    "as suwaydi al gharbi": "Riyadh",
+    "al rabwah": "Riyadh", "ar rabwah": "Riyadh",
+    "al rawdhah": "Riyadh", "ar-rawdha": "Riyadh", "ar rawdhah": "Riyadh",
+    "al rawdha": "Riyadh", "al-rawdhah": "Riyadh",
+    "al wurud": "Riyadh", "al-wurud": "Riyadh",
+    "al wadi": "Riyadh",
+    "al yasamin": "Riyadh",
+    "al izdihar": "Riyadh", "al-izdihar": "Riyadh",
+    "al khalidiyah": "Riyadh", "al-khalidiyah": "Riyadh",
+    "al falah": "Riyadh", "al-falah": "Riyadh",
+    "al fayha": "Riyadh", "al-fayha": "Riyadh",
+    "al manakh": "Riyadh", "al-manakh": "Riyadh",
+    "al ma'athar": "Riyadh", "al-maathar": "Riyadh", "al maathar": "Riyadh",
+    "al muwanisiyah": "Riyadh",
+    "al mashail": "Riyadh", "al-mashail": "Riyadh",
+    "al malik abd allah": "Riyadh", "al-malik-abdullah": "Riyadh",
+    "al selay": "Riyadh", "al-selay": "Riyadh",
+    "al shemal": "Riyadh", "al-shemal": "Riyadh",
+    "ash shati": "Riyadh",
+    "hittin": "Riyadh",
+    # Jeddah neighborhoods → Jeddah
+    "al aridhah": "Jeddah",
+    "al awali": "Jeddah",
+    "al basatin": "Jeddah",
+    "al baghdadiyah al gharbiyah": "Jeddah",
+    "al hamdaniya": "Jeddah", "al-hamdaniya": "Jeddah",
+    "dahaban": "Jeddah",
+    "mushrifah": "Jeddah",
+    "obhour shamaliya": "Jeddah",
+    "ubhur al janubiyah": "Jeddah",
+    "obhour": "Jeddah",
+    # Misc Riyadh & Eastern suburbs / industrial areas
+    "qurtubah": "Riyadh",
+    "industrial area-kharj road": "Riyadh",
+    # Other KSA towns
+    "besha": "Bisha",
+    "jizan": "Jazan",
+    "khulays": "Makkah",  # small town in Makkah region; nearest seeded city
+}
+
+
+async def resolve_city(
+    db: JobCrawlerDB,
+    hint: str | None,
+    *,
+    raw_location: str | None = None,
+) -> UUID | None:
+    """Map a free-text hint to an `sa_cities.id`.
+
+    Tries (in order):
+      1. The explicit hint (if any).
+      2. Each comma-separated token of `raw_location` from right to left
+         (city is usually one of the last tokens, e.g. "An Narjis, Riyadh").
+      3. For each candidate token, consult `_CITY_ALIASES` first (covers
+         alt transliterations and Riyadh/Jeddah neighborhoods) and only
+         fall back to trigram search against sa_cities when no alias hits.
+      4. Returns None when no token confidently matches.
+    """
+    candidates: list[str] = []
+    seen: set[str] = set()
+    for cand in (hint, *(reversed((raw_location or "").split(",")))):
+        if not cand:
+            continue
+        c = cand.strip()
+        key = c.lower()
+        if c and key not in seen:
+            seen.add(key)
+            candidates.append(c)
+    for c in candidates:
+        alias_target = _CITY_ALIASES.get(c.lower())
+        lookup = alias_target or c
+        matches = await db.geo.find_city(lookup, limit=1, min_similarity=0.5)
+        if matches:
+            return matches[0][0].id
+    return None
+
+
+def to_upsert(
+    parsed: ParsedPosting,
+    *,
+    source_id: UUID,
+    company_id: UUID | None,
+    recruiter_id: UUID | None,
+    city_id: UUID | None,
+) -> JobPostingUpsert:
+    """Pure conversion — no DB calls.
+
+    Caller is responsible for company/recruiter/city resolution and passes
+    the resulting ids in.
+    """
+    # Auto-detect Saudi-only + gender restrictions from title + description
+    # when the parser didn't set them explicitly. This is a no-op when the
+    # parser already populated the fields with a non-default value.
+    from job_crawler_db import GenderPreference
+
+    from .restrictions import detect_gender_preference, detect_saudi_only
+
+    body = " ".join(p for p in (parsed.title, parsed.description) if p)
+    saudi_only = parsed.saudi_nationals_only or detect_saudi_only(body)
+    gender = parsed.gender_preference
+    if gender is GenderPreference.any:
+        gender = detect_gender_preference(body)
+
+    # Source HTML often arrives with entities like `&amp;` not decoded
+    # (especially when read out of JSON-LD blocks). Decode once here so
+    # every downstream consumer (search, dedupe, dashboard) sees clean text.
+    title = html.unescape(parsed.title) if parsed.title else parsed.title
+    description = (
+        html.unescape(parsed.description) if parsed.description else parsed.description
+    )
+    raw_company_name = (
+        html.unescape(parsed.raw_company_name)
+        if parsed.raw_company_name
+        else parsed.raw_company_name
+    )
+
+    return JobPostingUpsert(
+        source_id=source_id,
+        source_job_external_id=parsed.source_job_external_id,
+        canonical_url=parsed.canonical_url,
+        title=title,
+        description=description,
+        description_html=parsed.description_html,
+        company_id=company_id,
+        raw_company_name=raw_company_name,
+        posted_by_recruiter_id=recruiter_id,
+        raw_poster_name=parsed.raw_poster_name,
+        employment_type=parsed.employment_type,
+        work_arrangement=parsed.work_arrangement,
+        experience_level=parsed.experience_level,
+        raw_location=parsed.raw_location,
+        city_id=city_id,
+        office_address=parsed.office_address,
+        hybrid_days_per_week=parsed.hybrid_days_per_week,
+        remote_country_restriction=parsed.remote_country_restriction,
+        hiring_manager_name=parsed.hiring_manager_name,
+        hiring_manager_linkedin_url=parsed.hiring_manager_linkedin_url,
+        saudi_nationals_only=saudi_only,
+        gender_preference=gender,
+        salary_min=parsed.salary_min,
+        salary_max=parsed.salary_max,
+        salary_currency=parsed.salary_currency,
+        salary_period=parsed.salary_period,
+        posted_at=parsed.posted_at,
+        source_updated_at=parsed.source_updated_at,
+        expires_at=parsed.expires_at,
+        raw_payload=parsed.raw_payload,
+    )
+
+
+async def persist_side_data(
+    db: JobCrawlerDB,
+    posting_id: UUID,
+    *,
+    channels: list[ApplicationChannelRaw],
+    raw_skills: list[RawSkillRaw],
+) -> None:
+    """Write the per-posting children (channels + raw skills)."""
+    for channel in channels:
+        try:
+            await db.postings.add_application_channel(
+                posting_id,
+                kind=channel.kind
+                if isinstance(channel.kind, ApplicationChannelKind)
+                else ApplicationChannelKind(channel.kind),
+                value=channel.value,
+                is_primary=channel.is_primary,
+                raw_label=channel.raw_label,
+            )
+        except Exception:
+            _LOG.exception("failed to persist application channel for %s", posting_id)
+
+    for raw in raw_skills:
+        skill_id: UUID | None = None
+        if raw.skill_slug:
+            skill = await db.skills.get_by_slug(raw.skill_slug)
+            skill_id = skill.id if skill else None
+        try:
+            await db.postings.add_raw_skill(
+                posting_id,
+                raw.raw_phrase,
+                skill_id=skill_id,
+                confidence=raw.confidence,
+            )
+        except Exception:
+            _LOG.exception("failed to persist raw skill for %s", posting_id)
+
+
+# Convenience: per-field success accounting consumed by `core.health`.
+REQUIRED_FIELDS: Final = ("title", "canonical_url", "raw_company_name")
+
+
+def field_coverage(parsed: ParsedPosting) -> float:
+    """Return the fraction of REQUIRED_FIELDS that are populated.
+
+    The runner averages this across a batch to feed `field_fill_rate`.
+    """
+    hits = sum(1 for f in REQUIRED_FIELDS if getattr(parsed, f, None))
+    return hits / len(REQUIRED_FIELDS)
+
+
+# Keep the SkillRequirement import alive for downstream type usage.
+_ = SkillRequirement

@@ -1,0 +1,142 @@
+slug,name_en,name_ar,kind,aliases
+python,Python,بايثون,tool,"py;py3"
+java,Java,جافا,tool,
+javascript,JavaScript,جافاسكريبت,tool,"js;ecmascript;es6"
+typescript,TypeScript,تايبسكريبت,tool,"ts"
+golang,Go,جو,tool,"golang"
+rust,Rust,راست,tool,
+c,C,سي,tool,
+cpp,C++,سي بلس بلس,tool,"c++;cplusplus"
+csharp,C#,سي شارب,tool,"c#;dotnet;.net"
+php,PHP,بي اتش بي,tool,
+ruby,Ruby,روبي,tool,"ror"
+kotlin,Kotlin,كوتلن,tool,
+swift,Swift,سويفت,tool,
+scala,Scala,سكالا,tool,
+sql,SQL,قواعد البيانات SQL,tool,
+postgresql,PostgreSQL,بوستجريس,tool,"postgres;pgsql"
+mysql,MySQL,ماي إس كيو إل,tool,
+mongodb,MongoDB,مونغو دي بي,tool,"mongo"
+redis,Redis,ريديس,tool,
+elasticsearch,Elasticsearch,إيلاستيك سيرش,tool,"elastic;opensearch"
+kafka,Apache Kafka,كافكا,tool,"kafka"
+rabbitmq,RabbitMQ,رابيت إم كيو,tool,
+docker,Docker,دوكر,tool,
+kubernetes,Kubernetes,كوبرنيتيس,tool,"k8s;kube"
+terraform,Terraform,تيرافورم,tool,
+ansible,Ansible,أنسبل,tool,
+jenkins,Jenkins,جنكنز,tool,
+github_actions,GitHub Actions,غيت هاب أكشن,tool,"gha"
+git,Git,جيت,tool,
+linux,Linux,لينكس,tool,
+aws,AWS,أمازون ويب سيرفس,tool,"amazon web services"
+azure,Microsoft Azure,أزور,tool,"azure"
+gcp,Google Cloud Platform,جوجل كلاود,tool,"google cloud;gcp"
+django,Django,جانغو,tool,
+flask,Flask,فلاسك,tool,
+fastapi,FastAPI,فاست إيه بي آي,tool,
+nodejs,Node.js,نود جي إس,tool,"node;node.js"
+react,React,رياكت,tool,"reactjs;react.js"
+vue,Vue.js,فيو جي إس,tool,"vue.js;vuejs"
+angular,Angular,أنغولار,tool,"angularjs"
+nextjs,Next.js,نيكست جي إس,tool,"next.js"
+spring,Spring,سبرنغ,tool,"spring boot;spring-boot"
+laravel,Laravel,لارافيل,tool,
+dotnet_core,.NET Core,دوت نت كور,tool,".net core;asp.net"
+android,Android,أندرويد,tool,
+ios,iOS,آي أو إس,tool,
+react_native,React Native,رياكت نيتيف,tool,
+flutter,Flutter,فلاتر,tool,
+graphql,GraphQL,جراف كيو إل,tool,
+rest,REST API,واجهات REST,hard,"rest api;restful"
+grpc,gRPC,جي آر بي سي,tool,
+machine_learning,Machine Learning,تعلم الآلة,hard,"ml"
+deep_learning,Deep Learning,تعلم عميق,hard,"dl"
+nlp,Natural Language Processing,معالجة اللغة الطبيعية,hard,"nlp"
+computer_vision,Computer Vision,رؤية الحاسوب,hard,"cv"
+pytorch,PyTorch,باي تورش,tool,
+tensorflow,TensorFlow,تنسرفلو,tool,
+pandas,Pandas,باندس,tool,
+numpy,NumPy,نمباي,tool,
+spark,Apache Spark,سبارك,tool,
+airflow,Apache Airflow,إير فلو,tool,
+dbt,dbt,دي بي تي,tool,
+tableau,Tableau,تابلو,tool,
+power_bi,Power BI,باور بي آي,tool,"powerbi"
+looker,Looker,لوكر,tool,
+excel,Microsoft Excel,إكسل,tool,"ms excel"
+data_engineering,Data Engineering,هندسة البيانات,hard,
+data_science,Data Science,علم البيانات,hard,
+data_analysis,Data Analysis,تحليل البيانات,hard,"data analytics"
+business_intelligence,Business Intelligence,ذكاء الأعمال,hard,"bi"
+devops,DevOps,ديف أوبس,hard,
+sre,Site Reliability Engineering,هندسة موثوقية الموقع,hard,
+ci_cd,CI/CD,تكامل ونشر مستمر,hard,"continuous integration"
+testing,Software Testing,اختبار البرمجيات,hard,"qa;quality assurance"
+selenium,Selenium,سيلينيوم,tool,
+cypress,Cypress,سايبرس,tool,
+playwright,Playwright,بلاي رايت,tool,
+agile,Agile,أجايل,soft,
+scrum,Scrum,سكروم,soft,
+kanban,Kanban,كانبان,soft,
+project_management,Project Management,إدارة المشاريع,soft,"pm"
+product_management,Product Management,إدارة المنتجات,soft,
+leadership,Leadership,القيادة,soft,
+communication,Communication,التواصل,soft,
+teamwork,Teamwork,العمل الجماعي,soft,
+problem_solving,Problem Solving,حل المشكلات,soft,
+analytical_thinking,Analytical Thinking,التفكير التحليلي,soft,
+critical_thinking,Critical Thinking,التفكير النقدي,soft,
+arabic,Arabic Language,اللغة العربية,language,
+english,English Language,اللغة الإنجليزية,language,
+sap,SAP,ساب,tool,
+oracle,Oracle Database,أوراكل,tool,
+salesforce,Salesforce,سيلز فورس,tool,
+hubspot,HubSpot,هاب سبوت,tool,
+zoho,Zoho,زوهو,tool,
+figma,Figma,فيغما,tool,
+sketch,Sketch,سكتش,tool,
+adobe_xd,Adobe XD,أدوبي إكس دي,tool,
+photoshop,Adobe Photoshop,فوتوشوب,tool,
+illustrator,Adobe Illustrator,إلستريتر,tool,
+seo,SEO,تحسين محركات البحث,hard,
+sem,SEM,التسويق عبر محركات البحث,hard,
+google_analytics,Google Analytics,جوجل أناليتكس,tool,"ga4"
+google_ads,Google Ads,جوجل أدز,tool,
+meta_ads,Meta Ads,ميتا أدز,tool,"facebook ads"
+content_marketing,Content Marketing,تسويق المحتوى,hard,
+social_media,Social Media Marketing,التسويق عبر مواقع التواصل,hard,
+copywriting,Copywriting,كتابة الإعلانات,hard,
+accounting,Accounting,المحاسبة,hard,
+finance,Finance,المالية,hard,
+ifrs,IFRS,معايير IFRS,certification,
+saudi_vat,Saudi VAT,ضريبة القيمة المضافة,hard,"vat;zatca"
+hr,Human Resources,الموارد البشرية,hard,
+recruitment,Recruitment,التوظيف,hard,"talent acquisition"
+training,Training & Development,التدريب والتطوير,hard,
+sales,Sales,المبيعات,hard,
+customer_service,Customer Service,خدمة العملاء,hard,
+b2b,B2B Sales,مبيعات B2B,hard,
+b2c,B2C Sales,مبيعات B2C,hard,
+pmp,PMP,شهادة PMP,certification,
+prince2,PRINCE2,شهادة PRINCE2,certification,
+aws_saa,AWS Solutions Architect,شهادة AWS,certification,"aws certified solutions architect"
+aws_developer,AWS Certified Developer,شهادة مطور AWS,certification,
+azure_az_900,Azure Fundamentals (AZ-900),شهادة أزور,certification,
+cisco_ccna,Cisco CCNA,شهادة سيسكو CCNA,certification,
+cissp,CISSP,شهادة CISSP,certification,
+ceh,Certified Ethical Hacker,شهادة CEH,certification,
+itil,ITIL,شهادة ITIL,certification,
+six_sigma,Six Sigma,سيكس سيغما,certification,
+cybersecurity,Cybersecurity,الأمن السيبراني,hard,"infosec"
+penetration_testing,Penetration Testing,اختبار الاختراق,hard,"pen testing"
+networking,Networking,الشبكات,hard,
+nginx,Nginx,نجنكس,tool,
+apache,Apache HTTP Server,أباتشي,tool,
+microservices,Microservices,الخدمات المصغرة,hard,
+event_driven,Event-Driven Architecture,معمارية مدفوعة بالأحداث,hard,
+ddd,Domain-Driven Design,التصميم المدفوع بالمجال,hard,"ddd"
+cqrs,CQRS,CQRS,hard,
+solid,SOLID Principles,مبادئ SOLID,soft,
+oop,Object-Oriented Programming,البرمجة كائنية التوجه,hard,"oop;object-oriented"
+functional_programming,Functional Programming,البرمجة الوظيفية,hard,"fp"

@@ -1,0 +1,176 @@
+# Per-source CronJobs. Each one runs `crawler <slug>` via the same image
+# as the API; the entrypoint script dispatches.
+#
+# Scheduling spread is intentional — no two crawlers should hit the same
+# host at the same minute. Cron timezone is UTC (k3s default).
+#
+# All jobs:
+#   * inherit env from the configmap + secret
+#   * have generous timeouts but tight resource limits
+#   * keep one prior failed pod for forensics
+
+---
+# Greenhouse — many SA-resident companies (PIF portfolio, NEOM, Tabby…) host
+# their public boards on Greenhouse. Cheap JSON API; runs often.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: job-crawler-greenhouse
+  namespace: job-crawler
+spec:
+  schedule: "17 */4 * * *"      # every 4h at :17
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 300
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      activeDeadlineSeconds: 1800   # 30 minutes
+      backoffLimit: 1
+      template:
+        spec:
+          restartPolicy: OnFailure
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            seccompProfile: { type: RuntimeDefault }
+          containers:
+            - name: crawler
+              image: localhost/job-crawler:latest
+              imagePullPolicy: IfNotPresent
+              args: ["crawler", "greenhouse"]
+              envFrom:
+                - configMapRef: { name: job-crawler-config }
+                - secretRef:    { name: job-crawler-secrets }
+              resources:
+                requests: { cpu: "50m", memory: "192Mi" }
+                limits:   { cpu: "500m", memory: "512Mi" }
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities: { drop: ["ALL"] }
+
+---
+# Bayt — internal JSON endpoint, polite HTTP with per-host throttle.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: job-crawler-bayt
+  namespace: job-crawler
+spec:
+  schedule: "37 */6 * * *"      # every 6h at :37
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 300
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      activeDeadlineSeconds: 2400
+      backoffLimit: 1
+      template:
+        spec:
+          restartPolicy: OnFailure
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            seccompProfile: { type: RuntimeDefault }
+          containers:
+            - name: crawler
+              image: localhost/job-crawler:latest
+              imagePullPolicy: IfNotPresent
+              args: ["crawler", "bayt"]
+              envFrom:
+                - configMapRef: { name: job-crawler-config }
+                - secretRef:    { name: job-crawler-secrets }
+              resources:
+                requests: { cpu: "50m", memory: "192Mi" }
+                limits:   { cpu: "500m", memory: "512Mi" }
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities: { drop: ["ALL"] }
+
+---
+# Canary — runs every hour, one synthetic fetch per enabled source.
+# Trips the breakage detector fast when a site changes.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: job-crawler-canary
+  namespace: job-crawler
+spec:
+  schedule: "47 * * * *"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 120
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      activeDeadlineSeconds: 300
+      backoffLimit: 0
+      template:
+        spec:
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            seccompProfile: { type: RuntimeDefault }
+          containers:
+            - name: canary
+              image: localhost/job-crawler:latest
+              imagePullPolicy: IfNotPresent
+              args: ["canary", "all"]
+              envFrom:
+                - configMapRef: { name: job-crawler-config }
+                - secretRef:    { name: job-crawler-secrets }
+              resources:
+                requests: { cpu: "25m", memory: "96Mi" }
+                limits:   { cpu: "250m", memory: "256Mi" }
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities: { drop: ["ALL"] }
+
+---
+# Companies discovery — weekly Wikidata SPARQL pull + seed CSV reconciliation.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: job-crawler-discover
+  namespace: job-crawler
+spec:
+  schedule: "13 3 * * 1"        # Mondays 03:13 UTC
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 600
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      activeDeadlineSeconds: 3600
+      backoffLimit: 1
+      template:
+        spec:
+          restartPolicy: OnFailure
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            seccompProfile: { type: RuntimeDefault }
+          containers:
+            - name: discover
+              image: localhost/job-crawler:latest
+              imagePullPolicy: IfNotPresent
+              args: ["discover", "--all"]
+              envFrom:
+                - configMapRef: { name: job-crawler-config }
+                - secretRef:    { name: job-crawler-secrets }
+              resources:
+                requests: { cpu: "50m", memory: "192Mi" }
+                limits:   { cpu: "500m", memory: "512Mi" }
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities: { drop: ["ALL"] }

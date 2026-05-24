@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en" dir="auto">
+<head>
+  <meta charset="utf-8" />
+  <title>jobs.omarss.net — Saudi jobs feed</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex,nofollow" />
+  <style>
+    :root {
+      color-scheme: light dark;
+      --fg: #1a1a1a;
+      --bg: #fafafa;
+      --muted: #6b6b6b;
+      --card: #ffffff;
+      --line: #e6e6e6;
+      --accent: #0a5cff;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root { --fg:#e8e8e8; --bg:#101418; --muted:#9aa4ad; --card:#171b20; --line:#262b32; --accent:#5b8cff; }
+    }
+    * { box-sizing: border-box; }
+    body { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background:var(--bg); color:var(--fg); margin:0; }
+    header { padding: 18px 20px; border-bottom: 1px solid var(--line); display:flex; justify-content:space-between; align-items:center; }
+    header h1 { font-size: 16px; margin: 0; font-weight: 600; }
+    header .status { font-size: 12px; color: var(--muted); }
+    main { padding: 16px 20px; max-width: 1100px; margin: 0 auto; }
+    form { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr auto; gap: 8px; margin-bottom: 18px; }
+    @media (max-width: 720px) { form { grid-template-columns: 1fr 1fr; } }
+    input, select, button { padding: 8px 10px; font: inherit; background: var(--card); color: var(--fg); border: 1px solid var(--line); border-radius: 6px; }
+    button { cursor: pointer; background: var(--accent); color: white; border: none; }
+    .meta { color: var(--muted); font-size: 12px; margin-bottom: 12px; }
+    ul.results { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+    li.hit { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; }
+    li.hit h3 { margin: 0 0 4px 0; font-size: 15px; }
+    li.hit .row { color: var(--muted); font-size: 13px; margin-top: 2px; }
+    li.hit .row .pill { display:inline-block; padding:1px 6px; margin-right:4px; border:1px solid var(--line); border-radius:999px; font-size:11px; }
+    .empty { color: var(--muted); padding: 24px 0; text-align: center; }
+    .err   { color: #b00020; padding: 16px 0; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>jobs.omarss.net</h1>
+    <span class="status" id="status">checking…</span>
+  </header>
+  <main>
+    <form id="search">
+      <input id="q" type="search" placeholder="Search jobs in EN or AR… (e.g. python, مهندس برمجيات, k8s)" autofocus />
+      <input id="city" type="search" placeholder="City (Riyadh, جدة…)" />
+      <select id="emp">
+        <option value="">Any employment</option>
+        <option value="full_time">Full-time</option>
+        <option value="part_time">Part-time</option>
+        <option value="contract">Contract</option>
+        <option value="internship">Internship</option>
+      </select>
+      <select id="work">
+        <option value="">Any arrangement</option>
+        <option value="onsite">On-site</option>
+        <option value="hybrid">Hybrid</option>
+        <option value="remote">Remote</option>
+      </select>
+      <select id="exp">
+        <option value="">Any level</option>
+        <option value="entry">Entry</option>
+        <option value="junior">Junior</option>
+        <option value="mid">Mid</option>
+        <option value="senior">Senior</option>
+        <option value="lead">Lead</option>
+        <option value="manager">Manager</option>
+      </select>
+      <button type="submit">Search</button>
+    </form>
+    <div class="meta" id="meta"></div>
+    <ul class="results" id="results"></ul>
+  </main>
+  <script>
+    const statusEl = document.getElementById('status');
+    const form     = document.getElementById('search');
+    const meta     = document.getElementById('meta');
+    const results  = document.getElementById('results');
+
+    async function pingHealth() {
+      try {
+        const r = await fetch('/v1/health');
+        const j = await r.json();
+        statusEl.textContent = j.status === 'ok'
+          ? `ok · ${j.sources_count} sources`
+          : 'degraded';
+      } catch (e) {
+        statusEl.textContent = 'unreachable';
+      }
+    }
+
+    function pill(label, value) {
+      return value ? `<span class="pill">${label}: ${value}</span>` : '';
+    }
+
+    async function runSearch(evt) {
+      if (evt) evt.preventDefault();
+      const params = new URLSearchParams();
+      const get = (id) => document.getElementById(id).value.trim();
+      if (get('q'))    params.set('q', get('q'));
+      if (get('city')) params.set('city', get('city'));
+      if (get('emp'))  params.set('employment_type', get('emp'));
+      if (get('work')) params.set('work_arrangement', get('work'));
+      if (get('exp'))  params.set('experience_level', get('exp'));
+      params.set('limit', '25');
+
+      results.innerHTML = '';
+      meta.textContent = 'searching…';
+      try {
+        const r = await fetch('/v1/search?' + params.toString());
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        const j = await r.json();
+        meta.textContent = `${j.count} result${j.count === 1 ? '' : 's'}`;
+        if (j.count === 0) {
+          results.innerHTML = '<div class="empty">No matching jobs.</div>';
+          return;
+        }
+        results.innerHTML = j.results.map(h => `
+          <li class="hit">
+            <h3>${h.title_en ?? h.title_ar ?? 'Untitled'}</h3>
+            <div class="row">
+              ${pill('arrangement', h.work_arrangement)}
+              ${pill('type', h.employment_type)}
+              ${h.salary_min ? pill('salary', `${h.salary_min}-${h.salary_max ?? ''} ${h.salary_currency ?? ''}`) : ''}
+              ${pill('postings', h.posting_count)}
+              ${pill('score', h.score.toFixed(2))}
+            </div>
+            <div class="row">last seen: ${new Date(h.last_seen_at).toLocaleString()}</div>
+          </li>
+        `).join('');
+      } catch (e) {
+        meta.textContent = '';
+        results.innerHTML = `<div class="err">Search failed: ${e.message}</div>`;
+      }
+    }
+    form.addEventListener('submit', runSearch);
+    pingHealth();
+    runSearch();
+  </script>
+</body>
+</html>

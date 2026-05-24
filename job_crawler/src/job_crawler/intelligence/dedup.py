@@ -1,0 +1,263 @@
+"""Cross-source cluster deduplication.
+
+The crawler ingests every posting as its own 1-row cluster (see
+`runner.py`). This module finds *the same job* posted on multiple sources
+and merges them into a single cluster via the existing
+`db.jobs.merge()` machinery + `posting_duplicate_edges` evidence rows.
+
+Signals (in priority order — first hit wins per pair)
+-----------------------------------------------------
+1. **exact content_hash** — identical normalised description body. The
+   strongest signal (e.g. one human pasted the same blurb into Bayt and
+   LinkedIn). similarity=1.0.
+2. **same canonical_url after normalisation** — exotic but possible when
+   one source aggregates another. similarity=1.0.
+3. **title trigram + company match + city match** — the workhorse path.
+   Title similarity ≥ 0.6 and the candidates share the resolved
+   `company_id` and `city_id`. similarity = title similarity.
+4. **title trigram + raw_company_name fuzzy + city** — fallback when one
+   side hasn't resolved the company yet. Requires trigram(company_name)
+   ≥ 0.5 + title ≥ 0.65.
+
+For every pair that fires, we:
+  * insert a `posting_duplicate_edges` row (with the reason + similarity)
+  * pick the canonical cluster (the one belonging to the highest-trust
+    source's posting) and merge the other(s) into it via `db.jobs.merge`.
+
+Run via:
+    python -m job_crawler.cli.intelligence --dedup
+    make intelligence-dedup
+"""
+
+from __future__ import annotations
+
+import logging
+from dataclasses import dataclass
+from decimal import Decimal
+from typing import Final
+from uuid import UUID
+
+from psycopg.rows import dict_row
+
+from job_crawler_db import DuplicateReason, JobCrawlerDB
+
+_LOG: Final = logging.getLogger("job_crawler.intelligence.dedup")
+
+
+@dataclass(slots=True)
+class DedupSummary:
+    pairs_considered: int = 0
+    edges_recorded: int = 0
+    clusters_merged: int = 0
+
+
+# ---------------------------------------------------------------------------
+# Stage 1: exact content_hash matches
+# ---------------------------------------------------------------------------
+
+
+async def _dedupe_by_content_hash(db: JobCrawlerDB, summary: DedupSummary) -> None:
+    """Every set of postings sharing a content_hash → all merge into one cluster."""
+    async with db.pool.connection() as conn, conn.cursor(row_factory=dict_row) as cur:
+        await cur.execute(
+            """
+            WITH grp AS (
+                SELECT content_hash,
+                       array_agg(id ORDER BY first_seen_at) AS posting_ids,
+                       COUNT(*) AS n
+                FROM   job_postings
+                WHERE  content_hash IS NOT NULL
+                  AND  cluster_job_id IS NOT NULL
+                GROUP  BY content_hash
+                HAVING COUNT(*) >= 2
+            )
+            SELECT posting_ids FROM grp;
+            """
+        )
+        groups = [row["posting_ids"] for row in await cur.fetchall()]
+
+    for ids in groups:
+        await _merge_postings(
+            db, ids, reason=DuplicateReason.exact_content_hash, similarity=Decimal("1.000"),
+            summary=summary,
+        )
+
+
+# ---------------------------------------------------------------------------
+# Stage 2: title trigram + company + city
+# ---------------------------------------------------------------------------
+
+
+async def _dedupe_by_title_company_loc(
+    db: JobCrawlerDB,
+    summary: DedupSummary,
+    *,
+    min_title_similarity: float = 0.6,
+) -> None:
+    """For every posting, find peers sharing (company_id, city_id) whose
+    title's trigram similarity ≥ threshold. Each match becomes an edge +
+    a candidate merge. Runs in O(N) over postings; the pg_trgm index on
+    job_postings(normalize_text(title)) makes the per-posting lookup fast.
+    """
+    async with db.pool.connection() as conn, conn.cursor(row_factory=dict_row) as cur:
+        await cur.execute(
+            """
+            WITH pairs AS (
+                SELECT a.id              AS a_id,
+                       b.id              AS b_id,
+                       a.cluster_job_id  AS a_cluster,
+                       b.cluster_job_id  AS b_cluster,
+                       similarity(normalize_text(a.title), normalize_text(b.title)) AS sim
+                FROM   job_postings a
+                JOIN   job_postings b
+                  ON   b.id > a.id                          -- canonical ordering
+                  AND  b.company_id IS NOT DISTINCT FROM a.company_id
+                  AND  b.city_id    IS NOT DISTINCT FROM a.city_id
+                  AND  a.company_id IS NOT NULL             -- skip "no company" matches
+                  AND  a.cluster_job_id <> b.cluster_job_id -- already same cluster?
+                WHERE  a.cluster_job_id IS NOT NULL
+                  AND  b.cluster_job_id IS NOT NULL
+                  AND  normalize_text(a.title) %% normalize_text(b.title)
+            )
+            SELECT a_id, b_id, a_cluster, b_cluster, sim
+            FROM   pairs
+            WHERE  sim >= %(thr)s
+            ORDER  BY sim DESC;
+            """,
+            {"thr": min_title_similarity},
+        )
+        pairs = list(await cur.fetchall())
+
+    for row in pairs:
+        summary.pairs_considered += 1
+        # Record the edge regardless of whether merging is possible.
+        try:
+            await db.dedupe.add_edge(
+                row["a_id"], row["b_id"],
+                reason=DuplicateReason.title_company_loc,
+                similarity=Decimal(str(row["sim"])).quantize(Decimal("0.001")),
+            )
+            summary.edges_recorded += 1
+        except Exception:
+            _LOG.exception("could not record edge for %s ↔ %s",
+                           row["a_id"], row["b_id"])
+        # Merge clusters, picking the higher-trust cluster as the survivor.
+        await _merge_clusters_for_pair(db, row["a_cluster"], row["b_cluster"], summary)
+
+
+# ---------------------------------------------------------------------------
+# helpers
+# ---------------------------------------------------------------------------
+
+
+async def _merge_postings(
+    db: JobCrawlerDB,
+    posting_ids: list[UUID],
+    *,
+    reason: DuplicateReason,
+    similarity: Decimal,
+    summary: DedupSummary,
+) -> None:
+    """Treat all `posting_ids` as the same job: record pairwise edges,
+    then merge their clusters down to one."""
+    if len(posting_ids) < 2:
+        return
+    # Edges (canonical ordering enforced by add_edge).
+    head = posting_ids[0]
+    for other in posting_ids[1:]:
+        summary.pairs_considered += 1
+        try:
+            await db.dedupe.add_edge(
+                head, other, reason=reason, similarity=similarity,
+            )
+            summary.edges_recorded += 1
+        except Exception:
+            _LOG.exception("could not record %s edge", reason.value)
+
+    # Clusters
+    clusters: list[UUID] = []
+    for pid in posting_ids:
+        p = await db.postings.get(pid)
+        if p and p.cluster_job_id and p.cluster_job_id not in clusters:
+            clusters.append(p.cluster_job_id)
+    if len(clusters) < 2:
+        return
+    target = await _pick_target_cluster(db, clusters)
+    for c in clusters:
+        if c == target:
+            continue
+        try:
+            await db.jobs.merge(target=target, source=c)
+            summary.clusters_merged += 1
+        except Exception:
+            _LOG.exception("merge %s → %s failed", c, target)
+
+
+async def _merge_clusters_for_pair(
+    db: JobCrawlerDB,
+    a_cluster: UUID | None,
+    b_cluster: UUID | None,
+    summary: DedupSummary,
+) -> None:
+    if a_cluster is None or b_cluster is None or a_cluster == b_cluster:
+        return
+    # In a dedup batch, earlier merges may have deleted one or both of these
+    # clusters. Skip cleanly if either is gone — the trigram pass picks up
+    # the surviving cluster on its next iteration.
+    a_alive = await db.jobs.get(a_cluster) is not None
+    b_alive = await db.jobs.get(b_cluster) is not None
+    if not (a_alive and b_alive):
+        return
+    target = await _pick_target_cluster(db, [a_cluster, b_cluster])
+    source = b_cluster if target == a_cluster else a_cluster
+    try:
+        await db.jobs.merge(target=target, source=source)
+        summary.clusters_merged += 1
+    except KeyError:
+        # Cluster vanished between alive-check and merge; harmless.
+        return
+    except Exception:
+        _LOG.exception("merge %s → %s failed", source, target)
+
+
+async def _pick_target_cluster(
+    db: JobCrawlerDB,
+    cluster_ids: list[UUID],
+) -> UUID:
+    """Pick the cluster whose canonical posting comes from the highest-trust
+    source. Ties → whichever has the most postings; ties again → oldest."""
+    async with db.pool.connection() as conn, conn.cursor(row_factory=dict_row) as cur:
+        await cur.execute(
+            """
+            SELECT j.id,
+                   COALESCE(s.trust_weight, 0)::float AS trust,
+                   j.posting_count,
+                   j.first_seen_at
+            FROM   jobs j
+            LEFT   JOIN job_postings p ON p.id = j.canonical_posting_id
+            LEFT   JOIN sources s ON s.id = p.source_id
+            WHERE  j.id = ANY(%(ids)s)
+            ORDER  BY trust DESC, j.posting_count DESC, j.first_seen_at;
+            """,
+            {"ids": cluster_ids},
+        )
+        rows = await cur.fetchall()
+    return rows[0]["id"] if rows else cluster_ids[0]
+
+
+# ---------------------------------------------------------------------------
+# Public entry point
+# ---------------------------------------------------------------------------
+
+
+async def run(db: JobCrawlerDB) -> DedupSummary:
+    summary = DedupSummary()
+    _LOG.info("dedup: stage 1 — exact content_hash")
+    await _dedupe_by_content_hash(db, summary)
+    _LOG.info("dedup: stage 2 — title trigram + company + city")
+    await _dedupe_by_title_company_loc(db, summary)
+    _LOG.info(
+        "dedup done: pairs=%d edges=%d cluster_merges=%d",
+        summary.pairs_considered, summary.edges_recorded, summary.clusters_merged,
+    )
+    return summary

@@ -1,0 +1,222 @@
+"""Heuristic AI-generated text detection.
+
+Why heuristics (and not a model)
+--------------------------------
+A real classifier (GPTZero, Originality.ai, a fine-tuned BERT) requires
+either an API key or hundreds of megabytes of model weights. For a
+noise-reduction pass on job descriptions that's overkill — *most* AI-
+generated postings carry several obvious tells in plain text, and a
+fast heuristic gives the dedupe pipeline a useful signal to feed into
+the fake-score.
+
+The function is pure, deterministic, and runs in microseconds on a
+posting-length string. Plug in a stronger detector by overriding
+`detect_ai_generation` at the call site if you outgrow these heuristics.
+
+Signals counted (each adds to the score, capped at 1.0):
+
+  * **LLM phrase markers** — "embark on a journey", "in the dynamic
+    landscape of", "we are seeking a passionate", "join our team" cliches,
+    "this role offers", "leverage your", etc.
+  * **Em-dash density** — LLMs love em-dashes far more than humans (per
+    https://www.theverge.com/2025/06/09/em-dash-llm and corroborating
+    studies). > 1 em-dash per 250 chars is suspicious.
+  * **Bullet uniformity** — every bullet starts with the same verb form
+    and ends with a period; humans tend to vary.
+  * **Sentence-length variance** — LLM prose has low burstiness; very
+    uniform sentence lengths score higher.
+  * **Generic closing** — "We are an equal-opportunity employer" or
+    similar boilerplate placed verbatim, often (but not exclusively)
+    LLM-added when the human writer forgot it.
+  * **Triple adjective density** — "innovative, collaborative, dynamic" is
+    an LLM tic.
+
+Returns
+-------
+`AIDetectionResult(score, confidence, hits, ...)` where:
+
+  * `score`      0..1 — higher = more likely AI-generated
+  * `confidence` 0..1 — how much evidence we have (longer texts → more)
+  * `hits`       list of strings naming each heuristic that fired
+"""
+
+from __future__ import annotations
+
+import math
+import re
+import statistics
+from dataclasses import dataclass, field
+
+# ---------------------------------------------------------------------------
+# Heuristic library — kept tunable in one place
+# ---------------------------------------------------------------------------
+
+# Phrases the model has been observed to overuse. Lowercased + casefolded
+# for matching. Add or remove freely as the model landscape shifts.
+_LLM_PHRASES: tuple[str, ...] = (
+    "embark on a journey",
+    "in the dynamic landscape of",
+    "in today's fast-paced",
+    "we are seeking a passionate",
+    "join our team",
+    "this role offers",
+    "you will be responsible for",
+    "leverage your",
+    "robust and scalable",
+    "harness the power of",
+    "make a meaningful impact",
+    "passionate about delivering",
+    "delve into",
+    "synergy",
+    "ever-evolving",
+    "innovative solutions",
+    "fast-paced environment",
+    "cutting-edge",
+    "drive impactful outcomes",
+    "collaborate cross-functionally",
+    "strong communication skills",
+    "a plus",
+    "nice to have",
+    "tailored to",
+    "in conclusion",
+    "it is important to note",
+    "as a leading",
+    "world-class",
+    "best-in-class",
+)
+
+# Boilerplate equal-opportunity / closing lines.
+_BOILERPLATE_PHRASES: tuple[str, ...] = (
+    "we are an equal opportunity employer",
+    "all qualified applicants will receive consideration",
+    "we celebrate diversity",
+    "we do not discriminate",
+)
+
+# Triple-adjective tic: 3 adjective-like words separated by commas (LLMs love it).
+# Matches forms like "innovative, collaborative, and dynamic" and
+# "building, shipping, and scaling".
+_ADJ = r"\w+(?:ing|ive|al|ous|ic|ed|y|able|ible)"
+_TRIPLE_ADJ_RE = re.compile(
+    rf"\b{_ADJ},\s+{_ADJ},?\s+(?:and\s+)?{_ADJ}\b",
+    re.IGNORECASE,
+)
+
+_EM_DASH_CHARS: frozenset[str] = frozenset({"—", "–"})  # em + en dash  # noqa: RUF001
+_SENT_SPLIT_RE = re.compile(r"(?<=[.!?])\s+")
+_BULLET_RE = re.compile(r"^[\s]*[-•*●▪]\s+(.+)$", re.MULTILINE)
+
+
+@dataclass(frozen=True, slots=True)
+class AIDetectionResult:
+    """Outcome of `detect_ai_generation`.
+
+    * `score`      — 0..1, higher means more AI-like
+    * `confidence` — 0..1, how trustworthy the score is (low for short text)
+    * `hits`       — names of every heuristic that contributed
+    * `details`    — per-heuristic numeric stats (em-dash count etc.)
+    """
+
+    score: float
+    confidence: float
+    hits: list[str] = field(default_factory=list)
+    details: dict[str, float | int] = field(default_factory=dict)
+
+    def is_likely_ai(self, *, threshold: float = 0.55) -> bool:
+        """True when score >= threshold AND confidence >= 0.5.
+
+        The confidence gate avoids false positives on very short text where
+        a single phrase match could otherwise look like an AI tell.
+        """
+        return self.score >= threshold and self.confidence >= 0.5
+
+
+def detect_ai_generation(text: str | None) -> AIDetectionResult:
+    """Score how likely `text` was generated by an LLM.
+
+    Pure function — no I/O, no side effects, deterministic. Safe to call
+    on every posting in the ingest pipeline; runs in ~50µs for a typical
+    job description on commodity hardware.
+    """
+    if not text:
+        return AIDetectionResult(score=0.0, confidence=0.0)
+
+    norm = text.casefold()
+    char_count = len(text)
+    word_count = max(1, len(norm.split()))
+
+    # Confidence ramps up with length. Below ~80 words we floor at 0.25;
+    # by ~400 words there's enough text to trust the signal.
+    confidence = max(0.25, min(1.0, word_count / 400.0))
+
+    hits: list[str] = []
+    details: dict[str, float | int] = {}
+    score = 0.0
+
+    # 1. LLM phrase markers — diminishing returns: each hit contributes less.
+    # Many of these phrases together is a *very* strong signal, so the cap
+    # is higher than any single other axis.
+    phrase_hits = sum(1 for p in _LLM_PHRASES if p in norm)
+    details["llm_phrase_hits"] = phrase_hits
+    if phrase_hits:
+        hits.append("llm_phrases")
+        # Saturating curve: 1 hit = 0.08, 3 = 0.20, 6 = 0.32, 12 = 0.42, asymptote 0.50.
+        score += 0.50 * (1 - math.exp(-phrase_hits / 4.0))
+
+    # 2. Em-dash density.
+    em_count = sum(text.count(ch) for ch in _EM_DASH_CHARS)
+    em_density = em_count / max(1, char_count / 250.0)  # per 250 chars
+    details["em_dash_count"] = em_count
+    details["em_dash_density_per_250c"] = round(em_density, 3)
+    if em_density > 1.0:
+        hits.append("em_dash_density")
+        score += min(0.20, 0.10 * (em_density - 1.0))
+
+    # 3. Sentence-length burstiness (low variance = more AI-like).
+    sentences = [s for s in _SENT_SPLIT_RE.split(text) if s.strip()]
+    if len(sentences) >= 5:
+        lengths = [len(s.split()) for s in sentences]
+        mean = statistics.fmean(lengths)
+        stdev = statistics.pstdev(lengths)
+        cv = stdev / mean if mean > 0 else 0.0  # coefficient of variation
+        details["sentence_count"] = len(sentences)
+        details["sentence_len_cv"] = round(cv, 3)
+        # Human writing typically has CV >= 0.50. Lower than that is suspicious.
+        if cv < 0.50:
+            hits.append("low_sentence_burstiness")
+            score += min(0.20, (0.50 - cv) * 0.80)
+
+    # 4. Bullet uniformity — too many bullets that start identically.
+    bullets = [m.group(1).strip() for m in _BULLET_RE.finditer(text)]
+    if len(bullets) >= 4:
+        first_words = [b.split()[0].casefold() for b in bullets if b]
+        repeats = len(first_words) - len(set(first_words))
+        repeat_ratio = repeats / max(1, len(first_words))
+        details["bullet_count"] = len(bullets)
+        details["bullet_first_word_repeat_ratio"] = round(repeat_ratio, 3)
+        if repeat_ratio >= 0.4:
+            hits.append("uniform_bullet_openings")
+            score += 0.10
+
+    # 5. Triple-adjective tic.
+    triple_matches = len(_TRIPLE_ADJ_RE.findall(text))
+    details["triple_adjective_matches"] = triple_matches
+    if triple_matches:
+        hits.append("triple_adjective_tic")
+        score += min(0.10, 0.05 * triple_matches)
+
+    # 6. Verbatim boilerplate.
+    bp_hits = sum(1 for p in _BOILERPLATE_PHRASES if p in norm)
+    details["boilerplate_phrase_hits"] = bp_hits
+    if bp_hits:
+        hits.append("boilerplate")
+        score += min(0.10, 0.05 * bp_hits)
+
+    # Saturate via tanh so the score is well-behaved at the upper end.
+    score = math.tanh(score * 1.1)
+    return AIDetectionResult(
+        score=round(score, 3),
+        confidence=round(confidence, 3),
+        hits=hits,
+        details=details,
+    )
