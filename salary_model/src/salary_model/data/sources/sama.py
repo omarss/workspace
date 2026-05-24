@@ -40,6 +40,7 @@ def fetch_sama_indicators() -> tuple[pd.DataFrame, FetchManifest]:
         ok=True,
         rows=len(df),
         fallback=True,
+        is_estimate=True,
         notes="bundled SAMA Monthly Bulletin 2025 Q1 anchors",
     )
     return df, manifest

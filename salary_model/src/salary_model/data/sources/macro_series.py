@@ -116,6 +116,7 @@ def fetch_macro_series() -> tuple[pd.DataFrame, FetchManifest]:
         ok=True,
         rows=len(df),
         fallback=True,
+        is_estimate=True,
         notes=(
             "Bundled monthly anchors from GASTAT CPI bulletins + SAMA monthly bulletins; "
             "replace with a live Excel/JSON scraper once SAMA publishes a stable feed."

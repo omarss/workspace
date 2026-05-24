@@ -50,15 +50,33 @@ def data_fetch_anchors() -> None:
     configure_logging()
     from salary_model.data.sources import (
         fetch_gastat_wage_index,
+        fetch_kapsarc_cpi_mom,
+        fetch_kapsarc_employees_compensation,
+        fetch_kapsarc_employees_demographics,
+        fetch_kapsarc_main_labor,
+        fetch_kapsarc_population,
+        fetch_kapsarc_public_sector_employment,
         fetch_sama_indicators,
         fetch_worldbank_macro,
     )
 
-    _, m1 = fetch_gastat_wage_index()
-    _, m2 = fetch_sama_indicators()
-    _, m3 = fetch_worldbank_macro()
-    for m in (m1, m2, m3):
-        typer.echo(f"{m.source}: ok={m.ok} fallback={m.fallback} rows={m.rows}")
+    fetchers = (
+        fetch_gastat_wage_index,
+        fetch_sama_indicators,
+        fetch_worldbank_macro,
+        fetch_kapsarc_main_labor,
+        fetch_kapsarc_employees_compensation,
+        fetch_kapsarc_employees_demographics,
+        fetch_kapsarc_public_sector_employment,
+        fetch_kapsarc_cpi_mom,
+        fetch_kapsarc_population,
+    )
+    for fn in fetchers:
+        _, m = fn()
+        typer.echo(
+            f"{m.source}: ok={m.ok} live={not m.is_estimate} rows={m.rows} "
+            f"fallback={m.fallback}"
+        )
 
 
 @app.command()

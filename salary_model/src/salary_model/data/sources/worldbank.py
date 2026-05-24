@@ -74,6 +74,7 @@ def fetch_worldbank_macro() -> tuple[pd.DataFrame, FetchManifest]:
             ok=True,
             rows=len(df),
             fallback=True,
+            is_estimate=True,
             notes="offline fallback to bundled CPI anchor",
         )
         return df, manifest
@@ -89,6 +90,7 @@ def fetch_worldbank_macro() -> tuple[pd.DataFrame, FetchManifest]:
         ok=True,
         rows=len(merged),
         fallback=failures > 0,
+        is_estimate=False,
         notes=f"fetched live; {failures} indicator fetch(es) failed",
         extra={"indicators": list(INDICATORS.keys())},
     )

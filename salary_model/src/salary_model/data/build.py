@@ -47,6 +47,16 @@ def build_dataset(
     sama_df, sama_manifest = sources.fetch_sama_indicators()
     wb_df, wb_manifest = sources.fetch_worldbank_macro()
     macro_df, macro_manifest = sources.fetch_macro_series()
+    # Live KAPSARC OpenDataSoft pulls; tagged is_estimate=False when they succeed.
+    # Each is best-effort: a 404 / network outage just leaves the slot as a stub.
+    kapsarc_results: dict[str, tuple[pd.DataFrame, Any]] = {
+        "main_labor": sources.fetch_kapsarc_main_labor(),
+        "emp_comp": sources.fetch_kapsarc_employees_compensation(),
+        "emp_demog": sources.fetch_kapsarc_employees_demographics(),
+        "public_emp": sources.fetch_kapsarc_public_sector_employment(),
+        "cpi_mom": sources.fetch_kapsarc_cpi_mom(),
+        "population": sources.fetch_kapsarc_population(),
+    }
 
     # ── 2. synthetic observations anchored to the public tables ───────────────
     spec = synthetic.default_spec(n_rows=n_rows, seed=seed)
@@ -66,8 +76,24 @@ def build_dataset(
     macro_df.to_parquet(macro_series_path, index=False)
     macro_series_latest = out_dir / "macro_series_latest.parquet"
     macro_df.to_parquet(macro_series_latest, index=False)
+    # KAPSARC live datasets — only write when the fetch returned rows.
+    kapsarc_paths: dict[str, str] = {}
+    for key, (df_k, _m_k) in kapsarc_results.items():
+        if len(df_k) > 0:
+            p = out_dir / f"kapsarc_{key}_{run_id}.parquet"
+            df_k.to_parquet(p, index=False)
+            kapsarc_paths[f"kapsarc_{key}"] = str(p.relative_to(settings.repo_root))
 
     # ── 4. manifest ───────────────────────────────────────────────────────────
+    source_manifests = {
+        "gastat_wage_index": asdict(wage_manifest),
+        "sama_indicators": asdict(sama_manifest),
+        "worldbank_macro": asdict(wb_manifest),
+        "ksa_monthly_macro": asdict(macro_manifest),
+    }
+    for key, (_df_k, m_k) in kapsarc_results.items():
+        source_manifests[f"kapsarc_{key}"] = asdict(m_k)
+    live_sources = [k for k, v in source_manifests.items() if not v.get("is_estimate", True)]
     manifest: dict[str, Any] = {
         "run_id": run_id,
         "built_at": datetime.now(tz=UTC).isoformat(),
@@ -78,13 +104,10 @@ def build_dataset(
         "macro": str(macro_path.relative_to(settings.repo_root)),
         "sama": str(sama_path.relative_to(settings.repo_root)),
         "macro_series": str(macro_series_path.relative_to(settings.repo_root)),
+        "kapsarc": kapsarc_paths,
         "snapshot_sha256": _hash_dataframe(obs),
-        "sources": {
-            "gastat_wage_index": asdict(wage_manifest),
-            "sama_indicators": asdict(sama_manifest),
-            "worldbank_macro": asdict(wb_manifest),
-            "ksa_monthly_macro": asdict(macro_manifest),
-        },
+        "sources": source_manifests,
+        "live_sources": live_sources,
         "source_trust": {
             k: {"name": v.name, "url": v.url, "trust": v.trust, "last_seen": v.last_seen}
             for k, v in SOURCE_TRUST.items()

@@ -45,6 +45,7 @@ def fetch_gastat_wage_index() -> tuple[pd.DataFrame, FetchManifest]:
         ok=True,
         rows=len(df),
         fallback=True,
+        is_estimate=True,
         notes="bundled anchors derived from GASTAT Labor Market Bulletin 2024",
     )
     return df, manifest
