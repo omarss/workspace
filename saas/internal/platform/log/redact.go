@@ -43,6 +43,15 @@ var staticRedactedKeys = map[string]struct{}{
 	"smtp_password":         {},
 	"sendgrid_api_key":      {},
 	"ses_secret_access_key": {},
+	// Identity PII (Phase 5). The struct-tag walker handles tagged fields
+	// inside Go values; this list covers loose JSON / map[string]any logs
+	// where pii:"true" cannot apply. Note: tenant/org "name" is NOT PII
+	// and is intentionally left out — only user-bound names are PII.
+	"email":            {},
+	"phone":            {},
+	"email_plaintext":  {},
+	"user_name":        {},
+	"external_subject": {},
 }
 
 var (
