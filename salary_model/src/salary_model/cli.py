@@ -1,0 +1,165 @@
+"""Typer CLI: the only supported way to invoke this project, alongside the Makefile."""
+
+from __future__ import annotations
+
+from datetime import UTC, datetime
+from pathlib import Path
+
+import typer
+
+from salary_model.config import configure_logging, get_logger, get_settings
+
+app = typer.Typer(
+    add_completion=False,
+    help="Saudi salary intelligence model CLI.",
+    no_args_is_help=True,
+)
+data_app = typer.Typer(help="Build and inspect datasets.", no_args_is_help=True)
+fairness_app = typer.Typer(help="Fairness operations.", no_args_is_help=True)
+drift_app = typer.Typer(help="Drift detection.", no_args_is_help=True)
+app.add_typer(data_app, name="data")
+app.add_typer(fairness_app, name="fairness")
+app.add_typer(drift_app, name="drift")
+
+
+def _ts() -> str:
+    return datetime.now(tz=UTC).strftime("%Y%m%dT%H%M%SZ")
+
+
+@data_app.command("build")
+def data_build(
+    seed: int = typer.Option(17, help="RNG seed for synthetic generator."),
+    run_id: str = typer.Option(_ts(), help="Identifier for this dataset snapshot."),
+    n_rows: int = typer.Option(
+        25_000, help="Number of synthetic observations to generate.", min=1_000,
+    ),
+) -> None:
+    """Fetch open anchors and build a versioned dataset snapshot."""
+    configure_logging()
+    log = get_logger("salary_model.cli")
+    log.info("data_build_start", seed=seed, run_id=run_id, n_rows=n_rows)
+    from salary_model.data.build import build_dataset
+
+    path = build_dataset(n_rows=n_rows, seed=seed, run_id=run_id)
+    typer.echo(f"snapshot: {path}")
+
+
+@data_app.command("fetch-anchors")
+def data_fetch_anchors() -> None:
+    """Refresh the public anchor tables only (no synthesis)."""
+    configure_logging()
+    from salary_model.data.sources import (
+        fetch_gastat_wage_index,
+        fetch_sama_indicators,
+        fetch_worldbank_macro,
+    )
+
+    _, m1 = fetch_gastat_wage_index()
+    _, m2 = fetch_sama_indicators()
+    _, m3 = fetch_worldbank_macro()
+    for m in (m1, m2, m3):
+        typer.echo(f"{m.source}: ok={m.ok} fallback={m.fallback} rows={m.rows}")
+
+
+@app.command()
+def train(
+    seed: int = typer.Option(17),
+    run_id: str = typer.Option(_ts()),
+    optuna_trials: int = typer.Option(12),
+) -> None:
+    """Train the full ladder once (alias for ``iterate`` for convenience)."""
+    configure_logging()
+    from salary_model.training.iterate import run_iteration
+
+    run_iteration(run_id=run_id, seed=seed, optuna_trials=optuna_trials)
+
+
+@app.command()
+def iterate(
+    seed: int = typer.Option(17),
+    run_id: str = typer.Option(_ts()),
+    optuna_trials: int = typer.Option(12),
+) -> None:
+    """Run the full iteration ladder and write reports/runs/<RUN_ID>/."""
+    configure_logging()
+    log = get_logger("salary_model.cli")
+    log.info("iterate_start", run_id=run_id, seed=seed)
+    from salary_model.training.iterate import run_iteration
+
+    report = run_iteration(run_id=run_id, seed=seed, optuna_trials=optuna_trials)
+    typer.echo(f"wrote reports/runs/{run_id}/summary.md ({len(report.steps)} steps)")
+
+
+@app.command()
+def evaluate(run_id: str | None = typer.Option(None)) -> None:
+    """Print the summary of the most recent (or given) run."""
+    settings = get_settings()
+    runs_dir = settings.reports_dir / "runs"
+    if run_id is None:
+        runs = sorted(p.name for p in runs_dir.iterdir() if p.is_dir()) if runs_dir.exists() else []
+        if not runs:
+            typer.echo("no runs found; run `make iterate` first", err=True)
+            raise typer.Exit(code=1)
+        run_id = runs[-1]
+    summary = runs_dir / run_id / "summary.md"
+    if not summary.exists():
+        typer.echo(f"no summary at {summary}", err=True)
+        raise typer.Exit(code=1)
+    typer.echo(summary.read_text(encoding="utf-8"))
+
+
+@fairness_app.command("audit")
+def fairness_audit(run_id: str | None = typer.Option(None)) -> None:
+    """Print the fairness audit of the most recent (or given) run."""
+    settings = get_settings()
+    runs_dir = settings.reports_dir / "runs"
+    if run_id is None:
+        runs = sorted(p.name for p in runs_dir.iterdir() if p.is_dir()) if runs_dir.exists() else []
+        if not runs:
+            typer.echo("no runs found", err=True)
+            raise typer.Exit(code=1)
+        run_id = runs[-1]
+    p = runs_dir / run_id / "fairness.md"
+    if not p.exists():
+        typer.echo(f"no fairness report at {p}", err=True)
+        raise typer.Exit(code=1)
+    typer.echo(p.read_text(encoding="utf-8"))
+
+
+_DRIFT_PATH_ARG = typer.Argument(
+    ..., help="Path to a current observations Parquet (built like the training snapshot).",
+)
+
+
+@drift_app.command("check")
+def drift_check(
+    current_snapshot: Path = _DRIFT_PATH_ARG,
+    run_id: str = typer.Option(_ts(), help="Identifier for this drift run."),
+) -> None:
+    """Compare a current snapshot against the latest training snapshot via PSI."""
+    configure_logging()
+    log = get_logger("salary_model.cli")
+    settings = get_settings()
+    from salary_model.data.build import load_latest_snapshot
+    from salary_model.features.build import build_feature_frame
+    from salary_model.monitoring.drift import compute_drift, write_report
+
+    if not current_snapshot.exists():
+        typer.echo(f"current snapshot not found: {current_snapshot}", err=True)
+        raise typer.Exit(code=1)
+
+    import pandas as pd  # local
+    ref_obs, _ = load_latest_snapshot()
+    curr_obs = pd.read_parquet(current_snapshot)
+    ref_feats = build_feature_frame(ref_obs).X
+    curr_feats = build_feature_frame(curr_obs).X
+
+    report = compute_drift(ref_feats, curr_feats)
+    out_dir = settings.reports_dir / "drift" / run_id
+    md_path, _json_path = write_report(report, out_dir)
+    log.info("drift_done", max_psi=report.max_psi, alerts=len(report.alerts), md=str(md_path))
+    typer.echo(f"wrote {md_path}\nmax_psi={report.max_psi:.4f}  alerts={len(report.alerts)}")
+
+
+if __name__ == "__main__":  # pragma: no cover
+    app()
