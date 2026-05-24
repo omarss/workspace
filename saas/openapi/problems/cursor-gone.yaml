@@ -1,0 +1,30 @@
+# Problem fragment: cursor-gone
+# Type URI: https://saas.omarss.net/problems/cursor-gone
+# Returned when a client passes a cursor encoded under an older version.
+# Per ADR 011 we do NOT silently re-interpret; clients must restart pagination.
+
+type: object
+required: [type, title, status]
+properties:
+  type:
+    type: string
+    const: "https://saas.omarss.net/problems/cursor-gone"
+  title:
+    type: string
+    example: "Cursor schema version is no longer supported."
+  status:
+    type: integer
+    const: 410
+  detail:
+    type: string
+  instance:
+    type: string
+  request_id:
+    type: string
+example:
+  type: "https://saas.omarss.net/problems/cursor-gone"
+  title: "Cursor schema version is no longer supported."
+  status: 410
+  detail: "The cursor was issued under schema v0; this endpoint now serves v1. Drop the cursor and restart pagination."
+  instance: "/v1/tenants"
+  request_id: "req_01HXYZ"
