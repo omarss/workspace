@@ -231,10 +231,25 @@ class HttpClient:
                         # No header → assume the worst. Synthesise a cooldown
                         # of 60s + 30s jitter so we stop hammering the server.
                         retry_after = 60.0 + random.uniform(0, 30)
-                    _LOG.warning(
-                        "rate-limited %s on %s, sleeping %.1fs",
-                        resp.status_code, url, retry_after,
-                    )
+                    # Cap the sleep. Some sites (Workable, Cloudflare) return
+                    # Retry-After: 86400 as a "go away forever" signal — if we
+                    # honour it literally the crawler stalls for 24h.
+                    # 120s is plenty to clear most rate-limit windows; the next
+                    # retry will either succeed or trip the tenacity retry cap.
+                    _MAX_RETRY_AFTER_S = 120.0
+                    if retry_after > _MAX_RETRY_AFTER_S:
+                        _LOG.warning(
+                            "rate-limited %s on %s, server asked for %.0fs; "
+                            "capping sleep at %.0fs",
+                            resp.status_code, url, retry_after,
+                            _MAX_RETRY_AFTER_S,
+                        )
+                        retry_after = _MAX_RETRY_AFTER_S
+                    else:
+                        _LOG.warning(
+                            "rate-limited %s on %s, sleeping %.1fs",
+                            resp.status_code, url, retry_after,
+                        )
                     import asyncio as _a
 
                     await _a.sleep(retry_after)

@@ -7,6 +7,11 @@ then the company's own `/careers` page looking for outbound ATS links.
 When a probe succeeds we register a `company_source_profiles` row so the
 matching ATS crawler picks the company up on its next run.
 
+When a probe trips an account-wide rate limit (Workable in particular
+returns 429 with a 24-hour Retry-After), the source enters a per-run
+cool-off so subsequent companies skip that probe entirely until the
+cool-off window expires.
+
 Pure async, polite (per-host throttle via core.http), idempotent.
 """
 
@@ -14,6 +19,7 @@ from __future__ import annotations
 
 import logging
 import re
+import time
 from collections.abc import Awaitable, Callable, Iterable
 from dataclasses import dataclass
 from typing import Final
@@ -27,6 +33,21 @@ from ..core.config import IDENTIFIABLE_UA, RateConfig
 from ..core.http import HttpClient
 
 _LOG: Final = logging.getLogger("job_crawler.company_sites.ats_detector")
+
+# Per-source rate-limit cool-off (epoch seconds). When a probe hits 429,
+# the caller skips that source for `_COOLOFF_S` seconds within this run.
+_RATE_LIMITED_UNTIL: dict[str, float] = {}
+_COOLOFF_S: Final[float] = 600.0  # 10 minutes
+
+
+def _is_rate_limited(source_slug: str) -> bool:
+    return time.time() < _RATE_LIMITED_UNTIL.get(source_slug, 0.0)
+
+
+def _looks_like_rate_limit(exc: BaseException) -> bool:
+    """Best-effort: pattern-match the exception text for a 429 marker."""
+    text = str(exc).lower()
+    return "429" in text or "rate" in text or "too many" in text
 
 # A single shared HTTP client for the whole detection run — polite, identifiable.
 _RATE: Final = RateConfig(
@@ -56,10 +77,17 @@ class DetectorSummary:
 # ---------------------------------------------------------------------------
 async def _probe_greenhouse(http: HttpClient, slug: str) -> ATSHit | None:
     """Probe https://boards-api.greenhouse.io/v1/boards/{slug} — 200 + JSON = hit."""
+    if _is_rate_limited("greenhouse"):
+        return None
     url = f"https://boards-api.greenhouse.io/v1/boards/{slug}/jobs?content=false"
     try:
         r = await http.fetch(url)
-    except Exception:
+    except Exception as exc:
+        if _looks_like_rate_limit(exc):
+            _RATE_LIMITED_UNTIL["greenhouse"] = time.time() + _COOLOFF_S
+            _LOG.warning(
+                "greenhouse rate-limited; cooling off %d s", int(_COOLOFF_S),
+            )
         return None
     if r.status != 200 or not isinstance(r.json, dict) or "jobs" not in r.json:
         return None
@@ -72,10 +100,15 @@ async def _probe_greenhouse(http: HttpClient, slug: str) -> ATSHit | None:
 
 async def _probe_lever(http: HttpClient, slug: str) -> ATSHit | None:
     """Probe https://api.lever.co/v0/postings/{slug}?mode=json — 200 + list = hit."""
+    if _is_rate_limited("lever"):
+        return None
     url = f"https://api.lever.co/v0/postings/{slug}?mode=json"
     try:
         r = await http.fetch(url)
-    except Exception:
+    except Exception as exc:
+        if _looks_like_rate_limit(exc):
+            _RATE_LIMITED_UNTIL["lever"] = time.time() + _COOLOFF_S
+            _LOG.warning("lever rate-limited; cooling off %d s", int(_COOLOFF_S))
         return None
     if r.status != 200 or not isinstance(r.json, list):
         return None
@@ -94,10 +127,18 @@ async def _probe_workable(http: HttpClient, slug: str) -> ATSHit | None:
     We require a non-empty jobs[] because Workable returns 200 + empty body
     for *any* slug, including never-registered ones.
     """
+    if _is_rate_limited("workable"):
+        return None
     url = f"https://apply.workable.com/api/v1/widget/accounts/{slug}"
     try:
         r = await http.fetch(url)
-    except Exception:
+    except Exception as exc:
+        if _looks_like_rate_limit(exc):
+            _RATE_LIMITED_UNTIL["workable"] = time.time() + _COOLOFF_S
+            _LOG.warning(
+                "workable rate-limited; cooling off %d s for the rest of this run",
+                int(_COOLOFF_S),
+            )
         return None
     if r.status != 200 or not isinstance(r.json, dict):
         return None
@@ -115,11 +156,18 @@ async def _probe_successfactors(http: HttpClient, slug: str) -> ATSHit | None:
     """Probe the SF guest portal. SF doesn't 404 unknown companies cleanly,
     so we look for a positive marker (the `jobreqcareerpc` shell + at least
     one `jobId` link or a "no jobs" banner)."""
+    if _is_rate_limited("successfactors"):
+        return None
     url = (f"https://career5.successfactors.eu/sfcareer/jobreqcareerpc"
            f"?company={slug}&lang=en_US")
     try:
         r = await http.fetch(url)
-    except Exception:
+    except Exception as exc:
+        if _looks_like_rate_limit(exc):
+            _RATE_LIMITED_UNTIL["successfactors"] = time.time() + _COOLOFF_S
+            _LOG.warning(
+                "successfactors rate-limited; cooling off %d s", int(_COOLOFF_S),
+            )
         return None
     if r.status != 200 or "sfcareer" not in r.text.lower():
         return None
