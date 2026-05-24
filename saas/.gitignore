@@ -2,6 +2,11 @@
 /bin/
 /dist/
 
+# Node.js (TS SDK consumers install transitively; never commit lockfiles or modules here)
+node_modules/
+sdk/ts/*/node_modules/
+sdk/ts/*/package-lock.json
+
 # OpenAPI generated intermediates
 /openapi/_generated/
 
