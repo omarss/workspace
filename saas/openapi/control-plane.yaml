@@ -1,0 +1,37 @@
+openapi: 3.1.0
+info:
+  title: SaaS Control Plane API
+  version: 0.0.1
+  description: Operator-only API for provisioning and operating isolated SaaS deployments.
+servers:
+  - url: https://control.saas.omarss.net
+tags:
+  - name: meta
+    description: Health and metadata.
+paths:
+  /healthz:
+    get:
+      operationId: getHealthz
+      tags: [meta]
+      summary: Liveness probe.
+      description: Returns 200 with a small status payload when the control plane is alive.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
+components:
+  schemas:
+    Health:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [ok]
+        version:
+          type: string
+        commit:
+          type: string
