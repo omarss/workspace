@@ -13,7 +13,15 @@
  */
 
 
+// May contain unused imports in some cases
+// @ts-ignore
+import type { Pagination } from './pagination';
+// May contain unused imports in some cases
+// @ts-ignore
+import type { Tenant } from './tenant';
 
-export * from './api/meta-api';
-export * from './api/tenants-api';
+export interface TenantListResponse {
+    'data': Array<Tenant>;
+    'pagination': Pagination;
+}
 

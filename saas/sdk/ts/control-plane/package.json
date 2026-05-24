@@ -24,7 +24,8 @@
     "prepare": "npm run build"
   },
   "dependencies": {
-    "axios": "^1.15.2"
+    "axios": "^1.15.2",
+    "ulidx": "^2.4.1"
   },
   "devDependencies": {
     "@types/node": "12.11.5 - 12.20.42",

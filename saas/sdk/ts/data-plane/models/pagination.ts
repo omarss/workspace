@@ -14,6 +14,8 @@
 
 
 
-export * from './api/meta-api';
-export * from './api/tenants-api';
+export interface Pagination {
+    'next_cursor'?: string;
+    'has_more': boolean;
+}
 

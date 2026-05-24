@@ -14,6 +14,9 @@
 
 
 
-export * from './api/meta-api';
-export * from './api/tenants-api';
+export interface CreateTenantRequest {
+    'slug': string;
+    'name': string;
+    'metadata'?: { [key: string]: string; };
+}
 

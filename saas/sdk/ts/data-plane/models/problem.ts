@@ -13,7 +13,17 @@
  */
 
 
+// May contain unused imports in some cases
+// @ts-ignore
+import type { FieldError } from './field-error';
 
-export * from './api/meta-api';
-export * from './api/tenants-api';
+export interface Problem {
+    'type': string;
+    'title': string;
+    'status': number;
+    'detail'?: string;
+    'instance'?: string;
+    'request_id'?: string;
+    'errors'?: Array<FieldError>;
+}
 

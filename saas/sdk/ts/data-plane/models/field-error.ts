@@ -14,6 +14,9 @@
 
 
 
-export * from './api/meta-api';
-export * from './api/tenants-api';
+export interface FieldError {
+    'field': string;
+    'message': string;
+    'code'?: string;
+}
 

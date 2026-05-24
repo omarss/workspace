@@ -14,16 +14,17 @@
 
 
 
-export interface Health {
-    'status': HealthStatusEnum;
-    'version'?: string;
-    'commit'?: string;
+export interface UpdateTenantRequest {
+    'name'?: string;
+    'status'?: UpdateTenantRequestStatusEnum;
+    'metadata'?: { [key: string]: string; };
 }
 
-export const HealthStatusEnum = {
-    Ok: 'ok',
+export const UpdateTenantRequestStatusEnum = {
+    Active: 'active',
+    Suspended: 'suspended',
 } as const;
 
-export type HealthStatusEnum = typeof HealthStatusEnum[keyof typeof HealthStatusEnum];
+export type UpdateTenantRequestStatusEnum = typeof UpdateTenantRequestStatusEnum[keyof typeof UpdateTenantRequestStatusEnum];
 
 
