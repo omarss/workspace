@@ -60,7 +60,19 @@ def build_dataset(
 
     # ── 2. synthetic observations anchored to the public tables ───────────────
     spec = synthetic.default_spec(n_rows=n_rows, seed=seed)
-    obs = synthetic.generate(spec)
+    obs_raw = synthetic.generate(spec)
+
+    # ── 2b. cleanup (§16 rules) ──────────────────────────────────────────────
+    from salary_model.data.cleanup import clean_observations, write_report
+    obs, cleanup_report = clean_observations(obs_raw, drop_outliers=False)
+    cleanup_dir = settings.reports_dir / "cleanup" / run_id
+    write_report(cleanup_report, cleanup_dir)
+    log.info(
+        "dataset_cleanup_done",
+        rows_in=cleanup_report.rows_in,
+        rows_out=cleanup_report.rows_out,
+        rows_dropped=cleanup_report.rows_dropped,
+    )
 
     # ── 3. write snapshot ─────────────────────────────────────────────────────
     snapshot_path = out_dir / f"observations_{run_id}.parquet"
@@ -105,6 +117,8 @@ def build_dataset(
         "sama": str(sama_path.relative_to(settings.repo_root)),
         "macro_series": str(macro_series_path.relative_to(settings.repo_root)),
         "kapsarc": kapsarc_paths,
+        "cleanup_report": str((cleanup_dir / "cleanup.md").relative_to(settings.repo_root)),
+        "cleanup": cleanup_report.to_dict(),
         "snapshot_sha256": _hash_dataframe(obs),
         "sources": source_manifests,
         "live_sources": live_sources,

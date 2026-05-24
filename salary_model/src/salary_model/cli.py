@@ -44,6 +44,43 @@ def data_build(
     typer.echo(f"snapshot: {path}")
 
 
+_CLEAN_INPUT_ARG = typer.Argument(
+    ..., help="Path to a raw observations Parquet to clean.",
+)
+_CLEAN_OUTPUT_OPT = typer.Option(None, help="Where to write the cleaned Parquet.")
+_CLEAN_DROP_OUTLIERS_OPT = typer.Option(
+    False, help="Drop instead of flag intra-segment outliers.",
+)
+
+
+@data_app.command("clean")
+def data_clean(
+    input_path: Path = _CLEAN_INPUT_ARG,
+    output_path: Path | None = _CLEAN_OUTPUT_OPT,
+    drop_outliers: bool = _CLEAN_DROP_OUTLIERS_OPT,
+) -> None:
+    """Run the §16 cleanup pipeline on a raw observations Parquet."""
+    configure_logging()
+    settings = get_settings()
+    import pandas as pd  # local
+
+    from salary_model.data.cleanup import clean_observations, write_report
+
+    if not input_path.exists():
+        typer.echo(f"input not found: {input_path}", err=True)
+        raise typer.Exit(code=1)
+    raw = pd.read_parquet(input_path)
+    cleaned, report = clean_observations(raw, drop_outliers=drop_outliers)
+    out = output_path or input_path.with_name(f"{input_path.stem}_clean.parquet")
+    cleaned.to_parquet(out, index=False, compression="zstd")
+    md_dir = settings.reports_dir / "cleanup" / _ts()
+    md_path, _ = write_report(report, md_dir)
+    typer.echo(
+        f"rows in {report.rows_in} -> out {report.rows_out} "
+        f"(dropped {report.rows_dropped})\nreport: {md_path}\ncleaned: {out}"
+    )
+
+
 @data_app.command("fetch-anchors")
 def data_fetch_anchors() -> None:
     """Refresh the public anchor tables only (no synthesis)."""
