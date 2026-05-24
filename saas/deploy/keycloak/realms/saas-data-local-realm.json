@@ -1,0 +1,114 @@
+{
+  "_comment_": "Phase 5 local-dev realm. Phase 12 templates render per-Deployment realms via gocloak at provisioning time; this file is the bootstrap-only template (foundations §8 anti-pattern: do not re-import to apply config drift).",
+  "realm": "saas-data-local",
+  "enabled": true,
+  "displayName": "SaaS Data Plane (local dev)",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "verifyEmail": true,
+  "resetPasswordAllowed": true,
+  "editUsernameAllowed": false,
+  "sslRequired": "external",
+  "accessTokenLifespan": 3600,
+  "smtpServer": {
+    "host": "mailhog",
+    "port": "1025",
+    "from": "no-reply@saas-data-local.test",
+    "fromDisplayName": "SaaS Data Plane (dev)",
+    "ssl": "false",
+    "starttls": "false",
+    "auth": "false"
+  },
+  "clients": [
+    {
+      "_comment_": "Phase 5 client. ADR 007: production swaps to one client per Deployment with audience saas-data-<dep_id>; the audience-mapper here is named in the same way so the swap is mechanical.",
+      "clientId": "saas-data-local",
+      "name": "SaaS Data Plane (local dev)",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "dev-secret-not-for-prod",
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "redirectUris": ["http://localhost:9090/*", "http://localhost:3000/*"],
+      "webOrigins": ["+"],
+      "attributes": {
+        "access.token.lifespan": "3600"
+      },
+      "protocolMappers": [
+        {
+          "name": "saas-data-local-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "saas-data-local",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "_comment_": "tenant_id is the authoritative tenancy claim. The user attribute is set by the platform at user-create time; the mapper copies it into the access token. Foundations §8 reminds us audience MUST be validated before tenant_id is read.",
+          "name": "tenant-id-attribute",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "tenant_id",
+            "claim.name": "tenant_id",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        }
+      ]
+    }
+  ],
+  "_comment_idps_": "Identity provider brokers. credentials carry placeholder values; the operator populates real client_id / client_secret via gocloak (or OpenBao KV bridge in Phase 6) before turning a Deployment on. The 'alias' field maps to /v1/users/{id}/social-providers/{provider} — keep in sync with identity.Provider.Valid().",
+  "identityProviders": [
+    {
+      "alias": "google",
+      "providerId": "google",
+      "enabled": false,
+      "trustEmail": false,
+      "storeToken": false,
+      "addReadTokenRoleOnCreate": false,
+      "config": {
+        "clientId": "${env.GOOGLE_CLIENT_ID:placeholder}",
+        "clientSecret": "${env.GOOGLE_CLIENT_SECRET:placeholder}",
+        "syncMode": "IMPORT",
+        "defaultScope": "openid profile email"
+      }
+    },
+    {
+      "alias": "github",
+      "providerId": "github",
+      "enabled": false,
+      "trustEmail": false,
+      "storeToken": false,
+      "config": {
+        "clientId": "${env.GITHUB_CLIENT_ID:placeholder}",
+        "clientSecret": "${env.GITHUB_CLIENT_SECRET:placeholder}",
+        "syncMode": "IMPORT",
+        "defaultScope": "user:email"
+      }
+    },
+    {
+      "alias": "apple",
+      "providerId": "apple",
+      "enabled": false,
+      "trustEmail": false,
+      "storeToken": false,
+      "_comment_": "Apple Sign-In requires the operator to fill team_id, key_id, client_id, and private_key (.p8) from the Apple Developer Program. Without those it stays disabled. Form-post response mode is required.",
+      "config": {
+        "clientId": "${env.APPLE_CLIENT_ID:placeholder}",
+        "syncMode": "IMPORT",
+        "defaultScope": "openid email name"
+      }
+    }
+  ]
+}

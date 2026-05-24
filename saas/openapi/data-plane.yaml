@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: SaaS Data Plane API
-  version: 0.0.2
+  version: 0.0.3
   description: Per-deployment data plane API. One vhost per Deployment under *.saas.omarss.net.
 servers:
   - url: https://{env}.{project}.saas.omarss.net
@@ -17,6 +17,17 @@ tags:
     description: Health and metadata.
   - name: tenants
     description: Tenant CRUD. Tenant is the unit of isolation and billing.
+  - name: users
+    description: |
+      Identity façade for the data plane. Wraps Keycloak; consumers never
+      see Keycloak details. Email and other PII are envelope-encrypted at
+      rest (see AGENTS.md §18.7).
+  - name: social-providers
+    description: |
+      Social login linking via Keycloak's IdP brokering. POST returns a
+      Keycloak-brokered authorization URL — the caller redirects there
+      and Keycloak completes the OAuth dance + writes the federated_identity
+      row itself. ADR 014 records the design.
 security:
   - bearerAuth: []
   - apiKeyAuth: []
@@ -188,6 +199,358 @@ paths:
           $ref: "#/components/responses/NotFound"
         "412":
           $ref: "#/components/responses/PreconditionFailed"
+
+  /v1/users:
+    get:
+      operationId: listUsers
+      tags: [users]
+      summary: List users in the caller's tenant.
+      description: |
+        Returns the platform users belonging to the caller's tenant. Email
+        plaintext is returned (decrypted at the persistence boundary); the
+        envelope columns stay on the server. Set the `email` query parameter
+        to look up a single user by email (HMAC-prefix lookup; never sends
+        plaintext to the DB).
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Sort"
+        - in: query
+          name: email
+          required: false
+          description: HMAC-prefix lookup; matches on email_lookup_hash.
+          schema:
+            type: string
+            format: email
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "410":
+          $ref: "#/components/responses/CursorGone"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+    post:
+      operationId: createUser
+      tags: [users]
+      summary: Create a platform user. Mirrors the row into Keycloak.
+      description: |
+        Idempotent. The platform creates a row + a Keycloak user in the
+        shared `saas-data-local` realm (per-Deployment realm lands in Phase 12).
+        Email is envelope-encrypted; an HMAC-SHA256 lookup hash backs the
+        per-tenant uniqueness index.
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateUserRequest"
+      responses:
+        "201":
+          description: Created
+          headers:
+            ETag:
+              schema:
+                type: string
+              description: 'Weak ETag, format W/"v<sequence>".'
+            Location:
+              schema:
+                type: string
+              description: URI of the created user.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          $ref: "#/components/responses/IdempotencyInFlight"
+        "422":
+          $ref: "#/components/responses/IdempotencyConflictOrValidation"
+
+  /v1/users/{user_id}:
+    parameters:
+      - in: path
+        name: user_id
+        required: true
+        schema:
+          type: string
+          pattern: "^user_[0-9A-HJKMNP-TV-Z]{26}$"
+    get:
+      operationId: getUser
+      tags: [users]
+      summary: Fetch a platform user by id.
+      responses:
+        "200":
+          description: OK
+          headers:
+            ETag:
+              schema:
+                type: string
+              description: 'Weak ETag, format W/"v<sequence>".'
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      operationId: updateUser
+      tags: [users]
+      summary: Update a platform user. ETag concurrency control required.
+      parameters:
+        - $ref: "#/components/parameters/IfMatch"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateUserRequest"
+      responses:
+        "200":
+          description: OK
+          headers:
+            ETag:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "412":
+          $ref: "#/components/responses/PreconditionFailed"
+        "422":
+          $ref: "#/components/responses/IdempotencyConflictOrValidation"
+    delete:
+      operationId: deleteUser
+      tags: [users]
+      summary: Soft-delete a platform user. Disables the Keycloak user.
+      parameters:
+        - $ref: "#/components/parameters/IfMatch"
+      responses:
+        "204":
+          description: Soft-deleted (status=deleted; Keycloak Enabled=false).
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "412":
+          $ref: "#/components/responses/PreconditionFailed"
+
+  /v1/users/{user_id}/disable:
+    parameters:
+      - in: path
+        name: user_id
+        required: true
+        schema:
+          type: string
+          pattern: "^user_[0-9A-HJKMNP-TV-Z]{26}$"
+    post:
+      operationId: disableUser
+      tags: [users]
+      summary: Disable a platform user. Emits user.disabled.
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /v1/users/{user_id}/enable:
+    parameters:
+      - in: path
+        name: user_id
+        required: true
+        schema:
+          type: string
+          pattern: "^user_[0-9A-HJKMNP-TV-Z]{26}$"
+    post:
+      operationId: enableUser
+      tags: [users]
+      summary: Enable a previously-disabled platform user.
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /v1/users/{user_id}/reset-password:
+    parameters:
+      - in: path
+        name: user_id
+        required: true
+        schema:
+          type: string
+          pattern: "^user_[0-9A-HJKMNP-TV-Z]{26}$"
+    post:
+      operationId: triggerPasswordReset
+      tags: [users]
+      summary: Trigger a password-reset email via Keycloak.
+      description: |
+        Phase 5 uses Keycloak's built-in SMTP (ExecuteActionsEmail with
+        UPDATE_PASSWORD). Phase 6 swaps the transport to the Notifications
+        module + Novu without changing this endpoint.
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "202":
+          description: Reset email queued.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /v1/users/{user_id}/verify-email:
+    parameters:
+      - in: path
+        name: user_id
+        required: true
+        schema:
+          type: string
+          pattern: "^user_[0-9A-HJKMNP-TV-Z]{26}$"
+    post:
+      operationId: triggerEmailVerify
+      tags: [users]
+      summary: Trigger an email-verification action via Keycloak.
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "202":
+          description: Verify-email action queued.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /v1/users/{user_id}/social-providers:
+    parameters:
+      - in: path
+        name: user_id
+        required: true
+        schema:
+          type: string
+          pattern: "^user_[0-9A-HJKMNP-TV-Z]{26}$"
+    get:
+      operationId: listSocialProviders
+      tags: [social-providers]
+      summary: List linked social providers for a user.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SocialProviderListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    post:
+      operationId: linkSocialProvider
+      tags: [social-providers]
+      summary: Start a social-provider link flow. Returns the Keycloak link URL.
+      description: |
+        Per ADR 014: we never call CreateUserFederatedIdentity from a
+        user-facing endpoint (no proof-of-possession). Instead, the platform
+        mints Keycloak's hashed link URL — the caller redirects the user's
+        browser there and Keycloak completes the OAuth dance with the
+        external IdP, writing the federated_identity row itself.
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LinkSocialProviderRequest"
+      responses:
+        "202":
+          description: Accepted; caller must redirect to authorization_url.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LinkSocialProviderResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/IdempotencyConflictOrValidation"
+
+  /v1/users/{user_id}/social-providers/{provider}:
+    parameters:
+      - in: path
+        name: user_id
+        required: true
+        schema:
+          type: string
+          pattern: "^user_[0-9A-HJKMNP-TV-Z]{26}$"
+      - in: path
+        name: provider
+        required: true
+        schema:
+          type: string
+          enum: [google, github, apple]
+    delete:
+      operationId: unlinkSocialProvider
+      tags: [social-providers]
+      summary: Unlink a social provider. Emits user.social_unlinked.
+      responses:
+        "204":
+          description: Unlinked.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
 components:
   schemas:
     Health:
@@ -299,6 +662,155 @@ components:
       additionalProperties:
         type: string
         maxLength: 256
+    User:
+      type: object
+      required:
+        - id
+        - object
+        - tenant_id
+        - email
+        - email_verified
+        - status
+        - created_at
+        - updated_at
+        - etag
+      properties:
+        id:
+          type: string
+          pattern: "^user_[0-9A-HJKMNP-TV-Z]{26}$"
+        object:
+          type: string
+          enum: [user]
+        tenant_id:
+          type: string
+          pattern: "^tenant_[0-9A-HJKMNP-TV-Z]{26}$"
+        email:
+          type: string
+          format: email
+          x-oapi-codegen-extra-tags:
+            pii: "true"
+            sensitive: "true"
+        email_verified:
+          type: boolean
+        name:
+          type: string
+          nullable: true
+          x-oapi-codegen-extra-tags:
+            pii: "true"
+        phone:
+          type: string
+          nullable: true
+          x-oapi-codegen-extra-tags:
+            pii: "true"
+            sensitive: "true"
+        status:
+          type: string
+          enum: [active, disabled, deleted]
+        metadata:
+          $ref: "#/components/schemas/Metadata"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        etag:
+          type: string
+          description: 'Weak ETag, format W/"v<sequence>".'
+    UserResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: "#/components/schemas/User"
+    UserListResponse:
+      type: object
+      required: [data, pagination]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/User"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+    CreateUserRequest:
+      type: object
+      required: [email]
+      properties:
+        email:
+          type: string
+          format: email
+          x-oapi-codegen-extra-tags:
+            pii: "true"
+            sensitive: "true"
+        name:
+          type: string
+          x-oapi-codegen-extra-tags:
+            pii: "true"
+        send_verification_email:
+          type: boolean
+          default: true
+        metadata:
+          $ref: "#/components/schemas/Metadata"
+    UpdateUserRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          x-oapi-codegen-extra-tags:
+            pii: "true"
+        phone:
+          type: string
+          x-oapi-codegen-extra-tags:
+            pii: "true"
+            sensitive: "true"
+        metadata:
+          $ref: "#/components/schemas/Metadata"
+    SocialProvider:
+      type: object
+      required: [provider, external_subject, linked_at]
+      properties:
+        provider:
+          type: string
+          enum: [google, github, apple]
+        external_subject:
+          type: string
+          x-oapi-codegen-extra-tags:
+            sensitive: "true"
+        linked_at:
+          type: string
+          format: date-time
+    SocialProviderListResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/SocialProvider"
+    LinkSocialProviderRequest:
+      type: object
+      required: [provider, return_to]
+      properties:
+        provider:
+          type: string
+          enum: [google, github, apple]
+        return_to:
+          type: string
+          format: uri
+          maxLength: 2048
+    LinkSocialProviderResponse:
+      type: object
+      required: [authorization_url, state, expires_at]
+      properties:
+        authorization_url:
+          type: string
+          format: uri
+        state:
+          type: string
+        expires_at:
+          type: string
+          format: date-time
     Pagination:
       type: object
       required: [has_more]

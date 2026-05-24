@@ -1,6 +1,6 @@
 {
   "name": "@omarss/saas-dataplane-sdk",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "OpenAPI client for @omarss/saas-dataplane-sdk",
   "author": "OpenAPI-Generator Contributors",
   "repository": {

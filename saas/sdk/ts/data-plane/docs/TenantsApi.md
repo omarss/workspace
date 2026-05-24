@@ -61,7 +61,7 @@ const { status, data } = await apiInstance.createTenant(
 ### HTTP response details
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
-|**201** | Created |  * ETag -  <br>  * Location - URI of the created tenant. <br>  |
+|**201** | Created |  * ETag -  <br>  * Location - URI of the created user. <br>  |
 |**401** | Missing or invalid bearer token / API key. |  -  |
 |**409** | Concurrent request with the same Idempotency-Key is still processing. |  -  |
 |**422** | Idempotency-Key reused with a different body, OR validation failed. |  -  |

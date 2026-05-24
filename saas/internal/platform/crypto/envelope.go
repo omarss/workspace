@@ -32,6 +32,14 @@ type Envelope struct {
 	KeyVersion int
 }
 
+// IsZero reports whether the envelope carries no encrypted payload. Empty
+// envelopes happen when an optional PII column (e.g. User.Name) was never set
+// on a Create or Update — the persistence layer skips empty envelopes
+// instead of binding NULL columns to a zero-length ciphertext.
+func (e Envelope) IsZero() bool {
+	return e.WrappedDEK == "" && len(e.Ciphertext) == 0
+}
+
 // Errors returned by EncryptPIIFields.
 var (
 	// ErrNotPointer — caller passed a non-pointer or nil to EncryptPIIFields.

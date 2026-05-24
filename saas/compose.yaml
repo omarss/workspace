@@ -37,6 +37,15 @@ services:
     ports: ["8081:8080"]
     volumes:
       - ./deploy/keycloak/realms:/opt/keycloak/data/import:ro
+    depends_on:
+      mailhog:
+        condition: service_started
+
+  # Phase 5: Mailhog catches the verify-email + password-reset emails
+  # Keycloak sends in local dev. UI on :8025; SMTP on :1025.
+  mailhog:
+    image: mailhog/mailhog:v1.0.1
+    ports: ["1025:1025", "8025:8025"]
 
   openbao:
     image: openbao/openbao:2.5.4

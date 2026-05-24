@@ -80,3 +80,41 @@ func TestEncryptPIIFields_PopulatesSiblingEnvelope(t *testing.T) {
 		t.Errorf("sibling envelope not populated: %+v", v.EmailEnvelope)
 	}
 }
+
+// sampleStrictMissingSibling intentionally tags Email PII without declaring
+// the EmailEnvelope sibling so the strict walker raises ErrEnvelopeFieldMissing.
+// This is the regression that Phase 5 introduces: silent envelope drop on a
+// PII column is a data-loss / leak hazard; strict mode fails the walker loudly.
+type sampleStrictMissingSibling struct {
+	UserID string `json:"user_id"`
+	Email  string `json:"email" pii:"true"`
+	Note   string `json:"note"`
+}
+
+func TestEncryptPIIFieldsStrict_MissingSiblingFailsLoudly(t *testing.T) {
+	enc := &stubEncryptor{}
+	v := &sampleStrictMissingSibling{UserID: "u_X", Email: "alice@example.com", Note: "ok"}
+	err := crypto.EncryptPIIFieldsStrict(context.Background(), enc, "kid", v)
+	if !errors.Is(err, crypto.ErrEnvelopeFieldMissing) {
+		t.Fatalf("expected ErrEnvelopeFieldMissing, got %v", err)
+	}
+	// Plaintext must remain intact when the walker refuses — the caller has
+	// not committed the row yet, so reverting cleanly matters.
+	if v.Email != "alice@example.com" {
+		t.Errorf("plaintext mutated despite strict-mode failure: %q", v.Email)
+	}
+}
+
+func TestEncryptPIIFieldsStrict_HappyPath(t *testing.T) {
+	enc := &stubEncryptor{}
+	v := &sampleWithSibling{UserID: "u_X", Email: "alice@example.com", Note: "ok"}
+	if err := crypto.EncryptPIIFieldsStrict(context.Background(), enc, "kid", v); err != nil {
+		t.Fatalf("EncryptPIIFieldsStrict: %v", err)
+	}
+	if v.Email != "" {
+		t.Errorf("plaintext Email not cleared: %q", v.Email)
+	}
+	if string(v.EmailEnvelope.Ciphertext) != "ct" || v.EmailEnvelope.KID != "kid" {
+		t.Errorf("sibling envelope not populated: %+v", v.EmailEnvelope)
+	}
+}

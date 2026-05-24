@@ -199,10 +199,20 @@ For every field marked `x-oapi-codegen-extra-tags: { pii: "true" }` (or
    ```
 
 3. The repository's `Insert` / `Update` paths call
-   `crypto.EncryptPIIFields(ctx, enc, kid, &row)` immediately before the
-   SQL `INSERT` / `UPDATE`. The walker reads the plaintext, encrypts it,
-   writes the result into `<Field>Envelope`, and zeroes the plaintext
-   field on the row.
+   **`crypto.EncryptPIIFieldsStrict(ctx, enc, deploymentID, &row)`** (the
+   strict variant) immediately before the SQL `INSERT` / `UPDATE`. Strict
+   mode errors with `crypto.ErrEnvelopeFieldMissing` if any `pii:"true"`
+   / `sensitive:"true"` field lacks a sibling `<Field>Envelope
+   crypto.Envelope` field on the struct, so missing siblings fail loudly
+   at write time rather than silently dropping PII. The walker reads the
+   plaintext, encrypts it, writes the result into `<Field>Envelope`, and
+   zeroes the plaintext field on the row.
+
+   The permissive variant `crypto.EncryptPIIFields` is retained for
+   backward compatibility but new modules MUST use strict mode. Identity
+   (Phase 5) is the first consumer; see
+   `internal/dataplane/identity/repo_pgx.go` for the canonical call site
+   at `Create` and `Update`.
 4. The repository's `Get` path loads the five columns into the sibling
    envelope and calls the matching decrypt helper. The expected kid for
    the decrypt is always the request context's `deployment_id` — the
