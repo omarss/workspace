@@ -7,7 +7,9 @@ timeouts and graceful fallback to bundled anchors when offline.
 
 from __future__ import annotations
 
+from salary_model.data.sources.ashby import fetch_ashby_postings
 from salary_model.data.sources.gastat import fetch_gastat_wage_index
+from salary_model.data.sources.greenhouse import fetch_greenhouse_postings
 from salary_model.data.sources.kapsarc import (
     fetch_kapsarc_cpi_mom,
     fetch_kapsarc_employees_compensation,
@@ -17,12 +19,18 @@ from salary_model.data.sources.kapsarc import (
     fetch_kapsarc_population,
     fetch_kapsarc_public_sector_employment,
 )
+from salary_model.data.sources.lever import fetch_lever_postings
 from salary_model.data.sources.macro_series import fetch_macro_series, lookup_at
+from salary_model.data.sources.postings import fetch_all_postings
 from salary_model.data.sources.sama import fetch_sama_indicators
+from salary_model.data.sources.workable import fetch_workable_postings
 from salary_model.data.sources.worldbank import fetch_worldbank_macro
 
 __all__ = [
+    "fetch_all_postings",
+    "fetch_ashby_postings",
     "fetch_gastat_wage_index",
+    "fetch_greenhouse_postings",
     "fetch_kapsarc_cpi_mom",
     "fetch_kapsarc_employees_compensation",
     "fetch_kapsarc_employees_demographics",
@@ -30,8 +38,10 @@ __all__ = [
     "fetch_kapsarc_main_labor",
     "fetch_kapsarc_population",
     "fetch_kapsarc_public_sector_employment",
+    "fetch_lever_postings",
     "fetch_macro_series",
     "fetch_sama_indicators",
+    "fetch_workable_postings",
     "fetch_worldbank_macro",
     "lookup_at",
 ]

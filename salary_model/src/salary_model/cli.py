@@ -81,6 +81,25 @@ def data_clean(
     )
 
 
+@data_app.command("fetch-boards")
+def data_fetch_boards() -> None:
+    """Pull active postings from the four open ATS APIs (Greenhouse/Lever/Ashby/Workable)."""
+    configure_logging()
+    from salary_model.data.sources import fetch_all_postings
+
+    df, manifest = fetch_all_postings()
+    typer.echo(
+        f"{manifest.source}: ok={manifest.ok} live={not manifest.is_estimate} "
+        f"rows={manifest.rows}"
+    )
+    if not df.empty:
+        n_ksa = int(df["is_ksa_hint"].sum())
+        typer.echo(f"  KSA-hint postings: {n_ksa} / {len(df)}")
+        per_source = df["source"].value_counts().to_dict()
+        for s, n in per_source.items():
+            typer.echo(f"  {s}: {n}")
+
+
 @data_app.command("fetch-anchors")
 def data_fetch_anchors() -> None:
     """Refresh the public anchor tables only (no synthesis)."""

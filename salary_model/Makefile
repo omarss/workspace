@@ -99,8 +99,12 @@ fetch-reports-force:  ## Re-download all PDFs even if already on disk
 fetch-open-data:  ## Best-effort pull from open.data.gov.sa (WAF-protected; may need manual)
 	bash scripts/fetch_data_gov_sa.sh
 
+.PHONY: fetch-boards
+fetch-boards:  ## Pull active postings from Greenhouse + Lever + Ashby + Workable
+	$(PY) salary-model data fetch-boards
+
 .PHONY: fetch-all
-fetch-all: data-anchors fetch-reports fetch-open-data  ## All external sources (live + PDFs + national portal)
+fetch-all: data-anchors fetch-reports fetch-open-data fetch-boards  ## All external sources
 
 # ── Retrain / refresh end-to-end ─────────────────────────────────────────────
 
