@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -21,6 +22,7 @@ import (
 
 	db "github.com/omarss/saas/internal/dataplane/db/sqlc"
 	"github.com/omarss/saas/internal/platform/auth"
+	"github.com/omarss/saas/internal/platform/crypto/envelope"
 	platformlog "github.com/omarss/saas/internal/platform/log"
 	platformotel "github.com/omarss/saas/internal/platform/otel"
 	"github.com/omarss/saas/internal/platform/outbox"
@@ -80,6 +82,27 @@ func run() error {
 		return fmt.Errorf("pgxpool: %w", err)
 	}
 	defer pool.Close()
+
+	// Envelope encryption client for the control plane. The controlplane
+	// process runs on the host (not in cluster) so AppRole is the auth
+	// method. role_id / secret_id come from a 0400 file under
+	// /etc/saas/approle/ in production; from env vars in local dev.
+	// SAAS_OPENBAO_DISABLED=1 skips the wiring entirely — any later PII
+	// path then fails closed (ErrNoEncryptor) rather than silently leaking.
+	encClient, err := newControlplaneEnvelopeClient(ctx)
+	if err != nil {
+		return fmt.Errorf("envelope client: %w", err)
+	}
+	if encClient != nil {
+		defer func() {
+			if closeErr := encClient.Close(); closeErr != nil {
+				slog.Warn("envelope client close", "err", closeErr)
+			}
+		}()
+	}
+	// Phase 4 wires the client into the process; Phase 12 uses it for the
+	// Deployment-provisioning code that touches secret/data/<deploymentID>.
+	_ = encClient
 	// The control plane currently shares the dataplane sqlc-generated queries
 	// (db package) only so it can drive the outbox dispatcher off a Queries
 	// handle bound to its own pool. Phase 12 introduces a dedicated
@@ -153,4 +176,73 @@ func run() error {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	return srv.Shutdown(shutdownCtx)
+}
+
+// envOr returns the env var value or the supplied default when unset.
+func envOr(k, def string) string {
+	if v := os.Getenv(k); v != "" {
+		return v
+	}
+	return def
+}
+
+// newControlplaneEnvelopeClient builds the OpenBao client used by the
+// control-plane host process. AppRole auth is the only supported method
+// here: the controlplane binary doesn't run in cluster so there's no SA
+// JWT to use.
+//
+// role_id + secret_id sourcing:
+//   - production: /etc/saas/approle/{role_id,secret_id} (0400 saas:saas)
+//   - local dev:  OPENBAO_APPROLE_ROLE_ID + OPENBAO_APPROLE_SECRET_ID env
+//     vars, populated by `make openbao-approle-creds`.
+//
+// SAAS_OPENBAO_DISABLED=1 short-circuits the wiring entirely; later PII
+// persistence paths then surface ErrNoEncryptor.
+func newControlplaneEnvelopeClient(ctx context.Context) (*envelope.Client, error) {
+	if os.Getenv("SAAS_OPENBAO_DISABLED") == "1" {
+		slog.Warn("envelope client disabled via SAAS_OPENBAO_DISABLED; PII writes will fail closed")
+		return nil, nil
+	}
+	addr := envOr("BAO_ADDR", "http://localhost:8200")
+	roleID, secretID, err := readApproleCreds()
+	if err != nil {
+		return nil, fmt.Errorf("read approle creds: %w", err)
+	}
+	if roleID == "" || secretID == "" {
+		// Distinct from SAAS_OPENBAO_DISABLED: missing creds is a config
+		// error, not an intentional skip. Surface it.
+		return nil, fmt.Errorf("approle credentials not configured (set OPENBAO_APPROLE_ROLE_ID + OPENBAO_APPROLE_SECRET_ID or populate /etc/saas/approle/)")
+	}
+	return envelope.New(ctx, envelope.Options{
+		Address:    addr,
+		AuthMethod: envelope.AuthAppRole,
+		RoleID:     roleID,
+		SecretID:   secretID,
+		CACertPath: os.Getenv("SAAS_OPENBAO_CA_CERT"),
+	})
+}
+
+// readApproleCreds prefers env vars (local dev) then falls back to the
+// production file paths under /etc/saas/approle/. The split lets the same
+// binary boot locally and in production without code changes.
+//
+// Note on the env-var-secret rule (ruleguard / forbidigo): the bare
+// os.Getenv ban targets generic secrets; the specific keys read here are
+// AppRole identifiers used at exactly one boundary (controlplane bootstrap)
+// and are the documented escape hatch in 01-foundations.md §5. The cmd/*
+// excludes in .golangci.yml already cover this path.
+func readApproleCreds() (roleID, secretID string, err error) {
+	if r := os.Getenv("OPENBAO_APPROLE_ROLE_ID"); r != "" {
+		s := os.Getenv("OPENBAO_APPROLE_SECRET_ID")
+		return r, s, nil
+	}
+	r, rerr := os.ReadFile("/etc/saas/approle/role_id")
+	if rerr != nil && !os.IsNotExist(rerr) {
+		return "", "", fmt.Errorf("read role_id: %w", rerr)
+	}
+	s, serr := os.ReadFile("/etc/saas/approle/secret_id")
+	if serr != nil && !os.IsNotExist(serr) {
+		return "", "", fmt.Errorf("read secret_id: %w", serr)
+	}
+	return strings.TrimSpace(string(r)), strings.TrimSpace(string(s)), nil
 }
