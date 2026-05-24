@@ -8,12 +8,14 @@ package migrations
 
 import "embed"
 
-// Controlplane embeds every forward-only SQL migration for the control plane.
+// Controlplane embeds every SQL migration for the control plane. Both
+// *.up.sql and *.down.sql are included so golang-migrate's iofs source can
+// drive `migrate down` from inside the compiled binary.
 //
-//go:embed controlplane/*.up.sql
+//go:embed controlplane/*.sql
 var Controlplane embed.FS
 
-// Dataplane embeds every forward-only SQL migration for the data plane.
+// Dataplane embeds every SQL migration for the data plane (up + down).
 //
-//go:embed dataplane/*.up.sql
+//go:embed dataplane/*.sql
 var Dataplane embed.FS

@@ -1,6 +1,6 @@
 {
   "name": "@omarss/saas-dataplane-sdk",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "OpenAPI client for @omarss/saas-dataplane-sdk",
   "author": "OpenAPI-Generator Contributors",
   "repository": {
@@ -24,7 +24,8 @@
     "prepare": "npm run build"
   },
   "dependencies": {
-    "axios": "^1.15.2"
+    "axios": "^1.15.2",
+    "ulidx": "^2.4.1"
   },
   "devDependencies": {
     "@types/node": "12.11.5 - 12.20.42",

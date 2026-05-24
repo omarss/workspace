@@ -90,10 +90,22 @@ test:
 test-int:
 	$(GO_TEST) test -race -count=1 -tags=integration ./...
 
-contract-test:
-	@echo "[contract-test] starting stub server and prism proxy"
-	# Wired in Phase 2 once /v1/tenants exists.
-	@echo "not yet wired"
+contract-test: build openapi-overlay
+	@echo "[contract-test] launching dataplane + prism proxy"
+	@mkdir -p /tmp/saas-contract
+	@SAAS_ENV=dev DATAPLANE_DATABASE_URL="$${DATAPLANE_DATABASE_URL:-postgres://saas:saas@localhost:55432/saas?sslmode=disable}" \
+	    ./bin/dataplane >/tmp/saas-contract/dataplane.log 2>&1 & echo $$! > /tmp/saas-contract/dataplane.pid
+	@sleep 2
+	@$(DOCKER) run --rm -d --name saas-contract-prism --network host \
+	    -v $(CURDIR):/work:ro stoplight/prism:$(PRISM_VERSION) \
+	    proxy /work/openapi/_generated/data-plane.yaml http://localhost:9090 --errors -p 4011 -m=false \
+	    >/tmp/saas-contract/prism.id
+	@sleep 3
+	@./scripts/replay-contract-fixtures.sh http://localhost:4011 \
+	    ; rc=$$? ; \
+	    $(DOCKER) kill saas-contract-prism >/dev/null 2>&1 || true ; \
+	    kill $$(cat /tmp/saas-contract/dataplane.pid) >/dev/null 2>&1 || true ; \
+	    exit $$rc
 
 # ── lint / format ───────────────────────────────────────────────────────────
 lint:
@@ -136,6 +148,10 @@ openapi-gen-ts:
 	    -g typescript-axios -o /work/sdk/ts/data-plane \
 	    --api-package=api --model-package=models \
 	    --additional-properties=npmName=@omarss/saas-dataplane-sdk,supportsES6=true,withInterfaces=true,withSeparateModelsAndApi=true
+	# Post-gen: add ulidx as a runtime dep so handwritten workflow wrappers
+	# (sdk/ts/*/workflows/*.ts) resolve at consumer install time. openapi-generator
+	# overwrites package.json on every run, so this patch must re-run with it.
+	$(DOCKER_RUN) node:22-alpine node -e "for (const d of ['sdk/ts/control-plane','sdk/ts/data-plane']) { const f=d+'/package.json'; const p=JSON.parse(require('fs').readFileSync(f,'utf8')); p.dependencies = Object.assign({}, p.dependencies, { ulidx: '^2.4.1' }); require('fs').writeFileSync(f, JSON.stringify(p, null, 2) + '\n'); }"
 
 openapi-diff-check:
 	@git diff --exit-code -- internal/controlplane/httpapi internal/dataplane/httpapi sdk/ts \

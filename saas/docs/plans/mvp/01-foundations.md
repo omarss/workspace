@@ -27,7 +27,7 @@ github.com/go-chi/chi/v5                                v5.3.0
 github.com/jackc/pgx/v5                                 v5.9.2
 github.com/oapi-codegen/oapi-codegen/v2                 v2.7.0    (build tool)
 github.com/oapi-codegen/nethttp-middleware              v1.1.2
-github.com/oapi-codegen/runtime                         v1.2.0
+github.com/oapi-codegen/runtime                         v1.4.1    (v1.2.0 lacks RequiredParameterError needed by oapi-codegen v2.7.0)
 github.com/golang-migrate/migrate/v4                    v4.19.1
 github.com/oklog/ulid/v2                                v2.1.1
 github.com/exaring/otelpgx                              latest    (verify; needs Go 1.25)
@@ -204,12 +204,12 @@ Two `sqlc.yaml` files: one for control plane, one for data plane (they generate 
 ```go
 cfg, err := pgxpool.ParseConfig(dsn)            // sslmode=verify-full
 cfg.ConnConfig.Tracer = otelpgx.NewTracer()     // OpenTelemetry
-cfg.AfterAcquire = setTenantGUC                 // session-level RLS binding
+cfg.PrepareConn = setTenantGUC                  // session-level RLS binding (pgx v5.9.2)
 pool, err := pgxpool.NewWithConfig(ctx, cfg)
 otelpgx.RecordStats(pool)
 ```
 
-`setTenantGUC` runs `SET LOCAL app.current_tenant_id = $1` for each acquired conn, sourcing from `auth.TenantFromContext(ctx)`. **This is layer 3 of tenant isolation.** Without this hook RLS does nothing.
+`setTenantGUC` returns `(bool, error)` and runs `SET LOCAL app.current_tenant_id = $1` for each acquired conn, sourcing from `auth.TenantFromContext(ctx)`. **This is layer 3 of tenant isolation.** Without this hook RLS does nothing.
 
 ### golang-migrate (forward-only)
 
