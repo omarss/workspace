@@ -101,7 +101,8 @@ func (p *LoggerPublisher) Publish(_ context.Context, e db.OutboxEvent) error {
 	if e.TenantID != nil {
 		tenant = *e.TenantID
 	}
-	p.log.Info("outbox publish",
+	p.log.Info(
+		"outbox publish",
 		"event_id", e.EventID,
 		"type", e.Type,
 		"tenant_id", tenant,

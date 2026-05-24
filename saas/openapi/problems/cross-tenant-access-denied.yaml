@@ -1,0 +1,33 @@
+# Problem fragment: cross-tenant-access-denied
+# Type URI: https://saas.omarss.net/problems/cross-tenant-access-denied
+# Emitted when auth.AssertTenant detects a tenant mismatch (layer 1 of the
+# eight-layer tenant isolation invariant — see docs/plans/mvp/00-master.md).
+
+type: object
+required: [type, title, status]
+properties:
+  type:
+    type: string
+    const: "https://saas.omarss.net/problems/cross-tenant-access-denied"
+  title:
+    type: string
+    example: "Cross-tenant access denied."
+  status:
+    type: integer
+    const: 403
+  detail:
+    type: string
+    example: "The authenticated caller's tenant_id does not match the resource's tenant_id."
+  instance:
+    type: string
+    example: "/v1/tenants/tenant_01HXYZ"
+  request_id:
+    type: string
+    example: "req_01HXYZ"
+example:
+  type: "https://saas.omarss.net/problems/cross-tenant-access-denied"
+  title: "Cross-tenant access denied."
+  status: 403
+  detail: "Caller authenticated as tenant_A; requested resource belongs to tenant_B."
+  instance: "/v1/tenants/tenant_B"
+  request_id: "req_01HXYZ"

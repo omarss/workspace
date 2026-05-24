@@ -1,0 +1,29 @@
+# Problem fragment: idempotency-key-conflict
+# Type URI: https://saas.omarss.net/problems/idempotency-key-conflict
+# Same key + different body. Stripe-style policy; ADR 010.
+
+type: object
+required: [type, title, status]
+properties:
+  type:
+    type: string
+    const: "https://saas.omarss.net/problems/idempotency-key-conflict"
+  title:
+    type: string
+    example: "Idempotency-Key reused with different body."
+  status:
+    type: integer
+    const: 422
+  detail:
+    type: string
+  instance:
+    type: string
+  request_id:
+    type: string
+example:
+  type: "https://saas.omarss.net/problems/idempotency-key-conflict"
+  title: "Idempotency-Key reused with different body."
+  status: 422
+  detail: "An earlier request used this Idempotency-Key with a different request body."
+  instance: "/v1/tenants"
+  request_id: "req_01HXYZ"

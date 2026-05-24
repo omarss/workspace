@@ -23,6 +23,8 @@ import (
 	"github.com/omarss/saas/internal/dataplane/tenancy"
 	"github.com/omarss/saas/internal/platform/auth"
 	"github.com/omarss/saas/internal/platform/idempotency"
+	platformlog "github.com/omarss/saas/internal/platform/log"
+	platformotel "github.com/omarss/saas/internal/platform/otel"
 	"github.com/omarss/saas/internal/platform/outbox"
 	"github.com/omarss/saas/internal/platform/pgxpool"
 )
@@ -81,11 +83,31 @@ func (s *strictServer) DeleteTenant(ctx context.Context, r httpapi.DeleteTenantR
 }
 
 func run() error {
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	// platformlog.New installs the PII-redacting JSON slog handler from
+	// internal/platform/log. Every log record passing through slog.Default()
+	// goes through the redactor's ReplaceAttr hook, satisfying AGENTS.md
+	// §18.5 (PII never logged plaintext). Without this default the per-call
+	// redactor is silently bypassed.
+	logger := platformlog.New(platformlog.Options{Level: slog.LevelInfo})
 	slog.SetDefault(logger)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+
+	// Wire the platform OTel skeleton. Phase 3 ships a no-op shutdown fn so
+	// cmd/* boots stay identical even before the real OTLP exporter lands in
+	// Phase 15 (DX polish). The defer ensures spans flush on SIGTERM.
+	shutdownOtel, err := platformotel.Init(ctx, "saas-dataplane")
+	if err != nil {
+		return fmt.Errorf("otel init: %w", err)
+	}
+	defer func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if shutdownErr := shutdownOtel(shutdownCtx); shutdownErr != nil {
+			slog.Warn("otel shutdown returned error", "err", shutdownErr)
+		}
+	}()
 
 	deploymentID := envOr("SAAS_DEPLOYMENT_ID", "dep_local_dev")
 	dsn := os.Getenv("DATAPLANE_DATABASE_URL")
@@ -93,7 +115,7 @@ func run() error {
 		return fmt.Errorf("DATAPLANE_DATABASE_URL is required")
 	}
 
-	pool, err := pgxpool.NewWithTenantBinding(ctx, dsn)
+	pool, err := pgxpool.NewPool(ctx, pgxpool.Options{DSN: dsn})
 	if err != nil {
 		return fmt.Errorf("pgxpool: %w", err)
 	}
@@ -112,6 +134,17 @@ func run() error {
 	go func() {
 		if err := dispatcher.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
 			slog.Error("outbox dispatcher exited", "err", err)
+		}
+	}()
+
+	// Idempotency cleanup ticker. ADR 010 mandates a periodic sweep so the
+	// 24h-TTL'd records don't accumulate. Interval is overridable via
+	// IDEMPOTENCY_CLEANUP_INTERVAL for fast-test scenarios.
+	cleanupInterval := envDuration("IDEMPOTENCY_CLEANUP_INTERVAL", idempotency.DefaultCleanupInterval)
+	cleaner := idempotency.NewCleaner(queries, cleanupInterval, slog.Default())
+	go func() {
+		if err := cleaner.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
+			slog.Error("idempotency cleaner exited", "err", err)
 		}
 	}()
 
@@ -160,4 +193,19 @@ func envOr(k, def string) string {
 		return v
 	}
 	return def
+}
+
+// envDuration reads an env var as a duration ("250ms", "5s", "15m"). On parse
+// error or absence, returns the supplied default.
+func envDuration(k string, def time.Duration) time.Duration {
+	v := os.Getenv(k)
+	if v == "" {
+		return def
+	}
+	d, err := time.ParseDuration(v)
+	if err != nil {
+		slog.Warn("invalid duration env var; using default", "key", k, "value", v, "default", def)
+		return def
+	}
+	return d
 }

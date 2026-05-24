@@ -74,7 +74,7 @@ func (s *Service) Create(ctx context.Context, slug, name string, metadata map[st
 	}
 
 	t := Tenant{
-		ID:        id.New("tenant"),
+		ID:        id.New(id.PrefixTenant),
 		Slug:      slug,
 		Name:      name,
 		Status:    StatusActive,
