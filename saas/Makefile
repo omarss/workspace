@@ -72,6 +72,7 @@ GOLANGCI_LINT := $(DOCKER) run --rm \
 .PHONY: build test test-int contract-test lint openapi-check \
         openapi-lint openapi-overlay openapi-gen-go openapi-gen-ts openapi-diff-check \
         compose-up compose-down migrate migrate-down sqlc-gen sdk-ts sdk-go \
+        openbao-init openbao-status openbao-rotate openbao-policies openbao-approle-creds \
         fmt vet tidy clean help
 
 help:
@@ -182,6 +183,51 @@ compose-up:
 
 compose-down:
 	$(DOCKER) compose -f compose.yaml down -v
+
+# ── OpenBao bootstrap ───────────────────────────────────────────────────────
+# All targets shell into the running openbao container so they don't need a
+# host-side `bao` binary. The container's entrypoint already initialised +
+# unsealed; these targets layer on the engines / auth methods / audit device.
+# Every step is idempotent — the `|| true` lets re-runs be a no-op when the
+# mount / device / auth method is already present.
+openbao-init:
+	@$(DOCKER) compose -f compose.yaml exec -T openbao sh -c '\
+		set -e; \
+		BAO_ADDR=http://127.0.0.1:8200; export BAO_ADDR; \
+		ROOT_TOKEN=$$(awk -F\" '"'"'/"root_token"/ { print $$4; exit }'"'"' /openbao/secrets/init.json 2>/dev/null || true); \
+		if [ -n "$$ROOT_TOKEN" ]; then export BAO_TOKEN=$$ROOT_TOKEN; fi; \
+		bao secrets enable -path=transit transit 2>/dev/null || true; \
+		bao secrets enable -path=secret -version=2 kv 2>/dev/null || true; \
+		bao auth enable kubernetes 2>/dev/null || true; \
+		bao auth enable approle 2>/dev/null || true; \
+		bao write -f auth/approle/role/controlplane \
+			token_policies=default \
+			token_ttl=1h token_max_ttl=4h \
+			secret_id_ttl=24h >/dev/null || true; \
+		echo "openbao: bootstrap done (transit, kv-v2, kubernetes auth, approle auth; audit device declared in openbao.hcl)"'
+
+openbao-status:
+	@$(DOCKER) compose -f compose.yaml exec -T openbao bao status
+
+openbao-policies:
+	@$(DOCKER) compose -f compose.yaml exec -T openbao bao policy list
+
+# Rotate the transit key for a specific deployment. `make openbao-rotate KID=dep_X`.
+openbao-rotate:
+	@test -n "$(KID)" || (echo "ERROR: set KID=<deployment_id>" && exit 2)
+	@$(DOCKER) compose -f compose.yaml exec -T openbao bao write -f "transit/keys/$(KID)/rotate"
+
+# Generate AppRole role_id + secret_id for the control-plane host process and
+# write them to /etc/saas/approle/{role_id,secret_id} so cmd/controlplane can
+# read them at boot. For local dev only; production uses a runbook step.
+openbao-approle-creds:
+	@$(DOCKER) compose -f compose.yaml exec -T openbao sh -c '\
+		BAO_ADDR=http://127.0.0.1:8200; export BAO_ADDR; \
+		ROOT_TOKEN=$$(awk -F\" '"'"'/"root_token"/ { print $$4; exit }'"'"' /openbao/secrets/init.json); \
+		export BAO_TOKEN=$$ROOT_TOKEN; \
+		bao read -field=role_id auth/approle/role/controlplane/role-id; \
+		echo "----"; \
+		bao write -field=secret_id -f auth/approle/role/controlplane/secret-id'
 
 # ── housekeeping ────────────────────────────────────────────────────────────
 clean:

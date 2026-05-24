@@ -180,6 +180,63 @@ The slog redactor and the persistence-layer Encryptor walker both honour
 it. Phase 4 wires the OpenBao Encryptor; Phase 3 ships the interface +
 walker. ADR 004 records the pipeline.
 
+### 10.1 PII persistence convention (Phase 4)
+
+For every field marked `x-oapi-codegen-extra-tags: { pii: "true" }` (or
+`sensitive: "true"`):
+
+1. The Go struct carries a sibling `<FieldName>Envelope crypto.Envelope`
+   field. The persistence walker populates it; the field is omitted from
+   JSON responses (zero-value when the row has no value).
+2. The migration adds a five-column set per PII field:
+
+   ```sql
+   <field>_ciphertext   bytea NOT NULL
+   <field>_wrapped_dek  text  NOT NULL
+   <field>_nonce        bytea NOT NULL
+   <field>_kid          text  NOT NULL
+   <field>_key_version  integer NOT NULL
+   ```
+
+3. The repository's `Insert` / `Update` paths call
+   `crypto.EncryptPIIFields(ctx, enc, kid, &row)` immediately before the
+   SQL `INSERT` / `UPDATE`. The walker reads the plaintext, encrypts it,
+   writes the result into `<Field>Envelope`, and zeroes the plaintext
+   field on the row.
+4. The repository's `Get` path loads the five columns into the sibling
+   envelope and calls the matching decrypt helper. The expected kid for
+   the decrypt is always the request context's `deployment_id` — the
+   helper refuses the call before any OpenBao round-trip if the row's
+   `kid` disagrees (`envelope.ErrKidMismatch`). This is layer 5 of the
+   eight-layer tenant isolation invariant.
+5. The slog redactor handles the in-flight plaintext via the same struct
+   tag — no separate registration needed.
+
+AAD (additional authenticated data) for every PII field is
+
+```text
+deployment_id || resource_type || resource_id
+```
+
+This binds the ciphertext to its row: copying the encrypted blob to a
+different row fails the AEAD authentication check. Changing the AAD
+format later requires a re-encryption pass over every existing row.
+
+### 10.2 KV v2 secrets (Phase 4)
+
+Per-Deployment secrets (Postgres app password, Keycloak admin creds,
+provider API keys, BYOK channel creds) live under
+
+```text
+secret/data/<deployment_id>/<purpose>/<name>
+```
+
+Use `envelope.Client.KVPut` / `KVGet` / `KVDelete` from
+`internal/platform/crypto/envelope`. The helpers reject path traversal
+(`..`, leading `/`) at the call-site boundary. The per-Deployment policy
+template forbids cross-Deployment KV access at the OpenBao layer, but
+the path validation is the first line of defence.
+
 ## 11. Cursors
 
 Schema version 1. Every cursor carries `{v, k, id}`; the `v` field is
@@ -225,7 +282,8 @@ these instead of re-implementing.
 | `validator/` | go-playground/validator wrapper (skeleton today; v10 wiring lands when first consumer needs it) |
 | `outbox/` | In-process Dispatcher + LoggerPublisher + PgxEventPublisher (ADR 009) |
 | `otel/` | OpenTelemetry tracer-provider boot (no-op skeleton in Phase 3; OTLP exporter in Phase 15) |
-| `crypto/` | Encryptor interface + reflection walker for `pii:"true"` (Phase 3); OpenBao envelope impl lands in Phase 4 |
+| `crypto/` | Encryptor interface + reflection walker for `pii:"true"` (Phase 3) + EnvelopeAdapter that wraps the OpenBao client (Phase 4) |
+| `crypto/envelope/` | OpenBao envelope client (Encrypt / Decrypt with kid binding, EnsureKey, RotateKey, Rewrap, KV v2 helper); k8s + AppRole auth flows (Phase 4) |
 
 ## Appendix B — Naming collisions
 

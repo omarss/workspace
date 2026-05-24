@@ -3,10 +3,12 @@
 # Sentinel dev-only credentials (do NOT use in prod):
 #   postgres:        user=saas pass=saas db=saas
 #   keycloak admin:  admin / admin
-#   openbao root:    dev-root
 #
-# Real OpenBao Shamir 5-of-3 unseal + real Keycloak realms land in Phases 5+/6.
-# Prism mocks read from openapi/_generated, which `make openapi-check` populates.
+# OpenBao runs against a file backend with scripted Shamir 5-of-3 unseal.
+# The init shares + root token are captured under /openbao/secrets (tmpfs),
+# so a container restart re-initialises (acceptable for local dev — see
+# docs/adr/006-openbao-shamir-and-kms-roadmap.md). Production swaps the
+# tmpfs share path for cloud KMS auto-unseal.
 services:
   postgres:
     image: postgres:16
@@ -38,12 +40,32 @@ services:
 
   openbao:
     image: openbao/openbao:2.5.4
-    cap_add: ["IPC_LOCK"]
+    # OpenBao 2.5+ dropped mlock support so we no longer add IPC_LOCK to
+    # the container. Swap-side protection is the host's responsibility:
+    # disabled or LUKS-encrypted swap. See docs/adr/006.
     environment:
-      BAO_DEV_ROOT_TOKEN_ID: dev-root
-      BAO_DEV_LISTEN_ADDRESS: "0.0.0.0:8200"
-    command: ["server", "-dev"]
+      BAO_ADDR: "http://0.0.0.0:8200"
+      BAO_LOG_LEVEL: info
+    volumes:
+      - openbao-data:/openbao/data
+      - openbao-logs:/openbao/logs
+      # /openbao/secrets holds the init.json with Shamir shares + root token.
+      # For LOCAL DEV ONLY this is a named volume so container restarts can
+      # auto-unseal. Production swaps to cloud KMS auto-unseal (no share file
+      # on disk). See docs/adr/006 for the trade-off.
+      - openbao-secrets:/openbao/secrets
+      - ./deploy/openbao/config:/openbao/config:ro
+      - ./deploy/openbao/init:/openbao/init:ro
+    entrypoint: ["/bin/sh", "/openbao/init/entrypoint.sh"]
     ports: ["8200:8200"]
+    healthcheck:
+      # sealedcode=204 lets the healthcheck succeed once the bootstrap script
+      # finishes unsealing. uninitcode=501 means a fresh container hasn't yet
+      # initialised — still acceptable; the bootstrap then runs.
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8200/v1/sys/health?standbyok=true&sealedcode=204"]
+      interval: 3s
+      timeout: 2s
+      retries: 50
 
   prism-mock-cp:
     image: stoplight/prism:5.15.10
@@ -60,3 +82,6 @@ services:
 
 volumes:
   pgdata: {}
+  openbao-data: {}
+  openbao-logs: {}
+  openbao-secrets: {}

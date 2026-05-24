@@ -22,6 +22,7 @@ import (
 	httpapi "github.com/omarss/saas/internal/dataplane/httpapi" // package dataplaneapi
 	"github.com/omarss/saas/internal/dataplane/tenancy"
 	"github.com/omarss/saas/internal/platform/auth"
+	"github.com/omarss/saas/internal/platform/crypto/envelope"
 	"github.com/omarss/saas/internal/platform/idempotency"
 	platformlog "github.com/omarss/saas/internal/platform/log"
 	platformotel "github.com/omarss/saas/internal/platform/otel"
@@ -122,6 +123,28 @@ func run() error {
 	defer pool.Close()
 	queries := db.New(pool)
 
+	// Envelope encryption client. Data-plane pods authenticate to OpenBao
+	// via the Kubernetes auth method (the in-pod SA JWT maps to a role
+	// named after this deployment_id; Phase 12d provisions the role).
+	// Local dev sets SAAS_OPENBAO_DISABLED=1 to skip this — the persistence
+	// walker degrades to ErrNoEncryptor at the first call, which is loud
+	// rather than silent.
+	encClient, err := newEnvelopeClient(ctx, deploymentID)
+	if err != nil {
+		return fmt.Errorf("envelope client: %w", err)
+	}
+	if encClient != nil {
+		defer func() {
+			if err := encClient.Close(); err != nil {
+				slog.Warn("envelope client close", "err", err)
+			}
+		}()
+	}
+	// encClient stays in scope but is not yet wired into the tenancy module
+	// (Tenant.Metadata is not PII per AGENTS.md §18.7). Phase 5 (Users)
+	// will wire it into the Users repository where Email lives.
+	_ = encClient
+
 	tenantSvc := tenancy.NewService(
 		tenancy.NewPgxRepository(queries),
 		outbox.NewPgxEventPublisher(queries, deploymentID),
@@ -193,6 +216,27 @@ func envOr(k, def string) string {
 		return v
 	}
 	return def
+}
+
+// newEnvelopeClient wires the data-plane envelope client using Kubernetes
+// auth. In cluster the in-pod SA JWT is used; the role name MUST equal the
+// deployment_id (Phase 12d provisions the role). Returns nil when
+// SAAS_OPENBAO_DISABLED=1 so local dev without a running bao still boots —
+// any actual PII persistence path then returns ErrNoEncryptor.
+func newEnvelopeClient(ctx context.Context, deploymentID string) (*envelope.Client, error) {
+	if os.Getenv("SAAS_OPENBAO_DISABLED") == "1" {
+		slog.Warn("envelope client disabled via SAAS_OPENBAO_DISABLED; PII writes will fail closed")
+		return nil, nil
+	}
+	addr := envOr("BAO_ADDR", "http://localhost:8200")
+	jwtPath := envOr("SAAS_OPENBAO_SA_TOKEN_PATH", "/var/run/secrets/kubernetes.io/serviceaccount/token")
+	return envelope.New(ctx, envelope.Options{
+		Address:    addr,
+		AuthMethod: envelope.AuthKubernetes,
+		Role:       deploymentID,
+		SAJWTPath:  jwtPath,
+		CACertPath: os.Getenv("SAAS_OPENBAO_CA_CERT"),
+	})
 }
 
 // envDuration reads an env var as a duration ("250ms", "5s", "15m"). On parse
