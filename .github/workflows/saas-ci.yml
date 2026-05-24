@@ -1,0 +1,69 @@
+name: saas-ci
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'saas/**'
+      - '.github/workflows/saas-ci.yml'
+  pull_request:
+    types: [opened, reopened, synchronize, labeled]
+    paths:
+      - 'saas/**'
+      - '.github/workflows/saas-ci.yml'
+
+jobs:
+  gate:
+    if: github.event_name == 'push' || contains(github.event.pull_request.labels.*.name, 'ready')
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: saas
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+          cache: true
+          cache-dependency-path: saas/go.sum
+      - run: make tidy
+      - run: git diff --exit-code go.mod go.sum
+      - run: make vet
+      - uses: golangci/golangci-lint-action@v6
+        with:
+          version: v2.12.2
+          working-directory: saas
+      - run: make openapi-check
+      - run: make build
+      - run: make test
+
+  integration:
+    needs: gate
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: saas
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: saas
+          POSTGRES_PASSWORD: saas
+          POSTGRES_DB: saas
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U saas" --health-interval 2s --health-timeout 3s --health-retries 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+          cache: true
+          cache-dependency-path: saas/go.sum
+      - run: make build
+      - env:
+          CONTROLPLANE_DATABASE_URL: "postgres://saas:saas@localhost:5432/saas?sslmode=disable"
+          DATAPLANE_DATABASE_URL: "postgres://saas:saas@localhost:5432/saas?sslmode=disable"
+        run: |
+          ./bin/migrate -plane controlplane up
+          ./bin/migrate -plane dataplane    up
+      - run: make test-int

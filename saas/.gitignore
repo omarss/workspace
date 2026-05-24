@@ -1,0 +1,20 @@
+# Build artifacts
+/bin/
+/dist/
+
+# OpenAPI generated intermediates
+/openapi/_generated/
+
+# Coverage
+coverage.out
+coverage.html
+
+# Editor / OS
+.idea/
+.vscode/
+.DS_Store
+
+# Secrets must never be committed (defense-in-depth; dev sentinels live in compose.yaml)
+.env
+.env.*
+!.env.example

@@ -1,0 +1,17 @@
+.gitignore
+.npmignore
+README.md
+api.ts
+api/meta-api.ts
+base.ts
+common.ts
+configuration.ts
+docs/Health.md
+docs/MetaApi.md
+git_push.sh
+index.ts
+models/health.ts
+models/index.ts
+package.json
+tsconfig.esm.json
+tsconfig.json

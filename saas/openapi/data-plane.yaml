@@ -1,0 +1,44 @@
+openapi: 3.1.0
+info:
+  title: SaaS Data Plane API
+  version: 0.0.1
+  description: Per-deployment data plane API. One vhost per Deployment under *.saas.omarss.net.
+servers:
+  - url: https://{env}.{project}.saas.omarss.net
+    variables:
+      env:
+        default: dev
+        description: Environment slug (dev, staging, prod).
+      project:
+        default: example
+        description: Project slug for the Deployment.
+tags:
+  - name: meta
+    description: Health and metadata.
+paths:
+  /healthz:
+    get:
+      operationId: getHealthz
+      tags: [meta]
+      summary: Liveness probe.
+      description: Returns 200 with a small status payload when the data plane is alive.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
+components:
+  schemas:
+    Health:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [ok]
+        version:
+          type: string
+        commit:
+          type: string

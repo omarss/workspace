@@ -1,0 +1,62 @@
+# Local Compose stack for SaaS platform development.
+#
+# Sentinel dev-only credentials (do NOT use in prod):
+#   postgres:        user=saas pass=saas db=saas
+#   keycloak admin:  admin / admin
+#   openbao root:    dev-root
+#
+# Real OpenBao Shamir 5-of-3 unseal + real Keycloak realms land in Phases 5+/6.
+# Prism mocks read from openapi/_generated, which `make openapi-check` populates.
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: saas
+      POSTGRES_PASSWORD: saas
+      POSTGRES_DB: saas
+    # Bind to 55432 on the host so we don't collide with the host's own
+    # Postgres on 5432 (qudrat lives there). Inside compose the canonical
+    # port is still 5432 — DSNs from other containers use postgres:5432.
+    ports: ["55432:5432"]
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "saas"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0
+    command: start-dev --import-realm
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      KC_DB: dev-file
+    ports: ["8081:8080"]
+    volumes:
+      - ./deploy/keycloak/realms:/opt/keycloak/data/import:ro
+
+  openbao:
+    image: openbao/openbao:2.5.4
+    cap_add: ["IPC_LOCK"]
+    environment:
+      BAO_DEV_ROOT_TOKEN_ID: dev-root
+      BAO_DEV_LISTEN_ADDRESS: "0.0.0.0:8200"
+    command: ["server", "-dev"]
+    ports: ["8200:8200"]
+
+  prism-mock-cp:
+    image: stoplight/prism:5.15.10
+    # `-m=false`: disable multiprocess mode (broken in 5.15.10 container).
+    command: ["mock", "-h", "0.0.0.0", "-p", "4010", "-m=false", "/work/openapi/_generated/control-plane.yaml"]
+    volumes: [".:/work:ro"]
+    ports: ["4010:4010"]
+
+  prism-mock-dp:
+    image: stoplight/prism:5.15.10
+    command: ["mock", "-h", "0.0.0.0", "-p", "4011", "-m=false", "/work/openapi/_generated/data-plane.yaml"]
+    volumes: [".:/work:ro"]
+    ports: ["4011:4011"]
+
+volumes:
+  pgdata: {}
