@@ -15,6 +15,7 @@ linters:
     - bodyclose
     - copyloopvar
     - errorlint
+    - forbidigo
     - gocritic
     - gosec
     - misspell
@@ -32,6 +33,52 @@ linters:
     gosec:
       excludes:
         - G404 # math/rand acceptable for non-crypto paths
+    # forbidigo enforces the §18.1 isolation invariant + the OpenBao guardrails
+    # at lint time. Anti-pattern guards in 04-platform-patterns.md forbid
+    # `//nolint:forbidigo` overrides — find another way.
+    #
+    # IMPORTANT: forbidigo can ONLY match identifier paths (e.g. `os.Getenv`),
+    # not full call expressions with literal arguments. The string-literal
+    # match against header names like `"X-Tenant-Id"` lives in the ruleguard
+    # rules under .golangci-rules/rules.go, dispatched via gocritic below.
+    # Keeping forbidigo here for the bare-identifier guardrails so a future
+    # `os.Getenv("ANY_SECRET")` regression still gets a second pair of eyes.
+    forbidigo:
+      analyze-types: true
+      forbid:
+        - pattern: '^os\.Getenv$'
+          msg: "Direct os.Getenv reads are discouraged for secrets. Prefer the bao api/v2 client for OpenBao-managed values; document the env in cmd/* if it must come from process env."
+    # gocritic ships a ruleguard checker that loads a Go-source DSL file and
+    # matches AST patterns — exactly what forbidigo cannot do. The rules live
+    # in .golangci-rules/rules.go (build tag `ruleguard` keeps them out of
+    # normal Go compilation).
+    gocritic:
+      enabled-checks:
+        - ruleguard
+      settings:
+        ruleguard:
+          # Relative path is resolved relative to the config file's directory
+          # in golangci-lint v2 (the ${configDir} substitution from v1 was
+          # removed in v2 and isn't a supported placeholder here).
+          rules: '.golangci-rules/rules.go'
+          failOn: 'all'
+  exclusions:
+    rules:
+      # auth.MockMiddleware is the ONE place that reads X-Mock-Tenant-Id.
+      # Keep the rule global but allow it inside the auth package's mock
+      # middleware where the read is deliberate.
+      - path: internal/platform/auth/middleware_mock\.go
+        linters: [forbidigo, gocritic]
+      # cmd/* binaries legitimately read non-secret env vars (DSN, deployment
+      # id, listen addr). The forbidigo bare-identifier rule against
+      # `os.Getenv` is a defensive guard, not an absolute ban — main.go is
+      # the sanctioned entry point for env reads.
+      - path: cmd/.*\.go
+        linters: [forbidigo]
+      # Mock middleware tests legitimately set headers the ruleguard banlist
+      # forbids — they're testing that the ban behaves correctly.
+      - path: internal/platform/auth/.*_test\.go
+        linters: [gocritic]
 
 formatters:
   enable:
