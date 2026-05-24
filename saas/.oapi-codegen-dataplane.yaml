@@ -1,0 +1,12 @@
+package: dataplaneapi
+output: internal/dataplane/httpapi/server.gen.go
+generate:
+  models: true
+  chi-server: true
+  strict-server: true
+  embedded-spec: true
+output-options:
+  skip-fmt: false
+  skip-prune: false
+  overlay:
+    path: openapi/overlays/30-downgrade.yaml

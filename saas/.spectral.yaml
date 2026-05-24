@@ -1,0 +1,13 @@
+extends: ["spectral:oas"]
+rules:
+  operation-operationId: error
+  operation-operationId-unique: error
+  operation-tags: error
+  operation-tag-defined: error
+  operation-success-response: error
+  oas3-valid-media-example: error
+  oas3-schema: error
+  path-params: error
+  no-$ref-siblings: error
+  # SaaS-specific
+  operation-description: warn
