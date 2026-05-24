@@ -1,0 +1,167 @@
+[
+  {
+    "step": 0,
+    "name": "ridge_baseline",
+    "metrics": {
+      "mae_p50": 5953.344824546925,
+      "mape_p50": 0.3232288883587453,
+      "smape_p50": 0.29865758243339974
+    },
+    "elapsed_s": 1.4995581980329007,
+    "notes": "log-target ridge with one-hot + scaler"
+  },
+  {
+    "step": 1,
+    "name": "lightgbm_huber",
+    "metrics": {
+      "mae_p50": 6227.581383170382,
+      "mape_p50": 0.32033191063096345,
+      "smape_p50": 0.30392898229662113
+    },
+    "elapsed_s": 6.129641406005248,
+    "notes": "LightGBM with monotone constraints on yoe/level/ownership"
+  },
+  {
+    "step": 2,
+    "name": "lightgbm_quantile",
+    "metrics": {
+      "pinball_q10": 1073.4430443711,
+      "pinball_q25": 2170.3795304766973,
+      "pinball_q50": 3113.0513835682373,
+      "pinball_q75": 2912.2339627995807,
+      "pinball_q90": 1924.3606882335237,
+      "mae_p50": 6226.1027671364745,
+      "mape_p50": 0.3200024139021749,
+      "smape_p50": 0.3035197514285224,
+      "rmse_p50": 11409.354484904385,
+      "coverage_80": 0.7525333333333334,
+      "width_80": 17292.87053250987
+    },
+    "elapsed_s": 37.479646193096414,
+    "notes": "Five quantile boosters; crossings repaired by sorting"
+  },
+  {
+    "step": 3,
+    "name": "conformal_calibrated",
+    "metrics": {
+      "pinball_q10": 1074.1530261737657,
+      "pinball_q25": 2170.3795304766973,
+      "pinball_q50": 3113.0513835682373,
+      "pinball_q75": 2912.2339627995807,
+      "pinball_q90": 1902.2951917005514,
+      "mae_p50": 6226.1027671364745,
+      "mape_p50": 0.3200024139021749,
+      "smape_p50": 0.3035197514285224,
+      "rmse_p50": 11409.354484904385,
+      "coverage_80": 0.8050666666666667,
+      "width_80": 18704.11895029242
+    },
+    "elapsed_s": 0.1373577939812094,
+    "notes": "Split-conformal symmetric widening per coverage target"
+  },
+  {
+    "step": 4,
+    "name": "feature_ablation_lean_vs_full",
+    "metrics": {
+      "pinball_q10": 1072.3693707047562,
+      "pinball_q25": 2176.738840154116,
+      "pinball_q50": 3122.9261278224303,
+      "pinball_q75": 2935.2766095949014,
+      "pinball_q90": 1942.372286834225,
+      "mae_p50": 6245.852255644861,
+      "mape_p50": 0.32352732345160684,
+      "smape_p50": 0.30337997171532843,
+      "rmse_p50": 11448.451649035687,
+      "coverage_80": 0.7402666666666666,
+      "width_80": 16798.348713192205,
+      "lift_pinball_q10": 1.7836554690095454,
+      "lift_pinball_q25": -6.359309677418878,
+      "lift_pinball_q50": -9.874744254193047,
+      "lift_pinball_q75": -23.042646795320707,
+      "lift_pinball_q90": -40.07709513367354,
+      "lift_mae_p50": -19.749488508386094,
+      "lift_mape_p50": -0.003524909549431965,
+      "lift_smape_p50": 0.00013977971319395488,
+      "lift_rmse_p50": -39.097164131302634,
+      "lift_coverage_80": 0.06480000000000008,
+      "lift_width_80": 1905.770237100216
+    },
+    "elapsed_s": 38.694133656914346,
+    "notes": "Trains a lean bundle without macro & anchor features for marginal-lift comparison"
+  },
+  {
+    "step": 5,
+    "name": "optuna_tuned_conformal",
+    "metrics": {
+      "pinball_q10": 1067.6077492544214,
+      "pinball_q25": 2160.223296692687,
+      "pinball_q50": 3118.8058270029715,
+      "pinball_q75": 2929.805710528334,
+      "pinball_q90": 1900.3490340160458,
+      "mae_p50": 6237.611654005943,
+      "mape_p50": 0.31905912206667186,
+      "smape_p50": 0.30403221679694675,
+      "rmse_p50": 11465.918183369091,
+      "coverage_80": 0.8018666666666666,
+      "width_80": 18823.71836526792
+    },
+    "elapsed_s": 275.8107336269459,
+    "notes": "Optuna 12 trials; best params {'num_leaves': 253, 'learning_rate': 0.06194976141821665, 'min_data_in_leaf': 197, 'feature_fraction': 0.895265269202026, 'bagging_fraction': 0.9743822808272341, 'bagging_freq': 10}"
+  },
+  {
+    "step": 6,
+    "name": "retrieval_blended",
+    "metrics": {
+      "pinball_q10": 1073.4664143536236,
+      "pinball_q50": 3148.151734742596,
+      "pinball_q90": 1918.238481484701,
+      "pinball_q25": 2160.223296692687,
+      "pinball_q75": 2929.805710528334,
+      "mae_p50": 6296.303469485192,
+      "mape_p50": 0.3252119933268202,
+      "smape_p50": 0.30822537290412483,
+      "rmse_p50": 11592.554815391688,
+      "coverage_80": 0.8058666666666666,
+      "width_80": 19222.563661163727,
+      "mean_n_comparables": 99.23093333333334
+    },
+    "elapsed_s": 1.3537395619787276,
+    "notes": "Recency- and confidence-weighted neighbor blending policy from \u00a710"
+  },
+  {
+    "step": 7,
+    "name": "recommendation_blinded_reweighted",
+    "metrics": {
+      "pinball_q10": 1078.806908085515,
+      "pinball_q25": 2183.5100015809444,
+      "pinball_q50": 3151.012886811042,
+      "pinball_q75": 3007.8845529992554,
+      "pinball_q90": 1921.244730455152,
+      "mae_p50": 6302.025773622084,
+      "mape_p50": 0.3214091221830359,
+      "smape_p50": 0.31012850238050754,
+      "rmse_p50": 11525.204046111248,
+      "coverage_80": 0.7970666666666667,
+      "width_80": 18729.570559409094,
+      "fair_gender_median_descriptive": 0.03605118544475862,
+      "fair_gender_median_recommend": 0.0,
+      "fair_nat_median_descriptive": 0.04380559446080616,
+      "fair_nat_median_recommend": 0.0
+    },
+    "elapsed_s": 62.71357081201859,
+    "notes": "Recommendation head: blinded features + reweighted samples; audit attached."
+  },
+  {
+    "step": 8,
+    "name": "v2_final",
+    "metrics": {
+      "mae_p50": 6296.303469485192,
+      "mape_p50": 0.3252119933268202,
+      "smape_p50": 0.30822537290412483,
+      "coverage_80": 0.8058666666666666,
+      "shrinkage_only_mae_diagnostic": 8132.06778990981
+    },
+    "elapsed_s": 0.28146796801593155,
+    "notes": "v2 = parametric (Optuna+conformal) + retrieval sparse fallback. Bayes shrinkage retained on the bundle as a diagnostic only (see notes)."
+  }
+]
