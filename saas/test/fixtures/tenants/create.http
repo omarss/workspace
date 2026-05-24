@@ -1,0 +1,8 @@
+POST /v1/tenants HTTP/1.1
+Host: localhost:4011
+Authorization: Bearer test
+Content-Type: application/json
+X-Mock-Tenant-Id: tenant_01HSEEDSEEDSEEDSEEDSEEDSEED
+Idempotency-Key: idem_01HXAAAAAAAAAAAAAAAAAAAAAA
+
+{"slug":"acme","name":"Acme Inc"}
