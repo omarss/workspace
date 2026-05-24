@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: SaaS Data Plane API
-  version: 0.0.1
+  version: 0.0.2
   description: Per-deployment data plane API. One vhost per Deployment under *.saas.omarss.net.
 servers:
   - url: https://{env}.{project}.saas.omarss.net
@@ -15,6 +15,11 @@ servers:
 tags:
   - name: meta
     description: Health and metadata.
+  - name: tenants
+    description: Tenant CRUD. Tenant is the unit of isolation and billing.
+security:
+  - bearerAuth: []
+  - apiKeyAuth: []
 paths:
   /healthz:
     get:
@@ -22,6 +27,7 @@ paths:
       tags: [meta]
       summary: Liveness probe.
       description: Returns 200 with a small status payload when the data plane is alive.
+      security: []
       responses:
         "200":
           description: OK
@@ -29,6 +35,159 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Health"
+  /v1/tenants:
+    get:
+      operationId: listTenants
+      tags: [tenants]
+      summary: List tenants visible to the caller's Deployment.
+      description: |
+        Returns the tenants the caller is authorised to see. In Phase 2 the
+        Data Plane caller's token resolves to exactly one tenant, so the list
+        contains one element. Operator impersonation across tenants lands in
+        Phase 13.
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Sort"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TenantListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "410":
+          $ref: "#/components/responses/CursorGone"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+    post:
+      operationId: createTenant
+      tags: [tenants]
+      summary: Create a tenant. Auto-creates a default Organization.
+      description: |
+        Idempotent. Replays with the same Idempotency-Key + body return the
+        cached 201 response; with the same key + a different body return 422
+        idempotency-key-conflict (see AGENTS.md section 5.2).
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTenantRequest"
+      responses:
+        "201":
+          description: Created
+          headers:
+            ETag:
+              schema:
+                type: string
+              description: 'Weak ETag, format W/"v<sequence>".'
+            Location:
+              schema:
+                type: string
+              description: URI of the created tenant.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TenantResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          $ref: "#/components/responses/IdempotencyInFlight"
+        "422":
+          $ref: "#/components/responses/IdempotencyConflictOrValidation"
+  /v1/tenants/{tenant_id}:
+    parameters:
+      - in: path
+        name: tenant_id
+        required: true
+        schema:
+          type: string
+          pattern: "^tenant_[0-9A-HJKMNP-TV-Z]{26}$"
+    get:
+      operationId: getTenant
+      tags: [tenants]
+      summary: Fetch a tenant by id.
+      description: Returns the tenant if the caller's tenant context matches the path id; 403 otherwise.
+      responses:
+        "200":
+          description: OK
+          headers:
+            ETag:
+              schema:
+                type: string
+              description: 'Weak ETag, format W/"v<sequence>".'
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TenantResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      operationId: updateTenant
+      tags: [tenants]
+      summary: Update a tenant. Idempotent. ETag concurrency control required.
+      description: |
+        PATCH requires the current Weak ETag in If-Match; a stale ETag returns 412.
+        Idempotency-Key replays the cached response when the body hash matches.
+      parameters:
+        - $ref: "#/components/parameters/IfMatch"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateTenantRequest"
+      responses:
+        "200":
+          description: OK
+          headers:
+            ETag:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TenantResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "412":
+          $ref: "#/components/responses/PreconditionFailed"
+        "422":
+          $ref: "#/components/responses/IdempotencyConflictOrValidation"
+    delete:
+      operationId: deleteTenant
+      tags: [tenants]
+      summary: Soft-delete a tenant. Retention applies before physical purge.
+      description: |
+        Soft-deletes the tenant; status flips to "deleted" and a retention window
+        applies before any physical purge (purge endpoint lands in Phase 18).
+      parameters:
+        - $ref: "#/components/parameters/IfMatch"
+      responses:
+        "204":
+          description: Soft-deleted.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "412":
+          $ref: "#/components/responses/PreconditionFailed"
 components:
   schemas:
     Health:
@@ -42,3 +201,253 @@ components:
           type: string
         commit:
           type: string
+    Tenant:
+      type: object
+      required:
+        - id
+        - object
+        - slug
+        - name
+        - status
+        - created_at
+        - updated_at
+        - etag
+      properties:
+        id:
+          type: string
+          pattern: "^tenant_[0-9A-HJKMNP-TV-Z]{26}$"
+        object:
+          type: string
+          enum: [tenant]
+        slug:
+          type: string
+          minLength: 2
+          maxLength: 32
+          pattern: "^[a-z][a-z0-9-]*[a-z0-9]$"
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        status:
+          type: string
+          enum: [active, suspended, deleted]
+        default_organization_id:
+          type: string
+          nullable: true
+          pattern: "^org_[0-9A-HJKMNP-TV-Z]{26}$"
+        metadata:
+          $ref: "#/components/schemas/Metadata"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        deleted_at:
+          type: string
+          format: date-time
+          nullable: true
+        etag:
+          type: string
+          description: 'Weak ETag, format W/"v<sequence>".'
+    TenantResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: "#/components/schemas/Tenant"
+    TenantListResponse:
+      type: object
+      required: [data, pagination]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Tenant"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+    CreateTenantRequest:
+      type: object
+      required: [slug, name]
+      properties:
+        slug:
+          type: string
+          minLength: 2
+          maxLength: 32
+          pattern: "^[a-z][a-z0-9-]*[a-z0-9]$"
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        metadata:
+          $ref: "#/components/schemas/Metadata"
+    UpdateTenantRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        status:
+          type: string
+          enum: [active, suspended]
+        metadata:
+          $ref: "#/components/schemas/Metadata"
+    Metadata:
+      type: object
+      maxProperties: 16
+      additionalProperties:
+        type: string
+        maxLength: 256
+    Pagination:
+      type: object
+      required: [has_more]
+      properties:
+        next_cursor:
+          type: string
+          nullable: true
+        has_more:
+          type: boolean
+    Problem:
+      type: object
+      required: [type, title, status]
+      properties:
+        type:
+          type: string
+          format: uri
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        instance:
+          type: string
+        request_id:
+          type: string
+        errors:
+          type: array
+          items:
+            $ref: "#/components/schemas/FieldError"
+    FieldError:
+      type: object
+      required: [field, message]
+      properties:
+        field:
+          type: string
+        message:
+          type: string
+        code:
+          type: string
+  parameters:
+    Limit:
+      in: query
+      name: limit
+      required: false
+      description: Max items to return (default 25, max 200).
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 200
+        default: 25
+    Cursor:
+      in: query
+      name: cursor
+      required: false
+      description: Opaque pagination cursor; obtained from a previous response.
+      schema:
+        type: string
+    Sort:
+      in: query
+      name: sort
+      required: false
+      description: Sort token. Default "-created_at".
+      schema:
+        type: string
+        default: "-created_at"
+    IdempotencyKey:
+      in: header
+      name: Idempotency-Key
+      required: true
+      description: 24-hour idempotency key (idem_<ulid>).
+      schema:
+        type: string
+        pattern: "^idem_[0-9A-HJKMNP-TV-Z]{26}$"
+    IfMatch:
+      in: header
+      name: If-Match
+      required: true
+      description: Weak ETag from a prior GET; rejects on mismatch with 412.
+      schema:
+        type: string
+  responses:
+    Unauthorized:
+      description: Missing or invalid bearer token / API key.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    Forbidden:
+      description: Caller lacks permission for this resource.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    NotFound:
+      description: Resource not found.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    PreconditionFailed:
+      description: If-Match header missing or stale.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    IdempotencyInFlight:
+      description: Concurrent request with the same Idempotency-Key is still processing.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    IdempotencyConflictOrValidation:
+      description: Idempotency-Key reused with a different body, OR validation failed.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    CursorGone:
+      description: Cursor schema version is no longer supported.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    RateLimited:
+      description: Rate limit exceeded.
+      headers:
+        RateLimit-Limit:
+          schema:
+            type: integer
+        RateLimit-Remaining:
+          schema:
+            type: integer
+        RateLimit-Reset:
+          schema:
+            type: integer
+        Retry-After:
+          schema:
+            type: integer
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    apiKeyAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: API key

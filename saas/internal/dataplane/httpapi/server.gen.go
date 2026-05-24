@@ -9,14 +9,22 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
 	"path"
 	"strings"
+	"time"
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/go-chi/chi/v5"
+	"github.com/oapi-codegen/runtime"
+)
+
+const (
+	ApiKeyAuthScopes apiKeyAuthContextKey = "apiKeyAuth.Scopes"
+	BearerAuthScopes bearerAuthContextKey = "bearerAuth.Scopes"
 )
 
 // Defines values for HealthStatus.
@@ -34,6 +42,74 @@ func (e HealthStatus) Valid() bool {
 	}
 }
 
+// Defines values for TenantObject.
+const (
+	TenantObjectTenant TenantObject = "tenant"
+)
+
+// Valid indicates whether the value is a known member of the TenantObject enum.
+func (e TenantObject) Valid() bool {
+	switch e {
+	case TenantObjectTenant:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for TenantStatus.
+const (
+	TenantStatusActive    TenantStatus = "active"
+	TenantStatusDeleted   TenantStatus = "deleted"
+	TenantStatusSuspended TenantStatus = "suspended"
+)
+
+// Valid indicates whether the value is a known member of the TenantStatus enum.
+func (e TenantStatus) Valid() bool {
+	switch e {
+	case TenantStatusActive:
+		return true
+	case TenantStatusDeleted:
+		return true
+	case TenantStatusSuspended:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for UpdateTenantRequestStatus.
+const (
+	UpdateTenantRequestStatusActive    UpdateTenantRequestStatus = "active"
+	UpdateTenantRequestStatusSuspended UpdateTenantRequestStatus = "suspended"
+)
+
+// Valid indicates whether the value is a known member of the UpdateTenantRequestStatus enum.
+func (e UpdateTenantRequestStatus) Valid() bool {
+	switch e {
+	case UpdateTenantRequestStatusActive:
+		return true
+	case UpdateTenantRequestStatusSuspended:
+		return true
+	default:
+		return false
+	}
+}
+
+// CreateTenantRequest defines model for CreateTenantRequest.
+type CreateTenantRequest struct {
+	Metadata *Metadata `json:"metadata,omitempty"`
+	Name     string    `json:"name"`
+	Slug     string    `json:"slug"`
+}
+
+// FieldError defines model for FieldError.
+type FieldError struct {
+	Code    *string `json:"code,omitempty"`
+	Field   string  `json:"field"`
+	Message string  `json:"message"`
+}
+
 // Health defines model for Health.
 type Health struct {
 	Commit  *string      `json:"commit,omitempty"`
@@ -44,11 +120,174 @@ type Health struct {
 // HealthStatus defines model for Health.Status.
 type HealthStatus string
 
+// Metadata defines model for Metadata.
+type Metadata map[string]string
+
+// Pagination defines model for Pagination.
+type Pagination struct {
+	HasMore    bool    `json:"has_more"`
+	NextCursor *string `json:"next_cursor,omitempty"`
+}
+
+// Problem defines model for Problem.
+type Problem struct {
+	Detail    *string       `json:"detail,omitempty"`
+	Errors    *[]FieldError `json:"errors,omitempty"`
+	Instance  *string       `json:"instance,omitempty"`
+	RequestId *string       `json:"request_id,omitempty"`
+	Status    int           `json:"status"`
+	Title     string        `json:"title"`
+	Type      string        `json:"type"`
+}
+
+// Tenant defines model for Tenant.
+type Tenant struct {
+	CreatedAt             time.Time  `json:"created_at"`
+	DefaultOrganizationId *string    `json:"default_organization_id,omitempty"`
+	DeletedAt             *time.Time `json:"deleted_at,omitempty"`
+
+	// Etag Weak ETag, format W/"v<sequence>".
+	Etag      string       `json:"etag"`
+	Id        string       `json:"id"`
+	Metadata  *Metadata    `json:"metadata,omitempty"`
+	Name      string       `json:"name"`
+	Object    TenantObject `json:"object"`
+	Slug      string       `json:"slug"`
+	Status    TenantStatus `json:"status"`
+	UpdatedAt time.Time    `json:"updated_at"`
+}
+
+// TenantObject defines model for Tenant.Object.
+type TenantObject string
+
+// TenantStatus defines model for Tenant.Status.
+type TenantStatus string
+
+// TenantListResponse defines model for TenantListResponse.
+type TenantListResponse struct {
+	Data       []Tenant   `json:"data"`
+	Pagination Pagination `json:"pagination"`
+}
+
+// TenantResponse defines model for TenantResponse.
+type TenantResponse struct {
+	Data Tenant `json:"data"`
+}
+
+// UpdateTenantRequest defines model for UpdateTenantRequest.
+type UpdateTenantRequest struct {
+	Metadata *Metadata                  `json:"metadata,omitempty"`
+	Name     *string                    `json:"name,omitempty"`
+	Status   *UpdateTenantRequestStatus `json:"status,omitempty"`
+}
+
+// UpdateTenantRequestStatus defines model for UpdateTenantRequest.Status.
+type UpdateTenantRequestStatus string
+
+// Cursor defines model for Cursor.
+type Cursor = string
+
+// IdempotencyKey defines model for IdempotencyKey.
+type IdempotencyKey = string
+
+// IfMatch defines model for IfMatch.
+type IfMatch = string
+
+// Limit defines model for Limit.
+type Limit = int
+
+// Sort defines model for Sort.
+type Sort = string
+
+// CursorGone defines model for CursorGone.
+type CursorGone = Problem
+
+// Forbidden defines model for Forbidden.
+type Forbidden = Problem
+
+// IdempotencyConflictOrValidation defines model for IdempotencyConflictOrValidation.
+type IdempotencyConflictOrValidation = Problem
+
+// IdempotencyInFlight defines model for IdempotencyInFlight.
+type IdempotencyInFlight = Problem
+
+// NotFound defines model for NotFound.
+type NotFound = Problem
+
+// PreconditionFailed defines model for PreconditionFailed.
+type PreconditionFailed = Problem
+
+// RateLimited defines model for RateLimited.
+type RateLimited = Problem
+
+// Unauthorized defines model for Unauthorized.
+type Unauthorized = Problem
+
+// apiKeyAuthContextKey is the context key for apiKeyAuth security scheme
+type apiKeyAuthContextKey string
+
+// bearerAuthContextKey is the context key for bearerAuth security scheme
+type bearerAuthContextKey string
+
+// ListTenantsParams defines parameters for ListTenants.
+type ListTenantsParams struct {
+	// Limit Max items to return (default 25, max 200).
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Cursor Opaque pagination cursor; obtained from a previous response.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// Sort Sort token. Default "-created_at".
+	Sort *Sort `form:"sort,omitempty" json:"sort,omitempty"`
+}
+
+// CreateTenantParams defines parameters for CreateTenant.
+type CreateTenantParams struct {
+	// IdempotencyKey 24-hour idempotency key (idem_<ulid>).
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// DeleteTenantParams defines parameters for DeleteTenant.
+type DeleteTenantParams struct {
+	// IfMatch Weak ETag from a prior GET; rejects on mismatch with 412.
+	IfMatch IfMatch `json:"If-Match"`
+}
+
+// UpdateTenantParams defines parameters for UpdateTenant.
+type UpdateTenantParams struct {
+	// IfMatch Weak ETag from a prior GET; rejects on mismatch with 412.
+	IfMatch IfMatch `json:"If-Match"`
+
+	// IdempotencyKey 24-hour idempotency key (idem_<ulid>).
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// CreateTenantJSONRequestBody defines body for CreateTenant for application/json ContentType.
+type CreateTenantJSONRequestBody = CreateTenantRequest
+
+// UpdateTenantJSONRequestBody defines body for UpdateTenant for application/json ContentType.
+type UpdateTenantJSONRequestBody = UpdateTenantRequest
+
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 	// Liveness probe.
 	// (GET /healthz)
 	GetHealthz(w http.ResponseWriter, r *http.Request)
+	// List tenants visible to the caller's Deployment.
+	// (GET /v1/tenants)
+	ListTenants(w http.ResponseWriter, r *http.Request, params ListTenantsParams)
+	// Create a tenant. Auto-creates a default Organization.
+	// (POST /v1/tenants)
+	CreateTenant(w http.ResponseWriter, r *http.Request, params CreateTenantParams)
+	// Soft-delete a tenant. Retention applies before physical purge.
+	// (DELETE /v1/tenants/{tenant_id})
+	DeleteTenant(w http.ResponseWriter, r *http.Request, tenantId string, params DeleteTenantParams)
+	// Fetch a tenant by id.
+	// (GET /v1/tenants/{tenant_id})
+	GetTenant(w http.ResponseWriter, r *http.Request, tenantId string)
+	// Update a tenant. Idempotent. ETag concurrency control required.
+	// (PATCH /v1/tenants/{tenant_id})
+	UpdateTenant(w http.ResponseWriter, r *http.Request, tenantId string, params UpdateTenantParams)
 }
 
 // Unimplemented server implementation that returns http.StatusNotImplemented for each endpoint.
@@ -58,6 +297,36 @@ type Unimplemented struct{}
 // Liveness probe.
 // (GET /healthz)
 func (_ Unimplemented) GetHealthz(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// List tenants visible to the caller's Deployment.
+// (GET /v1/tenants)
+func (_ Unimplemented) ListTenants(w http.ResponseWriter, r *http.Request, params ListTenantsParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Create a tenant. Auto-creates a default Organization.
+// (POST /v1/tenants)
+func (_ Unimplemented) CreateTenant(w http.ResponseWriter, r *http.Request, params CreateTenantParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Soft-delete a tenant. Retention applies before physical purge.
+// (DELETE /v1/tenants/{tenant_id})
+func (_ Unimplemented) DeleteTenant(w http.ResponseWriter, r *http.Request, tenantId string, params DeleteTenantParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Fetch a tenant by id.
+// (GET /v1/tenants/{tenant_id})
+func (_ Unimplemented) GetTenant(w http.ResponseWriter, r *http.Request, tenantId string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Update a tenant. Idempotent. ETag concurrency control required.
+// (PATCH /v1/tenants/{tenant_id})
+func (_ Unimplemented) UpdateTenant(w http.ResponseWriter, r *http.Request, tenantId string, params UpdateTenantParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -75,6 +344,307 @@ func (siw *ServerInterfaceWrapper) GetHealthz(w http.ResponseWriter, r *http.Req
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetHealthz(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListTenants operation middleware
+func (siw *ServerInterfaceWrapper) ListTenants(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, ApiKeyAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListTenantsParams
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "sort" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "sort", r.URL.Query(), &params.Sort, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "sort"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sort", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListTenants(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateTenant operation middleware
+func (siw *ServerInterfaceWrapper) CreateTenant(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, ApiKeyAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateTenantParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateTenant(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteTenant operation middleware
+func (siw *ServerInterfaceWrapper) DeleteTenant(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "tenant_id" -------------
+	var tenantId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tenant_id", chi.URLParam(r, "tenant_id"), &tenantId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tenant_id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, ApiKeyAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params DeleteTenantParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch IfMatch
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = IfMatch
+
+	} else {
+		err := fmt.Errorf("Header parameter If-Match is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "If-Match", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteTenant(w, r, tenantId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetTenant operation middleware
+func (siw *ServerInterfaceWrapper) GetTenant(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "tenant_id" -------------
+	var tenantId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tenant_id", chi.URLParam(r, "tenant_id"), &tenantId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tenant_id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, ApiKeyAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetTenant(w, r, tenantId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateTenant operation middleware
+func (siw *ServerInterfaceWrapper) UpdateTenant(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "tenant_id" -------------
+	var tenantId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tenant_id", chi.URLParam(r, "tenant_id"), &tenantId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tenant_id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, ApiKeyAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params UpdateTenantParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch IfMatch
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = IfMatch
+
+	} else {
+		err := fmt.Errorf("Header parameter If-Match is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "If-Match", Err: err})
+		return
+	}
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateTenant(w, r, tenantId, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -200,9 +770,50 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/healthz", wrapper.GetHealthz)
 	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/tenants", wrapper.ListTenants)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/v1/tenants", wrapper.CreateTenant)
+	})
+	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/v1/tenants/{tenant_id}", wrapper.DeleteTenant)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/tenants/{tenant_id}", wrapper.GetTenant)
+	})
+	r.Group(func(r chi.Router) {
+		r.Patch(options.BaseURL+"/v1/tenants/{tenant_id}", wrapper.UpdateTenant)
+	})
 
 	return r
 }
+
+type CursorGoneApplicationProblemPlusJSONResponse Problem
+
+type ForbiddenApplicationProblemPlusJSONResponse Problem
+
+type IdempotencyConflictOrValidationApplicationProblemPlusJSONResponse Problem
+
+type IdempotencyInFlightApplicationProblemPlusJSONResponse Problem
+
+type NotFoundApplicationProblemPlusJSONResponse Problem
+
+type PreconditionFailedApplicationProblemPlusJSONResponse Problem
+
+type RateLimitedResponseHeaders struct {
+	RateLimitLimit     *int
+	RateLimitRemaining *int
+	RateLimitReset     *int
+	RetryAfter         *int
+}
+type RateLimitedApplicationProblemPlusJSONResponse struct {
+	Body Problem
+
+	Headers RateLimitedResponseHeaders
+}
+
+type UnauthorizedApplicationProblemPlusJSONResponse Problem
 
 type GetHealthzRequestObject struct {
 }
@@ -225,11 +836,468 @@ func (response GetHealthz200JSONResponse) VisitGetHealthzResponse(w http.Respons
 	return err
 }
 
+type ListTenantsRequestObject struct {
+	Params ListTenantsParams
+}
+
+type ListTenantsResponseObject interface {
+	VisitListTenantsResponse(w http.ResponseWriter) error
+}
+
+type ListTenants200JSONResponse TenantListResponse
+
+func (response ListTenants200JSONResponse) VisitListTenantsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListTenants401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ListTenants401ApplicationProblemPlusJSONResponse) VisitListTenantsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListTenants410ApplicationProblemPlusJSONResponse struct {
+	CursorGoneApplicationProblemPlusJSONResponse
+}
+
+func (response ListTenants410ApplicationProblemPlusJSONResponse) VisitListTenantsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(410)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListTenants429ApplicationProblemPlusJSONResponse struct {
+	RateLimitedApplicationProblemPlusJSONResponse
+}
+
+func (response ListTenants429ApplicationProblemPlusJSONResponse) VisitListTenantsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.RateLimitLimit != nil {
+		w.Header().Set("RateLimit-Limit", fmt.Sprint(*response.Headers.RateLimitLimit))
+	}
+	if response.Headers.RateLimitRemaining != nil {
+		w.Header().Set("RateLimit-Remaining", fmt.Sprint(*response.Headers.RateLimitRemaining))
+	}
+	if response.Headers.RateLimitReset != nil {
+		w.Header().Set("RateLimit-Reset", fmt.Sprint(*response.Headers.RateLimitReset))
+	}
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateTenantRequestObject struct {
+	Params CreateTenantParams
+	Body   *CreateTenantJSONRequestBody
+}
+
+type CreateTenantResponseObject interface {
+	VisitCreateTenantResponse(w http.ResponseWriter) error
+}
+
+type CreateTenant201ResponseHeaders struct {
+	ETag     *string
+	Location *string
+}
+
+type CreateTenant201JSONResponse struct {
+	Body    TenantResponse
+	Headers CreateTenant201ResponseHeaders
+}
+
+func (response CreateTenant201JSONResponse) VisitCreateTenantResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	if response.Headers.Location != nil {
+		w.Header().Set("Location", fmt.Sprint(*response.Headers.Location))
+	}
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateTenant401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response CreateTenant401ApplicationProblemPlusJSONResponse) VisitCreateTenantResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateTenant409ApplicationProblemPlusJSONResponse struct {
+	IdempotencyInFlightApplicationProblemPlusJSONResponse
+}
+
+func (response CreateTenant409ApplicationProblemPlusJSONResponse) VisitCreateTenantResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateTenant422ApplicationProblemPlusJSONResponse struct {
+	IdempotencyConflictOrValidationApplicationProblemPlusJSONResponse
+}
+
+func (response CreateTenant422ApplicationProblemPlusJSONResponse) VisitCreateTenantResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteTenantRequestObject struct {
+	TenantId string `json:"tenant_id"`
+	Params   DeleteTenantParams
+}
+
+type DeleteTenantResponseObject interface {
+	VisitDeleteTenantResponse(w http.ResponseWriter) error
+}
+
+type DeleteTenant204Response struct {
+}
+
+func (response DeleteTenant204Response) VisitDeleteTenantResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type DeleteTenant401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteTenant401ApplicationProblemPlusJSONResponse) VisitDeleteTenantResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteTenant403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteTenant403ApplicationProblemPlusJSONResponse) VisitDeleteTenantResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteTenant404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteTenant404ApplicationProblemPlusJSONResponse) VisitDeleteTenantResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteTenant412ApplicationProblemPlusJSONResponse struct {
+	PreconditionFailedApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteTenant412ApplicationProblemPlusJSONResponse) VisitDeleteTenantResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetTenantRequestObject struct {
+	TenantId string `json:"tenant_id"`
+}
+
+type GetTenantResponseObject interface {
+	VisitGetTenantResponse(w http.ResponseWriter) error
+}
+
+type GetTenant200ResponseHeaders struct {
+	ETag *string
+}
+
+type GetTenant200JSONResponse struct {
+	Body    TenantResponse
+	Headers GetTenant200ResponseHeaders
+}
+
+func (response GetTenant200JSONResponse) VisitGetTenantResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetTenant401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response GetTenant401ApplicationProblemPlusJSONResponse) VisitGetTenantResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetTenant403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response GetTenant403ApplicationProblemPlusJSONResponse) VisitGetTenantResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetTenant404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response GetTenant404ApplicationProblemPlusJSONResponse) VisitGetTenantResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateTenantRequestObject struct {
+	TenantId string `json:"tenant_id"`
+	Params   UpdateTenantParams
+	Body     *UpdateTenantJSONRequestBody
+}
+
+type UpdateTenantResponseObject interface {
+	VisitUpdateTenantResponse(w http.ResponseWriter) error
+}
+
+type UpdateTenant200ResponseHeaders struct {
+	ETag *string
+}
+
+type UpdateTenant200JSONResponse struct {
+	Body    TenantResponse
+	Headers UpdateTenant200ResponseHeaders
+}
+
+func (response UpdateTenant200JSONResponse) VisitUpdateTenantResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateTenant401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateTenant401ApplicationProblemPlusJSONResponse) VisitUpdateTenantResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateTenant403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateTenant403ApplicationProblemPlusJSONResponse) VisitUpdateTenantResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateTenant404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateTenant404ApplicationProblemPlusJSONResponse) VisitUpdateTenantResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateTenant412ApplicationProblemPlusJSONResponse struct {
+	PreconditionFailedApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateTenant412ApplicationProblemPlusJSONResponse) VisitUpdateTenantResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateTenant422ApplicationProblemPlusJSONResponse struct {
+	IdempotencyConflictOrValidationApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateTenant422ApplicationProblemPlusJSONResponse) VisitUpdateTenantResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
 	// Liveness probe.
 	// (GET /healthz)
 	GetHealthz(ctx context.Context, request GetHealthzRequestObject) (GetHealthzResponseObject, error)
+	// List tenants visible to the caller's Deployment.
+	// (GET /v1/tenants)
+	ListTenants(ctx context.Context, request ListTenantsRequestObject) (ListTenantsResponseObject, error)
+	// Create a tenant. Auto-creates a default Organization.
+	// (POST /v1/tenants)
+	CreateTenant(ctx context.Context, request CreateTenantRequestObject) (CreateTenantResponseObject, error)
+	// Soft-delete a tenant. Retention applies before physical purge.
+	// (DELETE /v1/tenants/{tenant_id})
+	DeleteTenant(ctx context.Context, request DeleteTenantRequestObject) (DeleteTenantResponseObject, error)
+	// Fetch a tenant by id.
+	// (GET /v1/tenants/{tenant_id})
+	GetTenant(ctx context.Context, request GetTenantRequestObject) (GetTenantResponseObject, error)
+	// Update a tenant. Idempotent. ETag concurrency control required.
+	// (PATCH /v1/tenants/{tenant_id})
+	UpdateTenant(ctx context.Context, request UpdateTenantRequestObject) (UpdateTenantResponseObject, error)
 }
 
 type StrictHandlerFunc func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error)
@@ -285,20 +1353,200 @@ func (sh *strictHandler) GetHealthz(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// ListTenants operation middleware
+func (sh *strictHandler) ListTenants(w http.ResponseWriter, r *http.Request, params ListTenantsParams) {
+	var request ListTenantsRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListTenants(ctx, request.(ListTenantsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListTenants")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListTenantsResponseObject); ok {
+		if err := validResponse.VisitListTenantsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateTenant operation middleware
+func (sh *strictHandler) CreateTenant(w http.ResponseWriter, r *http.Request, params CreateTenantParams) {
+	var request CreateTenantRequestObject
+
+	request.Params = params
+
+	var body CreateTenantJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateTenant(ctx, request.(CreateTenantRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateTenant")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateTenantResponseObject); ok {
+		if err := validResponse.VisitCreateTenantResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteTenant operation middleware
+func (sh *strictHandler) DeleteTenant(w http.ResponseWriter, r *http.Request, tenantId string, params DeleteTenantParams) {
+	var request DeleteTenantRequestObject
+
+	request.TenantId = tenantId
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteTenant(ctx, request.(DeleteTenantRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteTenant")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteTenantResponseObject); ok {
+		if err := validResponse.VisitDeleteTenantResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetTenant operation middleware
+func (sh *strictHandler) GetTenant(w http.ResponseWriter, r *http.Request, tenantId string) {
+	var request GetTenantRequestObject
+
+	request.TenantId = tenantId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetTenant(ctx, request.(GetTenantRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetTenant")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetTenantResponseObject); ok {
+		if err := validResponse.VisitGetTenantResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateTenant operation middleware
+func (sh *strictHandler) UpdateTenant(w http.ResponseWriter, r *http.Request, tenantId string, params UpdateTenantParams) {
+	var request UpdateTenantRequestObject
+
+	request.TenantId = tenantId
+	request.Params = params
+
+	var body UpdateTenantJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateTenant(ctx, request.(UpdateTenantRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateTenant")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateTenantResponseObject); ok {
+		if err := validResponse.VisitUpdateTenantResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // Base64 encoded, compressed with deflate, json marshaled OpenAPI spec.
 // Stored as a slice of fixed-width chunks rather than one concatenated
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"bJLPb9NOEMX/ldV8vwdAxjbtzTekIlqB1Igeqxym8STesr/YGbuEyP87mnUgbcNtZI3fvnmfd4BN9CkG",
-	"CsLQHYA3A3ks4zWhk0GnlGOiLJbK90303opOsk8EHbBkG3YwV8CCMpYlCqOH7h7id1hX54sTZbYx/ENk",
-	"riDTj9Fm6vX/o+JJIz480kZg1kUbtlEleuJNtkmKIqwov+8pubj3FMT0KGiSw0Dm4+qmNreBzDREFpMo",
-	"m6vT4hh6yuZdzYhcR4+ZuQ4kNVQgVpw+fod4Z65UcPVHEJ4dA23d1h/0vpgoYLLQwWXd1pdQQUIZSjLN",
-	"UHL9pfOO5Nz/N5IxBzYXbWuerAwGDXt0zixZmIR7F7E3TwMFIwM9v9CyQWcnUtPKDFXzpocOPpNcHx/W",
-	"hDnFwAvPi7ZdsAahUPxgSs5uyr/NIy+YlmLo9H+mLXTwX3NqTnOsTXPsTKHz8qrbL4Utj95j3kMHX+1E",
-	"gZhNyvGhGBbcsTL3JAjrosGUNV3o7g8wZgcdDCKJu6Y5UJjm+pBy1D7Mr6kpFswWHxwd+zgtSW9xdAId",
-	"9DTBa4+fwmRzDKUN7MadedPTVGnuOxt2lTrt39bK9/jsS0n6iT45OpNdLcuL5DbmAu1UvFrjWv89/3Ud",
-	"lkgNht5oMApbwwrotZElq3k9/w4AAP//",
+	"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",
+	"yeq/AQAA//8=",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,
