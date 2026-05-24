@@ -14,16 +14,9 @@
 
 
 
-export interface Health {
-    'status': HealthStatusEnum;
-    'version'?: string;
-    'commit'?: string;
+export interface UpdateUserRequest {
+    'name'?: string;
+    'phone'?: string;
+    'metadata'?: { [key: string]: string; };
 }
-
-export const HealthStatusEnum = {
-    Ok: 'ok',
-} as const;
-
-export type HealthStatusEnum = typeof HealthStatusEnum[keyof typeof HealthStatusEnum];
-
 

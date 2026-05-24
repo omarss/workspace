@@ -14,34 +14,35 @@
 
 
 
-export interface Tenant {
+export interface User {
     'id': string;
-    'object': TenantObjectEnum;
-    'slug': string;
-    'name': string;
-    'status': TenantStatusEnum;
-    'default_organization_id'?: string;
+    'object': UserObjectEnum;
+    'tenant_id': string;
+    'email': string;
+    'email_verified': boolean;
+    'name'?: string;
+    'phone'?: string;
+    'status': UserStatusEnum;
     'metadata'?: { [key: string]: string; };
     'created_at': string;
     'updated_at': string;
-    'deleted_at'?: string;
     /**
      * Weak ETag, format W/\"v<sequence>\".
      */
     'etag': string;
 }
 
-export const TenantObjectEnum = {
-    Tenant: 'tenant',
+export const UserObjectEnum = {
+    User: 'user',
 } as const;
 
-export type TenantObjectEnum = typeof TenantObjectEnum[keyof typeof TenantObjectEnum];
-export const TenantStatusEnum = {
+export type UserObjectEnum = typeof UserObjectEnum[keyof typeof UserObjectEnum];
+export const UserStatusEnum = {
     Active: 'active',
-    Suspended: 'suspended',
+    Disabled: 'disabled',
     Deleted: 'deleted',
 } as const;
 
-export type TenantStatusEnum = typeof TenantStatusEnum[keyof typeof TenantStatusEnum];
+export type UserStatusEnum = typeof UserStatusEnum[keyof typeof UserStatusEnum];
 
 

@@ -13,17 +13,11 @@
  */
 
 
+// May contain unused imports in some cases
+// @ts-ignore
+import type { SocialProvider } from './social-provider';
 
-export interface Health {
-    'status': HealthStatusEnum;
-    'version'?: string;
-    'commit'?: string;
+export interface SocialProviderListResponse {
+    'data': Array<SocialProvider>;
 }
-
-export const HealthStatusEnum = {
-    Ok: 'ok',
-} as const;
-
-export type HealthStatusEnum = typeof HealthStatusEnum[keyof typeof HealthStatusEnum];
-
 

@@ -14,16 +14,9 @@
 
 
 
-export interface Health {
-    'status': HealthStatusEnum;
-    'version'?: string;
-    'commit'?: string;
+export interface LinkSocialProviderResponse {
+    'authorization_url': string;
+    'state': string;
+    'expires_at': string;
 }
-
-export const HealthStatusEnum = {
-    Ok: 'ok',
-} as const;
-
-export type HealthStatusEnum = typeof HealthStatusEnum[keyof typeof HealthStatusEnum];
-
 

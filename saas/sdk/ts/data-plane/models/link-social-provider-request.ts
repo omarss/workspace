@@ -14,16 +14,17 @@
 
 
 
-export interface Health {
-    'status': HealthStatusEnum;
-    'version'?: string;
-    'commit'?: string;
+export interface LinkSocialProviderRequest {
+    'provider': LinkSocialProviderRequestProviderEnum;
+    'return_to': string;
 }
 
-export const HealthStatusEnum = {
-    Ok: 'ok',
+export const LinkSocialProviderRequestProviderEnum = {
+    Google: 'google',
+    Github: 'github',
+    Apple: 'apple',
 } as const;
 
-export type HealthStatusEnum = typeof HealthStatusEnum[keyof typeof HealthStatusEnum];
+export type LinkSocialProviderRequestProviderEnum = typeof LinkSocialProviderRequestProviderEnum[keyof typeof LinkSocialProviderRequestProviderEnum];
 
 

@@ -14,16 +14,10 @@
 
 
 
-export interface Health {
-    'status': HealthStatusEnum;
-    'version'?: string;
-    'commit'?: string;
+export interface CreateUserRequest {
+    'email': string;
+    'name'?: string;
+    'send_verification_email'?: boolean;
+    'metadata'?: { [key: string]: string; };
 }
-
-export const HealthStatusEnum = {
-    Ok: 'ok',
-} as const;
-
-export type HealthStatusEnum = typeof HealthStatusEnum[keyof typeof HealthStatusEnum];
-
 

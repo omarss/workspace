@@ -20,6 +20,7 @@ import (
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/go-chi/chi/v5"
 	"github.com/oapi-codegen/runtime"
+	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
 const (
@@ -36,6 +37,48 @@ const (
 func (e HealthStatus) Valid() bool {
 	switch e {
 	case Ok:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for LinkSocialProviderRequestProvider.
+const (
+	LinkSocialProviderRequestProviderApple  LinkSocialProviderRequestProvider = "apple"
+	LinkSocialProviderRequestProviderGithub LinkSocialProviderRequestProvider = "github"
+	LinkSocialProviderRequestProviderGoogle LinkSocialProviderRequestProvider = "google"
+)
+
+// Valid indicates whether the value is a known member of the LinkSocialProviderRequestProvider enum.
+func (e LinkSocialProviderRequestProvider) Valid() bool {
+	switch e {
+	case LinkSocialProviderRequestProviderApple:
+		return true
+	case LinkSocialProviderRequestProviderGithub:
+		return true
+	case LinkSocialProviderRequestProviderGoogle:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SocialProviderProvider.
+const (
+	SocialProviderProviderApple  SocialProviderProvider = "apple"
+	SocialProviderProviderGithub SocialProviderProvider = "github"
+	SocialProviderProviderGoogle SocialProviderProvider = "google"
+)
+
+// Valid indicates whether the value is a known member of the SocialProviderProvider enum.
+func (e SocialProviderProvider) Valid() bool {
+	switch e {
+	case SocialProviderProviderApple:
+		return true
+	case SocialProviderProviderGithub:
+		return true
+	case SocialProviderProviderGoogle:
 		return true
 	default:
 		return false
@@ -96,11 +139,55 @@ func (e UpdateTenantRequestStatus) Valid() bool {
 	}
 }
 
+// Defines values for UserObject.
+const (
+	UserObjectUser UserObject = "user"
+)
+
+// Valid indicates whether the value is a known member of the UserObject enum.
+func (e UserObject) Valid() bool {
+	switch e {
+	case UserObjectUser:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for UserStatus.
+const (
+	Active   UserStatus = "active"
+	Deleted  UserStatus = "deleted"
+	Disabled UserStatus = "disabled"
+)
+
+// Valid indicates whether the value is a known member of the UserStatus enum.
+func (e UserStatus) Valid() bool {
+	switch e {
+	case Active:
+		return true
+	case Deleted:
+		return true
+	case Disabled:
+		return true
+	default:
+		return false
+	}
+}
+
 // CreateTenantRequest defines model for CreateTenantRequest.
 type CreateTenantRequest struct {
 	Metadata *Metadata `json:"metadata,omitempty"`
 	Name     string    `json:"name"`
 	Slug     string    `json:"slug"`
+}
+
+// CreateUserRequest defines model for CreateUserRequest.
+type CreateUserRequest struct {
+	Email                 openapi_types.Email `json:"email" pii:"true" sensitive:"true"`
+	Metadata              *Metadata           `json:"metadata,omitempty"`
+	Name                  *string             `json:"name,omitempty" pii:"true"`
+	SendVerificationEmail *bool               `json:"send_verification_email,omitempty"`
 }
 
 // FieldError defines model for FieldError.
@@ -120,6 +207,22 @@ type Health struct {
 // HealthStatus defines model for Health.Status.
 type HealthStatus string
 
+// LinkSocialProviderRequest defines model for LinkSocialProviderRequest.
+type LinkSocialProviderRequest struct {
+	Provider LinkSocialProviderRequestProvider `json:"provider"`
+	ReturnTo string                            `json:"return_to"`
+}
+
+// LinkSocialProviderRequestProvider defines model for LinkSocialProviderRequest.Provider.
+type LinkSocialProviderRequestProvider string
+
+// LinkSocialProviderResponse defines model for LinkSocialProviderResponse.
+type LinkSocialProviderResponse struct {
+	AuthorizationUrl string    `json:"authorization_url"`
+	ExpiresAt        time.Time `json:"expires_at"`
+	State            string    `json:"state"`
+}
+
 // Metadata defines model for Metadata.
 type Metadata map[string]string
 
@@ -138,6 +241,21 @@ type Problem struct {
 	Status    int           `json:"status"`
 	Title     string        `json:"title"`
 	Type      string        `json:"type"`
+}
+
+// SocialProvider defines model for SocialProvider.
+type SocialProvider struct {
+	ExternalSubject string                 `json:"external_subject" sensitive:"true"`
+	LinkedAt        time.Time              `json:"linked_at"`
+	Provider        SocialProviderProvider `json:"provider"`
+}
+
+// SocialProviderProvider defines model for SocialProvider.Provider.
+type SocialProviderProvider string
+
+// SocialProviderListResponse defines model for SocialProviderListResponse.
+type SocialProviderListResponse struct {
+	Data []SocialProvider `json:"data"`
 }
 
 // Tenant defines model for Tenant.
@@ -183,6 +301,48 @@ type UpdateTenantRequest struct {
 
 // UpdateTenantRequestStatus defines model for UpdateTenantRequest.Status.
 type UpdateTenantRequestStatus string
+
+// UpdateUserRequest defines model for UpdateUserRequest.
+type UpdateUserRequest struct {
+	Metadata *Metadata `json:"metadata,omitempty"`
+	Name     *string   `json:"name,omitempty" pii:"true"`
+	Phone    *string   `json:"phone,omitempty" pii:"true" sensitive:"true"`
+}
+
+// User defines model for User.
+type User struct {
+	CreatedAt     time.Time           `json:"created_at"`
+	Email         openapi_types.Email `json:"email" pii:"true" sensitive:"true"`
+	EmailVerified bool                `json:"email_verified"`
+
+	// Etag Weak ETag, format W/"v<sequence>".
+	Etag      string     `json:"etag"`
+	Id        string     `json:"id"`
+	Metadata  *Metadata  `json:"metadata,omitempty"`
+	Name      *string    `json:"name,omitempty" pii:"true"`
+	Object    UserObject `json:"object"`
+	Phone     *string    `json:"phone,omitempty" pii:"true" sensitive:"true"`
+	Status    UserStatus `json:"status"`
+	TenantId  string     `json:"tenant_id"`
+	UpdatedAt time.Time  `json:"updated_at"`
+}
+
+// UserObject defines model for User.Object.
+type UserObject string
+
+// UserStatus defines model for User.Status.
+type UserStatus string
+
+// UserListResponse defines model for UserListResponse.
+type UserListResponse struct {
+	Data       []User     `json:"data"`
+	Pagination Pagination `json:"pagination"`
+}
+
+// UserResponse defines model for UserResponse.
+type UserResponse struct {
+	Data User `json:"data"`
+}
 
 // Cursor defines model for Cursor.
 type Cursor = string
@@ -262,11 +422,86 @@ type UpdateTenantParams struct {
 	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
 }
 
+// ListUsersParams defines parameters for ListUsers.
+type ListUsersParams struct {
+	// Limit Max items to return (default 25, max 200).
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Cursor Opaque pagination cursor; obtained from a previous response.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// Sort Sort token. Default "-created_at".
+	Sort *Sort `form:"sort,omitempty" json:"sort,omitempty"`
+
+	// Email HMAC-prefix lookup; matches on email_lookup_hash.
+	Email *openapi_types.Email `form:"email,omitempty" json:"email,omitempty"`
+}
+
+// CreateUserParams defines parameters for CreateUser.
+type CreateUserParams struct {
+	// IdempotencyKey 24-hour idempotency key (idem_<ulid>).
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// DeleteUserParams defines parameters for DeleteUser.
+type DeleteUserParams struct {
+	// IfMatch Weak ETag from a prior GET; rejects on mismatch with 412.
+	IfMatch IfMatch `json:"If-Match"`
+}
+
+// UpdateUserParams defines parameters for UpdateUser.
+type UpdateUserParams struct {
+	// IfMatch Weak ETag from a prior GET; rejects on mismatch with 412.
+	IfMatch IfMatch `json:"If-Match"`
+
+	// IdempotencyKey 24-hour idempotency key (idem_<ulid>).
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// DisableUserParams defines parameters for DisableUser.
+type DisableUserParams struct {
+	// IdempotencyKey 24-hour idempotency key (idem_<ulid>).
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// EnableUserParams defines parameters for EnableUser.
+type EnableUserParams struct {
+	// IdempotencyKey 24-hour idempotency key (idem_<ulid>).
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// TriggerPasswordResetParams defines parameters for TriggerPasswordReset.
+type TriggerPasswordResetParams struct {
+	// IdempotencyKey 24-hour idempotency key (idem_<ulid>).
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// LinkSocialProviderParams defines parameters for LinkSocialProvider.
+type LinkSocialProviderParams struct {
+	// IdempotencyKey 24-hour idempotency key (idem_<ulid>).
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// TriggerEmailVerifyParams defines parameters for TriggerEmailVerify.
+type TriggerEmailVerifyParams struct {
+	// IdempotencyKey 24-hour idempotency key (idem_<ulid>).
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
 // CreateTenantJSONRequestBody defines body for CreateTenant for application/json ContentType.
 type CreateTenantJSONRequestBody = CreateTenantRequest
 
 // UpdateTenantJSONRequestBody defines body for UpdateTenant for application/json ContentType.
 type UpdateTenantJSONRequestBody = UpdateTenantRequest
+
+// CreateUserJSONRequestBody defines body for CreateUser for application/json ContentType.
+type CreateUserJSONRequestBody = CreateUserRequest
+
+// UpdateUserJSONRequestBody defines body for UpdateUser for application/json ContentType.
+type UpdateUserJSONRequestBody = UpdateUserRequest
+
+// LinkSocialProviderJSONRequestBody defines body for LinkSocialProvider for application/json ContentType.
+type LinkSocialProviderJSONRequestBody = LinkSocialProviderRequest
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
@@ -288,6 +523,42 @@ type ServerInterface interface {
 	// Update a tenant. Idempotent. ETag concurrency control required.
 	// (PATCH /v1/tenants/{tenant_id})
 	UpdateTenant(w http.ResponseWriter, r *http.Request, tenantId string, params UpdateTenantParams)
+	// List users in the caller's tenant.
+	// (GET /v1/users)
+	ListUsers(w http.ResponseWriter, r *http.Request, params ListUsersParams)
+	// Create a platform user. Mirrors the row into Keycloak.
+	// (POST /v1/users)
+	CreateUser(w http.ResponseWriter, r *http.Request, params CreateUserParams)
+	// Soft-delete a platform user. Disables the Keycloak user.
+	// (DELETE /v1/users/{user_id})
+	DeleteUser(w http.ResponseWriter, r *http.Request, userId string, params DeleteUserParams)
+	// Fetch a platform user by id.
+	// (GET /v1/users/{user_id})
+	GetUser(w http.ResponseWriter, r *http.Request, userId string)
+	// Update a platform user. ETag concurrency control required.
+	// (PATCH /v1/users/{user_id})
+	UpdateUser(w http.ResponseWriter, r *http.Request, userId string, params UpdateUserParams)
+	// Disable a platform user. Emits user.disabled.
+	// (POST /v1/users/{user_id}/disable)
+	DisableUser(w http.ResponseWriter, r *http.Request, userId string, params DisableUserParams)
+	// Enable a previously-disabled platform user.
+	// (POST /v1/users/{user_id}/enable)
+	EnableUser(w http.ResponseWriter, r *http.Request, userId string, params EnableUserParams)
+	// Trigger a password-reset email via Keycloak.
+	// (POST /v1/users/{user_id}/reset-password)
+	TriggerPasswordReset(w http.ResponseWriter, r *http.Request, userId string, params TriggerPasswordResetParams)
+	// List linked social providers for a user.
+	// (GET /v1/users/{user_id}/social-providers)
+	ListSocialProviders(w http.ResponseWriter, r *http.Request, userId string)
+	// Start a social-provider link flow. Returns the Keycloak link URL.
+	// (POST /v1/users/{user_id}/social-providers)
+	LinkSocialProvider(w http.ResponseWriter, r *http.Request, userId string, params LinkSocialProviderParams)
+	// Unlink a social provider. Emits user.social_unlinked.
+	// (DELETE /v1/users/{user_id}/social-providers/{provider})
+	UnlinkSocialProvider(w http.ResponseWriter, r *http.Request, userId string, provider string)
+	// Trigger an email-verification action via Keycloak.
+	// (POST /v1/users/{user_id}/verify-email)
+	TriggerEmailVerify(w http.ResponseWriter, r *http.Request, userId string, params TriggerEmailVerifyParams)
 }
 
 // Unimplemented server implementation that returns http.StatusNotImplemented for each endpoint.
@@ -327,6 +598,78 @@ func (_ Unimplemented) GetTenant(w http.ResponseWriter, r *http.Request, tenantI
 // Update a tenant. Idempotent. ETag concurrency control required.
 // (PATCH /v1/tenants/{tenant_id})
 func (_ Unimplemented) UpdateTenant(w http.ResponseWriter, r *http.Request, tenantId string, params UpdateTenantParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// List users in the caller's tenant.
+// (GET /v1/users)
+func (_ Unimplemented) ListUsers(w http.ResponseWriter, r *http.Request, params ListUsersParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Create a platform user. Mirrors the row into Keycloak.
+// (POST /v1/users)
+func (_ Unimplemented) CreateUser(w http.ResponseWriter, r *http.Request, params CreateUserParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Soft-delete a platform user. Disables the Keycloak user.
+// (DELETE /v1/users/{user_id})
+func (_ Unimplemented) DeleteUser(w http.ResponseWriter, r *http.Request, userId string, params DeleteUserParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Fetch a platform user by id.
+// (GET /v1/users/{user_id})
+func (_ Unimplemented) GetUser(w http.ResponseWriter, r *http.Request, userId string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Update a platform user. ETag concurrency control required.
+// (PATCH /v1/users/{user_id})
+func (_ Unimplemented) UpdateUser(w http.ResponseWriter, r *http.Request, userId string, params UpdateUserParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Disable a platform user. Emits user.disabled.
+// (POST /v1/users/{user_id}/disable)
+func (_ Unimplemented) DisableUser(w http.ResponseWriter, r *http.Request, userId string, params DisableUserParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Enable a previously-disabled platform user.
+// (POST /v1/users/{user_id}/enable)
+func (_ Unimplemented) EnableUser(w http.ResponseWriter, r *http.Request, userId string, params EnableUserParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Trigger a password-reset email via Keycloak.
+// (POST /v1/users/{user_id}/reset-password)
+func (_ Unimplemented) TriggerPasswordReset(w http.ResponseWriter, r *http.Request, userId string, params TriggerPasswordResetParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// List linked social providers for a user.
+// (GET /v1/users/{user_id}/social-providers)
+func (_ Unimplemented) ListSocialProviders(w http.ResponseWriter, r *http.Request, userId string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Start a social-provider link flow. Returns the Keycloak link URL.
+// (POST /v1/users/{user_id}/social-providers)
+func (_ Unimplemented) LinkSocialProvider(w http.ResponseWriter, r *http.Request, userId string, params LinkSocialProviderParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Unlink a social provider. Emits user.social_unlinked.
+// (DELETE /v1/users/{user_id}/social-providers/{provider})
+func (_ Unimplemented) UnlinkSocialProvider(w http.ResponseWriter, r *http.Request, userId string, provider string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Trigger an email-verification action via Keycloak.
+// (POST /v1/users/{user_id}/verify-email)
+func (_ Unimplemented) TriggerEmailVerify(w http.ResponseWriter, r *http.Request, userId string, params TriggerEmailVerifyParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -654,6 +997,707 @@ func (siw *ServerInterfaceWrapper) UpdateTenant(w http.ResponseWriter, r *http.R
 	handler.ServeHTTP(w, r)
 }
 
+// ListUsers operation middleware
+func (siw *ServerInterfaceWrapper) ListUsers(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, ApiKeyAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListUsersParams
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "sort" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "sort", r.URL.Query(), &params.Sort, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "sort"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sort", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "email" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "email", r.URL.Query(), &params.Email, runtime.BindQueryParameterOptions{Type: "string", Format: "email"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "email"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "email", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListUsers(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateUser operation middleware
+func (siw *ServerInterfaceWrapper) CreateUser(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, ApiKeyAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateUserParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateUser(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteUser operation middleware
+func (siw *ServerInterfaceWrapper) DeleteUser(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "user_id" -------------
+	var userId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "user_id", chi.URLParam(r, "user_id"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "user_id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, ApiKeyAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params DeleteUserParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch IfMatch
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = IfMatch
+
+	} else {
+		err := fmt.Errorf("Header parameter If-Match is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "If-Match", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteUser(w, r, userId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetUser operation middleware
+func (siw *ServerInterfaceWrapper) GetUser(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "user_id" -------------
+	var userId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "user_id", chi.URLParam(r, "user_id"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "user_id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, ApiKeyAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetUser(w, r, userId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateUser operation middleware
+func (siw *ServerInterfaceWrapper) UpdateUser(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "user_id" -------------
+	var userId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "user_id", chi.URLParam(r, "user_id"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "user_id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, ApiKeyAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params UpdateUserParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch IfMatch
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = IfMatch
+
+	} else {
+		err := fmt.Errorf("Header parameter If-Match is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "If-Match", Err: err})
+		return
+	}
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateUser(w, r, userId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DisableUser operation middleware
+func (siw *ServerInterfaceWrapper) DisableUser(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "user_id" -------------
+	var userId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "user_id", chi.URLParam(r, "user_id"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "user_id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, ApiKeyAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params DisableUserParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DisableUser(w, r, userId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// EnableUser operation middleware
+func (siw *ServerInterfaceWrapper) EnableUser(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "user_id" -------------
+	var userId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "user_id", chi.URLParam(r, "user_id"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "user_id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, ApiKeyAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params EnableUserParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.EnableUser(w, r, userId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// TriggerPasswordReset operation middleware
+func (siw *ServerInterfaceWrapper) TriggerPasswordReset(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "user_id" -------------
+	var userId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "user_id", chi.URLParam(r, "user_id"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "user_id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, ApiKeyAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params TriggerPasswordResetParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.TriggerPasswordReset(w, r, userId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListSocialProviders operation middleware
+func (siw *ServerInterfaceWrapper) ListSocialProviders(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "user_id" -------------
+	var userId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "user_id", chi.URLParam(r, "user_id"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "user_id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, ApiKeyAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListSocialProviders(w, r, userId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// LinkSocialProvider operation middleware
+func (siw *ServerInterfaceWrapper) LinkSocialProvider(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "user_id" -------------
+	var userId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "user_id", chi.URLParam(r, "user_id"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "user_id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, ApiKeyAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params LinkSocialProviderParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.LinkSocialProvider(w, r, userId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UnlinkSocialProvider operation middleware
+func (siw *ServerInterfaceWrapper) UnlinkSocialProvider(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "user_id" -------------
+	var userId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "user_id", chi.URLParam(r, "user_id"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "user_id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "provider" -------------
+	var provider string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "provider", chi.URLParam(r, "provider"), &provider, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "provider", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, ApiKeyAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UnlinkSocialProvider(w, r, userId, provider)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// TriggerEmailVerify operation middleware
+func (siw *ServerInterfaceWrapper) TriggerEmailVerify(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "user_id" -------------
+	var userId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "user_id", chi.URLParam(r, "user_id"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "user_id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, ApiKeyAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params TriggerEmailVerifyParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.TriggerEmailVerify(w, r, userId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 type UnescapedCookieParamError struct {
 	ParamName string
 	Err       error
@@ -784,6 +1828,42 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Patch(options.BaseURL+"/v1/tenants/{tenant_id}", wrapper.UpdateTenant)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/users", wrapper.ListUsers)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/v1/users", wrapper.CreateUser)
+	})
+	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/v1/users/{user_id}", wrapper.DeleteUser)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/users/{user_id}", wrapper.GetUser)
+	})
+	r.Group(func(r chi.Router) {
+		r.Patch(options.BaseURL+"/v1/users/{user_id}", wrapper.UpdateUser)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/v1/users/{user_id}/disable", wrapper.DisableUser)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/v1/users/{user_id}/enable", wrapper.EnableUser)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/v1/users/{user_id}/reset-password", wrapper.TriggerPasswordReset)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/users/{user_id}/social-providers", wrapper.ListSocialProviders)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/v1/users/{user_id}/social-providers", wrapper.LinkSocialProvider)
+	})
+	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/v1/users/{user_id}/social-providers/{provider}", wrapper.UnlinkSocialProvider)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/v1/users/{user_id}/verify-email", wrapper.TriggerEmailVerify)
 	})
 
 	return r
@@ -1278,6 +2358,943 @@ func (response UpdateTenant422ApplicationProblemPlusJSONResponse) VisitUpdateTen
 	return err
 }
 
+type ListUsersRequestObject struct {
+	Params ListUsersParams
+}
+
+type ListUsersResponseObject interface {
+	VisitListUsersResponse(w http.ResponseWriter) error
+}
+
+type ListUsers200JSONResponse UserListResponse
+
+func (response ListUsers200JSONResponse) VisitListUsersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListUsers401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ListUsers401ApplicationProblemPlusJSONResponse) VisitListUsersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListUsers410ApplicationProblemPlusJSONResponse struct {
+	CursorGoneApplicationProblemPlusJSONResponse
+}
+
+func (response ListUsers410ApplicationProblemPlusJSONResponse) VisitListUsersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(410)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListUsers429ApplicationProblemPlusJSONResponse struct {
+	RateLimitedApplicationProblemPlusJSONResponse
+}
+
+func (response ListUsers429ApplicationProblemPlusJSONResponse) VisitListUsersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.RateLimitLimit != nil {
+		w.Header().Set("RateLimit-Limit", fmt.Sprint(*response.Headers.RateLimitLimit))
+	}
+	if response.Headers.RateLimitRemaining != nil {
+		w.Header().Set("RateLimit-Remaining", fmt.Sprint(*response.Headers.RateLimitRemaining))
+	}
+	if response.Headers.RateLimitReset != nil {
+		w.Header().Set("RateLimit-Reset", fmt.Sprint(*response.Headers.RateLimitReset))
+	}
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateUserRequestObject struct {
+	Params CreateUserParams
+	Body   *CreateUserJSONRequestBody
+}
+
+type CreateUserResponseObject interface {
+	VisitCreateUserResponse(w http.ResponseWriter) error
+}
+
+type CreateUser201ResponseHeaders struct {
+	ETag     *string
+	Location *string
+}
+
+type CreateUser201JSONResponse struct {
+	Body    UserResponse
+	Headers CreateUser201ResponseHeaders
+}
+
+func (response CreateUser201JSONResponse) VisitCreateUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	if response.Headers.Location != nil {
+		w.Header().Set("Location", fmt.Sprint(*response.Headers.Location))
+	}
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateUser401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response CreateUser401ApplicationProblemPlusJSONResponse) VisitCreateUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateUser409ApplicationProblemPlusJSONResponse struct {
+	IdempotencyInFlightApplicationProblemPlusJSONResponse
+}
+
+func (response CreateUser409ApplicationProblemPlusJSONResponse) VisitCreateUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateUser422ApplicationProblemPlusJSONResponse struct {
+	IdempotencyConflictOrValidationApplicationProblemPlusJSONResponse
+}
+
+func (response CreateUser422ApplicationProblemPlusJSONResponse) VisitCreateUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteUserRequestObject struct {
+	UserId string `json:"user_id"`
+	Params DeleteUserParams
+}
+
+type DeleteUserResponseObject interface {
+	VisitDeleteUserResponse(w http.ResponseWriter) error
+}
+
+type DeleteUser204Response struct {
+}
+
+func (response DeleteUser204Response) VisitDeleteUserResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type DeleteUser401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteUser401ApplicationProblemPlusJSONResponse) VisitDeleteUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteUser403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteUser403ApplicationProblemPlusJSONResponse) VisitDeleteUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteUser404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteUser404ApplicationProblemPlusJSONResponse) VisitDeleteUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteUser412ApplicationProblemPlusJSONResponse struct {
+	PreconditionFailedApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteUser412ApplicationProblemPlusJSONResponse) VisitDeleteUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetUserRequestObject struct {
+	UserId string `json:"user_id"`
+}
+
+type GetUserResponseObject interface {
+	VisitGetUserResponse(w http.ResponseWriter) error
+}
+
+type GetUser200ResponseHeaders struct {
+	ETag *string
+}
+
+type GetUser200JSONResponse struct {
+	Body    UserResponse
+	Headers GetUser200ResponseHeaders
+}
+
+func (response GetUser200JSONResponse) VisitGetUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetUser401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response GetUser401ApplicationProblemPlusJSONResponse) VisitGetUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetUser403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response GetUser403ApplicationProblemPlusJSONResponse) VisitGetUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetUser404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response GetUser404ApplicationProblemPlusJSONResponse) VisitGetUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateUserRequestObject struct {
+	UserId string `json:"user_id"`
+	Params UpdateUserParams
+	Body   *UpdateUserJSONRequestBody
+}
+
+type UpdateUserResponseObject interface {
+	VisitUpdateUserResponse(w http.ResponseWriter) error
+}
+
+type UpdateUser200ResponseHeaders struct {
+	ETag *string
+}
+
+type UpdateUser200JSONResponse struct {
+	Body    UserResponse
+	Headers UpdateUser200ResponseHeaders
+}
+
+func (response UpdateUser200JSONResponse) VisitUpdateUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateUser401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateUser401ApplicationProblemPlusJSONResponse) VisitUpdateUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateUser403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateUser403ApplicationProblemPlusJSONResponse) VisitUpdateUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateUser404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateUser404ApplicationProblemPlusJSONResponse) VisitUpdateUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateUser412ApplicationProblemPlusJSONResponse struct {
+	PreconditionFailedApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateUser412ApplicationProblemPlusJSONResponse) VisitUpdateUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateUser422ApplicationProblemPlusJSONResponse struct {
+	IdempotencyConflictOrValidationApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateUser422ApplicationProblemPlusJSONResponse) VisitUpdateUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DisableUserRequestObject struct {
+	UserId string `json:"user_id"`
+	Params DisableUserParams
+}
+
+type DisableUserResponseObject interface {
+	VisitDisableUserResponse(w http.ResponseWriter) error
+}
+
+type DisableUser200JSONResponse UserResponse
+
+func (response DisableUser200JSONResponse) VisitDisableUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DisableUser401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response DisableUser401ApplicationProblemPlusJSONResponse) VisitDisableUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DisableUser403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response DisableUser403ApplicationProblemPlusJSONResponse) VisitDisableUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DisableUser404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response DisableUser404ApplicationProblemPlusJSONResponse) VisitDisableUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type EnableUserRequestObject struct {
+	UserId string `json:"user_id"`
+	Params EnableUserParams
+}
+
+type EnableUserResponseObject interface {
+	VisitEnableUserResponse(w http.ResponseWriter) error
+}
+
+type EnableUser200JSONResponse UserResponse
+
+func (response EnableUser200JSONResponse) VisitEnableUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type EnableUser401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response EnableUser401ApplicationProblemPlusJSONResponse) VisitEnableUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type EnableUser403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response EnableUser403ApplicationProblemPlusJSONResponse) VisitEnableUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type EnableUser404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response EnableUser404ApplicationProblemPlusJSONResponse) VisitEnableUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type TriggerPasswordResetRequestObject struct {
+	UserId string `json:"user_id"`
+	Params TriggerPasswordResetParams
+}
+
+type TriggerPasswordResetResponseObject interface {
+	VisitTriggerPasswordResetResponse(w http.ResponseWriter) error
+}
+
+type TriggerPasswordReset202Response struct {
+}
+
+func (response TriggerPasswordReset202Response) VisitTriggerPasswordResetResponse(w http.ResponseWriter) error {
+	w.WriteHeader(202)
+	return nil
+}
+
+type TriggerPasswordReset401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response TriggerPasswordReset401ApplicationProblemPlusJSONResponse) VisitTriggerPasswordResetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type TriggerPasswordReset403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response TriggerPasswordReset403ApplicationProblemPlusJSONResponse) VisitTriggerPasswordResetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type TriggerPasswordReset404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response TriggerPasswordReset404ApplicationProblemPlusJSONResponse) VisitTriggerPasswordResetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListSocialProvidersRequestObject struct {
+	UserId string `json:"user_id"`
+}
+
+type ListSocialProvidersResponseObject interface {
+	VisitListSocialProvidersResponse(w http.ResponseWriter) error
+}
+
+type ListSocialProviders200JSONResponse SocialProviderListResponse
+
+func (response ListSocialProviders200JSONResponse) VisitListSocialProvidersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListSocialProviders401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ListSocialProviders401ApplicationProblemPlusJSONResponse) VisitListSocialProvidersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListSocialProviders403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListSocialProviders403ApplicationProblemPlusJSONResponse) VisitListSocialProvidersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListSocialProviders404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ListSocialProviders404ApplicationProblemPlusJSONResponse) VisitListSocialProvidersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type LinkSocialProviderRequestObject struct {
+	UserId string `json:"user_id"`
+	Params LinkSocialProviderParams
+	Body   *LinkSocialProviderJSONRequestBody
+}
+
+type LinkSocialProviderResponseObject interface {
+	VisitLinkSocialProviderResponse(w http.ResponseWriter) error
+}
+
+type LinkSocialProvider202JSONResponse LinkSocialProviderResponse
+
+func (response LinkSocialProvider202JSONResponse) VisitLinkSocialProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(202)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type LinkSocialProvider401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response LinkSocialProvider401ApplicationProblemPlusJSONResponse) VisitLinkSocialProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type LinkSocialProvider403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response LinkSocialProvider403ApplicationProblemPlusJSONResponse) VisitLinkSocialProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type LinkSocialProvider404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response LinkSocialProvider404ApplicationProblemPlusJSONResponse) VisitLinkSocialProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type LinkSocialProvider422ApplicationProblemPlusJSONResponse struct {
+	IdempotencyConflictOrValidationApplicationProblemPlusJSONResponse
+}
+
+func (response LinkSocialProvider422ApplicationProblemPlusJSONResponse) VisitLinkSocialProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UnlinkSocialProviderRequestObject struct {
+	UserId   string `json:"user_id"`
+	Provider string `json:"provider"`
+}
+
+type UnlinkSocialProviderResponseObject interface {
+	VisitUnlinkSocialProviderResponse(w http.ResponseWriter) error
+}
+
+type UnlinkSocialProvider204Response struct {
+}
+
+func (response UnlinkSocialProvider204Response) VisitUnlinkSocialProviderResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type UnlinkSocialProvider401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response UnlinkSocialProvider401ApplicationProblemPlusJSONResponse) VisitUnlinkSocialProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UnlinkSocialProvider403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response UnlinkSocialProvider403ApplicationProblemPlusJSONResponse) VisitUnlinkSocialProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UnlinkSocialProvider404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response UnlinkSocialProvider404ApplicationProblemPlusJSONResponse) VisitUnlinkSocialProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type TriggerEmailVerifyRequestObject struct {
+	UserId string `json:"user_id"`
+	Params TriggerEmailVerifyParams
+}
+
+type TriggerEmailVerifyResponseObject interface {
+	VisitTriggerEmailVerifyResponse(w http.ResponseWriter) error
+}
+
+type TriggerEmailVerify202Response struct {
+}
+
+func (response TriggerEmailVerify202Response) VisitTriggerEmailVerifyResponse(w http.ResponseWriter) error {
+	w.WriteHeader(202)
+	return nil
+}
+
+type TriggerEmailVerify401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response TriggerEmailVerify401ApplicationProblemPlusJSONResponse) VisitTriggerEmailVerifyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type TriggerEmailVerify403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response TriggerEmailVerify403ApplicationProblemPlusJSONResponse) VisitTriggerEmailVerifyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type TriggerEmailVerify404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response TriggerEmailVerify404ApplicationProblemPlusJSONResponse) VisitTriggerEmailVerifyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
 	// Liveness probe.
@@ -1298,6 +3315,42 @@ type StrictServerInterface interface {
 	// Update a tenant. Idempotent. ETag concurrency control required.
 	// (PATCH /v1/tenants/{tenant_id})
 	UpdateTenant(ctx context.Context, request UpdateTenantRequestObject) (UpdateTenantResponseObject, error)
+	// List users in the caller's tenant.
+	// (GET /v1/users)
+	ListUsers(ctx context.Context, request ListUsersRequestObject) (ListUsersResponseObject, error)
+	// Create a platform user. Mirrors the row into Keycloak.
+	// (POST /v1/users)
+	CreateUser(ctx context.Context, request CreateUserRequestObject) (CreateUserResponseObject, error)
+	// Soft-delete a platform user. Disables the Keycloak user.
+	// (DELETE /v1/users/{user_id})
+	DeleteUser(ctx context.Context, request DeleteUserRequestObject) (DeleteUserResponseObject, error)
+	// Fetch a platform user by id.
+	// (GET /v1/users/{user_id})
+	GetUser(ctx context.Context, request GetUserRequestObject) (GetUserResponseObject, error)
+	// Update a platform user. ETag concurrency control required.
+	// (PATCH /v1/users/{user_id})
+	UpdateUser(ctx context.Context, request UpdateUserRequestObject) (UpdateUserResponseObject, error)
+	// Disable a platform user. Emits user.disabled.
+	// (POST /v1/users/{user_id}/disable)
+	DisableUser(ctx context.Context, request DisableUserRequestObject) (DisableUserResponseObject, error)
+	// Enable a previously-disabled platform user.
+	// (POST /v1/users/{user_id}/enable)
+	EnableUser(ctx context.Context, request EnableUserRequestObject) (EnableUserResponseObject, error)
+	// Trigger a password-reset email via Keycloak.
+	// (POST /v1/users/{user_id}/reset-password)
+	TriggerPasswordReset(ctx context.Context, request TriggerPasswordResetRequestObject) (TriggerPasswordResetResponseObject, error)
+	// List linked social providers for a user.
+	// (GET /v1/users/{user_id}/social-providers)
+	ListSocialProviders(ctx context.Context, request ListSocialProvidersRequestObject) (ListSocialProvidersResponseObject, error)
+	// Start a social-provider link flow. Returns the Keycloak link URL.
+	// (POST /v1/users/{user_id}/social-providers)
+	LinkSocialProvider(ctx context.Context, request LinkSocialProviderRequestObject) (LinkSocialProviderResponseObject, error)
+	// Unlink a social provider. Emits user.social_unlinked.
+	// (DELETE /v1/users/{user_id}/social-providers/{provider})
+	UnlinkSocialProvider(ctx context.Context, request UnlinkSocialProviderRequestObject) (UnlinkSocialProviderResponseObject, error)
+	// Trigger an email-verification action via Keycloak.
+	// (POST /v1/users/{user_id}/verify-email)
+	TriggerEmailVerify(ctx context.Context, request TriggerEmailVerifyRequestObject) (TriggerEmailVerifyResponseObject, error)
 }
 
 type StrictHandlerFunc func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error)
@@ -1499,54 +3552,422 @@ func (sh *strictHandler) UpdateTenant(w http.ResponseWriter, r *http.Request, te
 	}
 }
 
+// ListUsers operation middleware
+func (sh *strictHandler) ListUsers(w http.ResponseWriter, r *http.Request, params ListUsersParams) {
+	var request ListUsersRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListUsers(ctx, request.(ListUsersRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListUsers")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListUsersResponseObject); ok {
+		if err := validResponse.VisitListUsersResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateUser operation middleware
+func (sh *strictHandler) CreateUser(w http.ResponseWriter, r *http.Request, params CreateUserParams) {
+	var request CreateUserRequestObject
+
+	request.Params = params
+
+	var body CreateUserJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateUser(ctx, request.(CreateUserRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateUser")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateUserResponseObject); ok {
+		if err := validResponse.VisitCreateUserResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteUser operation middleware
+func (sh *strictHandler) DeleteUser(w http.ResponseWriter, r *http.Request, userId string, params DeleteUserParams) {
+	var request DeleteUserRequestObject
+
+	request.UserId = userId
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteUser(ctx, request.(DeleteUserRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteUser")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteUserResponseObject); ok {
+		if err := validResponse.VisitDeleteUserResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetUser operation middleware
+func (sh *strictHandler) GetUser(w http.ResponseWriter, r *http.Request, userId string) {
+	var request GetUserRequestObject
+
+	request.UserId = userId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetUser(ctx, request.(GetUserRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetUser")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetUserResponseObject); ok {
+		if err := validResponse.VisitGetUserResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateUser operation middleware
+func (sh *strictHandler) UpdateUser(w http.ResponseWriter, r *http.Request, userId string, params UpdateUserParams) {
+	var request UpdateUserRequestObject
+
+	request.UserId = userId
+	request.Params = params
+
+	var body UpdateUserJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateUser(ctx, request.(UpdateUserRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateUser")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateUserResponseObject); ok {
+		if err := validResponse.VisitUpdateUserResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DisableUser operation middleware
+func (sh *strictHandler) DisableUser(w http.ResponseWriter, r *http.Request, userId string, params DisableUserParams) {
+	var request DisableUserRequestObject
+
+	request.UserId = userId
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DisableUser(ctx, request.(DisableUserRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DisableUser")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DisableUserResponseObject); ok {
+		if err := validResponse.VisitDisableUserResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// EnableUser operation middleware
+func (sh *strictHandler) EnableUser(w http.ResponseWriter, r *http.Request, userId string, params EnableUserParams) {
+	var request EnableUserRequestObject
+
+	request.UserId = userId
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.EnableUser(ctx, request.(EnableUserRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "EnableUser")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(EnableUserResponseObject); ok {
+		if err := validResponse.VisitEnableUserResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// TriggerPasswordReset operation middleware
+func (sh *strictHandler) TriggerPasswordReset(w http.ResponseWriter, r *http.Request, userId string, params TriggerPasswordResetParams) {
+	var request TriggerPasswordResetRequestObject
+
+	request.UserId = userId
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.TriggerPasswordReset(ctx, request.(TriggerPasswordResetRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "TriggerPasswordReset")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(TriggerPasswordResetResponseObject); ok {
+		if err := validResponse.VisitTriggerPasswordResetResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListSocialProviders operation middleware
+func (sh *strictHandler) ListSocialProviders(w http.ResponseWriter, r *http.Request, userId string) {
+	var request ListSocialProvidersRequestObject
+
+	request.UserId = userId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListSocialProviders(ctx, request.(ListSocialProvidersRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListSocialProviders")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListSocialProvidersResponseObject); ok {
+		if err := validResponse.VisitListSocialProvidersResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// LinkSocialProvider operation middleware
+func (sh *strictHandler) LinkSocialProvider(w http.ResponseWriter, r *http.Request, userId string, params LinkSocialProviderParams) {
+	var request LinkSocialProviderRequestObject
+
+	request.UserId = userId
+	request.Params = params
+
+	var body LinkSocialProviderJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.LinkSocialProvider(ctx, request.(LinkSocialProviderRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "LinkSocialProvider")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(LinkSocialProviderResponseObject); ok {
+		if err := validResponse.VisitLinkSocialProviderResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UnlinkSocialProvider operation middleware
+func (sh *strictHandler) UnlinkSocialProvider(w http.ResponseWriter, r *http.Request, userId string, provider string) {
+	var request UnlinkSocialProviderRequestObject
+
+	request.UserId = userId
+	request.Provider = provider
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UnlinkSocialProvider(ctx, request.(UnlinkSocialProviderRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UnlinkSocialProvider")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UnlinkSocialProviderResponseObject); ok {
+		if err := validResponse.VisitUnlinkSocialProviderResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// TriggerEmailVerify operation middleware
+func (sh *strictHandler) TriggerEmailVerify(w http.ResponseWriter, r *http.Request, userId string, params TriggerEmailVerifyParams) {
+	var request TriggerEmailVerifyRequestObject
+
+	request.UserId = userId
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.TriggerEmailVerify(ctx, request.(TriggerEmailVerifyRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "TriggerEmailVerify")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(TriggerEmailVerifyResponseObject); ok {
+		if err := validResponse.VisitTriggerEmailVerifyResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // Base64 encoded, compressed with deflate, json marshaled OpenAPI spec.
 // Stored as a slice of fixed-width chunks rather than one concatenated
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
-	"yeq/AQAA//8=",
+	"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",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

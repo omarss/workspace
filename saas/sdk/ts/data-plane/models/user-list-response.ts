@@ -13,17 +13,15 @@
  */
 
 
+// May contain unused imports in some cases
+// @ts-ignore
+import type { Pagination } from './pagination';
+// May contain unused imports in some cases
+// @ts-ignore
+import type { User } from './user';
 
-export interface Health {
-    'status': HealthStatusEnum;
-    'version'?: string;
-    'commit'?: string;
+export interface UserListResponse {
+    'data': Array<User>;
+    'pagination': Pagination;
 }
-
-export const HealthStatusEnum = {
-    Ok: 'ok',
-} as const;
-
-export type HealthStatusEnum = typeof HealthStatusEnum[keyof typeof HealthStatusEnum];
-
 
