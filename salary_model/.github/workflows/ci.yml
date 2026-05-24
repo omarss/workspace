@@ -1,0 +1,77 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    # Run on push to main, or on PRs that carry the `ready` label.
+    if: |
+      github.event_name == 'push' ||
+      (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'ready'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+          cache-dependency-glob: |
+            uv.lock
+            pyproject.toml
+
+      - name: Pin Python 3.12
+        run: uv python install 3.12
+
+      - name: Install dependencies
+        run: uv sync --extra dev
+
+      - name: Lint (ruff)
+        run: uv run ruff check src tests
+
+      - name: Format check (ruff)
+        run: uv run ruff format --check src tests
+
+      - name: Typecheck (mypy --strict)
+        run: uv run mypy
+
+      - name: Unit tests
+        run: uv run pytest -m "not slow and not network"
+
+  smoke-iterate:
+    # Quick end-to-end gate on main only: build a tiny dataset and run the ladder.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: check
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+          cache-dependency-glob: |
+            uv.lock
+            pyproject.toml
+      - run: uv python install 3.12
+      - run: uv sync --extra dev
+      - name: Build small dataset
+        run: uv run salary-model data build --seed 17 --run-id ci --n-rows 4000
+      - name: Run iteration ladder (small Optuna budget)
+        run: uv run salary-model iterate --seed 17 --run-id ci --optuna-trials 2
+      - name: Upload reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: salary-model-ci-reports
+          path: reports/runs/ci/
+          retention-days: 30

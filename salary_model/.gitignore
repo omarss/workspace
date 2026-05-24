@@ -1,0 +1,63 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.installed.cfg
+*.egg
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.coverage
+.coverage.*
+htmlcov/
+.hypothesis/
+
+# uv / venv
+.venv/
+venv/
+env/
+
+# Distribution
+build/
+dist/
+wheels/
+
+# Project artifacts (large/ephemeral; do not commit)
+artifacts/
+mlruns/
+mlartifacts/
+data/raw/
+data/interim/
+data/processed/
+!data/seed/
+*.parquet
+*.joblib
+*.pkl
+*.lgb
+*.cbm
+
+# Reports: keep the index, ignore per-run binaries
+reports/runs/**/*.bin
+reports/runs/**/*.npz
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# OS
+Thumbs.db
+
+# Secrets
+.env
+.env.*
+!.env.example
+secrets.yaml
+*.key
+*.pem
