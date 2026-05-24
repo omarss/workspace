@@ -75,7 +75,8 @@ func startPostgres(t *testing.T) (*pgxpool.Pool, func()) {
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()
 
-	c, err := tcpostgres.Run(ctx, "postgres:16",
+	c, err := tcpostgres.Run(
+		ctx, "postgres:16",
 		tcpostgres.WithDatabase("saas"),
 		tcpostgres.WithUsername("saas"),
 		tcpostgres.WithPassword("saas"),

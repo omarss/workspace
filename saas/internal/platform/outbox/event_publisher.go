@@ -31,7 +31,7 @@ func (p *PgxEventPublisher) Publish(ctx context.Context, eventType, tenantID str
 		return err
 	}
 	params := db.InsertOutboxEventParams{
-		EventID:      id.New("evt"),
+		EventID:      id.New(id.PrefixEvent),
 		Type:         eventType,
 		EventVersion: 1,
 		DeploymentID: p.deploymentID,
