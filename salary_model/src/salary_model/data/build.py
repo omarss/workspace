@@ -1,0 +1,130 @@
+"""End-to-end dataset builder: open anchors + anchored synthetic observations.
+
+Outputs a single Parquet snapshot under ``data/processed/`` plus a manifest JSON with
+hashes and source provenance. Training reads only the snapshot, so retraining is
+reproducible.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+from dataclasses import asdict
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any
+
+import pandas as pd
+
+from salary_model.config import get_logger, get_settings
+from salary_model.data import sources, synthetic
+from salary_model.data.anchors import SOURCE_TRUST
+
+log = get_logger("salary_model.data.build")
+
+
+def _hash_dataframe(df: pd.DataFrame) -> str:
+    raw = pd.util.hash_pandas_object(df, index=True).values.tobytes()
+    return hashlib.sha256(raw).hexdigest()
+
+
+def build_dataset(
+    *,
+    n_rows: int,
+    seed: int,
+    out_dir: Path | None = None,
+    run_id: str | None = None,
+) -> Path:
+    """Build a versioned dataset snapshot. Returns the path of the written Parquet."""
+    settings = get_settings()
+    out_dir = out_dir or settings.processed_dir
+    run_id = run_id or datetime.now(tz=UTC).strftime("%Y%m%dT%H%M%SZ")
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    # ── 1. anchors / external sources ─────────────────────────────────────────
+    log.info("dataset_build_start", n_rows=n_rows, seed=seed, run_id=run_id)
+    wage_df, wage_manifest = sources.fetch_gastat_wage_index()
+    sama_df, sama_manifest = sources.fetch_sama_indicators()
+    wb_df, wb_manifest = sources.fetch_worldbank_macro()
+    macro_df, macro_manifest = sources.fetch_macro_series()
+
+    # ── 2. synthetic observations anchored to the public tables ───────────────
+    spec = synthetic.default_spec(n_rows=n_rows, seed=seed)
+    obs = synthetic.generate(spec)
+
+    # ── 3. write snapshot ─────────────────────────────────────────────────────
+    snapshot_path = out_dir / f"observations_{run_id}.parquet"
+    obs.to_parquet(snapshot_path, index=False, compression="zstd")
+
+    anchors_path = out_dir / f"anchors_{run_id}.parquet"
+    wage_df.to_parquet(anchors_path, index=False)
+    macro_path = out_dir / f"macro_{run_id}.parquet"
+    wb_df.to_parquet(macro_path, index=False)
+    sama_path = out_dir / f"sama_{run_id}.parquet"
+    sama_df.to_parquet(sama_path, index=False)
+    macro_series_path = out_dir / f"macro_series_{run_id}.parquet"
+    macro_df.to_parquet(macro_series_path, index=False)
+    macro_series_latest = out_dir / "macro_series_latest.parquet"
+    macro_df.to_parquet(macro_series_latest, index=False)
+
+    # ── 4. manifest ───────────────────────────────────────────────────────────
+    manifest: dict[str, Any] = {
+        "run_id": run_id,
+        "built_at": datetime.now(tz=UTC).isoformat(),
+        "n_rows": len(obs),
+        "seed": seed,
+        "snapshot": str(snapshot_path.relative_to(settings.repo_root)),
+        "anchors": str(anchors_path.relative_to(settings.repo_root)),
+        "macro": str(macro_path.relative_to(settings.repo_root)),
+        "sama": str(sama_path.relative_to(settings.repo_root)),
+        "macro_series": str(macro_series_path.relative_to(settings.repo_root)),
+        "snapshot_sha256": _hash_dataframe(obs),
+        "sources": {
+            "gastat_wage_index": asdict(wage_manifest),
+            "sama_indicators": asdict(sama_manifest),
+            "worldbank_macro": asdict(wb_manifest),
+            "ksa_monthly_macro": asdict(macro_manifest),
+        },
+        "source_trust": {
+            k: {"name": v.name, "url": v.url, "trust": v.trust, "last_seen": v.last_seen}
+            for k, v in SOURCE_TRUST.items()
+        },
+    }
+    manifest_path = out_dir / f"manifest_{run_id}.json"
+    manifest_path.write_text(
+        json.dumps(manifest, indent=2, default=str), encoding="utf-8"
+    )
+
+    latest = out_dir / "manifest_latest.json"
+    latest.write_text(json.dumps(manifest, indent=2, default=str), encoding="utf-8")
+
+    log.info("dataset_build_done", path=str(snapshot_path), rows=len(obs))
+    return snapshot_path
+
+
+def load_latest_snapshot() -> tuple[pd.DataFrame, dict[str, Any]]:
+    """Load the most recent dataset snapshot and its manifest."""
+    settings = get_settings()
+    manifest_path = settings.processed_dir / "manifest_latest.json"
+    if not manifest_path.exists():
+        msg = (
+            f"No dataset snapshot found at {manifest_path}. "
+            "Run `make data` to build one."
+        )
+        raise FileNotFoundError(msg)
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    snapshot_path = settings.repo_root / manifest["snapshot"]
+    df = pd.read_parquet(snapshot_path)
+    return df, manifest
+
+
+def load_latest_macro_series() -> pd.DataFrame:
+    """Load the macro time-series written alongside the latest snapshot."""
+    settings = get_settings()
+    path = settings.processed_dir / "macro_series_latest.parquet"
+    if not path.exists():
+        # Fallback: rebuild from bundled values without touching disk.
+        from salary_model.data.sources.macro_series import fetch_macro_series
+        df, _ = fetch_macro_series()
+        return df
+    return pd.read_parquet(path)
