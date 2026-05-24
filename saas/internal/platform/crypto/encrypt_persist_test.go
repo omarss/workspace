@@ -55,3 +55,28 @@ func TestEncryptPIIFields_NoEncryptor(t *testing.T) {
 		t.Fatalf("expected ErrNoEncryptor, got %v", err)
 	}
 }
+
+// sampleWithSibling exercises the Phase 4 sibling-envelope convention. The
+// walker should populate EmailEnvelope when it encrypts Email and leave the
+// plaintext column empty so the row never carries the unencrypted value
+// past the persistence boundary.
+type sampleWithSibling struct {
+	UserID        string          `json:"user_id"`
+	Email         string          `json:"email" pii:"true"`
+	EmailEnvelope crypto.Envelope // populated by the walker
+	Note          string          `json:"note"`
+}
+
+func TestEncryptPIIFields_PopulatesSiblingEnvelope(t *testing.T) {
+	enc := &stubEncryptor{}
+	v := &sampleWithSibling{UserID: "u_X", Email: "alice@example.com", Note: "ok"}
+	if err := crypto.EncryptPIIFields(context.Background(), enc, "kid", v); err != nil {
+		t.Fatalf("EncryptPIIFields: %v", err)
+	}
+	if v.Email != "" {
+		t.Errorf("plaintext Email not cleared: %q", v.Email)
+	}
+	if string(v.EmailEnvelope.Ciphertext) != "ct" || v.EmailEnvelope.KID != "kid" {
+		t.Errorf("sibling envelope not populated: %+v", v.EmailEnvelope)
+	}
+}
