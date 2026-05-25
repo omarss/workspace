@@ -120,6 +120,12 @@ object SmsParser {
             body.containsIgnoreCase("Withdrawal:ATM") -> Kind.CASH_WITHDRAWAL
             body.containsIgnoreCase("International Transfer") -> Kind.TRANSFER_OUT
             body.containsIgnoreCase("Debit Internal Transfer") -> Kind.TRANSFER_OUT
+            // Cross-bank local SARIE outgoing. Recipient is on the first
+            // (non-numeric) `To:` line — the existing AL_RAJHI_TO_RE
+            // already handles that. Own-account moves to the user's
+            // other bank (To:OMAR SHABAAN) are filtered later via the
+            // owner-name guard before we emit the ParsedSms.
+            body.containsIgnoreCase("Debit Transfer Local") -> Kind.TRANSFER_OUT
             // Incoming credits — treated as TRANSFER_IN so they land
             // on the Transfers card with a distinct direction rather
             // than being silently dropped. "Credit Transfer" covers
@@ -145,6 +151,14 @@ object SmsParser {
             ?: AL_RAJHI_PLACE_RE.find(body)?.groupValues?.get(1)?.trim()
             ?: AL_RAJHI_SERVICE_RE.find(body)?.groupValues?.get(1)?.trim()
             ?: AL_RAJHI_TO_RE.find(body)?.groupValues?.get(1)?.trim()
+
+        // Own-account move suppression. Local SARIE transfers where the
+        // recipient's name matches one of the user's own aliases (e.g.
+        // To:OMAR SHABAAN on Debit Transfer Local) are just the user
+        // moving money between their two banks. Drop both legs so they
+        // never inflate the Transfers ledger.
+        if (kind == Kind.TRANSFER_OUT && isOwner(merchant)) return null
+
         return ParsedSms(
             bank = Bank.AL_RAJHI,
             kind = kind,
@@ -162,6 +176,10 @@ object SmsParser {
     //   "Local Purchase Card: *6066; mada Pay Amount: 13 SAR At: ucoffe ..."
     //   "Internal outward transfer Amount:150.00SAR To:AJMAL ANWAR ..."
     //   "Transfer via WU Amount:1,260.00 SAR ... Receiver:<name> Country:..."
+    //   "Inward transfer (SARIE) 1500.00 SAR From OMAR SHABAAN ..."
+    //     (SARIE bodies have a bare-line amount with no "Amount:" prefix
+    //      and a no-colon "From <name>" line — own-account variants are
+    //      filtered later via the owner-name guard.)
     //   "Notification: Refund Transaction: ATM Cashwithdrawal ..."
     //
     // Shapes we skip:
@@ -214,11 +232,23 @@ object SmsParser {
             // these bodies is a timestamp, so the merchant lookup below
             // must consult Receiver: first for this kind.
             body.containsIgnoreCase("Transfer via WU") -> Kind.TRANSFER_OUT
+            // Incoming SARIE wire. Body shape is unique: amount sits on
+            // its own bare line ("1500.00 SAR") rather than after an
+            // "Amount:" prefix, and the sender's name follows a no-colon
+            // "From <name>" line. Both quirks are handled below.
+            body.containsIgnoreCase("Inward transfer") -> Kind.TRANSFER_IN
             body.containsIgnoreCase("Notification: Refund") -> Kind.REFUND
             else -> return null
         }
 
-        val extracted = extractStcAmount(body) ?: return null
+        // Amount extraction: SARIE inwards use a bare "N.NN SAR" line
+        // (no "Amount:" prefix), so route to a kind-specific extractor.
+        // Everything else uses the standard prefixed extractor.
+        val extracted = if (kind == Kind.TRANSFER_IN) {
+            extractStcInwardAmount(body) ?: return null
+        } else {
+            extractStcAmount(body) ?: return null
+        }
         val (originalAmount, rawCurrency) = extracted
         val originalCurrency = canonicalizeCurrency(rawCurrency)
         // Transfers use "To:<recipient name>" (Internal outward transfer)
@@ -231,10 +261,24 @@ object SmsParser {
             Kind.TRANSFER_OUT ->
                 STC_TO_RE.find(body)?.groupValues?.get(1)?.trim()
                     ?: STC_RECEIVER_RE.find(body)?.groupValues?.get(1)?.trim()
+            // SARIE inwards carry the sender on a no-colon "From <name>"
+            // line, so the standard colon-anchored STC_FROM_RE never
+            // matches. STC_INWARD_FROM_RE picks up the first such line
+            // (the bank's own bank name shows up on a second From line
+            // and must not win).
+            Kind.TRANSFER_IN ->
+                STC_INWARD_FROM_RE.find(body)?.groupValues?.get(1)?.trim()
             Kind.REFUND -> STC_TRANSACTION_RE.find(body)?.groupValues?.get(1)?.trim()
             else -> null
         } ?: STC_FROM_RE.find(body)?.groupValues?.get(1)?.trim()
             ?: STC_AT_RE.find(body)?.groupValues?.get(1)?.trim()
+
+        // Own-account SARIE inward (user sent themselves money from the
+        // other bank) — drop both legs. The matching outgoing leg on
+        // Al Rajhi (`Debit Transfer Local`) is filtered by the same
+        // owner-name guard there.
+        if (kind == Kind.TRANSFER_IN && isOwner(merchant)) return null
+
         return ParsedSms(
             bank = Bank.STC,
             kind = kind,
@@ -285,6 +329,47 @@ object SmsParser {
         val amount = match.groupValues[1].replace(",", "").toDoubleOrNull() ?: return null
         val currency = match.groupValues[2].ifBlank { "SAR" }
         return amount to currency
+    }
+
+    // Inward SARIE bodies print the amount on a bare line of its own
+    // (e.g. "1500.00 SAR") with no "Amount:" prefix. STC_AMOUNT_RE
+    // anchors on the literal word "Amount", so a SARIE-specific
+    // extractor is needed.
+    private fun extractStcInwardAmount(body: String): Pair<Double, String>? {
+        val match = STC_INWARD_AMOUNT_RE.find(body) ?: return null
+        val amount = match.groupValues[1].replace(",", "").toDoubleOrNull() ?: return null
+        val currency = match.groupValues[2].ifBlank { "SAR" }
+        return amount to currency
+    }
+
+    // Owner-name guard for own-account move suppression.
+    //
+    // Saudi banks emit cross-bank SARIE transfers as a *pair* of SMSes
+    // — an outgoing leg on the source bank ("Debit Transfer Local" on
+    // Al Rajhi) and an incoming leg on the destination bank ("Inward
+    // transfer (SARIE)" on STC). When both sides belong to the same
+    // person the user is just shuffling their own money between banks,
+    // not transferring it to anyone, so both legs should drop out of
+    // the transfers ledger.
+    //
+    // The signal is the recipient/sender name. We normalise via the
+    // shared recipientKey() (consonant skeleton, vowel-folded) so the
+    // bank's spelling variant of the day (OMAR SHABAAN today, OMAR
+    // SHAABAAN tomorrow) doesn't break detection.
+    //
+    // Aliases are intentionally hardcoded — owning the config makes
+    // the parser self-contained and one-file-readable; the user is the
+    // sole user of this app.
+    private val OWNER_NAME_KEYS: Set<String> = setOf(
+        "OMAR SHABAAN",
+        "OMAR S SHABAAN",
+        "OMAR SHAABAN",
+        "OMAR SHAABAAN",
+    ).mapTo(mutableSetOf()) { recipientKey(it) }
+
+    private fun isOwner(name: String?): Boolean {
+        if (name.isNullOrBlank()) return false
+        return recipientKey(name) in OWNER_NAME_KEYS
     }
 
     private fun String.containsIgnoreCase(needle: String) = contains(needle, ignoreCase = true)
@@ -365,6 +450,22 @@ object SmsParser {
     private val STC_FROM_RE = Regex(
         """From\s*:\s*([^\r\n]+)""",
         RegexOption.IGNORE_CASE,
+    )
+    // SARIE inward sender — "From OMAR SHABAAN" with no colon. The
+    // body also has "From AL RAJHI BANK" on the next line (the source
+    // bank name); we only want the first occurrence (the person), so
+    // .find() — which returns the first match — does the right thing.
+    // Requires at least one ASCII letter in the captured name so the
+    // dateless "From " ever-line doesn't match anything stray.
+    private val STC_INWARD_FROM_RE = Regex(
+        """(?m)^From\s+([A-Za-z][^\r\n]*)""",
+    )
+    // SARIE inward amount — bare "N.NN SAR" or "N SAR" on its own line.
+    // Multiline mode + line anchors (^...$) so we don't accidentally
+    // match a numeric token embedded in another line. Currency suffix
+    // is optional to mirror STC_AMOUNT_RE's contract.
+    private val STC_INWARD_AMOUNT_RE = Regex(
+        """(?m)^\s*([\d,]+(?:\.\d+)?)\s+([A-Z]{2,4})?\s*$""",
     )
     private val STC_AT_RE = Regex(
         """At\s*:\s*([^\r\n]+)""",

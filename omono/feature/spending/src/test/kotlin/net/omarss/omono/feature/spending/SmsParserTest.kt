@@ -619,6 +619,126 @@ class SmsParserTest {
         ).shouldBeNull()
     }
 
+    // ── Own-account move suppression (cross-bank SARIE pair) ──────────
+
+    @Test
+    fun `alrajhi debit transfer local to own self is suppressed`() {
+        // The outgoing leg of the user's own AlRajhi → STC SARIE move.
+        // To: line carries the user's own name → drop as own-account.
+        val body = """
+            Debit Transfer Local
+            Bank:Stc bank
+            From:7131
+            Amount:SR 1500
+            To:OMAR SHABAAN
+            To:9928
+            26/5/23 23:12
+        """.trimIndent()
+        SmsParser.parse("AlRajhiBank", body).shouldBeNull()
+    }
+
+    @Test
+    fun `alrajhi debit transfer local with shaabaan spelling variant also suppressed`() {
+        // Same own-account move, banks emit the alt transliteration.
+        val body = """
+            Debit Transfer Local
+            Bank:Stc bank
+            From:0758
+            Amount:SR 400
+            To:OMAR SHAABAAN
+            To:9928
+            26/5/16 10:50
+        """.trimIndent()
+        SmsParser.parse("AlRajhiBank", body).shouldBeNull()
+    }
+
+    @Test
+    fun `alrajhi debit transfer local to someone else is captured`() {
+        // Same shape, but recipient is a third party — must surface as
+        // a real outgoing transfer. Previously this fell through to
+        // null (no kind branch matched), losing the data.
+        val body = """
+            Debit Transfer Local
+            Bank:STC Bank
+            From:7131
+            Amount:SR 2500
+            To:SOMEONE ELSE
+            To:0123
+            26/5/23 23:12
+        """.trimIndent()
+        val parsed = SmsParser.parse("AlRajhiBank", body)
+        parsed.shouldNotBeNull()
+        parsed.kind shouldBe Transaction.Kind.TRANSFER_OUT
+        parsed.originalAmount shouldBe 2500.0
+        parsed.merchant shouldBe "SOMEONE ELSE"
+    }
+
+    @Test
+    fun `stc inward sarie from own self is suppressed`() {
+        // Incoming leg of the AlRajhi → STC own-account move. Body
+        // shape is unique: bare-line amount, no-colon From <name>.
+        val body = """
+            Inward transfer (SARIE)
+            1500.00 SAR
+            From OMAR SHABAAN
+            From AL RAJHI BANK
+            Account *928
+            23-05-2026 23:11
+            Ref. No. *SZC4
+        """.trimIndent()
+        SmsParser.parse("STC Bank", body).shouldBeNull()
+    }
+
+    @Test
+    fun `stc inward sarie from third party is captured as transfer_in`() {
+        // A real incoming SARIE from another person. Bare amount line
+        // + no-colon From — both parsed via SARIE-specific paths.
+        val body = """
+            Inward transfer (SARIE)
+            5000.00 SAR
+            From AJMAL ANWAR
+            From ANB BANK
+            Account *928
+            14-05-2026 09:20
+            Ref. No. *ABCD
+        """.trimIndent()
+        val parsed = SmsParser.parse("STC Bank", body)
+        parsed.shouldNotBeNull()
+        parsed.kind shouldBe Transaction.Kind.TRANSFER_IN
+        parsed.originalAmount shouldBe 5000.0
+        parsed.originalCurrency shouldBe "SAR"
+        parsed.merchant shouldBe "AJMAL ANWAR"
+    }
+
+    @Test
+    fun `transfer to mohmmad osemi survives spelling variants`() {
+        // Same recipient, two different spellings the bank might emit.
+        // Both should parse to the same Kind, with the merchant name
+        // returned verbatim — downstream aggregation uses recipientKey()
+        // to dedupe.
+        val mohmmad = """
+            Debit Internal Transfer
+            From:7131
+            Amount:SR 200
+            To:MOHMMAD OSEMI
+            To:8567
+            26/5/2 13:23
+        """.trimIndent()
+        val muhammad = mohmmad.replace("MOHMMAD", "MUHAMMAD")
+        val a = SmsParser.parse("AlRajhiBank", mohmmad)
+        val b = SmsParser.parse("AlRajhiBank", muhammad)
+        a.shouldNotBeNull()
+        b.shouldNotBeNull()
+        a.kind shouldBe Transaction.Kind.TRANSFER_OUT
+        b.kind shouldBe Transaction.Kind.TRANSFER_OUT
+        // Verbatim names differ at the surface...
+        a.merchant shouldBe "MOHMMAD OSEMI"
+        b.merchant shouldBe "MUHAMMAD OSEMI"
+        // ...but the normalised key matches, so downstream grouping
+        // will treat them as one recipient.
+        recipientKey(a.merchant!!) shouldBe recipientKey(b.merchant!!)
+    }
+
     // ── Unknown senders ────────────────────────────────────────────────
 
     @Test
