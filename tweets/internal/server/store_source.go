@@ -5,13 +5,19 @@ import (
 	"errors"
 	"log/slog"
 	"sort"
+	"time"
 )
 
 // StoreReader is the subset of the SQLite store the HTTP handler needs.
 // Keeping it as a tiny interface lets us swap in a fake for tests
 // without depending on the store package directly.
 type StoreReader interface {
-	Latest(ctx context.Context, country Country, limit int) ([]Tweet, error)
+	// Latest returns up to `limit` tweets matching any of the given
+	// countries with created_at < cursor (cursor zero = no upper
+	// bound). Newest first. Cities is an optional list of
+	// case-insensitive substrings matched against tweet.place; empty
+	// means "no city filter".
+	Latest(ctx context.Context, countries []Country, cities []string, cursor time.Time, limit int) ([]Tweet, error)
 }
 
 // CachedSource reads from a StoreReader and falls back to a secondary
@@ -27,7 +33,7 @@ type CachedSource struct {
 
 func NewCachedSource(store StoreReader, fallback FeedSource, limit int, log *slog.Logger) *CachedSource {
 	if limit <= 0 {
-		limit = 50
+		limit = 60
 	}
 	if log == nil {
 		log = slog.Default()
@@ -35,34 +41,71 @@ func NewCachedSource(store StoreReader, fallback FeedSource, limit int, log *slo
 	return &CachedSource{store: store, fallback: fallback, limit: limit, log: log}
 }
 
-func (c *CachedSource) Feed(ctx context.Context, country Country) ([]Tweet, error) {
-	tweets, err := c.store.Latest(ctx, country, c.limit)
+// Feed satisfies FeedSource. Pages of tweets behave as follows:
+//
+//   * First page (cursor == zero) is sorted event-first, then by
+//     created_at desc, so events float to the top.
+//   * Subsequent pages (cursor != zero) are chronological — they
+//     extend the timeline; reordering by event score on every
+//     subsequent page would cause tweets to "jump up" as the user
+//     scrolls past them, which is disorienting.
+//   * NextCursor on the response is the oldest created_at the client
+//     saw in this batch. Empty when fewer than `limit` rows came
+//     back (no more pages).
+func (c *CachedSource) Feed(ctx context.Context, req FeedRequest) (FeedResult, error) {
+	limit := req.Limit
+	if limit <= 0 {
+		limit = c.limit
+	}
+	tweets, err := c.store.Latest(ctx, req.Countries, req.Cities, req.Cursor, limit)
 	if err != nil {
-		c.log.Warn("store read failed; falling back to fixture", "country", country, "err", err)
-		return c.fallback.Feed(ctx, country)
+		c.log.Warn("store read failed; falling back to fixture", "err", err)
+		fb, fbErr := c.fallback.Feed(ctx, req)
+		if fbErr != nil {
+			return FeedResult{}, fbErr
+		}
+		return fb, nil
 	}
 	if len(tweets) == 0 {
-		// Distinguish "no rows yet" from "unknown country" — only fall
-		// back to fixture when the fixture itself accepts the country.
-		fallback, fbErr := c.fallback.Feed(ctx, country)
+		// Empty store → fall back to fixture so the UI is never blank.
+		// Errors from the fallback (e.g. unknown country) propagate.
+		fb, fbErr := c.fallback.Feed(ctx, req)
 		if errors.Is(fbErr, ErrUnknownCountry) {
-			return nil, ErrUnknownCountry
+			return FeedResult{}, ErrUnknownCountry
 		}
-		return sortFeed(fallback), nil
+		if fbErr != nil {
+			return FeedResult{}, fbErr
+		}
+		return fb, nil
 	}
-	return sortFeed(tweets), nil
+
+	if req.Cursor.IsZero() {
+		// First page — re-sort event-first in memory.
+		sortFeedEventFirst(tweets)
+	}
+	result := FeedResult{Tweets: tweets}
+	// Cursor points at the oldest tweet we returned. Set only when
+	// we filled the page — partial pages mean no more rows.
+	if len(tweets) >= limit {
+		oldest := tweets[0].CreatedAt
+		for _, tw := range tweets {
+			if tw.CreatedAt.Before(oldest) {
+				oldest = tw.CreatedAt
+			}
+		}
+		result.NextCursor = oldest
+	}
+	return result, nil
 }
 
-// sortFeed orders the result so the Feed tab emphasises events. Ties
-// break on created_at (newer first) which mirrors the chronological
-// product the scrape requested. Stable sort means same-score same-time
-// tweets keep their store-defined order.
-func sortFeed(in []Tweet) []Tweet {
+// sortFeedEventFirst orders the slice in place so high-event-score
+// tweets land at the top, with ties broken by created_at desc.
+// Stable so same-score same-time tweets keep their store order.
+func sortFeedEventFirst(in []Tweet) {
 	sort.SliceStable(in, func(i, j int) bool {
 		if in[i].EventScore != in[j].EventScore {
 			return in[i].EventScore > in[j].EventScore
 		}
 		return in[i].CreatedAt.After(in[j].CreatedAt)
 	})
-	return in
 }

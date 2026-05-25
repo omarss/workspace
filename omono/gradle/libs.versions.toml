@@ -47,6 +47,11 @@ timber = "5.0.1"
 # HTTP client (OSM Overpass speed-limit lookup)
 okhttp = "4.12.0"
 
+# Coil — async image loader for Compose. Backed by OkHttp so we share
+# the connection pool with the rest of the app's HTTP usage. v3 is
+# Compose-multiplatform-aware and the recommended version as of 2026.
+coil = "3.0.4"
+
 # Shizuku — ADB-elevation shim used for programmatic Wi-Fi + mobile
 # data toggling during "disable internet while driving". No root,
 # one-time ADB pair.
@@ -116,6 +121,10 @@ timber = { group = "com.jakewharton.timber", name = "timber", version.ref = "tim
 
 # HTTP client
 okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
+
+# Coil — Compose AsyncImage for tweet avatars (Feed tab).
+coil-compose = { group = "io.coil-kt.coil3", name = "coil-compose", version.ref = "coil" }
+coil-network-okhttp = { group = "io.coil-kt.coil3", name = "coil-network-okhttp", version.ref = "coil" }
 
 # Shizuku
 shizuku-api = { group = "dev.rikka.shizuku", name = "api", version.ref = "shizuku" }

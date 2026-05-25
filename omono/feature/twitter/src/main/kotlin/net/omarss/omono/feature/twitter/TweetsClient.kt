@@ -41,52 +41,68 @@ class TweetsClient @Inject constructor(
         .readTimeout(8, TimeUnit.SECONDS)
         .build()
 
-    override suspend fun feed(country: Country): List<Tweet> {
-        if (!isConfigured) return emptyList()
+    override suspend fun feed(request: FeedRequest): FeedPage {
+        if (!isConfigured) return FeedPage(emptyList())
         val base = baseUrl.toHttpUrlOrNull() ?: run {
             Timber.w("tweets.api.url is not a valid URL: %s", baseUrl)
-            return emptyList()
+            return FeedPage(emptyList())
         }
-        val url = base.newBuilder()
-            .addPathSegment("tweets")
-            .addQueryParameter("country", country.code)
-            .build()
-        val request = Request.Builder()
-            .url(url)
+        val builder = base.newBuilder().addPathSegment("tweets")
+        if (request.countries.isNotEmpty()) {
+            builder.addQueryParameter(
+                "country",
+                request.countries.joinToString(",") { it.code },
+            )
+        }
+        if (request.cities.isNotEmpty()) {
+            builder.addQueryParameter("city", request.cities.joinToString(","))
+        }
+        request.cursor?.takeIf { it.isNotBlank() }
+            ?.let { builder.addQueryParameter("cursor", it) }
+        if (request.limit > 0) {
+            builder.addQueryParameter("limit", request.limit.toString())
+        }
+        val httpReq = Request.Builder()
+            .url(builder.build())
             .header("User-Agent", USER_AGENT)
             .get()
             .build()
 
         return withContext(Dispatchers.IO) {
             runCatching {
-                http.newCall(request).execute().use { response ->
+                http.newCall(httpReq).execute().use { response ->
                     if (!response.isSuccessful) {
                         Timber.w("tweets HTTP %d", response.code)
-                        return@use emptyList<Tweet>()
+                        return@use FeedPage(emptyList())
                     }
                     val body = response.body?.string()
-                        ?: return@use emptyList<Tweet>()
-                    parse(body)
+                        ?: return@use FeedPage(emptyList())
+                    parsePage(body)
                 }
             }.onFailure {
                 Timber.w(it, "tweets fetch failed")
-            }.getOrNull() ?: emptyList()
+            }.getOrNull() ?: FeedPage(emptyList())
         }
     }
 
-    // Parser is `internal` so the feature module's unit tests can drive
-    // it directly without an HTTP server stand-in.
-    internal fun parse(json: String): List<Tweet> {
-        val root = runCatching { JSONObject(json) }.getOrNull() ?: return emptyList()
-        val arr: JSONArray = root.optJSONArray("tweets") ?: return emptyList()
+    // Parsers are `internal` so the feature module's unit tests can
+    // drive them directly without an HTTP server stand-in.
+    internal fun parsePage(json: String): FeedPage {
+        val root = runCatching { JSONObject(json) }.getOrNull() ?: return FeedPage(emptyList())
+        val arr: JSONArray = root.optJSONArray("tweets") ?: return FeedPage(emptyList())
         val out = ArrayList<Tweet>(arr.length())
         for (i in 0 until arr.length()) {
             val tweet = arr.optJSONObject(i) ?: continue
             val parsed = parseTweet(tweet) ?: continue
             out += parsed
         }
-        return out
+        val cursor = root.optString("next_cursor").ifBlank { null }
+        return FeedPage(out, cursor)
     }
+
+    // Kept for backward-compat with the existing Robolectric tests
+    // that drive parse(json) → List<Tweet>.
+    internal fun parse(json: String): List<Tweet> = parsePage(json).tweets
 
     private fun parseTweet(obj: JSONObject): Tweet? {
         val id = obj.optString("id").takeIf { it.isNotBlank() } ?: return null
@@ -95,6 +111,10 @@ class TweetsClient @Inject constructor(
         val country = Country.fromCode(countryCode) ?: return null
         val createdAtRaw = obj.optString("created_at").ifBlank { null }
         val createdAtMillis = parseTimestamp(createdAtRaw) ?: return null
+        // event_categories is a JSON array; convert to a Kotlin list.
+        val cats = obj.optJSONArray("event_categories")?.let { arr ->
+            (0 until arr.length()).mapNotNull { idx -> arr.optString(idx).ifBlank { null } }
+        }.orEmpty()
         return Tweet(
             id = id,
             author = obj.optString("author"),
@@ -107,8 +127,10 @@ class TweetsClient @Inject constructor(
             replyCount = obj.optInt("reply_count"),
             likeCount = obj.optInt("like_count"),
             retweetCount = obj.optInt("retweet_count"),
-            spamScore = obj.optDouble("spam_score", 0.0).toFloat()
-                .coerceIn(0f, 1f),
+            spamScore = obj.optDouble("spam_score", 0.0).toFloat().coerceIn(0f, 1f),
+            eventScore = obj.optDouble("event_score", 0.0).toFloat().coerceIn(0f, 1f),
+            eventCategories = cats,
+            avatarUrl = obj.optString("avatar_url").ifBlank { null },
         )
     }
 

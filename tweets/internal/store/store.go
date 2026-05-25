@@ -14,6 +14,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -88,13 +89,57 @@ func (d *DB) SaveBatch(ctx context.Context, tweets []server.Tweet) error {
 	return tx.Commit()
 }
 
-// Latest returns up to `limit` tweets for `country`, newest first.
-// Empty list is a valid response when nothing's been ingested yet.
-func (d *DB) Latest(ctx context.Context, country server.Country, limit int) ([]server.Tweet, error) {
+// Latest returns up to `limit` tweets matching any of the given
+// countries, ordered newest first. Optional filters:
+//
+//   * cities — case-insensitive substrings matched against the tweet's
+//     place field. Multiple cities are OR'd; empty slice means
+//     "no city filter".
+//   * cursor — only tweets with created_at < cursor are returned.
+//     Zero value means "no upper bound" (first page).
+//
+// All filtering runs in SQL except the city substring match — SQLite's
+// LIKE is collation-dependent and SUBSTR with arbitrary Arabic input
+// gets messy. Pulling a slightly larger window into memory and
+// filtering in Go keeps the query simple and the behaviour explicit.
+func (d *DB) Latest(
+	ctx context.Context,
+	countries []server.Country,
+	cities []string,
+	cursor time.Time,
+	limit int,
+) ([]server.Tweet, error) {
 	if limit <= 0 {
-		limit = 50
+		limit = 60
 	}
-	rows, err := d.conn.QueryContext(ctx, latestSQL, string(country), limit)
+	if len(countries) == 0 {
+		countries = []server.Country{server.CountryKSA}
+	}
+
+	// Build placeholders for the IN clause.
+	args := make([]any, 0, len(countries)+2)
+	placeholders := make([]string, len(countries))
+	for i, c := range countries {
+		placeholders[i] = "?"
+		args = append(args, string(c))
+	}
+	q := "SELECT body FROM tweets WHERE country IN (" + strings.Join(placeholders, ",") + ")"
+	if !cursor.IsZero() {
+		q += " AND created_at < ?"
+		args = append(args, cursor.UTC())
+	}
+	q += " ORDER BY created_at DESC LIMIT ?"
+	// Over-fetch when a city filter is set; we'll trim in memory.
+	fetchLimit := limit
+	if len(cities) > 0 {
+		fetchLimit = limit * 3
+		if fetchLimit > 600 {
+			fetchLimit = 600
+		}
+	}
+	args = append(args, fetchLimit)
+
+	rows, err := d.conn.QueryContext(ctx, q, args...)
 	if err != nil {
 		return nil, fmt.Errorf("query: %w", err)
 	}
@@ -113,9 +158,31 @@ func (d *DB) Latest(ctx context.Context, country server.Country, limit int) ([]s
 			// drifts across deploys.
 			continue
 		}
+		if len(cities) > 0 && !matchesAnyCity(tw.Place, cities) {
+			continue
+		}
 		out = append(out, tw)
+		if len(out) >= limit {
+			break
+		}
 	}
 	return out, rows.Err()
+}
+
+// matchesAnyCity mirrors server.matchesAnyCity but kept local to the
+// store package so the two source paths (store + fixture) don't
+// import each other.
+func matchesAnyCity(place string, cities []string) bool {
+	low := strings.ToLower(place)
+	for _, c := range cities {
+		if c == "" {
+			continue
+		}
+		if strings.Contains(low, strings.ToLower(c)) {
+			return true
+		}
+	}
+	return false
 }
 
 // PurgeOlderThan deletes rows ingested before `cutoff`. Called from
@@ -163,12 +230,8 @@ ON CONFLICT(id) DO UPDATE SET
     body         = excluded.body
 `
 
-const latestSQL = `
-SELECT body
-FROM tweets
-WHERE country = ?
-ORDER BY created_at DESC
-LIMIT ?
-`
+// latestSQL is built inline in Latest() so the IN (?,?,...) clause
+// expands for variable-length country lists. Kept the prepared
+// purgeSQL constant since it has fixed arity.
 
 const purgeSQL = `DELETE FROM tweets WHERE ingested_at < ?`
