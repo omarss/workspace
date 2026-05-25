@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/omarss/saas/internal/dataplane/authorization"
 	httpapi "github.com/omarss/saas/internal/dataplane/httpapi" // package dataplaneapi
 	"github.com/omarss/saas/internal/platform/auth"
 	"github.com/omarss/saas/internal/platform/cursor"
@@ -17,11 +18,17 @@ import (
 // this struct because it has no tenancy concerns, and the data-plane main()
 // composes the two via embedding (see cmd/dataplane/main.go).
 type Handler struct {
-	svc *Service
+	svc     *Service
+	checker authorization.PermissionChecker
 }
 
-// NewHandler wires a Handler over the tenancy service.
-func NewHandler(svc *Service) *Handler { return &Handler{svc: svc} }
+// NewHandler wires a Handler over the tenancy service. The checker is
+// the Phase 8 retrofit enforcer for destructive ops — pass nil in tests
+// that don't exercise the RBAC matrix; production wiring threads in the
+// authorization service via cmd/dataplane.
+func NewHandler(svc *Service, checker authorization.PermissionChecker) *Handler {
+	return &Handler{svc: svc, checker: checker}
+}
 
 // ListTenants returns the caller's tenant. Cross-tenant listing is reserved
 // for operator impersonation (Phase 13).
@@ -104,9 +111,18 @@ func (h *Handler) GetTenant(ctx context.Context, req httpapi.GetTenantRequestObj
 }
 
 // UpdateTenant handles PATCH /v1/tenants/{tenant_id} with mandatory If-Match.
+//
+// Phase 8 retrofit: when SAAS_RBAC_ENFORCE_DESTRUCTIVE=true the handler
+// requires the caller to carry the `tenant.write` permission before
+// mutating the row. The check is skipped when the env flag is unset to
+// avoid breaking dev / first-run flows where roles have not yet been
+// assigned to real users (CONVENTIONS.md §2 partial-retrofit note).
 func (h *Handler) UpdateTenant(ctx context.Context, req httpapi.UpdateTenantRequestObject) (httpapi.UpdateTenantResponseObject, error) {
 	if req.Body == nil {
 		return updateTenantProblem(http.StatusUnprocessableEntity, "validation-error", "request body required", "/v1/tenants/"+req.TenantId), nil
+	}
+	if err := h.enforceTenantWrite(ctx, req.TenantId); err != nil {
+		return updateTenantError(err, "/v1/tenants/"+req.TenantId), nil
 	}
 	expected, parseErr := etag.Parse(req.Params.IfMatch)
 	if parseErr != nil {
@@ -257,6 +273,11 @@ func updateTenantError(err error, instance string) httpapi.UpdateTenantResponseO
 		return httpapi.UpdateTenant401ApplicationProblemPlusJSONResponse{
 			UnauthorizedApplicationProblemPlusJSONResponse: httpapi.UnauthorizedApplicationProblemPlusJSONResponse(toAPIProblem(p)),
 		}
+	case errors.Is(err, authorization.ErrPermissionDenied):
+		p := problem.New("forbidden", "Caller lacks the required permission.", http.StatusForbidden, "tenant.write required", instance)
+		return httpapi.UpdateTenant403ApplicationProblemPlusJSONResponse{
+			ForbiddenApplicationProblemPlusJSONResponse: httpapi.ForbiddenApplicationProblemPlusJSONResponse(toAPIProblem(p)),
+		}
 	case errors.Is(err, auth.ErrCrossTenant):
 		p := problem.New("forbidden", "Caller lacks permission for this resource.", http.StatusForbidden, "", instance)
 		return httpapi.UpdateTenant403ApplicationProblemPlusJSONResponse{
@@ -319,6 +340,19 @@ func deleteTenantProblem(status int, slug, detail, instance string) httpapi.Dele
 	return httpapi.DeleteTenant412ApplicationProblemPlusJSONResponse{
 		PreconditionFailedApplicationProblemPlusJSONResponse: httpapi.PreconditionFailedApplicationProblemPlusJSONResponse(toAPIProblem(p)),
 	}
+}
+
+// enforceTenantWrite is the Phase 8 §8.11 retrofit gate: when the
+// SAAS_RBAC_ENFORCE_DESTRUCTIVE env flag is true, the caller must
+// carry the tenant.write permission scoped to tenantID. Returns
+// authorization.ErrPermissionDenied on refusal so updateTenantError
+// can render the 403.
+//
+// The principal's ActorID is used as the member identifier — see
+// CONVENTIONS.md §2 for the user→member resolution gap noted for v1.
+func (h *Handler) enforceTenantWrite(ctx context.Context, tenantID string) error {
+	p, _ := auth.PrincipalFromContext(ctx)
+	return authorization.EnforceDestructive(ctx, h.checker, p.ActorID, tenantID, "tenant.write")
 }
 
 func statusTitle(status int) string {

@@ -7,6 +7,7 @@ import (
 
 	openapi_types "github.com/oapi-codegen/runtime/types"
 
+	"github.com/omarss/saas/internal/dataplane/authorization"
 	httpapi "github.com/omarss/saas/internal/dataplane/httpapi"
 	"github.com/omarss/saas/internal/platform/auth"
 	"github.com/omarss/saas/internal/platform/cursor"
@@ -24,12 +25,21 @@ import (
 // domain errors to RFC 9457 problem responses. All authorization is
 // inside the service via auth.AssertTenant; tenant context is extracted
 // from the principal (never headers).
+//
+// Phase 8 retrofit: destructive endpoints (organization DELETE and
+// invitation creation) consult the PermissionChecker when
+// SAAS_RBAC_ENFORCE_DESTRUCTIVE=true. The checker may be nil in tests.
 type Handler struct {
-	svc *Service
+	svc     *Service
+	checker authorization.PermissionChecker
 }
 
-// NewHandler wires a Handler over the organizations service.
-func NewHandler(svc *Service) *Handler { return &Handler{svc: svc} }
+// NewHandler wires a Handler over the organizations service. checker is
+// the Phase 8 retrofit enforcer; pass nil in tests that don't exercise
+// the RBAC matrix.
+func NewHandler(svc *Service, checker authorization.PermissionChecker) *Handler {
+	return &Handler{svc: svc, checker: checker}
+}
 
 // Service returns the wrapped service.
 func (h *Handler) Service() *Service { return h.svc }
@@ -162,11 +172,16 @@ func (h *Handler) UpdateOrganization(ctx context.Context, req httpapi.UpdateOrga
 }
 
 // DeleteOrganization handles DELETE /v1/organizations/{organization_id}.
+// Phase 8 retrofit: requires organization.delete when
+// SAAS_RBAC_ENFORCE_DESTRUCTIVE=true.
 func (h *Handler) DeleteOrganization(ctx context.Context, req httpapi.DeleteOrganizationRequestObject) (httpapi.DeleteOrganizationResponseObject, error) {
 	instance := "/v1/organizations/" + req.OrganizationId
 	tenantID, ok := auth.TenantFromContext(ctx)
 	if !ok {
 		return deleteOrganizationProblem(http.StatusUnauthorized, "unauthorized", "missing tenant context", instance), nil
+	}
+	if err := h.enforceOrgDelete(ctx, tenantID); err != nil {
+		return deleteOrganizationError(err, instance), nil
 	}
 	expected, parseErr := etag.Parse(req.Params.IfMatch)
 	if parseErr != nil {
@@ -293,11 +308,17 @@ func (h *Handler) RemoveMember(ctx context.Context, req httpapi.RemoveMemberRequ
 // CreateInvitation handles POST /v1/organizations/{organization_id}/invitations.
 // Returns 202 with the one-time plaintext token + accept URL. Subsequent
 // reads of the invitation return only token_prefix.
+//
+// Phase 8 retrofit: requires invitation.write when
+// SAAS_RBAC_ENFORCE_DESTRUCTIVE=true.
 func (h *Handler) CreateInvitation(ctx context.Context, req httpapi.CreateInvitationRequestObject) (httpapi.CreateInvitationResponseObject, error) {
 	instance := "/v1/organizations/" + req.OrganizationId + "/invitations"
 	tenantID, ok := auth.TenantFromContext(ctx)
 	if !ok {
 		return createInvitationUnauthorized(instance), nil
+	}
+	if err := h.enforceInvitationWrite(ctx, tenantID); err != nil {
+		return createInvitationError(err, instance), nil
 	}
 	if req.Body == nil {
 		return createInvitationProblem422("request body required", instance), nil
@@ -640,6 +661,11 @@ func deleteOrganizationError(err error, instance string) httpapi.DeleteOrganizat
 	switch {
 	case errors.Is(err, auth.ErrUnauthorized):
 		return deleteOrganizationProblem(http.StatusUnauthorized, "unauthorized", "", instance)
+	case errors.Is(err, authorization.ErrPermissionDenied):
+		p := problem.New("forbidden", "Caller lacks the required permission.", http.StatusForbidden, "organization.delete required", instance)
+		return httpapi.DeleteOrganization403ApplicationProblemPlusJSONResponse{
+			ForbiddenApplicationProblemPlusJSONResponse: httpapi.ForbiddenApplicationProblemPlusJSONResponse(toAPIProblem(p)),
+		}
 	case errors.Is(err, auth.ErrCrossTenant):
 		p := problem.New("forbidden", "Caller lacks permission for this resource.", http.StatusForbidden, "", instance)
 		return httpapi.DeleteOrganization403ApplicationProblemPlusJSONResponse{
@@ -808,6 +834,11 @@ func createInvitationError(err error, instance string) httpapi.CreateInvitationR
 	switch {
 	case errors.Is(err, auth.ErrUnauthorized):
 		return createInvitationUnauthorized(instance)
+	case errors.Is(err, authorization.ErrPermissionDenied):
+		p := problem.New("forbidden", "Caller lacks the required permission.", http.StatusForbidden, "invitation.write required", instance)
+		return httpapi.CreateInvitation403ApplicationProblemPlusJSONResponse{
+			ForbiddenApplicationProblemPlusJSONResponse: httpapi.ForbiddenApplicationProblemPlusJSONResponse(toAPIProblem(p)),
+		}
 	case errors.Is(err, auth.ErrCrossTenant):
 		p := problem.New("forbidden", "Caller lacks permission for this resource.", http.StatusForbidden, "", instance)
 		return httpapi.CreateInvitation403ApplicationProblemPlusJSONResponse{
@@ -959,4 +990,17 @@ func statusTitle(status int) string {
 	default:
 		return "Error."
 	}
+}
+
+// enforceOrgDelete / enforceInvitationWrite — Phase 8 §8.11 retrofit
+// gates for the two destructive organizations endpoints exercised by
+// the MVP. See CONVENTIONS.md §2 for the partial-retrofit policy.
+func (h *Handler) enforceOrgDelete(ctx context.Context, tenantID string) error {
+	p, _ := auth.PrincipalFromContext(ctx)
+	return authorization.EnforceDestructive(ctx, h.checker, p.ActorID, tenantID, "organization.delete")
+}
+
+func (h *Handler) enforceInvitationWrite(ctx context.Context, tenantID string) error {
+	p, _ := auth.PrincipalFromContext(ctx)
+	return authorization.EnforceDestructive(ctx, h.checker, p.ActorID, tenantID, "invitation.write")
 }
