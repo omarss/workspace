@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"path"
@@ -43,6 +44,153 @@ func (e AuditIntegrityResponseDataFirstMismatchReason) Valid() bool {
 	}
 }
 
+// Defines values for DeploymentStatus.
+const (
+	DeploymentStatusActive       DeploymentStatus = "active"
+	DeploymentStatusDestroyed    DeploymentStatus = "destroyed"
+	DeploymentStatusDestroying   DeploymentStatus = "destroying"
+	DeploymentStatusFailed       DeploymentStatus = "failed"
+	DeploymentStatusProvisioning DeploymentStatus = "provisioning"
+	DeploymentStatusPurged       DeploymentStatus = "purged"
+	DeploymentStatusPurging      DeploymentStatus = "purging"
+	DeploymentStatusRestoring    DeploymentStatus = "restoring"
+	DeploymentStatusSuspended    DeploymentStatus = "suspended"
+	DeploymentStatusUpgrading    DeploymentStatus = "upgrading"
+)
+
+// Valid indicates whether the value is a known member of the DeploymentStatus enum.
+func (e DeploymentStatus) Valid() bool {
+	switch e {
+	case DeploymentStatusActive:
+		return true
+	case DeploymentStatusDestroyed:
+		return true
+	case DeploymentStatusDestroying:
+		return true
+	case DeploymentStatusFailed:
+		return true
+	case DeploymentStatusProvisioning:
+		return true
+	case DeploymentStatusPurged:
+		return true
+	case DeploymentStatusPurging:
+		return true
+	case DeploymentStatusRestoring:
+		return true
+	case DeploymentStatusSuspended:
+		return true
+	case DeploymentStatusUpgrading:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DeploymentDomainCertStatus.
+const (
+	DeploymentDomainCertStatusFailed   DeploymentDomainCertStatus = "failed"
+	DeploymentDomainCertStatusIssued   DeploymentDomainCertStatus = "issued"
+	DeploymentDomainCertStatusPending  DeploymentDomainCertStatus = "pending"
+	DeploymentDomainCertStatusRenewing DeploymentDomainCertStatus = "renewing"
+	DeploymentDomainCertStatusRevoked  DeploymentDomainCertStatus = "revoked"
+)
+
+// Valid indicates whether the value is a known member of the DeploymentDomainCertStatus enum.
+func (e DeploymentDomainCertStatus) Valid() bool {
+	switch e {
+	case DeploymentDomainCertStatusFailed:
+		return true
+	case DeploymentDomainCertStatusIssued:
+		return true
+	case DeploymentDomainCertStatusPending:
+		return true
+	case DeploymentDomainCertStatusRenewing:
+		return true
+	case DeploymentDomainCertStatusRevoked:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DeploymentDomainStatus.
+const (
+	Failed   DeploymentDomainStatus = "failed"
+	Pending  DeploymentDomainStatus = "pending"
+	Removed  DeploymentDomainStatus = "removed"
+	Verified DeploymentDomainStatus = "verified"
+)
+
+// Valid indicates whether the value is a known member of the DeploymentDomainStatus enum.
+func (e DeploymentDomainStatus) Valid() bool {
+	switch e {
+	case Failed:
+		return true
+	case Pending:
+		return true
+	case Removed:
+		return true
+	case Verified:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DeploymentDomainVerificationMethod.
+const (
+	DnsTxt DeploymentDomainVerificationMethod = "dns_txt"
+)
+
+// Valid indicates whether the value is a known member of the DeploymentDomainVerificationMethod enum.
+func (e DeploymentDomainVerificationMethod) Valid() bool {
+	switch e {
+	case DnsTxt:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DeploymentDomainVerificationRecordRecordType.
+const (
+	TXT DeploymentDomainVerificationRecordRecordType = "TXT"
+)
+
+// Valid indicates whether the value is a known member of the DeploymentDomainVerificationRecordRecordType enum.
+func (e DeploymentDomainVerificationRecordRecordType) Valid() bool {
+	switch e {
+	case TXT:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DeploymentHealthOverall.
+const (
+	Degraded  DeploymentHealthOverall = "degraded"
+	Healthy   DeploymentHealthOverall = "healthy"
+	Unhealthy DeploymentHealthOverall = "unhealthy"
+	Unknown   DeploymentHealthOverall = "unknown"
+)
+
+// Valid indicates whether the value is a known member of the DeploymentHealthOverall enum.
+func (e DeploymentHealthOverall) Valid() bool {
+	switch e {
+	case Degraded:
+		return true
+	case Healthy:
+		return true
+	case Unhealthy:
+		return true
+	case Unknown:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for HealthStatus.
 const (
 	Ok HealthStatus = "ok"
@@ -56,6 +204,11 @@ func (e HealthStatus) Valid() bool {
 	default:
 		return false
 	}
+}
+
+// AttachDomainRequest defines model for AttachDomainRequest.
+type AttachDomainRequest struct {
+	Domain string `json:"domain"`
 }
 
 // AuditIntegrityResponse defines model for AuditIntegrityResponse.
@@ -75,6 +228,158 @@ type AuditIntegrityResponse struct {
 // AuditIntegrityResponseDataFirstMismatchReason defines model for AuditIntegrityResponse.Data.FirstMismatchReason.
 type AuditIntegrityResponseDataFirstMismatchReason string
 
+// ControlPlaneAuditEvent defines model for ControlPlaneAuditEvent.
+type ControlPlaneAuditEvent struct {
+	Action       *string                 `json:"action,omitempty"`
+	DeploymentId *string                 `json:"deployment_id,omitempty"`
+	Id           *string                 `json:"id,omitempty"`
+	IpAddress    *string                 `json:"ip_address,omitempty"`
+	Metadata     *map[string]interface{} `json:"metadata,omitempty"`
+	OccurredAt   *time.Time              `json:"occurred_at,omitempty"`
+	OperatorId   *string                 `json:"operator_id,omitempty"`
+	RequestId    *string                 `json:"request_id,omitempty"`
+	ResourceId   *string                 `json:"resource_id,omitempty"`
+	ResourceType *string                 `json:"resource_type,omitempty"`
+}
+
+// ControlPlaneAuditEventListResponse defines model for ControlPlaneAuditEventListResponse.
+type ControlPlaneAuditEventListResponse struct {
+	Data       []ControlPlaneAuditEvent `json:"data"`
+	Pagination *Pagination              `json:"pagination,omitempty"`
+}
+
+// CreateDeploymentRequest defines model for CreateDeploymentRequest.
+type CreateDeploymentRequest struct {
+	DataResidency   *string            `json:"data_residency,omitempty"`
+	EnvironmentSlug string             `json:"environment_slug"`
+	ImageVersion    string             `json:"image_version"`
+	Metadata        *map[string]string `json:"metadata,omitempty"`
+	Modules         *[]string          `json:"modules,omitempty"`
+	ProjectSlug     string             `json:"project_slug"`
+	Region          *string            `json:"region,omitempty"`
+}
+
+// CreateDeploymentResponse defines model for CreateDeploymentResponse.
+type CreateDeploymentResponse struct {
+	BootstrapApiKey struct {
+		Id       string `json:"id"`
+		Secret   string `json:"secret"`
+		TenantId string `json:"tenant_id"`
+	} `json:"bootstrap_api_key"`
+	Data Deployment `json:"data"`
+}
+
+// Deployment defines model for Deployment.
+type Deployment struct {
+	CreatedAt       time.Time          `json:"created_at"`
+	CustomDomains   *[]string          `json:"custom_domains,omitempty"`
+	DataResidency   *string            `json:"data_residency,omitempty"`
+	EnvironmentSlug string             `json:"environment_slug"`
+	Etag            *string            `json:"etag,omitempty"`
+	Id              string             `json:"id"`
+	ImageVersion    string             `json:"image_version"`
+	LastEventId     *string            `json:"last_event_id,omitempty"`
+	Metadata        *map[string]string `json:"metadata,omitempty"`
+	Modules         *[]string          `json:"modules,omitempty"`
+	PrimaryVhost    string             `json:"primary_vhost"`
+	ProjectSlug     string             `json:"project_slug"`
+	Region          *string            `json:"region,omitempty"`
+	RetainUntil     *time.Time         `json:"retain_until,omitempty"`
+	Status          DeploymentStatus   `json:"status"`
+	UpdatedAt       *time.Time         `json:"updated_at,omitempty"`
+}
+
+// DeploymentStatus defines model for Deployment.Status.
+type DeploymentStatus string
+
+// DeploymentDomain defines model for DeploymentDomain.
+type DeploymentDomain struct {
+	CertStatus         *DeploymentDomainCertStatus        `json:"cert_status,omitempty"`
+	CreatedAt          time.Time                          `json:"created_at"`
+	DeploymentId       string                             `json:"deployment_id"`
+	Domain             string                             `json:"domain"`
+	Id                 string                             `json:"id"`
+	IsPrimary          *bool                              `json:"is_primary,omitempty"`
+	LastCheckAt        *time.Time                         `json:"last_check_at,omitempty"`
+	LastCheckError     *string                            `json:"last_check_error,omitempty"`
+	Status             DeploymentDomainStatus             `json:"status"`
+	VerificationMethod DeploymentDomainVerificationMethod `json:"verification_method"`
+	VerificationRecord struct {
+		RecordName  string                                       `json:"record_name"`
+		RecordType  DeploymentDomainVerificationRecordRecordType `json:"record_type"`
+		RecordValue string                                       `json:"record_value"`
+	} `json:"verification_record"`
+	VerifiedAt *time.Time `json:"verified_at,omitempty"`
+}
+
+// DeploymentDomainCertStatus defines model for DeploymentDomain.CertStatus.
+type DeploymentDomainCertStatus string
+
+// DeploymentDomainStatus defines model for DeploymentDomain.Status.
+type DeploymentDomainStatus string
+
+// DeploymentDomainVerificationMethod defines model for DeploymentDomain.VerificationMethod.
+type DeploymentDomainVerificationMethod string
+
+// DeploymentDomainVerificationRecordRecordType defines model for DeploymentDomain.VerificationRecord.RecordType.
+type DeploymentDomainVerificationRecordRecordType string
+
+// DeploymentDomainListResponse defines model for DeploymentDomainListResponse.
+type DeploymentDomainListResponse struct {
+	Data []DeploymentDomain `json:"data"`
+}
+
+// DeploymentDomainResponse defines model for DeploymentDomainResponse.
+type DeploymentDomainResponse struct {
+	Data DeploymentDomain `json:"data"`
+}
+
+// DeploymentHealth defines model for DeploymentHealth.
+type DeploymentHealth struct {
+	CheckedAt  *time.Time `json:"checked_at,omitempty"`
+	Components *[]struct {
+		Detail *string `json:"detail,omitempty"`
+		Name   *string `json:"name,omitempty"`
+		Status *string `json:"status,omitempty"`
+	} `json:"components,omitempty"`
+	DeploymentId *string                  `json:"deployment_id,omitempty"`
+	Overall      *DeploymentHealthOverall `json:"overall,omitempty"`
+}
+
+// DeploymentHealthOverall defines model for DeploymentHealth.Overall.
+type DeploymentHealthOverall string
+
+// DeploymentHealthResponse defines model for DeploymentHealthResponse.
+type DeploymentHealthResponse struct {
+	Data DeploymentHealth `json:"data"`
+}
+
+// DeploymentListResponse defines model for DeploymentListResponse.
+type DeploymentListResponse struct {
+	Data       []Deployment `json:"data"`
+	Pagination Pagination   `json:"pagination"`
+}
+
+// DeploymentResponse defines model for DeploymentResponse.
+type DeploymentResponse struct {
+	Data Deployment `json:"data"`
+}
+
+// DeploymentRevision defines model for DeploymentRevision.
+type DeploymentRevision struct {
+	AppliedAt    *time.Time `json:"applied_at,omitempty"`
+	AppliedBy    *string    `json:"applied_by,omitempty"`
+	DeploymentId *string    `json:"deployment_id,omitempty"`
+	Id           *string    `json:"id,omitempty"`
+	ImageVersion *string    `json:"image_version,omitempty"`
+	IsRolledBack *bool      `json:"is_rolled_back,omitempty"`
+}
+
+// DeploymentRevisionListResponse defines model for DeploymentRevisionListResponse.
+type DeploymentRevisionListResponse struct {
+	Data []DeploymentRevision `json:"data"`
+}
+
 // Health defines model for Health.
 type Health struct {
 	Commit  *string      `json:"commit,omitempty"`
@@ -85,17 +390,239 @@ type Health struct {
 // HealthStatus defines model for Health.Status.
 type HealthStatus string
 
+// Operator defines model for Operator.
+type Operator struct {
+	Email       *string   `json:"email,omitempty"`
+	Id          *string   `json:"id,omitempty"`
+	IpAllowlist *[]string `json:"ip_allowlist,omitempty"`
+	IsActive    *bool     `json:"is_active,omitempty"`
+	MfaEnabled  *bool     `json:"mfa_enabled,omitempty"`
+	Name        *string   `json:"name,omitempty"`
+}
+
+// OperatorListResponse defines model for OperatorListResponse.
+type OperatorListResponse struct {
+	Data []Operator `json:"data"`
+}
+
+// Pagination defines model for Pagination.
+type Pagination struct {
+	HasMore    *bool   `json:"has_more,omitempty"`
+	NextCursor *string `json:"next_cursor,omitempty"`
+}
+
+// RestoreDeploymentRequest defines model for RestoreDeploymentRequest.
+type RestoreDeploymentRequest struct {
+	ToTimestamp time.Time `json:"to_timestamp"`
+}
+
+// StartImpersonationRequest defines model for StartImpersonationRequest.
+type StartImpersonationRequest struct {
+	DurationSeconds *int   `json:"duration_seconds,omitempty"`
+	Reason          string `json:"reason"`
+	TargetMemberId  string `json:"target_member_id"`
+}
+
+// StartImpersonationResponse defines model for StartImpersonationResponse.
+type StartImpersonationResponse struct {
+	ExpiresAt time.Time `json:"expires_at"`
+	Token     string    `json:"token"`
+}
+
+// UpdateDeploymentRequest defines model for UpdateDeploymentRequest.
+type UpdateDeploymentRequest struct {
+	ImageVersion *string            `json:"image_version,omitempty"`
+	Metadata     *map[string]string `json:"metadata,omitempty"`
+}
+
+// UpgradeDeploymentRequest defines model for UpgradeDeploymentRequest.
+type UpgradeDeploymentRequest struct {
+	ImageVersion  string `json:"image_version"`
+	RunMigrations *bool  `json:"run_migrations,omitempty"`
+}
+
+// ListControlPlaneAuditEventsParams defines parameters for ListControlPlaneAuditEvents.
+type ListControlPlaneAuditEventsParams struct {
+	Limit        *int    `form:"limit,omitempty" json:"limit,omitempty"`
+	Cursor       *string `form:"cursor,omitempty" json:"cursor,omitempty"`
+	DeploymentId *string `form:"deployment_id,omitempty" json:"deployment_id,omitempty"`
+	OperatorId   *string `form:"operator_id,omitempty" json:"operator_id,omitempty"`
+}
+
+// ListDeploymentsParams defines parameters for ListDeployments.
+type ListDeploymentsParams struct {
+	Limit  *int    `form:"limit,omitempty" json:"limit,omitempty"`
+	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
+	Status *string `form:"status,omitempty" json:"status,omitempty"`
+}
+
+// CreateDeploymentParams defines parameters for CreateDeployment.
+type CreateDeploymentParams struct {
+	IdempotencyKey string `json:"Idempotency-Key"`
+}
+
+// DeleteDeploymentParams defines parameters for DeleteDeployment.
+type DeleteDeploymentParams struct {
+	RetainDays *int `form:"retain_days,omitempty" json:"retain_days,omitempty"`
+}
+
+// UpdateDeploymentParams defines parameters for UpdateDeployment.
+type UpdateDeploymentParams struct {
+	IfMatch        string  `json:"If-Match"`
+	IdempotencyKey *string `json:"Idempotency-Key,omitempty"`
+}
+
 // VerifyDeploymentAuditIntegrityParams defines parameters for VerifyDeploymentAuditIntegrity.
 type VerifyDeploymentAuditIntegrityParams struct {
-	// TenantId Optional — verify a single tenant's chain instead of every tenant on the Deployment.
 	TenantId *string `form:"tenant_id,omitempty" json:"tenant_id,omitempty"`
 }
 
+// AttachDeploymentDomainParams defines parameters for AttachDeploymentDomain.
+type AttachDeploymentDomainParams struct {
+	IdempotencyKey string `json:"Idempotency-Key"`
+}
+
+// DetachDeploymentDomainParams defines parameters for DetachDeploymentDomain.
+type DetachDeploymentDomainParams struct {
+	IfMatch *string `json:"If-Match,omitempty"`
+}
+
+// VerifyDeploymentDomainParams defines parameters for VerifyDeploymentDomain.
+type VerifyDeploymentDomainParams struct {
+	IdempotencyKey string `json:"Idempotency-Key"`
+}
+
+// FreezeDeploymentKeysParams defines parameters for FreezeDeploymentKeys.
+type FreezeDeploymentKeysParams struct {
+	IdempotencyKey string `json:"Idempotency-Key"`
+}
+
+// StartImpersonationSessionParams defines parameters for StartImpersonationSession.
+type StartImpersonationSessionParams struct {
+	IdempotencyKey string `json:"Idempotency-Key"`
+}
+
+// TailDeploymentLogsParams defines parameters for TailDeploymentLogs.
+type TailDeploymentLogsParams struct {
+	Since  *time.Time `form:"since,omitempty" json:"since,omitempty"`
+	Filter *string    `form:"filter,omitempty" json:"filter,omitempty"`
+	Tail   *int       `form:"tail,omitempty" json:"tail,omitempty"`
+}
+
+// PurgeDeploymentParams defines parameters for PurgeDeployment.
+type PurgeDeploymentParams struct {
+	IdempotencyKey string `json:"Idempotency-Key"`
+}
+
+// RestartDeploymentParams defines parameters for RestartDeployment.
+type RestartDeploymentParams struct {
+	IdempotencyKey string `json:"Idempotency-Key"`
+}
+
+// RestoreDeploymentParams defines parameters for RestoreDeployment.
+type RestoreDeploymentParams struct {
+	IdempotencyKey string `json:"Idempotency-Key"`
+}
+
+// RollbackDeploymentParams defines parameters for RollbackDeployment.
+type RollbackDeploymentParams struct {
+	IdempotencyKey string `json:"Idempotency-Key"`
+}
+
+// UpgradeDeploymentParams defines parameters for UpgradeDeployment.
+type UpgradeDeploymentParams struct {
+	IdempotencyKey string `json:"Idempotency-Key"`
+}
+
+// CreateDeploymentJSONRequestBody defines body for CreateDeployment for application/json ContentType.
+type CreateDeploymentJSONRequestBody = CreateDeploymentRequest
+
+// UpdateDeploymentJSONRequestBody defines body for UpdateDeployment for application/json ContentType.
+type UpdateDeploymentJSONRequestBody = UpdateDeploymentRequest
+
+// AttachDeploymentDomainJSONRequestBody defines body for AttachDeploymentDomain for application/json ContentType.
+type AttachDeploymentDomainJSONRequestBody = AttachDomainRequest
+
+// StartImpersonationSessionJSONRequestBody defines body for StartImpersonationSession for application/json ContentType.
+type StartImpersonationSessionJSONRequestBody = StartImpersonationRequest
+
+// RestoreDeploymentJSONRequestBody defines body for RestoreDeployment for application/json ContentType.
+type RestoreDeploymentJSONRequestBody = RestoreDeploymentRequest
+
+// UpgradeDeploymentJSONRequestBody defines body for UpgradeDeployment for application/json ContentType.
+type UpgradeDeploymentJSONRequestBody = UpgradeDeploymentRequest
+
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// List control-plane operator audit events.
+	// (GET /control/v1/audit-events)
+	ListControlPlaneAuditEvents(w http.ResponseWriter, r *http.Request, params ListControlPlaneAuditEventsParams)
+	// List Deployments.
+	// (GET /control/v1/deployments)
+	ListDeployments(w http.ResponseWriter, r *http.Request, params ListDeploymentsParams)
+	// Provision a new Deployment.
+	// (POST /control/v1/deployments)
+	CreateDeployment(w http.ResponseWriter, r *http.Request, params CreateDeploymentParams)
+
+	// (DELETE /control/v1/deployments/{deployment_id})
+	DeleteDeployment(w http.ResponseWriter, r *http.Request, deploymentId string, params DeleteDeploymentParams)
+
+	// (GET /control/v1/deployments/{deployment_id})
+	GetDeployment(w http.ResponseWriter, r *http.Request, deploymentId string)
+
+	// (PATCH /control/v1/deployments/{deployment_id})
+	UpdateDeployment(w http.ResponseWriter, r *http.Request, deploymentId string, params UpdateDeploymentParams)
 	// Walk the audit chain and report the first mismatch (if any).
 	// (GET /control/v1/deployments/{deployment_id}/audit-integrity)
 	VerifyDeploymentAuditIntegrity(w http.ResponseWriter, r *http.Request, deploymentId string, params VerifyDeploymentAuditIntegrityParams)
+
+	// (GET /control/v1/deployments/{deployment_id}/domains)
+	ListDeploymentDomains(w http.ResponseWriter, r *http.Request, deploymentId string)
+
+	// (POST /control/v1/deployments/{deployment_id}/domains)
+	AttachDeploymentDomain(w http.ResponseWriter, r *http.Request, deploymentId string, params AttachDeploymentDomainParams)
+
+	// (DELETE /control/v1/deployments/{deployment_id}/domains/{domain_id})
+	DetachDeploymentDomain(w http.ResponseWriter, r *http.Request, deploymentId string, domainId string, params DetachDeploymentDomainParams)
+
+	// (GET /control/v1/deployments/{deployment_id}/domains/{domain_id})
+	GetDeploymentDomain(w http.ResponseWriter, r *http.Request, deploymentId string, domainId string)
+
+	// (POST /control/v1/deployments/{deployment_id}/domains/{domain_id}/verify)
+	VerifyDeploymentDomain(w http.ResponseWriter, r *http.Request, deploymentId string, domainId string, params VerifyDeploymentDomainParams)
+
+	// (POST /control/v1/deployments/{deployment_id}/freeze-keys)
+	FreezeDeploymentKeys(w http.ResponseWriter, r *http.Request, deploymentId string, params FreezeDeploymentKeysParams)
+
+	// (GET /control/v1/deployments/{deployment_id}/health)
+	GetDeploymentHealth(w http.ResponseWriter, r *http.Request, deploymentId string)
+
+	// (POST /control/v1/deployments/{deployment_id}/impersonation-sessions)
+	StartImpersonationSession(w http.ResponseWriter, r *http.Request, deploymentId string, params StartImpersonationSessionParams)
+
+	// (GET /control/v1/deployments/{deployment_id}/logs)
+	TailDeploymentLogs(w http.ResponseWriter, r *http.Request, deploymentId string, params TailDeploymentLogsParams)
+
+	// (POST /control/v1/deployments/{deployment_id}/purge)
+	PurgeDeployment(w http.ResponseWriter, r *http.Request, deploymentId string, params PurgeDeploymentParams)
+
+	// (POST /control/v1/deployments/{deployment_id}/restart)
+	RestartDeployment(w http.ResponseWriter, r *http.Request, deploymentId string, params RestartDeploymentParams)
+
+	// (POST /control/v1/deployments/{deployment_id}/restore)
+	RestoreDeployment(w http.ResponseWriter, r *http.Request, deploymentId string, params RestoreDeploymentParams)
+
+	// (GET /control/v1/deployments/{deployment_id}/revisions)
+	ListDeploymentRevisions(w http.ResponseWriter, r *http.Request, deploymentId string)
+
+	// (POST /control/v1/deployments/{deployment_id}/rollback)
+	RollbackDeployment(w http.ResponseWriter, r *http.Request, deploymentId string, params RollbackDeploymentParams)
+
+	// (POST /control/v1/deployments/{deployment_id}/upgrade)
+	UpgradeDeployment(w http.ResponseWriter, r *http.Request, deploymentId string, params UpgradeDeploymentParams)
+	// List operators (Phase 13 extends with MFA status).
+	// (GET /control/v1/operators)
+	ListOperators(w http.ResponseWriter, r *http.Request)
 	// Liveness probe.
 	// (GET /healthz)
 	GetHealthz(w http.ResponseWriter, r *http.Request)
@@ -105,9 +632,123 @@ type ServerInterface interface {
 
 type Unimplemented struct{}
 
+// List control-plane operator audit events.
+// (GET /control/v1/audit-events)
+func (_ Unimplemented) ListControlPlaneAuditEvents(w http.ResponseWriter, r *http.Request, params ListControlPlaneAuditEventsParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// List Deployments.
+// (GET /control/v1/deployments)
+func (_ Unimplemented) ListDeployments(w http.ResponseWriter, r *http.Request, params ListDeploymentsParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Provision a new Deployment.
+// (POST /control/v1/deployments)
+func (_ Unimplemented) CreateDeployment(w http.ResponseWriter, r *http.Request, params CreateDeploymentParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (DELETE /control/v1/deployments/{deployment_id})
+func (_ Unimplemented) DeleteDeployment(w http.ResponseWriter, r *http.Request, deploymentId string, params DeleteDeploymentParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (GET /control/v1/deployments/{deployment_id})
+func (_ Unimplemented) GetDeployment(w http.ResponseWriter, r *http.Request, deploymentId string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (PATCH /control/v1/deployments/{deployment_id})
+func (_ Unimplemented) UpdateDeployment(w http.ResponseWriter, r *http.Request, deploymentId string, params UpdateDeploymentParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // Walk the audit chain and report the first mismatch (if any).
 // (GET /control/v1/deployments/{deployment_id}/audit-integrity)
 func (_ Unimplemented) VerifyDeploymentAuditIntegrity(w http.ResponseWriter, r *http.Request, deploymentId string, params VerifyDeploymentAuditIntegrityParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (GET /control/v1/deployments/{deployment_id}/domains)
+func (_ Unimplemented) ListDeploymentDomains(w http.ResponseWriter, r *http.Request, deploymentId string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (POST /control/v1/deployments/{deployment_id}/domains)
+func (_ Unimplemented) AttachDeploymentDomain(w http.ResponseWriter, r *http.Request, deploymentId string, params AttachDeploymentDomainParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (DELETE /control/v1/deployments/{deployment_id}/domains/{domain_id})
+func (_ Unimplemented) DetachDeploymentDomain(w http.ResponseWriter, r *http.Request, deploymentId string, domainId string, params DetachDeploymentDomainParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (GET /control/v1/deployments/{deployment_id}/domains/{domain_id})
+func (_ Unimplemented) GetDeploymentDomain(w http.ResponseWriter, r *http.Request, deploymentId string, domainId string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (POST /control/v1/deployments/{deployment_id}/domains/{domain_id}/verify)
+func (_ Unimplemented) VerifyDeploymentDomain(w http.ResponseWriter, r *http.Request, deploymentId string, domainId string, params VerifyDeploymentDomainParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (POST /control/v1/deployments/{deployment_id}/freeze-keys)
+func (_ Unimplemented) FreezeDeploymentKeys(w http.ResponseWriter, r *http.Request, deploymentId string, params FreezeDeploymentKeysParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (GET /control/v1/deployments/{deployment_id}/health)
+func (_ Unimplemented) GetDeploymentHealth(w http.ResponseWriter, r *http.Request, deploymentId string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (POST /control/v1/deployments/{deployment_id}/impersonation-sessions)
+func (_ Unimplemented) StartImpersonationSession(w http.ResponseWriter, r *http.Request, deploymentId string, params StartImpersonationSessionParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (GET /control/v1/deployments/{deployment_id}/logs)
+func (_ Unimplemented) TailDeploymentLogs(w http.ResponseWriter, r *http.Request, deploymentId string, params TailDeploymentLogsParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (POST /control/v1/deployments/{deployment_id}/purge)
+func (_ Unimplemented) PurgeDeployment(w http.ResponseWriter, r *http.Request, deploymentId string, params PurgeDeploymentParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (POST /control/v1/deployments/{deployment_id}/restart)
+func (_ Unimplemented) RestartDeployment(w http.ResponseWriter, r *http.Request, deploymentId string, params RestartDeploymentParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (POST /control/v1/deployments/{deployment_id}/restore)
+func (_ Unimplemented) RestoreDeployment(w http.ResponseWriter, r *http.Request, deploymentId string, params RestoreDeploymentParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (GET /control/v1/deployments/{deployment_id}/revisions)
+func (_ Unimplemented) ListDeploymentRevisions(w http.ResponseWriter, r *http.Request, deploymentId string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (POST /control/v1/deployments/{deployment_id}/rollback)
+func (_ Unimplemented) RollbackDeployment(w http.ResponseWriter, r *http.Request, deploymentId string, params RollbackDeploymentParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (POST /control/v1/deployments/{deployment_id}/upgrade)
+func (_ Unimplemented) UpgradeDeployment(w http.ResponseWriter, r *http.Request, deploymentId string, params UpgradeDeploymentParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// List operators (Phase 13 extends with MFA status).
+// (GET /control/v1/operators)
+func (_ Unimplemented) ListOperators(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -125,6 +766,323 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.Handler) http.Handler
+
+// ListControlPlaneAuditEvents operation middleware
+func (siw *ServerInterfaceWrapper) ListControlPlaneAuditEvents(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListControlPlaneAuditEventsParams
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "deployment_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "deployment_id", r.URL.Query(), &params.DeploymentId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "deployment_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "deployment_id", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "operator_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "operator_id", r.URL.Query(), &params.OperatorId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "operator_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "operator_id", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListControlPlaneAuditEvents(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListDeployments operation middleware
+func (siw *ServerInterfaceWrapper) ListDeployments(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListDeploymentsParams
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "status" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "status", r.URL.Query(), &params.Status, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "status"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "status", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListDeployments(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateDeployment operation middleware
+func (siw *ServerInterfaceWrapper) CreateDeployment(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateDeploymentParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateDeployment(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteDeployment operation middleware
+func (siw *ServerInterfaceWrapper) DeleteDeployment(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "deployment_id" -------------
+	var deploymentId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "deployment_id", chi.URLParam(r, "deployment_id"), &deploymentId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "deployment_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params DeleteDeploymentParams
+
+	// ------------- Optional query parameter "retain_days" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "retain_days", r.URL.Query(), &params.RetainDays, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "retain_days"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "retain_days", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteDeployment(w, r, deploymentId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetDeployment operation middleware
+func (siw *ServerInterfaceWrapper) GetDeployment(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "deployment_id" -------------
+	var deploymentId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "deployment_id", chi.URLParam(r, "deployment_id"), &deploymentId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "deployment_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetDeployment(w, r, deploymentId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateDeployment operation middleware
+func (siw *ServerInterfaceWrapper) UpdateDeployment(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "deployment_id" -------------
+	var deploymentId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "deployment_id", chi.URLParam(r, "deployment_id"), &deploymentId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "deployment_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params UpdateDeploymentParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = IfMatch
+
+	} else {
+		err := fmt.Errorf("Header parameter If-Match is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "If-Match", Err: err})
+		return
+	}
+
+	// ------------- Optional header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = &IdempotencyKey
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateDeployment(w, r, deploymentId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
 
 // VerifyDeploymentAuditIntegrity operation middleware
 func (siw *ServerInterfaceWrapper) VerifyDeploymentAuditIntegrity(w http.ResponseWriter, r *http.Request) {
@@ -159,6 +1117,755 @@ func (siw *ServerInterfaceWrapper) VerifyDeploymentAuditIntegrity(w http.Respons
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.VerifyDeploymentAuditIntegrity(w, r, deploymentId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListDeploymentDomains operation middleware
+func (siw *ServerInterfaceWrapper) ListDeploymentDomains(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "deployment_id" -------------
+	var deploymentId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "deployment_id", chi.URLParam(r, "deployment_id"), &deploymentId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "deployment_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListDeploymentDomains(w, r, deploymentId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// AttachDeploymentDomain operation middleware
+func (siw *ServerInterfaceWrapper) AttachDeploymentDomain(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "deployment_id" -------------
+	var deploymentId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "deployment_id", chi.URLParam(r, "deployment_id"), &deploymentId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "deployment_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params AttachDeploymentDomainParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.AttachDeploymentDomain(w, r, deploymentId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DetachDeploymentDomain operation middleware
+func (siw *ServerInterfaceWrapper) DetachDeploymentDomain(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "deployment_id" -------------
+	var deploymentId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "deployment_id", chi.URLParam(r, "deployment_id"), &deploymentId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "deployment_id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "domain_id" -------------
+	var domainId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "domain_id", chi.URLParam(r, "domain_id"), &domainId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "domain_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params DetachDeploymentDomainParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = &IfMatch
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DetachDeploymentDomain(w, r, deploymentId, domainId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetDeploymentDomain operation middleware
+func (siw *ServerInterfaceWrapper) GetDeploymentDomain(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "deployment_id" -------------
+	var deploymentId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "deployment_id", chi.URLParam(r, "deployment_id"), &deploymentId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "deployment_id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "domain_id" -------------
+	var domainId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "domain_id", chi.URLParam(r, "domain_id"), &domainId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "domain_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetDeploymentDomain(w, r, deploymentId, domainId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// VerifyDeploymentDomain operation middleware
+func (siw *ServerInterfaceWrapper) VerifyDeploymentDomain(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "deployment_id" -------------
+	var deploymentId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "deployment_id", chi.URLParam(r, "deployment_id"), &deploymentId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "deployment_id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "domain_id" -------------
+	var domainId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "domain_id", chi.URLParam(r, "domain_id"), &domainId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "domain_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params VerifyDeploymentDomainParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.VerifyDeploymentDomain(w, r, deploymentId, domainId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// FreezeDeploymentKeys operation middleware
+func (siw *ServerInterfaceWrapper) FreezeDeploymentKeys(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "deployment_id" -------------
+	var deploymentId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "deployment_id", chi.URLParam(r, "deployment_id"), &deploymentId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "deployment_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params FreezeDeploymentKeysParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.FreezeDeploymentKeys(w, r, deploymentId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetDeploymentHealth operation middleware
+func (siw *ServerInterfaceWrapper) GetDeploymentHealth(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "deployment_id" -------------
+	var deploymentId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "deployment_id", chi.URLParam(r, "deployment_id"), &deploymentId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "deployment_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetDeploymentHealth(w, r, deploymentId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// StartImpersonationSession operation middleware
+func (siw *ServerInterfaceWrapper) StartImpersonationSession(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "deployment_id" -------------
+	var deploymentId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "deployment_id", chi.URLParam(r, "deployment_id"), &deploymentId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "deployment_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params StartImpersonationSessionParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.StartImpersonationSession(w, r, deploymentId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// TailDeploymentLogs operation middleware
+func (siw *ServerInterfaceWrapper) TailDeploymentLogs(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "deployment_id" -------------
+	var deploymentId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "deployment_id", chi.URLParam(r, "deployment_id"), &deploymentId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "deployment_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params TailDeploymentLogsParams
+
+	// ------------- Optional query parameter "since" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "since", r.URL.Query(), &params.Since, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "since"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "since", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "filter" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "filter", r.URL.Query(), &params.Filter, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "filter"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "filter", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "tail" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "tail", r.URL.Query(), &params.Tail, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "tail"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tail", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.TailDeploymentLogs(w, r, deploymentId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PurgeDeployment operation middleware
+func (siw *ServerInterfaceWrapper) PurgeDeployment(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "deployment_id" -------------
+	var deploymentId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "deployment_id", chi.URLParam(r, "deployment_id"), &deploymentId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "deployment_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params PurgeDeploymentParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PurgeDeployment(w, r, deploymentId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RestartDeployment operation middleware
+func (siw *ServerInterfaceWrapper) RestartDeployment(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "deployment_id" -------------
+	var deploymentId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "deployment_id", chi.URLParam(r, "deployment_id"), &deploymentId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "deployment_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params RestartDeploymentParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RestartDeployment(w, r, deploymentId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RestoreDeployment operation middleware
+func (siw *ServerInterfaceWrapper) RestoreDeployment(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "deployment_id" -------------
+	var deploymentId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "deployment_id", chi.URLParam(r, "deployment_id"), &deploymentId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "deployment_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params RestoreDeploymentParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RestoreDeployment(w, r, deploymentId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListDeploymentRevisions operation middleware
+func (siw *ServerInterfaceWrapper) ListDeploymentRevisions(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "deployment_id" -------------
+	var deploymentId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "deployment_id", chi.URLParam(r, "deployment_id"), &deploymentId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "deployment_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListDeploymentRevisions(w, r, deploymentId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RollbackDeployment operation middleware
+func (siw *ServerInterfaceWrapper) RollbackDeployment(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "deployment_id" -------------
+	var deploymentId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "deployment_id", chi.URLParam(r, "deployment_id"), &deploymentId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "deployment_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params RollbackDeploymentParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RollbackDeployment(w, r, deploymentId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpgradeDeployment operation middleware
+func (siw *ServerInterfaceWrapper) UpgradeDeployment(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "deployment_id" -------------
+	var deploymentId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "deployment_id", chi.URLParam(r, "deployment_id"), &deploymentId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "deployment_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params UpgradeDeploymentParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpgradeDeployment(w, r, deploymentId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListOperators operation middleware
+func (siw *ServerInterfaceWrapper) ListOperators(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListOperators(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -296,13 +2003,219 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	}
 
 	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/control/v1/audit-events", wrapper.ListControlPlaneAuditEvents)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/control/v1/deployments", wrapper.ListDeployments)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/control/v1/deployments", wrapper.CreateDeployment)
+	})
+	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/control/v1/deployments/{deployment_id}", wrapper.DeleteDeployment)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/control/v1/deployments/{deployment_id}", wrapper.GetDeployment)
+	})
+	r.Group(func(r chi.Router) {
+		r.Patch(options.BaseURL+"/control/v1/deployments/{deployment_id}", wrapper.UpdateDeployment)
+	})
+	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/control/v1/deployments/{deployment_id}/audit-integrity", wrapper.VerifyDeploymentAuditIntegrity)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/control/v1/deployments/{deployment_id}/domains", wrapper.ListDeploymentDomains)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/control/v1/deployments/{deployment_id}/domains", wrapper.AttachDeploymentDomain)
+	})
+	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/control/v1/deployments/{deployment_id}/domains/{domain_id}", wrapper.DetachDeploymentDomain)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/control/v1/deployments/{deployment_id}/domains/{domain_id}", wrapper.GetDeploymentDomain)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/control/v1/deployments/{deployment_id}/domains/{domain_id}/verify", wrapper.VerifyDeploymentDomain)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/control/v1/deployments/{deployment_id}/freeze-keys", wrapper.FreezeDeploymentKeys)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/control/v1/deployments/{deployment_id}/health", wrapper.GetDeploymentHealth)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/control/v1/deployments/{deployment_id}/impersonation-sessions", wrapper.StartImpersonationSession)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/control/v1/deployments/{deployment_id}/logs", wrapper.TailDeploymentLogs)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/control/v1/deployments/{deployment_id}/purge", wrapper.PurgeDeployment)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/control/v1/deployments/{deployment_id}/restart", wrapper.RestartDeployment)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/control/v1/deployments/{deployment_id}/restore", wrapper.RestoreDeployment)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/control/v1/deployments/{deployment_id}/revisions", wrapper.ListDeploymentRevisions)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/control/v1/deployments/{deployment_id}/rollback", wrapper.RollbackDeployment)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/control/v1/deployments/{deployment_id}/upgrade", wrapper.UpgradeDeployment)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/control/v1/operators", wrapper.ListOperators)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/healthz", wrapper.GetHealthz)
 	})
 
 	return r
+}
+
+type ListControlPlaneAuditEventsRequestObject struct {
+	Params ListControlPlaneAuditEventsParams
+}
+
+type ListControlPlaneAuditEventsResponseObject interface {
+	VisitListControlPlaneAuditEventsResponse(w http.ResponseWriter) error
+}
+
+type ListControlPlaneAuditEvents200JSONResponse ControlPlaneAuditEventListResponse
+
+func (response ListControlPlaneAuditEvents200JSONResponse) VisitListControlPlaneAuditEventsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListDeploymentsRequestObject struct {
+	Params ListDeploymentsParams
+}
+
+type ListDeploymentsResponseObject interface {
+	VisitListDeploymentsResponse(w http.ResponseWriter) error
+}
+
+type ListDeployments200JSONResponse DeploymentListResponse
+
+func (response ListDeployments200JSONResponse) VisitListDeploymentsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateDeploymentRequestObject struct {
+	Params CreateDeploymentParams
+	Body   *CreateDeploymentJSONRequestBody
+}
+
+type CreateDeploymentResponseObject interface {
+	VisitCreateDeploymentResponse(w http.ResponseWriter) error
+}
+
+type CreateDeployment201ResponseHeaders struct {
+	ETag *string
+}
+
+type CreateDeployment201JSONResponse struct {
+	Body    CreateDeploymentResponse
+	Headers CreateDeployment201ResponseHeaders
+}
+
+func (response CreateDeployment201JSONResponse) VisitCreateDeploymentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteDeploymentRequestObject struct {
+	DeploymentId string `json:"deployment_id"`
+	Params       DeleteDeploymentParams
+}
+
+type DeleteDeploymentResponseObject interface {
+	VisitDeleteDeploymentResponse(w http.ResponseWriter) error
+}
+
+type DeleteDeployment204Response struct {
+}
+
+func (response DeleteDeployment204Response) VisitDeleteDeploymentResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type GetDeploymentRequestObject struct {
+	DeploymentId string `json:"deployment_id"`
+}
+
+type GetDeploymentResponseObject interface {
+	VisitGetDeploymentResponse(w http.ResponseWriter) error
+}
+
+type GetDeployment200JSONResponse DeploymentResponse
+
+func (response GetDeployment200JSONResponse) VisitGetDeploymentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateDeploymentRequestObject struct {
+	DeploymentId string `json:"deployment_id"`
+	Params       UpdateDeploymentParams
+	Body         *UpdateDeploymentJSONRequestBody
+}
+
+type UpdateDeploymentResponseObject interface {
+	VisitUpdateDeploymentResponse(w http.ResponseWriter) error
+}
+
+type UpdateDeployment200JSONResponse DeploymentResponse
+
+func (response UpdateDeployment200JSONResponse) VisitUpdateDeploymentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
 }
 
 type VerifyDeploymentAuditIntegrityRequestObject struct {
@@ -317,6 +2230,398 @@ type VerifyDeploymentAuditIntegrityResponseObject interface {
 type VerifyDeploymentAuditIntegrity200JSONResponse AuditIntegrityResponse
 
 func (response VerifyDeploymentAuditIntegrity200JSONResponse) VisitVerifyDeploymentAuditIntegrityResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListDeploymentDomainsRequestObject struct {
+	DeploymentId string `json:"deployment_id"`
+}
+
+type ListDeploymentDomainsResponseObject interface {
+	VisitListDeploymentDomainsResponse(w http.ResponseWriter) error
+}
+
+type ListDeploymentDomains200JSONResponse DeploymentDomainListResponse
+
+func (response ListDeploymentDomains200JSONResponse) VisitListDeploymentDomainsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AttachDeploymentDomainRequestObject struct {
+	DeploymentId string `json:"deployment_id"`
+	Params       AttachDeploymentDomainParams
+	Body         *AttachDeploymentDomainJSONRequestBody
+}
+
+type AttachDeploymentDomainResponseObject interface {
+	VisitAttachDeploymentDomainResponse(w http.ResponseWriter) error
+}
+
+type AttachDeploymentDomain201JSONResponse DeploymentDomainResponse
+
+func (response AttachDeploymentDomain201JSONResponse) VisitAttachDeploymentDomainResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DetachDeploymentDomainRequestObject struct {
+	DeploymentId string `json:"deployment_id"`
+	DomainId     string `json:"domain_id"`
+	Params       DetachDeploymentDomainParams
+}
+
+type DetachDeploymentDomainResponseObject interface {
+	VisitDetachDeploymentDomainResponse(w http.ResponseWriter) error
+}
+
+type DetachDeploymentDomain204Response struct {
+}
+
+func (response DetachDeploymentDomain204Response) VisitDetachDeploymentDomainResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type GetDeploymentDomainRequestObject struct {
+	DeploymentId string `json:"deployment_id"`
+	DomainId     string `json:"domain_id"`
+}
+
+type GetDeploymentDomainResponseObject interface {
+	VisitGetDeploymentDomainResponse(w http.ResponseWriter) error
+}
+
+type GetDeploymentDomain200JSONResponse DeploymentDomainResponse
+
+func (response GetDeploymentDomain200JSONResponse) VisitGetDeploymentDomainResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type VerifyDeploymentDomainRequestObject struct {
+	DeploymentId string `json:"deployment_id"`
+	DomainId     string `json:"domain_id"`
+	Params       VerifyDeploymentDomainParams
+}
+
+type VerifyDeploymentDomainResponseObject interface {
+	VisitVerifyDeploymentDomainResponse(w http.ResponseWriter) error
+}
+
+type VerifyDeploymentDomain200JSONResponse DeploymentDomainResponse
+
+func (response VerifyDeploymentDomain200JSONResponse) VisitVerifyDeploymentDomainResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type FreezeDeploymentKeysRequestObject struct {
+	DeploymentId string `json:"deployment_id"`
+	Params       FreezeDeploymentKeysParams
+}
+
+type FreezeDeploymentKeysResponseObject interface {
+	VisitFreezeDeploymentKeysResponse(w http.ResponseWriter) error
+}
+
+type FreezeDeploymentKeys202JSONResponse DeploymentResponse
+
+func (response FreezeDeploymentKeys202JSONResponse) VisitFreezeDeploymentKeysResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(202)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetDeploymentHealthRequestObject struct {
+	DeploymentId string `json:"deployment_id"`
+}
+
+type GetDeploymentHealthResponseObject interface {
+	VisitGetDeploymentHealthResponse(w http.ResponseWriter) error
+}
+
+type GetDeploymentHealth200JSONResponse DeploymentHealthResponse
+
+func (response GetDeploymentHealth200JSONResponse) VisitGetDeploymentHealthResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StartImpersonationSessionRequestObject struct {
+	DeploymentId string `json:"deployment_id"`
+	Params       StartImpersonationSessionParams
+	Body         *StartImpersonationSessionJSONRequestBody
+}
+
+type StartImpersonationSessionResponseObject interface {
+	VisitStartImpersonationSessionResponse(w http.ResponseWriter) error
+}
+
+type StartImpersonationSession201JSONResponse StartImpersonationResponse
+
+func (response StartImpersonationSession201JSONResponse) VisitStartImpersonationSessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type TailDeploymentLogsRequestObject struct {
+	DeploymentId string `json:"deployment_id"`
+	Params       TailDeploymentLogsParams
+}
+
+type TailDeploymentLogsResponseObject interface {
+	VisitTailDeploymentLogsResponse(w http.ResponseWriter) error
+}
+
+type TailDeploymentLogs200ApplicationxNdjsonResponse struct {
+	Body          io.Reader
+	ContentLength int64
+}
+
+func (response TailDeploymentLogs200ApplicationxNdjsonResponse) VisitTailDeploymentLogsResponse(w http.ResponseWriter) error {
+
+	w.Header().Set("Content-Type", "application/x-ndjson")
+	if response.ContentLength != 0 {
+		w.Header().Set("Content-Length", fmt.Sprint(response.ContentLength))
+	}
+	w.WriteHeader(200)
+
+	if closer, ok := response.Body.(io.ReadCloser); ok {
+		defer closer.Close()
+	}
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		// If w doesn't support flushing, fall back to io.Copy.
+		_, err := io.Copy(w, response.Body)
+		return err
+	}
+	// text/event-stream messages are typically small; use a
+	// modest buffer and flush after each chunk so clients see
+	// events immediately instead of waiting on OS buffering.
+	buf := make([]byte, 4096)
+	for {
+		n, err := response.Body.Read(buf)
+		if n > 0 {
+			if _, writeErr := w.Write(buf[:n]); writeErr != nil {
+				return writeErr
+			}
+			flusher.Flush()
+		}
+		if err != nil {
+			if err == io.EOF {
+				return nil
+			}
+			return err
+		}
+	}
+}
+
+type PurgeDeploymentRequestObject struct {
+	DeploymentId string `json:"deployment_id"`
+	Params       PurgeDeploymentParams
+}
+
+type PurgeDeploymentResponseObject interface {
+	VisitPurgeDeploymentResponse(w http.ResponseWriter) error
+}
+
+type PurgeDeployment202JSONResponse DeploymentResponse
+
+func (response PurgeDeployment202JSONResponse) VisitPurgeDeploymentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(202)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RestartDeploymentRequestObject struct {
+	DeploymentId string `json:"deployment_id"`
+	Params       RestartDeploymentParams
+}
+
+type RestartDeploymentResponseObject interface {
+	VisitRestartDeploymentResponse(w http.ResponseWriter) error
+}
+
+type RestartDeployment202JSONResponse DeploymentResponse
+
+func (response RestartDeployment202JSONResponse) VisitRestartDeploymentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(202)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RestoreDeploymentRequestObject struct {
+	DeploymentId string `json:"deployment_id"`
+	Params       RestoreDeploymentParams
+	Body         *RestoreDeploymentJSONRequestBody
+}
+
+type RestoreDeploymentResponseObject interface {
+	VisitRestoreDeploymentResponse(w http.ResponseWriter) error
+}
+
+type RestoreDeployment202JSONResponse DeploymentResponse
+
+func (response RestoreDeployment202JSONResponse) VisitRestoreDeploymentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(202)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListDeploymentRevisionsRequestObject struct {
+	DeploymentId string `json:"deployment_id"`
+}
+
+type ListDeploymentRevisionsResponseObject interface {
+	VisitListDeploymentRevisionsResponse(w http.ResponseWriter) error
+}
+
+type ListDeploymentRevisions200JSONResponse DeploymentRevisionListResponse
+
+func (response ListDeploymentRevisions200JSONResponse) VisitListDeploymentRevisionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RollbackDeploymentRequestObject struct {
+	DeploymentId string `json:"deployment_id"`
+	Params       RollbackDeploymentParams
+}
+
+type RollbackDeploymentResponseObject interface {
+	VisitRollbackDeploymentResponse(w http.ResponseWriter) error
+}
+
+type RollbackDeployment202JSONResponse DeploymentResponse
+
+func (response RollbackDeployment202JSONResponse) VisitRollbackDeploymentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(202)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpgradeDeploymentRequestObject struct {
+	DeploymentId string `json:"deployment_id"`
+	Params       UpgradeDeploymentParams
+	Body         *UpgradeDeploymentJSONRequestBody
+}
+
+type UpgradeDeploymentResponseObject interface {
+	VisitUpgradeDeploymentResponse(w http.ResponseWriter) error
+}
+
+type UpgradeDeployment202JSONResponse DeploymentResponse
+
+func (response UpgradeDeployment202JSONResponse) VisitUpgradeDeploymentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(202)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListOperatorsRequestObject struct {
+}
+
+type ListOperatorsResponseObject interface {
+	VisitListOperatorsResponse(w http.ResponseWriter) error
+}
+
+type ListOperators200JSONResponse OperatorListResponse
+
+func (response ListOperators200JSONResponse) VisitListOperatorsResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -351,9 +2656,75 @@ func (response GetHealthz200JSONResponse) VisitGetHealthzResponse(w http.Respons
 
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
+	// List control-plane operator audit events.
+	// (GET /control/v1/audit-events)
+	ListControlPlaneAuditEvents(ctx context.Context, request ListControlPlaneAuditEventsRequestObject) (ListControlPlaneAuditEventsResponseObject, error)
+	// List Deployments.
+	// (GET /control/v1/deployments)
+	ListDeployments(ctx context.Context, request ListDeploymentsRequestObject) (ListDeploymentsResponseObject, error)
+	// Provision a new Deployment.
+	// (POST /control/v1/deployments)
+	CreateDeployment(ctx context.Context, request CreateDeploymentRequestObject) (CreateDeploymentResponseObject, error)
+
+	// (DELETE /control/v1/deployments/{deployment_id})
+	DeleteDeployment(ctx context.Context, request DeleteDeploymentRequestObject) (DeleteDeploymentResponseObject, error)
+
+	// (GET /control/v1/deployments/{deployment_id})
+	GetDeployment(ctx context.Context, request GetDeploymentRequestObject) (GetDeploymentResponseObject, error)
+
+	// (PATCH /control/v1/deployments/{deployment_id})
+	UpdateDeployment(ctx context.Context, request UpdateDeploymentRequestObject) (UpdateDeploymentResponseObject, error)
 	// Walk the audit chain and report the first mismatch (if any).
 	// (GET /control/v1/deployments/{deployment_id}/audit-integrity)
 	VerifyDeploymentAuditIntegrity(ctx context.Context, request VerifyDeploymentAuditIntegrityRequestObject) (VerifyDeploymentAuditIntegrityResponseObject, error)
+
+	// (GET /control/v1/deployments/{deployment_id}/domains)
+	ListDeploymentDomains(ctx context.Context, request ListDeploymentDomainsRequestObject) (ListDeploymentDomainsResponseObject, error)
+
+	// (POST /control/v1/deployments/{deployment_id}/domains)
+	AttachDeploymentDomain(ctx context.Context, request AttachDeploymentDomainRequestObject) (AttachDeploymentDomainResponseObject, error)
+
+	// (DELETE /control/v1/deployments/{deployment_id}/domains/{domain_id})
+	DetachDeploymentDomain(ctx context.Context, request DetachDeploymentDomainRequestObject) (DetachDeploymentDomainResponseObject, error)
+
+	// (GET /control/v1/deployments/{deployment_id}/domains/{domain_id})
+	GetDeploymentDomain(ctx context.Context, request GetDeploymentDomainRequestObject) (GetDeploymentDomainResponseObject, error)
+
+	// (POST /control/v1/deployments/{deployment_id}/domains/{domain_id}/verify)
+	VerifyDeploymentDomain(ctx context.Context, request VerifyDeploymentDomainRequestObject) (VerifyDeploymentDomainResponseObject, error)
+
+	// (POST /control/v1/deployments/{deployment_id}/freeze-keys)
+	FreezeDeploymentKeys(ctx context.Context, request FreezeDeploymentKeysRequestObject) (FreezeDeploymentKeysResponseObject, error)
+
+	// (GET /control/v1/deployments/{deployment_id}/health)
+	GetDeploymentHealth(ctx context.Context, request GetDeploymentHealthRequestObject) (GetDeploymentHealthResponseObject, error)
+
+	// (POST /control/v1/deployments/{deployment_id}/impersonation-sessions)
+	StartImpersonationSession(ctx context.Context, request StartImpersonationSessionRequestObject) (StartImpersonationSessionResponseObject, error)
+
+	// (GET /control/v1/deployments/{deployment_id}/logs)
+	TailDeploymentLogs(ctx context.Context, request TailDeploymentLogsRequestObject) (TailDeploymentLogsResponseObject, error)
+
+	// (POST /control/v1/deployments/{deployment_id}/purge)
+	PurgeDeployment(ctx context.Context, request PurgeDeploymentRequestObject) (PurgeDeploymentResponseObject, error)
+
+	// (POST /control/v1/deployments/{deployment_id}/restart)
+	RestartDeployment(ctx context.Context, request RestartDeploymentRequestObject) (RestartDeploymentResponseObject, error)
+
+	// (POST /control/v1/deployments/{deployment_id}/restore)
+	RestoreDeployment(ctx context.Context, request RestoreDeploymentRequestObject) (RestoreDeploymentResponseObject, error)
+
+	// (GET /control/v1/deployments/{deployment_id}/revisions)
+	ListDeploymentRevisions(ctx context.Context, request ListDeploymentRevisionsRequestObject) (ListDeploymentRevisionsResponseObject, error)
+
+	// (POST /control/v1/deployments/{deployment_id}/rollback)
+	RollbackDeployment(ctx context.Context, request RollbackDeploymentRequestObject) (RollbackDeploymentResponseObject, error)
+
+	// (POST /control/v1/deployments/{deployment_id}/upgrade)
+	UpgradeDeployment(ctx context.Context, request UpgradeDeploymentRequestObject) (UpgradeDeploymentResponseObject, error)
+	// List operators (Phase 13 extends with MFA status).
+	// (GET /control/v1/operators)
+	ListOperators(ctx context.Context, request ListOperatorsRequestObject) (ListOperatorsResponseObject, error)
 	// Liveness probe.
 	// (GET /healthz)
 	GetHealthz(ctx context.Context, request GetHealthzRequestObject) (GetHealthzResponseObject, error)
@@ -388,6 +2759,178 @@ type strictHandler struct {
 	options     StrictHTTPServerOptions
 }
 
+// ListControlPlaneAuditEvents operation middleware
+func (sh *strictHandler) ListControlPlaneAuditEvents(w http.ResponseWriter, r *http.Request, params ListControlPlaneAuditEventsParams) {
+	var request ListControlPlaneAuditEventsRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListControlPlaneAuditEvents(ctx, request.(ListControlPlaneAuditEventsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListControlPlaneAuditEvents")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListControlPlaneAuditEventsResponseObject); ok {
+		if err := validResponse.VisitListControlPlaneAuditEventsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListDeployments operation middleware
+func (sh *strictHandler) ListDeployments(w http.ResponseWriter, r *http.Request, params ListDeploymentsParams) {
+	var request ListDeploymentsRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListDeployments(ctx, request.(ListDeploymentsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListDeployments")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListDeploymentsResponseObject); ok {
+		if err := validResponse.VisitListDeploymentsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateDeployment operation middleware
+func (sh *strictHandler) CreateDeployment(w http.ResponseWriter, r *http.Request, params CreateDeploymentParams) {
+	var request CreateDeploymentRequestObject
+
+	request.Params = params
+
+	var body CreateDeploymentJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateDeployment(ctx, request.(CreateDeploymentRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateDeployment")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateDeploymentResponseObject); ok {
+		if err := validResponse.VisitCreateDeploymentResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteDeployment operation middleware
+func (sh *strictHandler) DeleteDeployment(w http.ResponseWriter, r *http.Request, deploymentId string, params DeleteDeploymentParams) {
+	var request DeleteDeploymentRequestObject
+
+	request.DeploymentId = deploymentId
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteDeployment(ctx, request.(DeleteDeploymentRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteDeployment")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteDeploymentResponseObject); ok {
+		if err := validResponse.VisitDeleteDeploymentResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetDeployment operation middleware
+func (sh *strictHandler) GetDeployment(w http.ResponseWriter, r *http.Request, deploymentId string) {
+	var request GetDeploymentRequestObject
+
+	request.DeploymentId = deploymentId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetDeployment(ctx, request.(GetDeploymentRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetDeployment")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetDeploymentResponseObject); ok {
+		if err := validResponse.VisitGetDeploymentResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateDeployment operation middleware
+func (sh *strictHandler) UpdateDeployment(w http.ResponseWriter, r *http.Request, deploymentId string, params UpdateDeploymentParams) {
+	var request UpdateDeploymentRequestObject
+
+	request.DeploymentId = deploymentId
+	request.Params = params
+
+	var body UpdateDeploymentJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateDeployment(ctx, request.(UpdateDeploymentRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateDeployment")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateDeploymentResponseObject); ok {
+		if err := validResponse.VisitUpdateDeploymentResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // VerifyDeploymentAuditIntegrity operation middleware
 func (sh *strictHandler) VerifyDeploymentAuditIntegrity(w http.ResponseWriter, r *http.Request, deploymentId string, params VerifyDeploymentAuditIntegrityParams) {
 	var request VerifyDeploymentAuditIntegrityRequestObject
@@ -408,6 +2951,462 @@ func (sh *strictHandler) VerifyDeploymentAuditIntegrity(w http.ResponseWriter, r
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(VerifyDeploymentAuditIntegrityResponseObject); ok {
 		if err := validResponse.VisitVerifyDeploymentAuditIntegrityResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListDeploymentDomains operation middleware
+func (sh *strictHandler) ListDeploymentDomains(w http.ResponseWriter, r *http.Request, deploymentId string) {
+	var request ListDeploymentDomainsRequestObject
+
+	request.DeploymentId = deploymentId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListDeploymentDomains(ctx, request.(ListDeploymentDomainsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListDeploymentDomains")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListDeploymentDomainsResponseObject); ok {
+		if err := validResponse.VisitListDeploymentDomainsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// AttachDeploymentDomain operation middleware
+func (sh *strictHandler) AttachDeploymentDomain(w http.ResponseWriter, r *http.Request, deploymentId string, params AttachDeploymentDomainParams) {
+	var request AttachDeploymentDomainRequestObject
+
+	request.DeploymentId = deploymentId
+	request.Params = params
+
+	var body AttachDeploymentDomainJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.AttachDeploymentDomain(ctx, request.(AttachDeploymentDomainRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AttachDeploymentDomain")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(AttachDeploymentDomainResponseObject); ok {
+		if err := validResponse.VisitAttachDeploymentDomainResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DetachDeploymentDomain operation middleware
+func (sh *strictHandler) DetachDeploymentDomain(w http.ResponseWriter, r *http.Request, deploymentId string, domainId string, params DetachDeploymentDomainParams) {
+	var request DetachDeploymentDomainRequestObject
+
+	request.DeploymentId = deploymentId
+	request.DomainId = domainId
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DetachDeploymentDomain(ctx, request.(DetachDeploymentDomainRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DetachDeploymentDomain")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DetachDeploymentDomainResponseObject); ok {
+		if err := validResponse.VisitDetachDeploymentDomainResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetDeploymentDomain operation middleware
+func (sh *strictHandler) GetDeploymentDomain(w http.ResponseWriter, r *http.Request, deploymentId string, domainId string) {
+	var request GetDeploymentDomainRequestObject
+
+	request.DeploymentId = deploymentId
+	request.DomainId = domainId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetDeploymentDomain(ctx, request.(GetDeploymentDomainRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetDeploymentDomain")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetDeploymentDomainResponseObject); ok {
+		if err := validResponse.VisitGetDeploymentDomainResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// VerifyDeploymentDomain operation middleware
+func (sh *strictHandler) VerifyDeploymentDomain(w http.ResponseWriter, r *http.Request, deploymentId string, domainId string, params VerifyDeploymentDomainParams) {
+	var request VerifyDeploymentDomainRequestObject
+
+	request.DeploymentId = deploymentId
+	request.DomainId = domainId
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.VerifyDeploymentDomain(ctx, request.(VerifyDeploymentDomainRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "VerifyDeploymentDomain")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(VerifyDeploymentDomainResponseObject); ok {
+		if err := validResponse.VisitVerifyDeploymentDomainResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// FreezeDeploymentKeys operation middleware
+func (sh *strictHandler) FreezeDeploymentKeys(w http.ResponseWriter, r *http.Request, deploymentId string, params FreezeDeploymentKeysParams) {
+	var request FreezeDeploymentKeysRequestObject
+
+	request.DeploymentId = deploymentId
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.FreezeDeploymentKeys(ctx, request.(FreezeDeploymentKeysRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "FreezeDeploymentKeys")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(FreezeDeploymentKeysResponseObject); ok {
+		if err := validResponse.VisitFreezeDeploymentKeysResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetDeploymentHealth operation middleware
+func (sh *strictHandler) GetDeploymentHealth(w http.ResponseWriter, r *http.Request, deploymentId string) {
+	var request GetDeploymentHealthRequestObject
+
+	request.DeploymentId = deploymentId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetDeploymentHealth(ctx, request.(GetDeploymentHealthRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetDeploymentHealth")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetDeploymentHealthResponseObject); ok {
+		if err := validResponse.VisitGetDeploymentHealthResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// StartImpersonationSession operation middleware
+func (sh *strictHandler) StartImpersonationSession(w http.ResponseWriter, r *http.Request, deploymentId string, params StartImpersonationSessionParams) {
+	var request StartImpersonationSessionRequestObject
+
+	request.DeploymentId = deploymentId
+	request.Params = params
+
+	var body StartImpersonationSessionJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.StartImpersonationSession(ctx, request.(StartImpersonationSessionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "StartImpersonationSession")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(StartImpersonationSessionResponseObject); ok {
+		if err := validResponse.VisitStartImpersonationSessionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// TailDeploymentLogs operation middleware
+func (sh *strictHandler) TailDeploymentLogs(w http.ResponseWriter, r *http.Request, deploymentId string, params TailDeploymentLogsParams) {
+	var request TailDeploymentLogsRequestObject
+
+	request.DeploymentId = deploymentId
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.TailDeploymentLogs(ctx, request.(TailDeploymentLogsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "TailDeploymentLogs")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(TailDeploymentLogsResponseObject); ok {
+		if err := validResponse.VisitTailDeploymentLogsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PurgeDeployment operation middleware
+func (sh *strictHandler) PurgeDeployment(w http.ResponseWriter, r *http.Request, deploymentId string, params PurgeDeploymentParams) {
+	var request PurgeDeploymentRequestObject
+
+	request.DeploymentId = deploymentId
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PurgeDeployment(ctx, request.(PurgeDeploymentRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PurgeDeployment")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PurgeDeploymentResponseObject); ok {
+		if err := validResponse.VisitPurgeDeploymentResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RestartDeployment operation middleware
+func (sh *strictHandler) RestartDeployment(w http.ResponseWriter, r *http.Request, deploymentId string, params RestartDeploymentParams) {
+	var request RestartDeploymentRequestObject
+
+	request.DeploymentId = deploymentId
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RestartDeployment(ctx, request.(RestartDeploymentRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RestartDeployment")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RestartDeploymentResponseObject); ok {
+		if err := validResponse.VisitRestartDeploymentResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RestoreDeployment operation middleware
+func (sh *strictHandler) RestoreDeployment(w http.ResponseWriter, r *http.Request, deploymentId string, params RestoreDeploymentParams) {
+	var request RestoreDeploymentRequestObject
+
+	request.DeploymentId = deploymentId
+	request.Params = params
+
+	var body RestoreDeploymentJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RestoreDeployment(ctx, request.(RestoreDeploymentRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RestoreDeployment")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RestoreDeploymentResponseObject); ok {
+		if err := validResponse.VisitRestoreDeploymentResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListDeploymentRevisions operation middleware
+func (sh *strictHandler) ListDeploymentRevisions(w http.ResponseWriter, r *http.Request, deploymentId string) {
+	var request ListDeploymentRevisionsRequestObject
+
+	request.DeploymentId = deploymentId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListDeploymentRevisions(ctx, request.(ListDeploymentRevisionsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListDeploymentRevisions")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListDeploymentRevisionsResponseObject); ok {
+		if err := validResponse.VisitListDeploymentRevisionsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RollbackDeployment operation middleware
+func (sh *strictHandler) RollbackDeployment(w http.ResponseWriter, r *http.Request, deploymentId string, params RollbackDeploymentParams) {
+	var request RollbackDeploymentRequestObject
+
+	request.DeploymentId = deploymentId
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RollbackDeployment(ctx, request.(RollbackDeploymentRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RollbackDeployment")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RollbackDeploymentResponseObject); ok {
+		if err := validResponse.VisitRollbackDeploymentResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpgradeDeployment operation middleware
+func (sh *strictHandler) UpgradeDeployment(w http.ResponseWriter, r *http.Request, deploymentId string, params UpgradeDeploymentParams) {
+	var request UpgradeDeploymentRequestObject
+
+	request.DeploymentId = deploymentId
+	request.Params = params
+
+	var body UpgradeDeploymentJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpgradeDeployment(ctx, request.(UpgradeDeploymentRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpgradeDeployment")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpgradeDeploymentResponseObject); ok {
+		if err := validResponse.VisitUpgradeDeploymentResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListOperators operation middleware
+func (sh *strictHandler) ListOperators(w http.ResponseWriter, r *http.Request) {
+	var request ListOperatorsRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListOperators(ctx, request.(ListOperatorsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListOperators")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListOperatorsResponseObject); ok {
+		if err := validResponse.VisitListOperatorsResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -444,25 +3443,55 @@ func (sh *strictHandler) GetHealthz(w http.ResponseWriter, r *http.Request) {
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
+	"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",
+	"DwAA//8=",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

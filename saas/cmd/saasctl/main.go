@@ -28,6 +28,8 @@ func main() {
 		versionCmd(),
 		initCmd(),
 		tenantCmd(),
+		deploymentCmd(),
+		domainCmd(),
 	)
 	if err := root.Execute(); err != nil {
 		os.Exit(1)

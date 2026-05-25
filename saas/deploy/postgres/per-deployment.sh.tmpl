@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+# Per-Deployment Postgres bootstrap. Phase 12c renders + executes this with
+# psql as the host postgres superuser; Phase 11 ships the template only.
+#
+# Intentionally idempotent: every CREATE is guarded; re-running on an
+# existing DB is a no-op. The script never DROPs.
+set -euo pipefail
+
+DEPLOYMENT_ID="${1:?usage: $0 <deployment_id> <project_slug> <environment_slug>}"
+PROJECT_SLUG="${2:?missing project slug}"
+ENV_SLUG="${3:?missing environment slug}"
+
+DB_NAME="saas_${PROJECT_SLUG}_${ENV_SLUG}"
+APP_ROLE="${DB_NAME}_app"
+APP_PASS="$(openssl rand -hex 32)"
+
+psql -v ON_ERROR_STOP=1 <<SQL
+DO \$\$BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_database WHERE datname = '${DB_NAME}') THEN
+    EXECUTE format('CREATE DATABASE %I', '${DB_NAME}');
+  END IF;
+END\$\$;
+
+DO \$\$BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '${APP_ROLE}') THEN
+    EXECUTE format('CREATE ROLE %I LOGIN PASSWORD %L', '${APP_ROLE}', '${APP_PASS}');
+  END IF;
+END\$\$;
+
+GRANT CONNECT ON DATABASE "${DB_NAME}" TO "${APP_ROLE}";
+SQL
+
+# RLS toggles + search_path must run INSIDE the per-Deployment DB.
+psql -v ON_ERROR_STOP=1 -d "${DB_NAME}" <<SQL
+ALTER ROLE "${APP_ROLE}" SET search_path TO public;
+-- FORCE RLS for the app role is the layer-3 isolation invariant
+-- (AGENTS.md §18). Phase 12c sets it per-table after Phase-2 migrations apply.
+SQL
+
+# Emit the per-Deployment DSN on stdout for the controlplane to capture into
+# the k8s Secret. Never log this value.
+printf 'postgres://%s:%s@127.0.0.1:5432/%s?sslmode=disable\n' "${APP_ROLE}" "${APP_PASS}" "${DB_NAME}"

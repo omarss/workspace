@@ -1,0 +1,29 @@
+# /etc/sudoers.d/saas-controlplane
+#
+# Sudo allow-list for the saas-controlplane host process. Phase 12a installs
+# this file at /etc/sudoers.d/saas-controlplane (mode 0440, validated with
+# `visudo -cf`). Phase 11 ships the template only.
+#
+# Trust model (see 01-foundations.md §10 + AGENTS.md §6):
+#   - The controlplane binary runs as the unprivileged `saas` user.
+#   - The `saas` user owns /etc/nginx/sites-{available,enabled}/saas-*.conf
+#     (mode 0644) so file writes need no sudo.
+#   - Only `nginx -t`, `nginx -s reload`, `systemctl reload nginx`, and
+#     `certbot --nginx` require root — all explicitly listed here.
+#   - Wildcards are bounded to the platform zone and BYOD case; no `ALL`.
+#
+# Re-running `homelab` `apply-nginx` clobbers certbot-added 443 blocks
+# (see workspace_personal/CLAUDE.md gotcha #1). The controlplane process
+# does NOT call homelab's bulk apply path — it manages its own vhosts.
+
+Cmnd_Alias SAAS_NGINX = /usr/sbin/nginx -t, \
+                        /usr/sbin/nginx -s reload, \
+                        /usr/bin/systemctl reload nginx
+
+Cmnd_Alias SAAS_CERTBOT = /usr/bin/certbot --nginx -d *.saas.omarss.net --non-interactive --agree-tos -m *, \
+                          /usr/bin/certbot --nginx -d * --non-interactive --agree-tos -m *
+
+saas ALL=(root) NOPASSWD: SAAS_NGINX, SAAS_CERTBOT
+
+Defaults!SAAS_NGINX   !requiretty, !env_reset
+Defaults!SAAS_CERTBOT !requiretty, !env_reset

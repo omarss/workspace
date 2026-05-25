@@ -1,0 +1,33 @@
+# Allow egress to:
+#   - Host Postgres (per-Deployment DB)              tcp/5432
+#   - Host OpenBao (transit + KV)                    tcp/8200
+#   - kube-system DNS (so Service-name resolution works)  udp/53
+# All other egress is denied by default-deny. Cross-namespace traffic to
+# OTHER deployments' pods is therefore physically blocked at the CNI.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-platform
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: dataplane
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    - to:
+        - ipBlock:
+            cidr: 10.43.0.0/16   # overlay replaces with host CIDR
+      ports:
+        - protocol: TCP
+          port: 5432
+        - protocol: TCP
+          port: 8200

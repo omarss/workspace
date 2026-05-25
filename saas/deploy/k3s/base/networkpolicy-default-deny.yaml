@@ -1,0 +1,13 @@
+# Default-deny ingress + egress for every pod in a per-Deployment namespace.
+# This is layer 4 of the eight-layer tenant isolation invariant
+# (AGENTS.md §3.1 / §18). Cross-namespace traffic between deployments is
+# physically blocked at the CNI; explicit allow policies open the few flows
+# we actually need (host nginx -> pod ingress, pod -> postgres + openbao
+# egress).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]

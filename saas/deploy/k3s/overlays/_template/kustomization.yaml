@@ -1,0 +1,45 @@
+# Per-Deployment kustomize overlay template. Phase 12b renders one of these
+# under deploy/k3s/overlays/<deployment_id>/ at provision time. The
+# `replacements:` block patches the base manifests at the field-manager
+# level — no string templating of YAML (AGENTS.md §4.1).
+#
+# Substitutions Phase 12b fills in:
+#   ${deployment_id}     dep_<ulid>
+#   ${project_slug}      e.g. acme
+#   ${environment_slug}  e.g. prod
+#   ${image_version}     e.g. v0.3.1
+#   ${nodeport}          allocated unique port (30000-32767)
+#   ${db_secret_name}    dataplane-db (mounted from the per-Deployment secret)
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: saas-${project_slug}-${environment_slug}
+nameSuffix: -${deployment_id}
+
+resources:
+  - ../../base
+
+images:
+  - name: ghcr.io/omarss/saas/dataplane
+    newTag: ${image_version}
+
+# Label every resource so RBAC + audit can scope by deployment.
+commonLabels:
+  saas.omarss.net/deployment-id: ${deployment_id}
+  saas.omarss.net/project-slug: ${project_slug}
+  saas.omarss.net/environment-slug: ${environment_slug}
+
+replacements:
+  - source:
+      kind: Namespace
+      fieldPath: metadata.labels.[saas.omarss.net/deployment-id]
+    targets:
+      - select: { kind: Deployment }
+        fieldPaths:
+          - spec.template.spec.containers.[name=dataplane].env.[name=SAAS_DEPLOYMENT_ID].value
+  - source:
+      kind: Service
+      fieldPath: spec.ports.0.nodePort
+    targets:
+      - select: { kind: Service, name: dataplane }
+        fieldPaths: [spec.ports.0.nodePort]
