@@ -6,6 +6,8 @@ package db
 
 import (
 	"context"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type Querier interface {
@@ -17,11 +19,25 @@ type Querier interface {
 	// state is already consumed or expired — the caller surfaces this as a 400
 	// "state-already-used" or "state-expired" problem.
 	ConsumeSocialLoginState(ctx context.Context, state string) (SocialLoginState, error)
+	CountActiveMembersByOrganization(ctx context.Context, organizationID string) (int64, error)
+	CreateInvitation(ctx context.Context, arg CreateInvitationParams) (Invitation, error)
+	CreateMember(ctx context.Context, arg CreateMemberParams) (Member, error)
 	CreateNotification(ctx context.Context, arg CreateNotificationParams) (Notification, error)
 	// Inserts a new channel row. The repo layer runs the strict envelope walker
 	// on the secrets payload before binding the parameters; this query is a thin
 	// shim over a fully-formed row.
 	CreateNotificationChannel(ctx context.Context, arg CreateNotificationChannelParams) (NotificationChannel, error)
+	// Organizations + Members + Invitations queries (Phase 7).
+	//
+	// The repository (internal/dataplane/organizations/repo_pgx.go) is
+	// responsible for:
+	//   * Running crypto.EncryptPIIFieldsStrict on the Invitation domain
+	//     struct BEFORE binding parameters (invitee_email envelope columns).
+	//   * Verifying env.KID == deployment_id on every Get / List hydrate
+	//     before invoking DecryptField.
+	//   * Computing the HMAC-SHA256 invitee_email_lookup_hash via the same
+	//     hasher used by Identity (deployment-scoped key in OpenBao KV).
+	CreateOrganization(ctx context.Context, arg CreateOrganizationParams) (Organization, error)
 	// Inserts a fully-formed envelope row. The caller (PgxRepository) computes
 	// email_lookup_hash and runs the persistence walker to populate the
 	// envelope columns before binding the parameters.
@@ -29,13 +45,25 @@ type Querier interface {
 	CreateTenant(ctx context.Context, arg CreateTenantParams) (Tenant, error)
 	DeleteExpiredSocialLoginStates(ctx context.Context) (int64, error)
 	ExpireIdempotencyRecords(ctx context.Context) error
+	// Sweeper helper. Flips every pending invitation past its expiry into
+	// 'expired'. Returning the rows lets the sweeper emit one outbox event
+	// per flipped row.
+	ExpireOverdueInvitations(ctx context.Context, now pgtype.Timestamptz) ([]ExpireOverdueInvitationsRow, error)
 	FinishIdempotencyRecord(ctx context.Context, arg FinishIdempotencyRecordParams) error
 	GetIdempotencyRecord(ctx context.Context, arg GetIdempotencyRecordParams) (IdempotencyRecord, error)
+	GetInvitation(ctx context.Context, id string) (Invitation, error)
+	// Constant-time-equality lookup. The plaintext token never touches the DB;
+	// the caller computes sha256(token) and passes it as the argument.
+	GetInvitationByTokenHash(ctx context.Context, tokenHash []byte) (Invitation, error)
+	GetMember(ctx context.Context, id string) (Member, error)
+	GetMemberByUser(ctx context.Context, arg GetMemberByUserParams) (Member, error)
 	GetNotification(ctx context.Context, id string) (Notification, error)
 	GetNotificationChannel(ctx context.Context, id string) (NotificationChannel, error)
 	GetNotificationChannelByName(ctx context.Context, arg GetNotificationChannelByNameParams) (NotificationChannel, error)
 	GetNotificationWorkflow(ctx context.Context, id string) (NotificationWorkflow, error)
 	GetNotificationWorkflowByName(ctx context.Context, arg GetNotificationWorkflowByNameParams) (NotificationWorkflow, error)
+	GetOrganization(ctx context.Context, id string) (Organization, error)
+	GetOrganizationBySlug(ctx context.Context, arg GetOrganizationBySlugParams) (Organization, error)
 	GetPlatformUser(ctx context.Context, id string) (PlatformUser, error)
 	GetPlatformUserByEmailHash(ctx context.Context, arg GetPlatformUserByEmailHashParams) (PlatformUser, error)
 	GetPlatformUserByKeycloakID(ctx context.Context, keycloakUserID string) (PlatformUser, error)
@@ -46,9 +74,14 @@ type Querier interface {
 	InsertSocialLoginState(ctx context.Context, arg InsertSocialLoginStateParams) error
 	LinkIdentityProvider(ctx context.Context, arg LinkIdentityProviderParams) error
 	ListIdentityProviders(ctx context.Context, arg ListIdentityProvidersParams) ([]ListIdentityProvidersRow, error)
+	ListInvitationsByOrganization(ctx context.Context, arg ListInvitationsByOrganizationParams) ([]Invitation, error)
+	ListMembersByOrganization(ctx context.Context, arg ListMembersByOrganizationParams) ([]Member, error)
 	ListNotificationChannels(ctx context.Context, arg ListNotificationChannelsParams) ([]NotificationChannel, error)
 	ListNotificationWorkflows(ctx context.Context, tenantID string) ([]NotificationWorkflow, error)
 	ListNotifications(ctx context.Context, arg ListNotificationsParams) ([]Notification, error)
+	// Keyset pagination on (created_at DESC, id DESC). row_limit is limit+1
+	// so the caller can detect has_more.
+	ListOrganizationsByTenant(ctx context.Context, arg ListOrganizationsByTenantParams) ([]Organization, error)
 	// Keyset pagination on (created_at DESC, id DESC). row_limit is limit+1 so
 	// the caller can detect has_more.
 	ListPlatformUsers(ctx context.Context, arg ListPlatformUsersParams) ([]PlatformUser, error)
@@ -57,9 +90,12 @@ type Querier interface {
 	// trims and emits the cursor for the trailing row).
 	ListTenants(ctx context.Context, arg ListTenantsParams) ([]Tenant, error)
 	ListUnpublishedOutbox(ctx context.Context, limit int32) ([]OutboxEvent, error)
+	MarkInvitationAccepted(ctx context.Context, arg MarkInvitationAcceptedParams) (Invitation, error)
+	MarkInvitationRevoked(ctx context.Context, arg MarkInvitationRevokedParams) (Invitation, error)
 	MarkOutboxFailed(ctx context.Context, arg MarkOutboxFailedParams) error
 	MarkOutboxPublished(ctx context.Context, id int64) error
 	RegisterNotificationWorkflow(ctx context.Context, arg RegisterNotificationWorkflowParams) (NotificationWorkflow, error)
+	RemoveMember(ctx context.Context, arg RemoveMemberParams) (Member, error)
 	// Rotation endpoint: swaps the envelope columns and stamps last_rotated_at.
 	// Bumps row_seq via the trigger.
 	RotateNotificationChannelSecrets(ctx context.Context, arg RotateNotificationChannelSecretsParams) (NotificationChannel, error)
@@ -70,9 +106,11 @@ type Querier interface {
 	// and outbox subscribers see the change. Cannot transition out of 'deleted'.
 	SetPlatformUserStatus(ctx context.Context, arg SetPlatformUserStatusParams) (PlatformUser, error)
 	SoftDeleteNotificationChannel(ctx context.Context, arg SoftDeleteNotificationChannelParams) (int64, error)
+	SoftDeleteOrganization(ctx context.Context, arg SoftDeleteOrganizationParams) (Organization, error)
 	SoftDeletePlatformUser(ctx context.Context, arg SoftDeletePlatformUserParams) (PlatformUser, error)
 	SoftDeleteTenant(ctx context.Context, arg SoftDeleteTenantParams) (Tenant, error)
 	UnlinkIdentityProvider(ctx context.Context, arg UnlinkIdentityProviderParams) (int64, error)
+	UpdateMemberRole(ctx context.Context, arg UpdateMemberRoleParams) (Member, error)
 	// Metadata-only patch under optimistic concurrency. Does NOT accept new
 	// credentials (per ADR 017 rotation is a distinct verb).
 	UpdateNotificationChannelMeta(ctx context.Context, arg UpdateNotificationChannelMetaParams) (NotificationChannel, error)
@@ -81,6 +119,7 @@ type Querier interface {
 	// description column accepts an explicit NULL only by clearing the patch
 	// field at the service layer; the wire-level patch model carries a flag.
 	UpdateNotificationWorkflow(ctx context.Context, arg UpdateNotificationWorkflowParams) (NotificationWorkflow, error)
+	UpdateOrganization(ctx context.Context, arg UpdateOrganizationParams) (Organization, error)
 	// Patch name/phone envelope columns + metadata under optimistic concurrency.
 	// Each PII field updates the full five-column envelope set; the caller passes
 	// nil when the column should not change.
