@@ -1,4 +1,4 @@
-.PHONY: k3s-config apply-k8s apply-obsidian apply-openclaw apply-network-policies apply-nginx apply-apps-host apply-geofence geofence-status geofence-disable geofence-enable geofence-refresh apply-all
+.PHONY: k3s-config apply-k8s apply-obsidian apply-openclaw apply-network-policies apply-nginx apply-apps-host apply-tweets-host tweets-cookies-edit tweets-status tweets-restart apply-geofence geofence-status geofence-disable geofence-enable geofence-refresh apply-all
 
 # Copy k3s server configs to /etc/rancher/k3s/
 k3s-config:
@@ -41,6 +41,33 @@ apply-nginx:
 # After this, run: sudo certbot --nginx -d apps.omarss.net
 apply-apps-host:
 	sudo bash scripts/setup-apps-host.sh
+
+# One-shot full setup for the tweets.omarss.net feed service:
+# builds tweetsd, installs binary + systemd unit, creates /srv/tweets
+# (700, holds X session cookies), installs the nginx vhost + snippet,
+# reloads nginx. Idempotent.
+#
+# Safe to re-run after pulling a new version of tweets/ — the build
+# step always rebuilds the binary and `systemctl restart` picks it up.
+#
+# After the first run: edit /srv/tweets/cookies.json with your X
+# auth_token + ct0, then `sudo systemctl restart tweets`.
+# Then re-run certbot: sudo certbot --nginx -d tweets.omarss.net
+apply-tweets-host:
+	sudo bash scripts/setup-tweets-host.sh
+
+# Convenience wrappers for the tweets feed service.
+tweets-cookies-edit:
+	sudo -e /srv/tweets/cookies.json
+
+tweets-status:
+	sudo systemctl status tweets.service --no-pager
+	@echo
+	@curl -sS http://127.0.0.1:8088/healthz || echo "(local healthz unreachable)"
+
+tweets-restart:
+	sudo systemctl restart tweets.service
+	sudo systemctl status tweets.service --no-pager | head -8
 
 # Saudi Arabia geofence: blocks all incoming TCP from non-SA IPs except
 # tailscale, LAN, and tcp/80 (kept open for ACME). Pre-flights against

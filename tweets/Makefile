@@ -20,8 +20,8 @@ build: ## Compile the tweetsd binary into ./bin/
 	$(GO) build -o $(BINARY) ./cmd/tweetsd
 
 .PHONY: run
-run: ## Run tweetsd on $ADDR (default :8080)
-	$(GO) run ./cmd/tweetsd -addr $(ADDR)
+run: ## Run tweetsd on $ADDR (default :8080). Add READONLY=1 to skip scraping.
+	$(GO) run ./cmd/tweetsd -addr $(ADDR) $(if $(READONLY),-readonly)
 
 .PHONY: test
 test: ## Run unit tests

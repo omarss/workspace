@@ -1,0 +1,52 @@
+# tweets feed service unit.
+# Installed at /etc/systemd/system/tweets.service by setup-tweets-host.sh.
+
+[Unit]
+Description=tweets feed scraper + JSON API for the omono app
+Documentation=file:///srv/tweets/README.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=omar
+Group=omar
+WorkingDirectory=/srv/tweets
+
+# Bound to loopback only — public access goes through the
+# tweets.omarss.net nginx vhost which terminates TLS.
+ExecStart=/usr/local/bin/tweetsd \
+    -addr 127.0.0.1:8088 \
+    -cookies /srv/tweets/cookies.json \
+    -db /srv/tweets/tweets.sqlite
+
+# Restart unconditionally — the scraper is allowed to crash on
+# unexpected X responses; systemd brings it back up and the next scrape
+# tick tries again.
+Restart=on-failure
+RestartSec=10s
+
+# Hardening — this process touches the network and reads cookies but
+# does not need write access outside its working directory, ptrace,
+# kernel modules, or new user namespaces.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/srv/tweets
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+MemoryDenyWriteExecute=true
+LockPersonality=true
+SystemCallArchitectures=native
+
+# Log volume is small (one JSON line per scrape tick + per request).
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
