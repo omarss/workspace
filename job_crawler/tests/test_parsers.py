@@ -21,7 +21,11 @@ from uuid import UUID
 from job_crawler.ats.greenhouse import GreenhouseCrawler
 from job_crawler.boards.mihnati import MihnatiCrawler
 from job_crawler.boards.wuzzuf import WuzzufCrawler
-from job_crawler.core.normalise import to_upsert
+from job_crawler.core.normalise import (
+    LocationResolution,
+    coerce_country_code,
+    to_upsert,
+)
 from job_crawler.core.types import Listing, ParsedPosting, RawPosting
 
 
@@ -204,3 +208,74 @@ def test_to_upsert_unescapes_entity_titles() -> None:
     )
     assert upsert.title == "Sales Manager & Marketing"
     assert upsert.raw_company_name == "Acme & Co"
+
+
+# ---------------------------------------------------------------------------
+# coerce_country_code: defends the FK on job_postings.country_code →
+# countries(code). JSON-LD `addressCountry` is wildly inconsistent —
+# we've seen "United States" naively truncated to "un", bare ISO codes,
+# upper/lowercase mixes, free-text city names that happen to start with
+# two letters. Any unknown value must fall back to "sa".
+# ---------------------------------------------------------------------------
+def test_coerce_country_code_accepts_known_codes() -> None:
+    for code in ("sa", "ae", "bh", "kw", "om", "qa"):
+        assert coerce_country_code(code) == code
+        assert coerce_country_code(code.upper()) == code
+
+
+def test_coerce_country_code_rejects_unknown_codes_with_default() -> None:
+    # "United States" → "un" via the legacy `.lower()[:2]` truncation.
+    # That's the exact failure that took down 6+ Cisco postings in a
+    # live run; this test guards the regression.
+    assert coerce_country_code("United States") == "sa"
+    assert coerce_country_code("us") == "sa"
+    assert coerce_country_code("XX") == "sa"
+    assert coerce_country_code("") == "sa"
+    assert coerce_country_code(None) == "sa"
+
+
+def test_coerce_country_code_respects_explicit_default() -> None:
+    """Tests / non-SA crawlers can override the fallback."""
+    assert coerce_country_code("United Kingdom", default="ae") == "ae"
+    assert coerce_country_code("ae", default="ae") == "ae"
+
+
+def test_to_upsert_coerces_bogus_country_code_to_sa() -> None:
+    """End-to-end: a ParsedPosting with country_code='un' (the live bug)
+    yields a JobPostingUpsert with country_code='sa' — FK-safe."""
+    parsed = ParsedPosting(
+        source_job_external_id="cc-cisco-1",
+        canonical_url="https://careers.cisco.com/job/123",
+        title="Sourcing Commodity Manager",
+        description="Plain body.",
+        raw_location="Various",
+        country_code="un",  # the exact failure mode
+    )
+    upsert = to_upsert(
+        parsed,
+        source_id=UUID(int=2),
+        company_id=None,
+        recruiter_id=None,
+        location=None,
+    )
+    assert upsert.country_code == "sa"
+
+
+def test_to_upsert_keeps_seeded_country_from_location_resolution() -> None:
+    """When resolve_city returns a real country code, to_upsert mirrors
+    it — coercion only kicks in for unknown values."""
+    parsed = ParsedPosting(
+        source_job_external_id="cc-acme-1",
+        canonical_url="https://careers.acme.ae/job/1",
+        title="Engineer",
+        description="Plain body.",
+        country_code="sa",  # parsed default
+    )
+    upsert = to_upsert(
+        parsed,
+        source_id=UUID(int=3),
+        company_id=None,
+        recruiter_id=None,
+        location=LocationResolution(country_code="ae"),
+    )
+    assert upsert.country_code == "ae"

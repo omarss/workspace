@@ -37,6 +37,30 @@ class LocationResolution:
     country_code: str | None = None
 
 
+# Countries seeded by `discover/manual_seed._ensure_reference`. Any
+# `country_code` outside this set is unknown to the FK on
+# job_postings.country_code → countries(code) and the upsert blows up.
+# Real-world JSON-LD `addressCountry` values are inconsistent — we've
+# seen "United States" (gets truncated to "un"), "USA" → "us",
+# bare codes, full names, even free-text. Validate explicitly + fall
+# back to "sa" rather than risk the FK.
+_KNOWN_COUNTRY_CODES: Final[frozenset[str]] = frozenset({
+    "sa", "ae", "bh", "kw", "om", "qa",
+})
+
+
+def coerce_country_code(value: str | None, default: str = "sa") -> str:
+    """Return a valid 2-letter country code or the default.
+
+    Crawlers / JSON-LD parsers should funnel any country-ish string
+    through this so an unknown value never reaches `JobPostingUpsert`.
+    """
+    if not value:
+        return default
+    code = value.strip().lower()[:2]
+    return code if code in _KNOWN_COUNTRY_CODES else default
+
+
 # Free-text aliases + sub-city neighborhoods → canonical cities.name_en.
 # Bayt and a few other sources frequently emit raw_location values that are
 # neighborhoods (e.g. "An Narjis", "Al Olaya"), district names, or alternate
@@ -182,7 +206,14 @@ def to_upsert(
     `country_code` still mirrors through so country-level filters work.
     """
     loc = location or LocationResolution()
-    country_code = loc.country_code or parsed.country_code or "sa"
+    # Coerce to a known country to guarantee the FK on
+    # job_postings.country_code → countries(code) passes. JSON-LD
+    # `addressCountry` is wildly inconsistent ("United States" gets
+    # naively truncated to "un" by upstream parsers, etc.) — silently
+    # fall back to the SA default rather than fail the whole upsert.
+    country_code = coerce_country_code(
+        loc.country_code or parsed.country_code, default="sa",
+    )
     # Auto-detect Saudi-only + gender restrictions from title + description
     # when the parser didn't set them explicitly. This is a no-op when the
     # parser already populated the fields with a non-default value.
