@@ -11,6 +11,7 @@ import (
 
 	httpapi "github.com/omarss/saas/internal/dataplane/httpapi" // package dataplaneapi
 	"github.com/omarss/saas/internal/dataplane/identity"
+	"github.com/omarss/saas/internal/dataplane/notifications"
 	"github.com/omarss/saas/internal/dataplane/tenancy"
 	"github.com/omarss/saas/internal/platform/auth"
 )
@@ -21,8 +22,9 @@ import (
 // in-memory identity repo so the strict interface is fully satisfied without
 // dragging Keycloak or a real DB into the tenancy suite.
 type strictSrv struct {
-	tenants  *tenancy.Handler
-	identity *identity.Handler
+	tenants       *tenancy.Handler
+	identity      *identity.Handler
+	notifications *notifications.Handler
 }
 
 // Tenants delegation —————————————————————————————————————————————————————
@@ -101,6 +103,56 @@ func (s *strictSrv) GetHealthz(_ context.Context, _ httpapi.GetHealthzRequestObj
 	return httpapi.GetHealthz200JSONResponse{Status: httpapi.Ok}, nil
 }
 
+// Notifications delegation ————————————————————————————————————————————————
+
+func (s *strictSrv) ListNotificationChannels(ctx context.Context, r httpapi.ListNotificationChannelsRequestObject) (httpapi.ListNotificationChannelsResponseObject, error) {
+	return s.notifications.ListNotificationChannels(ctx, r)
+}
+
+func (s *strictSrv) CreateNotificationChannel(ctx context.Context, r httpapi.CreateNotificationChannelRequestObject) (httpapi.CreateNotificationChannelResponseObject, error) {
+	return s.notifications.CreateNotificationChannel(ctx, r)
+}
+
+func (s *strictSrv) GetNotificationChannel(ctx context.Context, r httpapi.GetNotificationChannelRequestObject) (httpapi.GetNotificationChannelResponseObject, error) {
+	return s.notifications.GetNotificationChannel(ctx, r)
+}
+
+func (s *strictSrv) UpdateNotificationChannel(ctx context.Context, r httpapi.UpdateNotificationChannelRequestObject) (httpapi.UpdateNotificationChannelResponseObject, error) {
+	return s.notifications.UpdateNotificationChannel(ctx, r)
+}
+
+func (s *strictSrv) DeleteNotificationChannel(ctx context.Context, r httpapi.DeleteNotificationChannelRequestObject) (httpapi.DeleteNotificationChannelResponseObject, error) {
+	return s.notifications.DeleteNotificationChannel(ctx, r)
+}
+
+func (s *strictSrv) RotateNotificationChannelCredentials(ctx context.Context, r httpapi.RotateNotificationChannelCredentialsRequestObject) (httpapi.RotateNotificationChannelCredentialsResponseObject, error) {
+	return s.notifications.RotateNotificationChannelCredentials(ctx, r)
+}
+
+func (s *strictSrv) ListNotificationWorkflows(ctx context.Context, r httpapi.ListNotificationWorkflowsRequestObject) (httpapi.ListNotificationWorkflowsResponseObject, error) {
+	return s.notifications.ListNotificationWorkflows(ctx, r)
+}
+
+func (s *strictSrv) RegisterNotificationWorkflow(ctx context.Context, r httpapi.RegisterNotificationWorkflowRequestObject) (httpapi.RegisterNotificationWorkflowResponseObject, error) {
+	return s.notifications.RegisterNotificationWorkflow(ctx, r)
+}
+
+func (s *strictSrv) UpdateNotificationWorkflow(ctx context.Context, r httpapi.UpdateNotificationWorkflowRequestObject) (httpapi.UpdateNotificationWorkflowResponseObject, error) {
+	return s.notifications.UpdateNotificationWorkflow(ctx, r)
+}
+
+func (s *strictSrv) ListNotifications(ctx context.Context, r httpapi.ListNotificationsRequestObject) (httpapi.ListNotificationsResponseObject, error) {
+	return s.notifications.ListNotifications(ctx, r)
+}
+
+func (s *strictSrv) SendNotification(ctx context.Context, r httpapi.SendNotificationRequestObject) (httpapi.SendNotificationResponseObject, error) {
+	return s.notifications.SendNotification(ctx, r)
+}
+
+func (s *strictSrv) GetNotification(ctx context.Context, r httpapi.GetNotificationRequestObject) (httpapi.GetNotificationResponseObject, error) {
+	return s.notifications.GetNotification(ctx, r)
+}
+
 // noopIdentityProvider satisfies identity.IdentityProvider without doing any
 // work. Used to fulfil the strict interface in the tenancy security suite —
 // every method either returns "" / nil or an error that surfaces as a 5xx
@@ -117,8 +169,11 @@ func (noopIdentityProvider) SetEnabled(_ context.Context, _, _ string, _ bool) e
 }
 
 func (noopIdentityProvider) TriggerPasswordReset(_ context.Context, _, _ string) error { return nil }
-func (noopIdentityProvider) TriggerEmailVerify(_ context.Context, _, _ string) error   { return nil }
-func (noopIdentityProvider) DeleteUser(_ context.Context, _, _ string) error           { return nil }
+
+func (noopIdentityProvider) TriggerEmailVerify(_ context.Context, _, _ string) error { return nil }
+
+func (noopIdentityProvider) DeleteUser(_ context.Context, _, _ string) error { return nil }
+
 func (noopIdentityProvider) StartSocialLogin(_ context.Context, _ identity.StartSocialLoginArgs) (string, error) {
 	return "", nil
 }
@@ -164,9 +219,19 @@ func buildServer(t *testing.T, prodEnv bool) (*httptest.Server, *fakeRepo) {
 	})
 	idH := identity.NewHandler(idSvc)
 
+	// Phase 6: stub notifications handler so the strict-server interface
+	// is fully satisfied. The tenancy suite never calls /v1/notifications;
+	// the stub repo returns ErrNotFound for any lookup.
+	notifSvc := notifications.NewService(notifications.Config{
+		Repo:         newTenancySuiteNotificationsRepo(),
+		Events:       noopEvents{},
+		DeploymentID: "dep_test",
+	})
+	notifH := notifications.NewHandler(notifSvc)
+
 	r := chi.NewRouter()
 	r.Use(auth.MockMiddleware)
-	httpapi.HandlerFromMux(httpapi.NewStrictHandler(&strictSrv{tenants: h, identity: idH}, nil), r)
+	httpapi.HandlerFromMux(httpapi.NewStrictHandler(&strictSrv{tenants: h, identity: idH, notifications: notifH}, nil), r)
 	return httptest.NewServer(r), repo
 }
 
@@ -375,4 +440,80 @@ func (*tenancySuiteIdentityRepo) InsertSocialLoginState(context.Context, identit
 
 func (*tenancySuiteIdentityRepo) ConsumeSocialLoginState(context.Context, string) (identity.SocialLoginState, error) {
 	return identity.SocialLoginState{}, identity.ErrNotFound
+}
+
+// ---------------------------------------------------------------------------
+// notifications stub repo — same pattern; every read returns ErrNotFound,
+// every write is a no-op. The tenancy §17.3 matrix never exercises
+// /v1/notifications, so a stub is sufficient.
+// ---------------------------------------------------------------------------
+
+type tenancySuiteNotificationsRepo struct{}
+
+func newTenancySuiteNotificationsRepo() *tenancySuiteNotificationsRepo {
+	return &tenancySuiteNotificationsRepo{}
+}
+
+func (*tenancySuiteNotificationsRepo) CreateChannel(context.Context, notifications.Channel) (notifications.Channel, error) {
+	return notifications.Channel{}, notifications.ErrInvalidInput
+}
+
+func (*tenancySuiteNotificationsRepo) GetChannel(context.Context, string, string) (notifications.Channel, error) {
+	return notifications.Channel{}, notifications.ErrNotFound
+}
+
+func (*tenancySuiteNotificationsRepo) GetChannelByName(context.Context, string, string) (notifications.Channel, error) {
+	return notifications.Channel{}, notifications.ErrNotFound
+}
+
+func (*tenancySuiteNotificationsRepo) ListChannels(context.Context, string, int) ([]notifications.Channel, error) {
+	return nil, nil
+}
+
+func (*tenancySuiteNotificationsRepo) UpdateChannel(context.Context, string, string, int64, notifications.ChannelPatch) (notifications.Channel, error) {
+	return notifications.Channel{}, notifications.ErrNotFound
+}
+
+func (*tenancySuiteNotificationsRepo) DeleteChannel(context.Context, string, string, int64) error {
+	return notifications.ErrNotFound
+}
+
+func (*tenancySuiteNotificationsRepo) RotateChannelSecrets(context.Context, string, string, string) (notifications.Channel, error) {
+	return notifications.Channel{}, notifications.ErrNotFound
+}
+
+func (*tenancySuiteNotificationsRepo) SetChannelNovuIntegrationID(context.Context, string, string) error {
+	return nil
+}
+
+func (*tenancySuiteNotificationsRepo) RegisterWorkflow(context.Context, notifications.Workflow) (notifications.Workflow, error) {
+	return notifications.Workflow{}, notifications.ErrInvalidInput
+}
+
+func (*tenancySuiteNotificationsRepo) GetWorkflowByName(context.Context, string, string) (notifications.Workflow, error) {
+	return notifications.Workflow{}, notifications.ErrNotFound
+}
+
+func (*tenancySuiteNotificationsRepo) ListWorkflows(context.Context, string) ([]notifications.Workflow, error) {
+	return nil, nil
+}
+
+func (*tenancySuiteNotificationsRepo) UpdateWorkflow(context.Context, string, string, notifications.WorkflowPatch) (notifications.Workflow, error) {
+	return notifications.Workflow{}, notifications.ErrNotFound
+}
+
+func (*tenancySuiteNotificationsRepo) CreateNotification(context.Context, notifications.Notification) (notifications.Notification, error) {
+	return notifications.Notification{}, notifications.ErrInvalidInput
+}
+
+func (*tenancySuiteNotificationsRepo) GetNotification(context.Context, string, string) (notifications.Notification, error) {
+	return notifications.Notification{}, notifications.ErrNotFound
+}
+
+func (*tenancySuiteNotificationsRepo) ListNotifications(context.Context, string, int, *notifications.ListCursor) ([]notifications.Notification, bool, error) {
+	return nil, false, nil
+}
+
+func (*tenancySuiteNotificationsRepo) UpdateNotificationStatus(context.Context, string, notifications.NotificationStatus, *string, *string) (notifications.Notification, error) {
+	return notifications.Notification{}, notifications.ErrNotFound
 }
