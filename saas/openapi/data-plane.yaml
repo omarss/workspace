@@ -42,6 +42,20 @@ tags:
       Send and inspect transactional notifications. POST /send returns 202
       Accepted; status transitions are owned by the outbox-consuming worker
       (ADR 013).
+  - name: organizations
+    description: |
+      Organizations group platform users inside a Tenant. Every Tenant gets
+      a default organization on creation. Multi-org tenants must opt in via
+      tenant.metadata.multi_org.
+  - name: members
+    description: |
+      Memberships link a platform User to an Organization. Role assignment
+      lands in Phase 8 RBAC; Phase 7 ships the role_id placeholder column.
+  - name: invitations
+    description: |
+      Pending invitations for an Organization. POST returns 202 with the
+      one-time accept URL + plaintext token; subsequent reads return only
+      the token_prefix.
 security:
   - bearerAuth: []
   - apiKeyAuth: []
@@ -565,6 +579,442 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+
+  /v1/tenants/{tenant_id}/organizations:
+    parameters:
+      - in: path
+        name: tenant_id
+        required: true
+        schema:
+          type: string
+          pattern: "^tenant_[0-9A-HJKMNP-TV-Z]{26}$"
+    get:
+      operationId: listOrganizations
+      tags: [organizations]
+      summary: List organizations in a tenant.
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrganizationListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "410":
+          $ref: "#/components/responses/CursorGone"
+    post:
+      operationId: createOrganization
+      tags: [organizations]
+      summary: Create a new organization in a tenant (multi_org required).
+      description: |
+        Creating extra organizations requires `tenant.metadata.multi_org=true`.
+        The default organization is auto-created on tenant.create and cannot
+        be created via this endpoint.
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateOrganizationRequest"
+      responses:
+        "201":
+          description: Created
+          headers:
+            ETag:
+              schema:
+                type: string
+            Location:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrganizationResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "405":
+          description: Multi-org is disabled for this tenant.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "409":
+          $ref: "#/components/responses/IdempotencyInFlight"
+        "422":
+          $ref: "#/components/responses/IdempotencyConflictOrValidation"
+
+  /v1/organizations/{organization_id}:
+    parameters:
+      - in: path
+        name: organization_id
+        required: true
+        schema:
+          type: string
+          pattern: "^org_[0-9A-HJKMNP-TV-Z]{26}$"
+    get:
+      operationId: getOrganization
+      tags: [organizations]
+      summary: Fetch an organization by id.
+      responses:
+        "200":
+          description: OK
+          headers:
+            ETag:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrganizationResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      operationId: updateOrganization
+      tags: [organizations]
+      summary: Update an organization.
+      parameters:
+        - $ref: "#/components/parameters/IfMatch"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateOrganizationRequest"
+      responses:
+        "200":
+          description: OK
+          headers:
+            ETag:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrganizationResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "412":
+          $ref: "#/components/responses/PreconditionFailed"
+        "422":
+          $ref: "#/components/responses/IdempotencyConflictOrValidation"
+    delete:
+      operationId: deleteOrganization
+      tags: [organizations]
+      summary: Soft-delete an organization. Refuses while active members remain.
+      parameters:
+        - $ref: "#/components/parameters/IfMatch"
+      responses:
+        "204":
+          description: Soft-deleted.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "412":
+          $ref: "#/components/responses/PreconditionFailed"
+        "422":
+          $ref: "#/components/responses/IdempotencyConflictOrValidation"
+
+  /v1/organizations/{organization_id}/members:
+    parameters:
+      - in: path
+        name: organization_id
+        required: true
+        schema:
+          type: string
+          pattern: "^org_[0-9A-HJKMNP-TV-Z]{26}$"
+    get:
+      operationId: listMembers
+      tags: [members]
+      summary: List members of an organization.
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MemberListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "410":
+          $ref: "#/components/responses/CursorGone"
+
+  /v1/organizations/{organization_id}/members/{member_id}:
+    parameters:
+      - in: path
+        name: organization_id
+        required: true
+        schema:
+          type: string
+          pattern: "^org_[0-9A-HJKMNP-TV-Z]{26}$"
+      - in: path
+        name: member_id
+        required: true
+        schema:
+          type: string
+          pattern: "^member_[0-9A-HJKMNP-TV-Z]{26}$"
+    get:
+      operationId: getMember
+      tags: [members]
+      summary: Fetch a member by id.
+      responses:
+        "200":
+          description: OK
+          headers:
+            ETag:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MemberResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      operationId: updateMember
+      tags: [members]
+      summary: Update a member's role assignment (Phase 8 RBAC placeholder).
+      parameters:
+        - $ref: "#/components/parameters/IfMatch"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateMemberRequest"
+      responses:
+        "200":
+          description: OK
+          headers:
+            ETag:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MemberResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "412":
+          $ref: "#/components/responses/PreconditionFailed"
+        "422":
+          $ref: "#/components/responses/IdempotencyConflictOrValidation"
+    delete:
+      operationId: removeMember
+      tags: [members]
+      summary: Remove a member (soft-delete; status='removed').
+      parameters:
+        - $ref: "#/components/parameters/IfMatch"
+      responses:
+        "204":
+          description: Removed.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "412":
+          $ref: "#/components/responses/PreconditionFailed"
+
+  /v1/organizations/{organization_id}/invitations:
+    parameters:
+      - in: path
+        name: organization_id
+        required: true
+        schema:
+          type: string
+          pattern: "^org_[0-9A-HJKMNP-TV-Z]{26}$"
+    get:
+      operationId: listInvitations
+      tags: [invitations]
+      summary: List invitations for an organization.
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InvitationListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    post:
+      operationId: createInvitation
+      tags: [invitations]
+      summary: Create an invitation. Email is queued; plaintext token returned ONCE.
+      description: |
+        Returns 202 Accepted because the email dispatch is queued via the
+        Notifications module. The response carries `accept_url` and the
+        one-time plaintext token alongside `state` + `expires_at`; subsequent
+        reads of this invitation return only the `token_prefix`. Never log
+        the response body.
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateInvitationRequest"
+      responses:
+        "202":
+          description: Accepted; invitation persisted + email queued.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateInvitationResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/IdempotencyInFlight"
+        "422":
+          $ref: "#/components/responses/IdempotencyConflictOrValidation"
+
+  /v1/invitations/{invitation_id}:
+    parameters:
+      - in: path
+        name: invitation_id
+        required: true
+        schema:
+          type: string
+          pattern: "^inv_[0-9A-HJKMNP-TV-Z]{26}$"
+    get:
+      operationId: getInvitation
+      tags: [invitations]
+      summary: Fetch an invitation by id. Plaintext token never echoed.
+      responses:
+        "200":
+          description: OK
+          headers:
+            ETag:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InvitationResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      operationId: revokeInvitation
+      tags: [invitations]
+      summary: Revoke a pending invitation. Returns 204.
+      parameters:
+        - $ref: "#/components/parameters/IfMatch"
+      responses:
+        "204":
+          description: Revoked.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "410":
+          description: Invitation already consumed or expired.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "412":
+          $ref: "#/components/responses/PreconditionFailed"
+
+  /v1/invitations/{invitation_id}/accept:
+    parameters:
+      - in: path
+        name: invitation_id
+        required: true
+        schema:
+          type: string
+          pattern: "^inv_[0-9A-HJKMNP-TV-Z]{26}$"
+    post:
+      operationId: acceptInvitation
+      tags: [invitations]
+      summary: Accept a pending invitation. Creates the Member row.
+      description: |
+        Consumes a one-time accept token. The caller's JWT supplies the user
+        identity; the invitation's stored tenant_id is constant-time-compared
+        to the caller's tenant. Returns the newly-created Member.
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AcceptInvitationRequest"
+      responses:
+        "200":
+          description: Member created; invitation consumed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MemberResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "410":
+          description: Invitation already consumed, revoked, or expired.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "422":
+          $ref: "#/components/responses/IdempotencyConflictOrValidation"
 
   /v1/notification-channels:
     get:
@@ -1472,6 +1922,300 @@ components:
         payload:
           type: object
           additionalProperties: true
+          x-oapi-codegen-extra-tags:
+            sensitive: "true"
+
+    Organization:
+      type: object
+      required:
+        - id
+        - object
+        - tenant_id
+        - slug
+        - name
+        - status
+        - created_at
+        - updated_at
+        - etag
+      properties:
+        id:
+          type: string
+          pattern: "^org_[0-9A-HJKMNP-TV-Z]{26}$"
+        object:
+          type: string
+          enum: [organization]
+        tenant_id:
+          type: string
+          pattern: "^tenant_[0-9A-HJKMNP-TV-Z]{26}$"
+        slug:
+          type: string
+          minLength: 2
+          maxLength: 32
+          pattern: "^[a-z][a-z0-9-]*[a-z0-9]$"
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        status:
+          type: string
+          enum: [active, suspended, deleted]
+        metadata:
+          $ref: "#/components/schemas/Metadata"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        deleted_at:
+          type: string
+          format: date-time
+          nullable: true
+        etag:
+          type: string
+    OrganizationResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: "#/components/schemas/Organization"
+    OrganizationListResponse:
+      type: object
+      required: [data, pagination]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Organization"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+    CreateOrganizationRequest:
+      type: object
+      required: [slug, name]
+      properties:
+        slug:
+          type: string
+          minLength: 2
+          maxLength: 32
+          pattern: "^[a-z][a-z0-9-]*[a-z0-9]$"
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        metadata:
+          $ref: "#/components/schemas/Metadata"
+    UpdateOrganizationRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        status:
+          type: string
+          enum: [active, suspended]
+        metadata:
+          $ref: "#/components/schemas/Metadata"
+
+    Member:
+      type: object
+      required:
+        - id
+        - object
+        - tenant_id
+        - organization_id
+        - user_id
+        - status
+        - joined_at
+        - updated_at
+        - etag
+      properties:
+        id:
+          type: string
+          pattern: "^member_[0-9A-HJKMNP-TV-Z]{26}$"
+        object:
+          type: string
+          enum: [member]
+        tenant_id:
+          type: string
+          pattern: "^tenant_[0-9A-HJKMNP-TV-Z]{26}$"
+        organization_id:
+          type: string
+          pattern: "^org_[0-9A-HJKMNP-TV-Z]{26}$"
+        user_id:
+          type: string
+          pattern: "^user_[0-9A-HJKMNP-TV-Z]{26}$"
+        role_id:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [active, suspended, removed]
+        metadata:
+          $ref: "#/components/schemas/Metadata"
+        joined_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        removed_at:
+          type: string
+          format: date-time
+          nullable: true
+        etag:
+          type: string
+    MemberResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: "#/components/schemas/Member"
+    MemberListResponse:
+      type: object
+      required: [data, pagination]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Member"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+    UpdateMemberRequest:
+      type: object
+      properties:
+        role_id:
+          type: string
+          nullable: true
+
+    Invitation:
+      type: object
+      required:
+        - id
+        - object
+        - tenant_id
+        - organization_id
+        - invitee_email
+        - token_prefix
+        - status
+        - expires_at
+        - created_at
+        - updated_at
+        - etag
+      properties:
+        id:
+          type: string
+          pattern: "^inv_[0-9A-HJKMNP-TV-Z]{26}$"
+        object:
+          type: string
+          enum: [invitation]
+        tenant_id:
+          type: string
+          pattern: "^tenant_[0-9A-HJKMNP-TV-Z]{26}$"
+        organization_id:
+          type: string
+          pattern: "^org_[0-9A-HJKMNP-TV-Z]{26}$"
+        invitee_email:
+          type: string
+          format: email
+          x-oapi-codegen-extra-tags:
+            pii: "true"
+            sensitive: "true"
+        token_prefix:
+          type: string
+          description: First 8 chars of the base64-url accept token. The full token is only returned in the POST /invitations 202 response.
+        invited_by_user_id:
+          type: string
+          pattern: "^user_[0-9A-HJKMNP-TV-Z]{26}$"
+        proposed_role_id:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [pending, accepted, revoked, expired]
+        expires_at:
+          type: string
+          format: date-time
+        accepted_at:
+          type: string
+          format: date-time
+          nullable: true
+        accepted_by_user_id:
+          type: string
+          nullable: true
+        revoked_at:
+          type: string
+          format: date-time
+          nullable: true
+        revoked_by_user_id:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        etag:
+          type: string
+    InvitationResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: "#/components/schemas/Invitation"
+    InvitationListResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Invitation"
+    CreateInvitationRequest:
+      type: object
+      required: [invitee_email]
+      properties:
+        invitee_email:
+          type: string
+          format: email
+          x-oapi-codegen-extra-tags:
+            pii: "true"
+            sensitive: "true"
+        proposed_role_id:
+          type: string
+          nullable: true
+        expires_in_seconds:
+          type: integer
+          minimum: 3600
+          maximum: 2592000
+    CreateInvitationResponse:
+      type: object
+      required: [data, accept_url, state, expires_at]
+      properties:
+        data:
+          $ref: "#/components/schemas/Invitation"
+        accept_url:
+          type: string
+          format: uri
+          description: Full accept URL including the one-time plaintext token. Never logged; returned only in this 202 response.
+          x-oapi-codegen-extra-tags:
+            sensitive: "true"
+        state:
+          type: string
+          description: Plaintext one-time accept token. Discard after sending the email; subsequent reads return only token_prefix.
+          x-oapi-codegen-extra-tags:
+            sensitive: "true"
+        expires_at:
+          type: string
+          format: date-time
+    AcceptInvitationRequest:
+      type: object
+      required: [token]
+      properties:
+        token:
+          type: string
+          description: The one-time plaintext token from the invitation email.
           x-oapi-codegen-extra-tags:
             sensitive: "true"
 

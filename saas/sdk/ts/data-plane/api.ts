@@ -14,10 +14,13 @@
 
 
 
+export * from './api/invitations-api';
+export * from './api/members-api';
 export * from './api/meta-api';
 export * from './api/notification-channels-api';
 export * from './api/notification-workflows-api';
 export * from './api/notifications-api';
+export * from './api/organizations-api';
 export * from './api/social-providers-api';
 export * from './api/tenants-api';
 export * from './api/users-api';
