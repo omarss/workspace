@@ -1,0 +1,4 @@
+bin/
+*.log
+*.sqlite
+*.sqlite-journal

@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.MenuBook
+import androidx.compose.material.icons.filled.AlternateEmail
 import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.LocationOn
@@ -50,6 +51,7 @@ import net.omarss.omono.ui.places.PlacesRoute
 import net.omarss.omono.ui.prayer.PrayerRoute
 import net.omarss.omono.ui.quiz.QuizRoute
 import net.omarss.omono.ui.settings.SettingsRoute
+import net.omarss.omono.ui.twitter.TwitterRoute
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -85,6 +87,9 @@ class MainActivity : ComponentActivity() {
                         }
                         composable(Destination.Places.route) {
                             PlacesRoute(contentPadding = PaddingValues(0.dp))
+                        }
+                        composable(Destination.Twitter.route) {
+                            TwitterRoute(contentPadding = PaddingValues(0.dp))
                         }
                         composable(Destination.More.route) {
                             MoreRoute(
@@ -133,6 +138,11 @@ enum class Destination(
     Tracking(route = "tracking", label = "Drive", icon = Icons.Filled.Speed),
     Finance(route = "finance", label = "Finance", icon = Icons.Filled.Payments),
     Places(route = "places", label = "Places", icon = Icons.Filled.LocationOn),
+    // 5-item nav crosses Material's recommended 3-5 ceiling at the top
+    // edge; that's still inside spec. AlternateEmail (@) reads as "social
+    // feed" without using X branding (which would be a ToS/trademark
+    // headache anyway).
+    Twitter(route = "twitter", label = "Feed", icon = Icons.Filled.AlternateEmail),
     More(route = "more", label = "More", icon = Icons.Filled.Apps),
 }
 

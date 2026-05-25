@@ -30,6 +30,14 @@ val rootLocalProps = Properties().apply {
 val gplacesApiUrl: String = rootLocalProps.getProperty("gplaces.api.url", "")
 val gplacesApiKey: String = rootLocalProps.getProperty("gplaces.api.key", "")
 
+// Homelab tweets feed service (see /tweets in this monorepo). Missing
+// URL builds an APK that renders the Twitter tab as "not configured"
+// pointing at the README — every other tab keeps working.
+val tweetsApiUrl: String = rootLocalProps.getProperty(
+    "tweets.api.url",
+    "https://tweets.omarss.net",
+)
+
 android {
     namespace = "net.omarss.omono"
 
@@ -40,6 +48,7 @@ android {
 
         buildConfigField("String", "GPLACES_API_URL", "\"${gplacesApiUrl}\"")
         buildConfigField("String", "GPLACES_API_KEY", "\"${gplacesApiKey}\"")
+        buildConfigField("String", "TWEETS_API_URL", "\"${tweetsApiUrl}\"")
     }
 
     buildFeatures {
@@ -102,6 +111,7 @@ dependencies {
     implementation(projects.feature.docs)
     implementation(projects.feature.prayer)
     implementation(projects.feature.selfupdate)
+    implementation(projects.feature.twitter)
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
