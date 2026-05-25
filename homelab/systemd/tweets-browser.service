@@ -1,0 +1,68 @@
+# Headless Chrome that holds the authenticated X session for the
+# tweets feed service. tweets.service depends on this unit — without
+# it, the refresher has nowhere to capture cookies + x-client-transaction-id
+# from.
+#
+# One-time setup: run `make tweets-browser-login` to launch a headed
+# Chrome with the same --user-data-dir, log into x.com, close it.
+# After that this unit serves headless forever.
+
+[Unit]
+Description=tweets browser — headless Chrome holding the X session
+Documentation=file:///srv/tweets/README.md
+After=network-online.target
+Wants=network-online.target
+PartOf=tweets.service
+
+[Service]
+Type=simple
+User=omar
+Group=omar
+WorkingDirectory=/srv/tweets
+
+# --headless=new is Chrome's modern headless mode; doesn't need xvfb.
+# CDP listens on loopback only — the only consumer is tweetsd's
+# refresher, and exposing CDP publicly would let anyone control this
+# logged-in X session.
+ExecStart=/usr/bin/google-chrome \
+    --headless=new \
+    --user-data-dir=/srv/tweets/browser-profile \
+    --remote-debugging-address=127.0.0.1 \
+    --remote-debugging-port=9222 \
+    --remote-allow-origins=http://127.0.0.1:9222 \
+    --no-first-run \
+    --no-default-browser-check \
+    --disable-background-networking \
+    --disable-component-update \
+    --disable-features=Translate,MediaRouter \
+    --disable-gpu \
+    --no-pings \
+    --user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36 \
+    https://x.com/
+
+Restart=on-failure
+RestartSec=10s
+
+# Hardening — Chrome is large attack surface but we're not running
+# untrusted JS in it (only x.com). Restrict file-system writes and
+# privilege escalation regardless.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/srv/tweets
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+SystemCallArchitectures=native
+
+# Chrome can be chatty in logs (especially headless with --enable-logging);
+# we don't enable that flag, so journal volume stays small.
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

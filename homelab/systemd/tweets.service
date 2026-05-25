@@ -4,8 +4,8 @@
 [Unit]
 Description=tweets feed scraper + JSON API for the omono app
 Documentation=file:///srv/tweets/README.md
-After=network-online.target
-Wants=network-online.target
+After=network-online.target tweets-browser.service
+Wants=network-online.target tweets-browser.service
 
 [Service]
 Type=simple
@@ -15,10 +15,16 @@ WorkingDirectory=/srv/tweets
 
 # Bound to loopback only — public access goes through the
 # tweets.omarss.net nginx vhost which terminates TLS.
+# Refresh-script + venv-python paths drive the CDP refresher that
+# re-arms cookies + the search-template signature against the local
+# tweets-browser service.
 ExecStart=/usr/local/bin/tweetsd \
     -addr 127.0.0.1:8088 \
     -cookies /srv/tweets/cookies.json \
-    -db /srv/tweets/tweets.sqlite
+    -template /srv/tweets/search-template.json \
+    -db /srv/tweets/tweets.sqlite \
+    -refresh-script /srv/tweets/refresh-template.py \
+    -refresh-venv-python /srv/tweets/refresh-venv/bin/python
 
 # Restart unconditionally — the scraper is allowed to crash on
 # unexpected X responses; systemd brings it back up and the next scrape
@@ -40,7 +46,6 @@ ProtectControlGroups=true
 RestrictNamespaces=true
 RestrictRealtime=true
 RestrictSUIDSGID=true
-MemoryDenyWriteExecute=true
 LockPersonality=true
 SystemCallArchitectures=native
 
