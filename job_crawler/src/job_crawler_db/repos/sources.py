@@ -42,25 +42,29 @@ class SourcesRepo(Repo):
         kind: SourceKind | str,
         base_url: str,
         trust_weight: Decimal | float = Decimal("0.50"),
-        crawl_enabled: bool = True,
+        crawl_enabled: bool | None = None,
         config: dict[str, Any] | None = None,
     ) -> Source:
         """Create or update a source by slug.
 
         Use during application bootstrap; safe to re-run on every deploy.
+        `crawl_enabled` defaults to None so a source that crawler_health
+        marked broken is NOT silently re-enabled by `runner.ensure_source()`
+        on the next invocation; explicit True/False from a CLI flip is
+        respected. On first insert, None becomes the column default (true).
         """
         row = await self._fetchone(
             """
             INSERT INTO sources (slug, display_name, kind, base_url, trust_weight,
                                  crawl_enabled, config)
             VALUES (%(slug)s, %(display_name)s, %(kind)s, %(base_url)s,
-                    %(trust_weight)s, %(crawl_enabled)s, %(config)s::jsonb)
+                    %(trust_weight)s, COALESCE(%(crawl_enabled)s, true), %(config)s::jsonb)
             ON CONFLICT (slug) DO UPDATE SET
                 display_name  = EXCLUDED.display_name,
                 kind          = EXCLUDED.kind,
                 base_url      = EXCLUDED.base_url,
                 trust_weight  = EXCLUDED.trust_weight,
-                crawl_enabled = EXCLUDED.crawl_enabled,
+                crawl_enabled = COALESCE(%(crawl_enabled)s, sources.crawl_enabled),
                 config        = EXCLUDED.config
             RETURNING *;
             """,
