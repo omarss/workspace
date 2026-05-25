@@ -36,10 +36,16 @@ type Features struct {
 	// missed entirely — adult/sex-work promo hashtag stamps, dropshipping
 	// coupon spam with Unicode-decoration brackets, repetitive local-
 	// business ads built around a Saudi phone number.
-	BlocklistAdult       bool
-	BlocklistCoupon      bool
-	BlocklistLocalBizAd  bool
-	BlocklistOffTopicPol bool
+	BlocklistAdult         bool
+	BlocklistCoupon        bool
+	BlocklistLocalBizAd    bool
+	BlocklistOffTopicPol   bool
+	// Off-region commercial promo: posts tagged inside KSA/EG whose
+	// content is selling a service that explicitly lives elsewhere
+	// (Dubai car rental from a Riyadh-tagged account, etc.). Caught
+	// via combined "rent / car / Dubai" keywords; the cross-field
+	// place-vs-text check is left to the future.
+	BlocklistOffRegionPromo bool
 }
 
 // Score returns a value in [0, 1]. Higher = more spam-like. The mapping
@@ -135,6 +141,9 @@ func Score(f Features) (float64, map[string]float64) {
 	if f.BlocklistOffTopicPol {
 		add(contrib, "off_topic_political", 0.4)
 	}
+	if f.BlocklistOffRegionPromo {
+		add(contrib, "off_region_promo", 0.55)
+	}
 
 	// Sum the components, clamp.
 	total := 0.0
@@ -172,10 +181,11 @@ func Compute(text string, createdAccount time.Time, followers, following int, du
 		FollowerRatio:        ratio,
 		DuplicateRecent:      duplicateRecent,
 		TextLength:           len([]rune(text)),
-		BlocklistAdult:       matchAdult(text),
-		BlocklistCoupon:      matchCoupon(text),
-		BlocklistLocalBizAd:  matchLocalBizAd(text),
-		BlocklistOffTopicPol: matchOffTopicPolitical(text),
+		BlocklistAdult:          matchAdult(text),
+		BlocklistCoupon:         matchCoupon(text),
+		BlocklistLocalBizAd:     matchLocalBizAd(text),
+		BlocklistOffTopicPol:    matchOffTopicPolitical(text),
+		BlocklistOffRegionPromo: matchOffRegionPromo(text),
 	}
 }
 
@@ -209,6 +219,18 @@ var adultKeywords = []string{
 	"sex_in_",
 	"sex_riyadh",
 	"sex_jeddah",
+	// Softer-promo phrasings observed on the live KSA feed that the
+	// hashtag-stamp blocklist above misses. Each one is a phrase a
+	// non-promo account is highly unlikely to write.
+	"come to me 24",
+	"come to me 24/24",
+	"24/24 incall",
+	"24/24 outcall",
+	"مساج في مدينة",  // "massage in [city]" — typical multi-city promo
+	"مساج خاص",        // "private massage"
+	"مساج للسيدات والرجال",
+	"مساج منزلي",
+	"مساج فندقي",
 }
 
 func matchCoupon(text string) bool {
@@ -305,6 +327,50 @@ var polKeywords = []string{
 	"long live",
 	"long-live",
 	"glorified leader",
+}
+
+// matchOffRegionPromo catches accounts tagged inside KSA/EG selling a
+// service that lives elsewhere (most common: Dubai car-rental).
+// Needs *two* matching phrases — a service phrase and a region phrase —
+// so a one-off tourist post mentioning Dubai doesn't trigger.
+func matchOffRegionPromo(text string) bool {
+	low := strings.ToLower(text)
+	hasService := false
+	for _, k := range offRegionServiceKeywords {
+		if strings.Contains(low, k) {
+			hasService = true
+			break
+		}
+	}
+	if !hasService {
+		return false
+	}
+	for _, k := range offRegionPlaceKeywords {
+		if strings.Contains(low, k) {
+			return true
+		}
+	}
+	return false
+}
+
+var offRegionServiceKeywords = []string{
+	"استأجر سيارة",         // "rent a car"
+	"تأجير سيارة",          // "car rental"
+	"تأجير سيارات",         // "car rentals"
+	"تاجر سيارات",          // "car dealer / trader"
+	"بدون وديعة",           // "no deposit" — used in rental promo
+	"بدون تأمين مخالفات",   // "no traffic-fine insurance"
+	"car rental in",
+	"rent a car in",
+}
+
+var offRegionPlaceKeywords = []string{
+	"في دبي",   // "in Dubai" — content explicitly Dubai
+	"دبي ",     // "Dubai " with trailing space — anchored prefix
+	"أبوظبي",   // Abu Dhabi
+	"الإمارات", // UAE
+	"in dubai",
+	"in abu dhabi",
 }
 
 func add(m map[string]float64, key string, v float64) {
