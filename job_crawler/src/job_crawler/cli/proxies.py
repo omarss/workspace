@@ -12,12 +12,21 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import os
 import sys
 from pathlib import Path
 
 from ..core.proxy import DEFAULT_SOURCES, ProxyPool, build_default_pool
 
-_STATE = Path(__file__).resolve().parents[3] / ".cache" / "proxy_pool.json"
+# Honour JC_PROXY_STATE_FILE so this CLI uses the same persistence path
+# the crawler runner uses inside containers (where /app/.cache is on a
+# read-only root FS — see homelab/apps/job-crawler/cronjobs.yaml).
+_STATE = Path(
+    os.environ.get(
+        "JC_PROXY_STATE_FILE",
+        str(Path(__file__).resolve().parents[3] / ".cache" / "proxy_pool.json"),
+    )
+)
 
 
 async def _refresh() -> int:

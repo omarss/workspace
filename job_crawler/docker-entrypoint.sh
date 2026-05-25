@@ -8,9 +8,15 @@ set -eu
 
 case "${1:-api}" in
   api)
+    # `--forwarded-allow-ips='*'` was a deployment-hardening gap (Finding 6):
+    # any direct NodePort client could spoof X-Forwarded-For / -Proto.
+    # The configmap pins UVICORN_FORWARDED_ALLOW_IPS to loopback + the k3s
+    # pod CIDR. Local `docker run` falls back to 127.0.0.1 — same effect
+    # as not passing the flag at all.
     exec uvicorn job_crawler_api.app:app \
       --host 0.0.0.0 --port "${PORT:-8080}" \
-      --proxy-headers --forwarded-allow-ips='*' \
+      --proxy-headers \
+      --forwarded-allow-ips="${UVICORN_FORWARDED_ALLOW_IPS:-127.0.0.1}" \
       --no-access-log
     ;;
   crawler)
