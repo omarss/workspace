@@ -62,12 +62,13 @@ class LinkedInCrawler(BoardCrawler):
     source_kind: ClassVar[SourceKind] = SourceKind.aggregator
     source_base_url: ClassVar[str] = "https://www.linkedin.com"
     source_trust_weight: ClassVar[float] = 0.60
-    # LinkedIn fingerprints aggressively at TLS+HTTP/2 level — same as Bayt.
-    # Use curl_cffi Chrome impersonation. Still rate-limits by IP, so we
-    # also enable the rotating proxy pool — every retry comes from a fresh
-    # exit IP so a single throttled address doesn't poison the whole run.
-    impersonate_browser: ClassVar[str] = "chrome"
-    use_proxy_pool: ClassVar[bool] = True
+    # LinkedIn fingerprints both TLS and runtime behaviour. curl_cffi
+    # passes the TLS layer but the behavioural detector (mouse moves,
+    # request cadence) still trips. Playwright runs full Chromium which
+    # defeats both — at the cost of IP-rate-limit pressure. Pair with a
+    # residential proxy pool to push the daily ceiling higher.
+    use_playwright: ClassVar[bool] = True
+    use_proxy_pool: ClassVar[bool] = False
     rate: ClassVar[RateConfig] = RateConfig(
         max_rps=1.0, burst=2, max_concurrent=1,
         timeout_seconds=30.0,

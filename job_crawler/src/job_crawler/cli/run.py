@@ -14,9 +14,10 @@ from __future__ import annotations
 import argparse
 import asyncio
 import logging
+import os
 import sys
 from pathlib import Path
-from typing import Final
+from typing import Any, Final
 
 from job_crawler_db import JobCrawlerDB
 
@@ -46,14 +47,28 @@ _LOG: Final = logging.getLogger("job_crawler.cli.run")
 async def _run_one(db: JobCrawlerDB, slug: str) -> int:
     """Run a single crawler. Returns the process-exit code for it."""
     cls = get(slug)
-    proxy_pool = await _get_proxy_pool() if cls.use_proxy_pool else None
-    http = HttpClient(
-        cls.rate,
-        respect_robots=cls.respect_robots,
-        http2=not cls.prefer_http_1_1,
-        impersonate=cls.impersonate_browser,
-        proxy_pool=proxy_pool,
-    )
+    # Pick the right fetcher: Playwright (Chromium) for SPA / bot-walled
+    # sites that need behavioural cover, HttpClient (httpx/curl_cffi) for
+    # everything else. Both expose the same async `.fetch()` shape so the
+    # crawler body is agnostic.
+    http: Any
+    if cls.use_playwright:
+        from ..core.playwright_fetcher import PlaywrightFetcher
+
+        # Per-source cookie env: JC_LINKEDIN_COOKIE, JC_INDEED_COOKIE, etc.
+        cookie_env_var = f"JC_{cls.source_slug.upper()}_COOKIE"
+        cookie_header = os.environ.get(cookie_env_var, "").strip() or None
+        http = PlaywrightFetcher(cls.rate, cookie=cookie_header)
+        await http.__aenter__()
+    else:
+        proxy_pool = await _get_proxy_pool() if cls.use_proxy_pool else None
+        http = HttpClient(
+            cls.rate,
+            respect_robots=cls.respect_robots,
+            http2=not cls.prefer_http_1_1,
+            impersonate=cls.impersonate_browser,
+            proxy_pool=proxy_pool,
+        )
     crawler = cls(http, db=db)
     try:
         runner = CrawlerRunner(db, crawler)

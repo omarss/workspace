@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 from typing import ClassVar, Final
@@ -32,6 +33,7 @@ from job_crawler_db import (
 )
 
 from ..core.config import IDENTIFIABLE_UA, RateConfig
+from ..core.jsonld import JobPostingLD
 from ..core.types import (
     ApplicationChannelRaw,
     Listing,
@@ -39,6 +41,33 @@ from ..core.types import (
     RawPosting,
 )
 from ._base import BoardCrawler
+
+_IDS_FROM_HTML_RE: Final = re.compile(r"JobID=([A-Za-z0-9_-]+)")
+
+
+def _ids_from_html(html: str) -> set[str]:
+    return set(_IDS_FROM_HTML_RE.findall(html))
+
+
+def _txt(node: object) -> str:
+    if node is None:
+        return ""
+    text = node.text(separator=" ", strip=True) if hasattr(node, "text") else ""
+    return re.sub(r"\s+", " ", text or "").strip()
+
+
+def _city_hint(raw_location: str | None) -> str | None:
+    if not raw_location:
+        return None
+    head = raw_location.split(",")[0].strip()
+    return head or None
+
+
+def _join_location(ld: JobPostingLD | None) -> str | None:
+    if ld is None:
+        return None
+    parts = [p for p in (ld.city, ld.region, ld.country) if p]
+    return ", ".join(parts) if parts else None
 
 _LOG: Final = logging.getLogger("job_crawler.jadarat")
 
@@ -50,111 +79,120 @@ class JadaratCrawler(BoardCrawler):
     source_base_url: ClassVar[str] = "https://jadarat.sa"
     source_trust_weight: ClassVar[float] = 0.98  # gov source — authoritative
     rate: ClassVar[RateConfig] = RateConfig(
-        max_rps=1.0, burst=2, max_concurrent=2,
-        timeout_seconds=30.0, user_agent=IDENTIFIABLE_UA,
+        max_rps=0.3, burst=1, max_concurrent=1,
+        # Queue-It releases on its own schedule; give Chromium up to 4 min
+        # per request to sit through the queue.
+        timeout_seconds=240.0, user_agent=IDENTIFIABLE_UA,
     )
     canary_urls: ClassVar[tuple[str, ...]] = (
         "https://jadarat.sa/JobSearch",
     )
+    # Playwright headless Chromium — sits through the Queue-It interstitial
+    # on its own (no need for a captured cookie) by waiting for the URL to
+    # drop the `queueittoken=` parameter. See `_LISTING_URL` below.
+    use_playwright: ClassVar[bool] = True
 
     async def discover_listings(self, *, since: datetime) -> AsyncIterator[Listing]:
-        # Without a valid session cookie / queue token Jadarat 302s us
-        # straight to its queue page on every request. Detect that early
-        # so we don't burn the rate-limit budget for nothing.
-        cookie = os.environ.get("JC_JADARAT_COOKIE", "").strip()
-        if not cookie:
-            _LOG.warning(
-                "jadarat: JC_JADARAT_COOKIE not set — site is behind Queue-It "
-                "and requires a real browser session token to enumerate. "
-                "Skipping discover.",
-            )
-            return
-
+        # Playwright sits through Queue-It automatically: we navigate to
+        # /JobSearch and wait for the URL to no longer contain the queue
+        # token. After release the SPA hydrates and exposes job cards.
         max_pages = int(os.environ.get("JC_JADARAT_MAX_PAGES", "10"))
-        headers = {"Cookie": cookie, "Accept": "application/json"}
         seen: set[str] = set()
         for page in range(1, max_pages + 1):
-            url = (
-                f"{self.source_base_url}/api/jobseeker/getjobs"
-                f"?lang=ar&pageno={page}&country_id=1"
-            )
+            url = f"{self.source_base_url}/JobSearch?pageno={page}"
             try:
-                result = await self.http.fetch(url, headers=headers)
+                result = await self.http.fetch(  # type: ignore[call-arg]
+                    url,
+                    wait_for_url_pattern="/JobSearch",
+                    wait_for_selector="a[href*='JobID'], [data-testid='job-card']",
+                )
             except Exception as exc:
                 _LOG.warning("jadarat page %d failed: %s", page, exc)
                 break
-            payload = result.json or {}
-            jobs = payload.get("DataList") or payload.get("data") or []
-            if not isinstance(jobs, list) or not jobs:
-                _LOG.info("jadarat page %d empty, stopping", page)
+            if "queueittoken" in (result.url or ""):
+                _LOG.warning(
+                    "jadarat: Queue-It did not release within timeout on page %d",
+                    page,
+                )
                 break
-            for job in jobs:
-                if not isinstance(job, dict):
-                    continue
-                external_id = str(
-                    job.get("JobID") or job.get("JobNo") or job.get("id") or ""
-                ).strip()
-                if not external_id or external_id in seen:
-                    continue
-                seen.add(external_id)
-                detail_url = f"{self.source_base_url}/JobDetails?JobID={external_id}"
+            # Extract jobId-bearing hrefs from the hydrated DOM.
+            ids = _ids_from_html(result.text or "")
+            new_ids = ids - seen
+            if not new_ids:
+                _LOG.info("jadarat: no new IDs on page %d, stopping", page)
+                break
+            seen.update(new_ids)
+            for jid in new_ids:
+                detail_url = f"{self.source_base_url}/JobDetails?JobID={jid}"
                 yield Listing(
-                    source_job_external_id=external_id,
+                    source_job_external_id=jid,
                     detail_url=detail_url,
-                    extra={"job": job},
                 )
 
     async def fetch_detail(self, listing: Listing) -> RawPosting | None:
-        # The list response carries the full record; no extra HTTP needed.
-        job = listing.extra.get("job")
-        if not isinstance(job, dict):
-            return await super().fetch_detail(listing)
+        # Playwright path: navigate to the detail URL, wait for the
+        # Queue-It interstitial to release, return the hydrated HTML.
+        try:
+            result = await self.http.fetch(  # type: ignore[call-arg]
+                listing.detail_url,
+                wait_for_url_pattern="/JobDetails",
+                wait_for_selector="h1, [data-testid='job-title']",
+            )
+        except Exception:
+            return None
         return RawPosting(
             listing=listing,
-            canonical_url=listing.detail_url,
-            payload={"json": job},
+            canonical_url=result.url,
+            payload={"html": result.text},
             fetched_at=datetime.now(UTC),
-            duration_ms=0, http_status=200, bytes=len(str(job)),
+            duration_ms=result.duration_ms,
+            http_status=result.status,
+            bytes=result.bytes,
         )
 
     def parse(self, raw: RawPosting) -> ParsedPosting | None:
-        job = raw.payload.get("json")
-        if not isinstance(job, dict):
-            return None
-        external_id = str(
-            job.get("JobID") or job.get("JobNo") or job.get("id") or ""
-        ).strip()
-        title = (
-            job.get("JobTitleAR")
-            or job.get("JobTitle")
-            or job.get("title")
-            or ""
-        ).strip()
-        if not external_id or not title:
+        from selectolax.parser import HTMLParser
+
+        from ..core.jsonld import extract_job_posting
+
+        html = raw.payload.get("html")
+        if not isinstance(html, str) or not html:
             return None
 
-        # Jadarat exposes Arabic + English titles + a description; field
-        # names vary slightly across endpoints, so we coalesce.
-        description = (
-            job.get("JobDescriptionAR")
-            or job.get("JobDescription")
-            or job.get("description")
-            or ""
-        ).strip() or None
+        ld = extract_job_posting(html)
+        tree = HTMLParser(html)
 
-        raw_company_name = (
-            job.get("CompanyNameAR")
-            or job.get("CompanyName")
-            or job.get("EmployerName")
-            or ""
-        ).strip() or None
+        # External id from the URL (most reliable across DOM shapes).
+        m = re.search(r"JobID=([^&]+)", raw.canonical_url)
+        if not m:
+            return None
+        external_id = m.group(1)
 
-        raw_location = (
-            job.get("RegionAR")
-            or job.get("Region")
-            or job.get("City")
-            or ""
-        ).strip() or None
+        title = (ld.title if ld else None) or _txt(
+            tree.css_first("h1, [data-testid='job-title']"),
+        )
+        if not title:
+            return None
+
+        description = (ld.description if ld else None) or _txt(
+            tree.css_first(
+                "[data-testid='job-description'], "
+                ".job-description, .description, article, main",
+            ),
+        )
+
+        raw_company_name = (ld.company_name if ld else None) or _txt(
+            tree.css_first(
+                "[data-testid='company-name'], .company-name, "
+                "a[href*='company']",
+            ),
+        ) or None
+
+        raw_location = _join_location(ld) or _txt(
+            tree.css_first(
+                "[data-testid='job-location'], .location, .region",
+            ),
+        ) or None
 
         channels: list[ApplicationChannelRaw] = [
             ApplicationChannelRaw(
@@ -174,30 +212,24 @@ class JadaratCrawler(BoardCrawler):
         ):
             (parsed_fields if value else missing_fields).add(name)
 
-        posted_dt = _parse_dt(
-            job.get("PostingDate") or job.get("CreatedDate") or job.get("posted_at")
-        )
-        expires_dt = _parse_dt(
-            job.get("ExpiryDate") or job.get("ValidThrough") or job.get("expires_at")
-        )
         return ParsedPosting(
             source_job_external_id=external_id,
             canonical_url=raw.canonical_url,
             title=title,
-            posted_at=posted_dt,
-            source_updated_at=posted_dt,
-            expires_at=expires_dt,
+            posted_at=(ld.posted_at if ld else None),
+            source_updated_at=(ld.posted_at if ld else None),
+            expires_at=(ld.valid_through if ld else None),
             description=description,
             raw_company_name=raw_company_name,
             raw_location=raw_location,
-            city_name_hint=raw_location,
+            city_name_hint=_city_hint(raw_location),
             country_code="sa",
             # Jadarat lists only KSA-nationals jobs by design.
             saudi_nationals_only=True,
             application_channels=channels,
             parsed_fields=parsed_fields,
             missing_fields=missing_fields,
-            raw_payload={"source": "jadarat", "job": job},
+            raw_payload={"source": "jadarat"},
         )
 
     def normalize(self, parsed: ParsedPosting):  # type: ignore[override]

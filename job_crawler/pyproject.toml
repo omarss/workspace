@@ -34,6 +34,7 @@ crawler = [
     "python-dotenv>=1.0",          # BSD-3 — env loading
     "aiosmtplib>=4.0",             # MIT — async SMTP for alerts (no paid API)
     "curl_cffi>=0.7",              # MIT — TLS-fingerprint impersonation for bot-walled sites
+    "playwright>=1.49",            # Apache-2 — headless browser for SPA / JS-walled sites
 ]
 dev = [
     "pytest>=8.3",
@@ -97,4 +98,8 @@ exclude = ["build/", "dist/"]
 
 [[tool.mypy.overrides]]
 module = "testcontainers.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "playwright.*"
 ignore_missing_imports = true

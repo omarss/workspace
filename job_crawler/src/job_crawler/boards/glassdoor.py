@@ -60,8 +60,11 @@ class GlassdoorCrawler(BoardCrawler):
     canary_urls: ClassVar[tuple[str, ...]] = (
         "https://www.glassdoor.com/Job/saudi-arabia-jobs-SRCH_IL.0,12_IN191.htm",
     )
-    impersonate_browser: ClassVar[str] = "chrome"
-    use_proxy_pool: ClassVar[bool] = True
+    # Glassdoor is a Next.js SPA — listings hydrate client-side, so a
+    # raw HTML fetch returns an empty shell. Playwright lets Chrome run
+    # the JS so we see the same DOM a human would.
+    use_playwright: ClassVar[bool] = True
+    use_proxy_pool: ClassVar[bool] = False
 
     _CARD_RE: ClassVar[re.Pattern[str]] = re.compile(
         r'data-job-id="([^"]+)"|/partner/jobListing\.htm\?jobListingId=(\d+)',

@@ -60,12 +60,12 @@ class IndeedCrawler(BoardCrawler):
     canary_urls: ClassVar[tuple[str, ...]] = (
         "https://sa.indeed.com/jobs?l=Saudi+Arabia",
     )
-    # TLS-impersonate Chrome so curl_cffi reaches the CDN edge; the wall
-    # is still server-side but this removes one layer of fingerprint match.
-    impersonate_browser: ClassVar[str] = "chrome"
-    # Indeed IP-throttles aggressively. Route through the proxy pool when
-    # one is wired in; otherwise expect immediate 403 from cloud IPs.
-    use_proxy_pool: ClassVar[bool] = True
+    # Playwright headless Chromium — defeats Indeed's TLS + behavioural
+    # fingerprinting that 403s curl_cffi requests. IP-throttling still
+    # applies; pair with `use_proxy_pool` once residential proxies are
+    # wired in.
+    use_playwright: ClassVar[bool] = True
+    use_proxy_pool: ClassVar[bool] = False
 
     _CARD_RE: ClassVar[re.Pattern[str]] = re.compile(r'data-jk="([^"]+)"')
 

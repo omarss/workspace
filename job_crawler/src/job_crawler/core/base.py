@@ -61,6 +61,12 @@ class BaseCrawler(ABC):
     # permanent failure (auth required, SSL handshake, blocked-by-target).
     # Sites typically need this AND impersonate_browser together.
     use_proxy_pool: ClassVar[bool] = False
+    # When True the CLI substitutes the HttpClient with a `PlaywrightFetcher`
+    # (headless Chromium) — for SPA sites whose listings only materialise
+    # after JS hydration (Glassdoor), TLS+behavioural bot walls (LinkedIn,
+    # Indeed) and queue-interstitials (Jadarat). ~3-5s Chromium launch is
+    # amortised across the whole run.
+    use_playwright: ClassVar[bool] = False
     # 1-3 URLs that should always parse correctly. Hand-picked stable jobs;
     # the canary system fetches these on every cycle to detect site changes.
     canary_urls: ClassVar[tuple[str, ...]] = ()
