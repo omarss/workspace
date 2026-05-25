@@ -29,6 +29,12 @@ WorkingDirectory=/srv/tweets
 # "target" argument ("Multiple targets are not supported in headless
 # mode"). The CDP refresher navigates the about:blank tab to x.com
 # itself via Page.navigate when it needs to capture a search.
+#
+# The --user-agent value MUST be wrapped in double quotes so systemd
+# treats the spaces inside the UA string as part of one argument.
+# Without quoting, systemd word-splits "Mozilla/5.0 (X11; ..." into
+# six positional arguments and Chrome rejects them with the same
+# "Multiple targets are not supported in headless mode" error.
 ExecStart=/usr/bin/google-chrome \
     --headless=new \
     --user-data-dir=/srv/tweets/browser-profile \
@@ -42,7 +48,7 @@ ExecStart=/usr/bin/google-chrome \
     --disable-features=Translate,MediaRouter \
     --disable-gpu \
     --no-pings \
-    --user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36
+    "--user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36"
 
 Restart=on-failure
 RestartSec=10s
