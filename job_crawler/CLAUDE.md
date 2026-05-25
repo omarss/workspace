@@ -231,7 +231,7 @@ findings. Status:
 | 6  | Low  | DONE PR#23 | `UVICORN_FORWARDED_ALLOW_IPS` env; default 127.0.0.1     |
 | 16 | Med  | DONE PR#24 | `BaseCrawler.normalize()` + 18 placeholder bodies gone   |
 | 17 | Med  | DONE PR#24 | Canary returns `Literal["ok","fail","skipped_no_canary"]` |
-| 2  | High | DONE PR#25 | mypy strict reaches zero errors; `make check` enforces it |
+| 2  | High | DONE PR#26 | mypy strict reaches zero errors; `make check` enforces it |
 
 **All 18 findings closed.** Subsequent audit cycles should add new rows
 beneath this table; never remove rows once they're done — they double as
