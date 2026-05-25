@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"strings"
 	"time"
 )
 
@@ -13,16 +14,63 @@ type FixtureSource struct{}
 
 func NewFixtureSource() *FixtureSource { return &FixtureSource{} }
 
-func (f *FixtureSource) Feed(_ context.Context, country Country) ([]Tweet, error) {
+func (f *FixtureSource) Feed(_ context.Context, req FeedRequest) (FeedResult, error) {
 	now := time.Now().UTC()
-	switch country {
-	case CountryKSA:
-		return f.ksa(now), nil
-	case CountryEgypt:
-		return f.egypt(now), nil
-	default:
-		return nil, ErrUnknownCountry
+	out := make([]Tweet, 0, 6)
+	for _, country := range req.Countries {
+		switch country {
+		case CountryKSA:
+			out = append(out, f.ksa(now)...)
+		case CountryEgypt:
+			out = append(out, f.egypt(now)...)
+		default:
+			return FeedResult{}, ErrUnknownCountry
+		}
 	}
+	// Apply city filter when set; otherwise pass everything.
+	if len(req.Cities) > 0 {
+		filtered := out[:0]
+		for _, tw := range out {
+			if matchesAnyCity(tw.Place, req.Cities) {
+				filtered = append(filtered, tw)
+			}
+		}
+		out = filtered
+	}
+	// Honour cursor + limit so fixtures behave like the store does.
+	if !req.Cursor.IsZero() {
+		filtered := out[:0]
+		for _, tw := range out {
+			if tw.CreatedAt.Before(req.Cursor) {
+				filtered = append(filtered, tw)
+			}
+		}
+		out = filtered
+	}
+	limit := req.Limit
+	if limit <= 0 {
+		limit = 60
+	}
+	if len(out) > limit {
+		out = out[:limit]
+	}
+	return FeedResult{Tweets: out}, nil
+}
+
+// matchesAnyCity returns true when place contains any of the
+// case-insensitive substrings in cities. Used by both the fixture
+// source (here) and the store source (store_source.go).
+func matchesAnyCity(place string, cities []string) bool {
+	low := strings.ToLower(place)
+	for _, c := range cities {
+		if c == "" {
+			continue
+		}
+		if strings.Contains(low, strings.ToLower(c)) {
+			return true
+		}
+	}
+	return false
 }
 
 func (f *FixtureSource) ksa(now time.Time) []Tweet {

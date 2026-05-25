@@ -126,4 +126,9 @@ dependencies {
     implementation(libs.accompanist.permissions)
     implementation(libs.reorderable)
     implementation(libs.timber)
+    // Coil — async avatar rendering on the Feed tab. Already on feature/twitter
+    // for parser-side code; app needs it directly because the AsyncImage
+    // composable is invoked from the screen here.
+    implementation(libs.coil.compose)
+    implementation(libs.coil.network.okhttp)
 }

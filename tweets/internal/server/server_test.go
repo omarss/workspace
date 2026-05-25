@@ -40,8 +40,8 @@ func TestTweets_DefaultCountry(t *testing.T) {
 	if err := json.Unmarshal(rr.Body.Bytes(), &body); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if body.Country != CountryKSA {
-		t.Errorf("expected default country ksa, got %q", body.Country)
+	if len(body.Countries) != 1 || body.Countries[0] != CountryKSA {
+		t.Errorf("expected default country [ksa], got %v", body.Countries)
 	}
 	if len(body.Tweets) == 0 {
 		t.Error("expected fixture tweets, got none")
@@ -60,8 +60,8 @@ func TestTweets_Egypt(t *testing.T) {
 	if err := json.Unmarshal(rr.Body.Bytes(), &body); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if body.Country != CountryEgypt {
-		t.Errorf("expected egypt, got %q", body.Country)
+	if len(body.Countries) != 1 || body.Countries[0] != CountryEgypt {
+		t.Errorf("expected [eg], got %v", body.Countries)
 	}
 	for _, tw := range body.Tweets {
 		if tw.Country != CountryEgypt {

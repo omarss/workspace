@@ -111,7 +111,6 @@ func extractTweet(m map[string]any, country server.Country) (server.Tweet, bool)
 		}
 	}
 
-	// Author info lives under core.user_results.result.legacy.{name,screen_name}.
 	// Author info path. X moved {name, screen_name} from the user's
 	// legacy block up into a sibling `core` block in mid-2026:
 	//   tweet.core.user_results.result.core.{name, screen_name}
@@ -119,6 +118,10 @@ func extractTweet(m map[string]any, country server.Country) (server.Tweet, bool)
 	// quoted, etc.), so try the new path first and fall back to the
 	// old one. Both staying empty just leaves the handle blank — the
 	// UI tolerates it.
+	//
+	// Avatar URL lives at `result.avatar.image_url` (~48×48 _normal
+	// variant). Falls back to `legacy.profile_image_url_https` for
+	// the older schema.
 	if c, ok := core["core"].(map[string]any); ok {
 		if ur, ok := c["user_results"].(map[string]any); ok {
 			if r, ok := ur["result"].(map[string]any); ok {
@@ -126,13 +129,19 @@ func extractTweet(m map[string]any, country server.Country) (server.Tweet, bool)
 					out.Author, _ = uc["name"].(string)
 					out.Handle, _ = uc["screen_name"].(string)
 				}
-				if out.Author == "" || out.Handle == "" {
+				if av, ok := r["avatar"].(map[string]any); ok {
+					out.AvatarURL, _ = av["image_url"].(string)
+				}
+				if out.Author == "" || out.Handle == "" || out.AvatarURL == "" {
 					if l, ok := r["legacy"].(map[string]any); ok {
-						if n, _ := l["name"].(string); n != "" && out.Author == "" {
-							out.Author = n
+						if out.Author == "" {
+							out.Author, _ = l["name"].(string)
 						}
-						if sn, _ := l["screen_name"].(string); sn != "" && out.Handle == "" {
-							out.Handle = sn
+						if out.Handle == "" {
+							out.Handle, _ = l["screen_name"].(string)
+						}
+						if out.AvatarURL == "" {
+							out.AvatarURL, _ = l["profile_image_url_https"].(string)
 						}
 					}
 				}

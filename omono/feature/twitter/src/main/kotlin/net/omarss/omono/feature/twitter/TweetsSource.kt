@@ -7,10 +7,23 @@ package net.omarss.omono.feature.twitter
 interface TweetsSource {
     val isConfigured: Boolean
 
-    // Returns the latest feed for the given country, sorted newest
-    // first. Throws on transport / parse errors so the caller (the
-    // repository) decides whether to surface or swallow. Returning an
-    // empty list is a valid "no tweets right now" answer and must not
-    // throw.
-    suspend fun feed(country: Country): List<Tweet>
+    /** Fetch one page. Empty list is a valid empty answer (don't throw). */
+    suspend fun feed(request: FeedRequest): FeedPage
 }
+
+// FeedRequest mirrors the server's URL query params 1:1 so the layers
+// stay easy to read. Empty `cities` means "no city filter"; zero
+// `limit` means "use the server default".
+data class FeedRequest(
+    val countries: List<Country>,
+    val cities: List<String> = emptyList(),
+    val cursor: String? = null,
+    val limit: Int = 60,
+)
+
+// FeedPage is one page of results plus the cursor the client passes
+// back to fetch the next page. Empty `nextCursor` signals end-of-feed.
+data class FeedPage(
+    val tweets: List<Tweet>,
+    val nextCursor: String? = null,
+)

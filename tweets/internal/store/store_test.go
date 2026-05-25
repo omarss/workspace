@@ -45,7 +45,7 @@ func TestSaveBatch_RoundTrip(t *testing.T) {
 		t.Fatalf("save: %v", err)
 	}
 
-	got, err := db.Latest(ctx, server.CountryKSA, 10)
+	got, err := db.Latest(ctx, []server.Country{server.CountryKSA}, nil, time.Time{}, 10)
 	if err != nil {
 		t.Fatalf("latest: %v", err)
 	}
@@ -77,7 +77,7 @@ func TestSaveBatch_Upsert(t *testing.T) {
 	if err := db.SaveBatch(ctx, []server.Tweet{tw}); err != nil {
 		t.Fatalf("second save: %v", err)
 	}
-	got, _ := db.Latest(ctx, server.CountryKSA, 10)
+	got, _ := db.Latest(ctx, []server.Country{server.CountryKSA}, nil, time.Time{}, 10)
 	if len(got) != 1 {
 		t.Fatalf("expected 1 row after upsert, got %d", len(got))
 	}
@@ -95,8 +95,8 @@ func TestLatest_PerCountryIsolation(t *testing.T) {
 		makeTweet("k1", "ksa", now, 0),
 		makeTweet("e1", "eg", now, 0),
 	})
-	ksa, _ := db.Latest(ctx, server.CountryKSA, 10)
-	eg, _ := db.Latest(ctx, server.CountryEgypt, 10)
+	ksa, _ := db.Latest(ctx, []server.Country{server.CountryKSA}, nil, time.Time{}, 10)
+	eg, _ := db.Latest(ctx, []server.Country{server.CountryEgypt}, nil, time.Time{}, 10)
 
 	if len(ksa) != 1 || ksa[0].ID != "k1" {
 		t.Errorf("ksa query returned wrong rows: %v", ksa)
@@ -109,7 +109,7 @@ func TestLatest_PerCountryIsolation(t *testing.T) {
 func TestLatest_DefaultLimitWhenZero(t *testing.T) {
 	db := newTestDB(t)
 	ctx := context.Background()
-	got, err := db.Latest(ctx, server.CountryKSA, 0)
+	got, err := db.Latest(ctx, []server.Country{server.CountryKSA}, nil, time.Time{}, 0)
 	if err != nil {
 		t.Fatalf("latest: %v", err)
 	}
@@ -141,7 +141,7 @@ func TestPurgeOlderThan(t *testing.T) {
 	if n != 1 {
 		t.Errorf("expected 1 row purged, got %d", n)
 	}
-	remaining, _ := db.Latest(ctx, server.CountryKSA, 10)
+	remaining, _ := db.Latest(ctx, []server.Country{server.CountryKSA}, nil, time.Time{}, 10)
 	if len(remaining) != 1 || remaining[0].ID != "new" {
 		t.Errorf("expected only 'new' to survive, got %v", remaining)
 	}
