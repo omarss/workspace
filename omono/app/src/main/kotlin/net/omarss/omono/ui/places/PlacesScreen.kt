@@ -83,6 +83,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import net.omarss.omono.core.designsystem.theme.OmonoTokens
 import net.omarss.omono.feature.places.Place
 import net.omarss.omono.feature.places.PlaceCategory
 import sh.calvin.reorderable.ReorderableItem
@@ -1073,7 +1074,7 @@ private fun RatingLine(rating: Float, reviewCount: Int?) {
                 imageVector = if (i < filled) Icons.Filled.Star else Icons.Outlined.StarBorder,
                 contentDescription = null,
                 tint = if (i < filled) {
-                    Color(0xFFF59E0B) // amber for filled
+                    OmonoTokens.colors.accentGold
                 } else {
                     MaterialTheme.colorScheme.onSurfaceVariant
                 },
@@ -1100,7 +1101,7 @@ private fun OpenChip() {
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(50))
-            .background(Color(0xFF10B981)) // emerald
+            .background(OmonoTokens.colors.income)
             .padding(horizontal = 6.dp, vertical = 2.dp),
     ) {
         Text(

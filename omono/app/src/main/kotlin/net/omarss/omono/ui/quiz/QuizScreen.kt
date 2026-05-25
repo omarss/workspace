@@ -52,6 +52,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import net.omarss.omono.core.designsystem.theme.OmonoTokens
 import net.omarss.omono.feature.quiz.Question
 import net.omarss.omono.feature.quiz.QuestionType
 import net.omarss.omono.feature.quiz.QuizOption
@@ -649,18 +650,20 @@ private fun OptionCard(
     val isPickedAndCorrect = picked && isCorrectOption
     val isPickedAndWrong = picked && !isCorrectOption
 
+    val semantic = OmonoTokens.colors
     val containerColor = when {
         !hasPicked -> MaterialTheme.colorScheme.surfaceContainerHighest
-        isPickedAndCorrect -> Color(0xFFDCFCE7) // emerald 100
-        isPickedAndWrong -> Color(0xFFFEE2E2) // red 100
-        option.letter == correctLetter -> Color(0xFFDCFCE7) // reveal correct when user picked wrong
+        isPickedAndCorrect -> semantic.incomeSoft
+        isPickedAndWrong -> semantic.dangerSoft
+        // Reveal the correct answer when the user picked wrong.
+        option.letter == correctLetter -> semantic.incomeSoft
         else -> MaterialTheme.colorScheme.surfaceContainerHighest
     }
     val borderColor = when {
         !hasPicked -> Color.Transparent
-        isPickedAndCorrect -> Color(0xFF10B981) // emerald 500
-        isPickedAndWrong -> Color(0xFFDC2626) // red 600
-        option.letter == correctLetter -> Color(0xFF10B981)
+        isPickedAndCorrect -> semantic.income
+        isPickedAndWrong -> semantic.danger
+        option.letter == correctLetter -> semantic.income
         else -> Color.Transparent
     }
 
@@ -708,17 +711,17 @@ private fun OptionCard(
                     isPickedAndCorrect -> Icon(
                         imageVector = Icons.Filled.Check,
                         contentDescription = "Correct",
-                        tint = Color(0xFF10B981),
+                        tint = semantic.income,
                     )
                     isPickedAndWrong -> Icon(
                         imageVector = Icons.Filled.Close,
                         contentDescription = "Incorrect",
-                        tint = Color(0xFFDC2626),
+                        tint = semantic.danger,
                     )
                     option.letter == correctLetter -> Icon(
                         imageVector = Icons.Filled.Check,
                         contentDescription = "Correct answer",
-                        tint = Color(0xFF10B981),
+                        tint = semantic.income,
                     )
                     else -> Unit
                 }
@@ -825,11 +828,12 @@ private fun SummaryRow(
     correct: String?,
     isCorrect: Boolean,
 ) {
+    val semantic = OmonoTokens.colors
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
             containerColor = if (isCorrect) {
-                Color(0xFFDCFCE7)
+                semantic.incomeSoft
             } else {
                 MaterialTheme.colorScheme.surfaceContainerHighest
             },
@@ -846,7 +850,7 @@ private fun SummaryRow(
                     .size(28.dp)
                     .clip(CircleShape)
                     .background(
-                        if (isCorrect) Color(0xFF10B981) else Color(0xFFDC2626),
+                        if (isCorrect) semantic.income else semantic.danger,
                     ),
                 contentAlignment = Alignment.Center,
             ) {
