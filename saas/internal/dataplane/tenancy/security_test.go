@@ -215,6 +215,38 @@ func (s *strictSrv) AcceptInvitation(_ context.Context, _ httpapi.AcceptInvitati
 	return nil, nil //nolint:nilnil
 }
 
+// API keys delegation — Phase 9 stubs so the tenancy matrix keeps
+// satisfying StrictServerInterface. The tenancy tests never invoke
+// the api-key endpoints.
+
+func (s *strictSrv) ListAPIKeys(_ context.Context, _ httpapi.ListAPIKeysRequestObject) (httpapi.ListAPIKeysResponseObject, error) {
+	return nil, nil //nolint:nilnil
+}
+
+func (s *strictSrv) CreateAPIKey(_ context.Context, _ httpapi.CreateAPIKeyRequestObject) (httpapi.CreateAPIKeyResponseObject, error) {
+	return nil, nil //nolint:nilnil
+}
+
+func (s *strictSrv) GetAPIKey(_ context.Context, _ httpapi.GetAPIKeyRequestObject) (httpapi.GetAPIKeyResponseObject, error) {
+	return nil, nil //nolint:nilnil
+}
+
+func (s *strictSrv) UpdateAPIKey(_ context.Context, _ httpapi.UpdateAPIKeyRequestObject) (httpapi.UpdateAPIKeyResponseObject, error) {
+	return nil, nil //nolint:nilnil
+}
+
+func (s *strictSrv) DeleteAPIKey(_ context.Context, _ httpapi.DeleteAPIKeyRequestObject) (httpapi.DeleteAPIKeyResponseObject, error) {
+	return nil, nil //nolint:nilnil
+}
+
+func (s *strictSrv) RotateAPIKey(_ context.Context, _ httpapi.RotateAPIKeyRequestObject) (httpapi.RotateAPIKeyResponseObject, error) {
+	return nil, nil //nolint:nilnil
+}
+
+func (s *strictSrv) RevokeAPIKey(_ context.Context, _ httpapi.RevokeAPIKeyRequestObject) (httpapi.RevokeAPIKeyResponseObject, error) {
+	return nil, nil //nolint:nilnil
+}
+
 // Authorization delegation — Phase 8 stubs so the tenancy matrix keeps
 // satisfying StrictServerInterface. The tenancy tests never invoke the
 // RBAC endpoints; each stub returns nil so the wiring compiles without

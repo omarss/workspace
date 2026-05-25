@@ -63,6 +63,15 @@ tags:
       dom = tenant_id (ADR 005). Wildcard domains are forbidden by DB
       CHECK + service-layer validation. Every denied check emits an
       `authorization.denied` outbox event for the Phase 10 audit log.
+  - name: api-keys
+    description: |
+      Tenant-bound bearer-token API keys (AGENTS.md §8.5). Plaintext
+      secrets are returned exactly once at create and rotate time;
+      subsequent reads expose only the visible prefix. argon2id PHC
+      hashing + envelope-encrypted prefix-search index per ADR 008.
+      Rotation preserves the previous secret for a configurable grace
+      window (default 24h, max 7d) so clients can roll over without
+      downtime.
 security:
   - bearerAuth: []
   - apiKeyAuth: []
@@ -1352,6 +1361,221 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/NotificationResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /v1/tenants/{tenant_id}/api-keys:
+    parameters:
+      - in: path
+        name: tenant_id
+        required: true
+        schema:
+          type: string
+          pattern: "^tenant_[0-9A-HJKMNP-TV-Z]{26}$"
+    get:
+      operationId: listAPIKeys
+      tags: [api-keys]
+      summary: List API keys for a tenant.
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIKeyListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      operationId: createAPIKey
+      tags: [api-keys]
+      summary: Mint a new API key. Plaintext returned ONCE.
+      description: |
+        Creates an API key under the named tenant. The response body
+        carries the plaintext bearer in `secret` — this is the only
+        time it is returned. Subsequent reads expose only the prefix.
+        The `apikey.write` permission is required when the deployment
+        has SAAS_RBAC_ENFORCE_DESTRUCTIVE=true (Phase 8 retrofit).
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAPIKeyRequest"
+      responses:
+        "201":
+          description: Created. The plaintext secret is returned ONCE.
+          headers:
+            ETag:
+              schema:
+                type: string
+            Location:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateAPIKeyResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "422":
+          $ref: "#/components/responses/IdempotencyConflictOrValidation"
+
+  /v1/api-keys/{api_key_id}:
+    parameters:
+      - in: path
+        name: api_key_id
+        required: true
+        schema:
+          type: string
+          pattern: "^apik_[0-9A-HJKMNP-TV-Z]{26}$"
+    get:
+      operationId: getAPIKey
+      tags: [api-keys]
+      summary: Fetch an API key by id (no plaintext).
+      responses:
+        "200":
+          description: OK
+          headers:
+            ETag:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIKeyResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      operationId: updateAPIKey
+      tags: [api-keys]
+      summary: Update name, scopes, ip_allowlist, rate_limit.
+      parameters:
+        - $ref: "#/components/parameters/IfMatch"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateAPIKeyRequest"
+      responses:
+        "200":
+          description: OK
+          headers:
+            ETag:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIKeyResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "412":
+          $ref: "#/components/responses/PreconditionFailed"
+        "422":
+          $ref: "#/components/responses/IdempotencyConflictOrValidation"
+    delete:
+      operationId: deleteAPIKey
+      tags: [api-keys]
+      summary: Soft-revoke an API key (alias of revoke).
+      responses:
+        "204":
+          description: Revoked.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /v1/api-keys/{api_key_id}/rotate:
+    parameters:
+      - in: path
+        name: api_key_id
+        required: true
+        schema:
+          type: string
+          pattern: "^apik_[0-9A-HJKMNP-TV-Z]{26}$"
+    post:
+      operationId: rotateAPIKey
+      tags: [api-keys]
+      summary: Rotate an API key with optional grace period.
+      description: |
+        Mints a new plaintext secret for the same row id and demotes
+        the previous secret into a predecessor PHC valid until
+        `predecessor_expires_at`. Requires `apikey.write` when
+        SAAS_RBAC_ENFORCE_DESTRUCTIVE=true.
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RotateAPIKeyRequest"
+      responses:
+        "200":
+          description: Rotated. New plaintext returned ONCE.
+          headers:
+            ETag:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RotateAPIKeyResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/IdempotencyConflictOrValidation"
+
+  /v1/api-keys/{api_key_id}/revoke:
+    parameters:
+      - in: path
+        name: api_key_id
+        required: true
+        schema:
+          type: string
+          pattern: "^apik_[0-9A-HJKMNP-TV-Z]{26}$"
+    post:
+      operationId: revokeAPIKey
+      tags: [api-keys]
+      summary: Immediately revoke an API key (no grace).
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "200":
+          description: Revoked.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIKeyResponse"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
@@ -2713,6 +2937,194 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/CheckAuthorizationResponseData"
+
+    APIKey:
+      type: object
+      required:
+        - id
+        - object
+        - tenant_id
+        - name
+        - prefix
+        - scopes
+        - status
+        - created_by
+        - created_at
+        - updated_at
+        - etag
+      properties:
+        id:
+          type: string
+          pattern: "^apik_[0-9A-HJKMNP-TV-Z]{26}$"
+        object:
+          type: string
+          enum: [api_key]
+        tenant_id:
+          type: string
+          pattern: "^tenant_[0-9A-HJKMNP-TV-Z]{26}$"
+        environment_id:
+          type: string
+          nullable: true
+        name:
+          type: string
+          minLength: 1
+          maxLength: 64
+        prefix:
+          type: string
+          description: 'Visible prefix shape `<env>_<8-char-random>`, e.g. "live_AX9BC7D3".'
+        scopes:
+          type: array
+          items:
+            type: string
+            pattern: "^[a-z_]+\\.[a-z_]+$"
+        status:
+          type: string
+          enum: [active, revoked, expired]
+        rate_limit_per_minute:
+          type: integer
+          nullable: true
+          minimum: 1
+          maximum: 100000
+        ip_allowlist:
+          type: array
+          nullable: true
+          items:
+            type: string
+            description: CIDR block (e.g. 10.0.0.0/24).
+        created_by:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+        last_used_at:
+          type: string
+          format: date-time
+          nullable: true
+        revoked_at:
+          type: string
+          format: date-time
+          nullable: true
+        rotated_at:
+          type: string
+          format: date-time
+          nullable: true
+        predecessor_expires_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: When the previous secret stops authenticating during rotation grace.
+        etag:
+          type: string
+          description: 'Weak ETag, format W/"v<sequence>".'
+    APIKeyResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: "#/components/schemas/APIKey"
+    APIKeyListResponse:
+      type: object
+      required: [data, pagination]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/APIKey"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+    CreateAPIKeyRequest:
+      type: object
+      required: [name, scopes]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 64
+        scopes:
+          type: array
+          minItems: 1
+          items:
+            type: string
+            pattern: "^[a-z_]+\\.[a-z_]+$"
+        environment_id:
+          type: string
+        expires_at:
+          type: string
+          format: date-time
+        rate_limit_per_minute:
+          type: integer
+          minimum: 1
+          maximum: 100000
+        ip_allowlist:
+          type: array
+          items:
+            type: string
+    CreateAPIKeyResponse:
+      type: object
+      required: [data, secret]
+      properties:
+        data:
+          $ref: "#/components/schemas/APIKey"
+        secret:
+          type: string
+          description: 'Plaintext bearer; returned ONCE on create. Store immediately.'
+          x-oapi-codegen-extra-tags:
+            pii: "true"
+            sensitive: "true"
+    UpdateAPIKeyRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 64
+        scopes:
+          type: array
+          items:
+            type: string
+            pattern: "^[a-z_]+\\.[a-z_]+$"
+        rate_limit_per_minute:
+          type: integer
+          minimum: 1
+          maximum: 100000
+        ip_allowlist:
+          type: array
+          items:
+            type: string
+        expires_at:
+          type: string
+          format: date-time
+    RotateAPIKeyRequest:
+      type: object
+      properties:
+        grace_period_seconds:
+          type: integer
+          minimum: 0
+          maximum: 604800
+          default: 86400
+    RotateAPIKeyResponse:
+      type: object
+      required: [data, secret, predecessor_expires_at]
+      properties:
+        data:
+          $ref: "#/components/schemas/APIKey"
+        secret:
+          type: string
+          description: 'New plaintext bearer; returned ONCE on rotate.'
+          x-oapi-codegen-extra-tags:
+            pii: "true"
+            sensitive: "true"
+        predecessor_expires_at:
+          type: string
+          format: date-time
+          description: When the previous secret stops authenticating.
 
     Pagination:
       type: object

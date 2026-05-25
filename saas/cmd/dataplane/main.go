@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -18,6 +19,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 
+	"github.com/omarss/saas/internal/dataplane/apikeys"
 	"github.com/omarss/saas/internal/dataplane/authorization"
 	db "github.com/omarss/saas/internal/dataplane/db/sqlc"
 	httpapi "github.com/omarss/saas/internal/dataplane/httpapi" // package dataplaneapi
@@ -58,6 +60,7 @@ type strictServer struct {
 	notificationsHandler *notifications.Handler
 	organizationsHandler *organizations.Handler
 	authorizationHandler *authorization.Handler
+	apikeysHandler       *apikeys.Handler
 }
 
 // GetHealthz implements the Phase-1 liveness probe inline so the data plane
@@ -298,6 +301,36 @@ func (s *strictServer) BatchCheckAuthorization(ctx context.Context, r httpapi.Ba
 	return s.authorizationHandler.BatchCheckAuthorization(ctx, r)
 }
 
+// API keys delegation — Phase 9.
+
+func (s *strictServer) ListAPIKeys(ctx context.Context, r httpapi.ListAPIKeysRequestObject) (httpapi.ListAPIKeysResponseObject, error) {
+	return s.apikeysHandler.ListAPIKeys(ctx, r)
+}
+
+func (s *strictServer) CreateAPIKey(ctx context.Context, r httpapi.CreateAPIKeyRequestObject) (httpapi.CreateAPIKeyResponseObject, error) {
+	return s.apikeysHandler.CreateAPIKey(ctx, r)
+}
+
+func (s *strictServer) GetAPIKey(ctx context.Context, r httpapi.GetAPIKeyRequestObject) (httpapi.GetAPIKeyResponseObject, error) {
+	return s.apikeysHandler.GetAPIKey(ctx, r)
+}
+
+func (s *strictServer) UpdateAPIKey(ctx context.Context, r httpapi.UpdateAPIKeyRequestObject) (httpapi.UpdateAPIKeyResponseObject, error) {
+	return s.apikeysHandler.UpdateAPIKey(ctx, r)
+}
+
+func (s *strictServer) DeleteAPIKey(ctx context.Context, r httpapi.DeleteAPIKeyRequestObject) (httpapi.DeleteAPIKeyResponseObject, error) {
+	return s.apikeysHandler.DeleteAPIKey(ctx, r)
+}
+
+func (s *strictServer) RotateAPIKey(ctx context.Context, r httpapi.RotateAPIKeyRequestObject) (httpapi.RotateAPIKeyResponseObject, error) {
+	return s.apikeysHandler.RotateAPIKey(ctx, r)
+}
+
+func (s *strictServer) RevokeAPIKey(ctx context.Context, r httpapi.RevokeAPIKeyRequestObject) (httpapi.RevokeAPIKeyResponseObject, error) {
+	return s.apikeysHandler.RevokeAPIKey(ctx, r)
+}
+
 func run() error {
 	// platformlog.New installs the PII-redacting JSON slog handler from
 	// internal/platform/log. Every log record passing through slog.Default()
@@ -465,12 +498,45 @@ func run() error {
 		slog.Warn("authorization: destructive-op RBAC enforcement DISABLED (set SAAS_RBAC_ENFORCE_DESTRUCTIVE=true in production)")
 	}
 
+	// Phase 9 — API keys module. Envelope adapter is shared with
+	// identity / notifications. The HMAC key loader reads from the
+	// envelope client's KV API; local dev (SAAS_OPENBAO_DISABLED=1)
+	// falls back to a deterministic static loader so the verifier
+	// can still drive end-to-end tests without OpenBao up.
+	apikeysIndexer := apikeys.NewPrefixIndexer(
+		deploymentID,
+		envAdapter,
+		envAdapter,
+		newAPIKeysKeyLoader(encClient),
+	)
+	apikeysSvc := apikeys.NewService(apikeys.Config{
+		Repo:         apikeys.NewPgxRepository(pool),
+		Events:       outbox.NewPgxEventPublisher(queries, deploymentID),
+		Indexer:      apikeysIndexer,
+		DeploymentID: deploymentID,
+	})
+	apikeysHandler := apikeys.NewHandler(apikeysSvc, authzSvc)
+	apikeysUsage := apikeys.NewUsageBuffer(apikeysSvc.Repository(), apikeys.DefaultFlushInterval)
+	apikeysLimiter := apikeys.NewRateLimiter(envInt("SAAS_DEFAULT_API_KEY_RPM", apikeys.DefaultRPM))
+	apikeysVerifier := apikeys.NewVerifier(apikeysSvc, apikeysUsage, apikeysLimiter)
+
+	// Start the usage buffer flush goroutine + the predecessor
+	// sweeper. Both are best-effort: a flush / sweep failure logs but
+	// does not crash the process.
+	go func() {
+		if err := apikeysUsage.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
+			slog.Error("api-key usage flush exited", "err", err)
+		}
+	}()
+	go runAPIKeySweeper(ctx, apikeysSvc)
+
 	srv := &strictServer{
 		tenancyHandler:       tenancy.NewHandler(tenantSvc, authzSvc),
 		identityHandler:      identity.NewHandler(identitySvc, authzSvc),
 		notificationsHandler: notifications.NewHandler(notificationsSvc, authzSvc),
 		organizationsHandler: organizations.NewHandler(orgsService, authzSvc),
 		authorizationHandler: authorization.NewHandler(authzSvc),
+		apikeysHandler:       apikeysHandler,
 	}
 
 	// Outbox dispatcher: one goroutine per process. Phase 2 publisher is a
@@ -501,13 +567,15 @@ func run() error {
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.Timeout(60 * time.Second))
-	// Layer 1 (auth): JWT verifier first (Phase 5), then the dev-only mock
-	// middleware. In production the mock is a compile-time no-op (build tag
-	// `prod`), so only the JWT path executes. In dev the chain is:
-	//   1. JWT verifier — sets Principal from a Bearer token if present.
-	//   2. Mock middleware — sets Principal from X-Mock-Tenant-Id otherwise.
-	// The JWT verifier is wired only when OIDC_JWKS_URL is set; without it
-	// dev boots with mock-only auth (Phase 5 plan §5.7).
+	// Layer 1 (auth) chain — order matters:
+	//   1. API-key verifier (Phase 9). Inspects Authorization for a
+	//      "Bearer live_*" / "Bearer test_*" shape; verifies + sets
+	//      principal. Pass-through for non-API-key bearers.
+	//   2. JWT verifier (Phase 5). When OIDC_JWKS_URL is set, sets
+	//      principal from a JWT bearer.
+	//   3. Mock middleware (dev only). X-Mock-Tenant-Id path that the
+	//      prod build tag turns into a no-op (CONVENTIONS.md §5).
+	r.Use(apikeys.Middleware(apikeysVerifier))
 	if verifier, vErr := newJWTVerifier(ctx); vErr != nil {
 		return fmt.Errorf("jwt verifier: %w", vErr)
 	} else if verifier != nil {
@@ -737,6 +805,61 @@ func (f *tenantEventFanout) Publish(ctx context.Context, eventType, tenantID str
 		}
 	}
 	return nil
+}
+
+// envInt reads an env var as an int. Returns the default on parse
+// failure or absence.
+func envInt(k string, def int) int {
+	v := os.Getenv(k)
+	if v == "" {
+		return def
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil {
+		slog.Warn("invalid int env var; using default", "key", k, "value", v, "default", def)
+		return def
+	}
+	return n
+}
+
+// newAPIKeysKeyLoader picks the right KeyLoader implementation: the
+// BaoKVKeyLoader when the envelope client is wired, the
+// StaticKeyLoader otherwise (local dev). The static fallback uses a
+// deterministic per-deployment key so the verifier can still
+// authenticate freshly-minted bearers in a !OpenBao build.
+func newAPIKeysKeyLoader(encClient *envelope.Client) apikeys.KeyLoader {
+	if encClient == nil {
+		// Dev mode — deterministic, never used in prod.
+		return &apikeys.StaticKeyLoader{
+			Key: []byte("saas-dev-apikey-hmac-do-not-use-in-prod-XX"),
+		}
+	}
+	return &apikeys.BaoKVKeyLoader{KV: encClient}
+}
+
+// runAPIKeySweeper invokes Service.SweepPredecessors on a 1h interval.
+// The sweeper clears expired predecessor PHCs so the auth path stops
+// honouring rotated-grace bearers past their window. A failure logs;
+// the next tick retries.
+func runAPIKeySweeper(ctx context.Context, svc *apikeys.Service) {
+	const sweepInterval = time.Hour
+	t := time.NewTicker(sweepInterval)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+			n, err := svc.SweepPredecessors(ctx)
+			if err != nil {
+				slog.Warn("api-key sweep failed", "err", err)
+				continue
+			}
+			if n > 0 {
+				slog.Info("api-key predecessors swept", "count", n)
+			}
+		}
+	}
 }
 
 // envDuration reads an env var as a duration ("250ms", "5s", "15m"). On parse
