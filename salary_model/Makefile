@@ -124,9 +124,11 @@ train: data  ## Train production model bundle (v2 = full ladder)
 evaluate:  ## Evaluate latest trained model and write reports/
 	$(PY) salary-model evaluate --run-id $(RUN_ID)
 
+OPTUNA_TRIALS ?= 4
+
 .PHONY: iterate
 iterate:  ## Run full iteration ladder (baseline -> v2) with a report per step
-	$(PY) salary-model iterate --run-id $(RUN_ID) --seed $(SEED)
+	$(PY) salary-model iterate --run-id $(RUN_ID) --seed $(SEED) --optuna-trials $(OPTUNA_TRIALS)
 
 .PHONY: fairness-audit
 fairness-audit:  ## Run counterfactual fairness audit on the current model bundle
