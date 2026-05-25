@@ -18,7 +18,7 @@ from job_crawler_db import JobCrawlerDB
 from ..alerts.email import send_alert
 from ..core.health import record_canary
 from ..core.http import HttpClient
-from ..registry import NotImplementedCrawler, get, resolve_slugs
+from ..registry import get, resolve_slugs
 
 _LOG: Final = logging.getLogger("job_crawler.cli.canary")
 
@@ -26,8 +26,6 @@ _LOG: Final = logging.getLogger("job_crawler.cli.canary")
 async def _check(db: JobCrawlerDB, slug: str) -> bool:
     """Run the canary for one source. Returns True on success."""
     cls = get(slug)
-    if issubclass(cls, NotImplementedCrawler):
-        return True
     if not cls.canary_urls:
         _LOG.info("[%s] no canary URLs configured — skipping", slug)
         return True

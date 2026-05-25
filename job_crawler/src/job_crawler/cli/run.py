@@ -25,7 +25,7 @@ from ..core.http import HttpClient
 from ..core.proxy import ProxyPool, build_default_pool
 from ..core.runner import CrawlerRunner
 from ..intelligence import pipeline as intelligence
-from ..registry import REGISTRY, NotImplementedCrawler, get, resolve_slugs
+from ..registry import REGISTRY, get, resolve_slugs
 
 # Shared proxy state lives under .cache/ so survives runs but stays local.
 _PROXY_STATE_FILE = Path(__file__).resolve().parents[3] / ".cache" / "proxy_pool.json"
@@ -46,9 +46,6 @@ _LOG: Final = logging.getLogger("job_crawler.cli.run")
 async def _run_one(db: JobCrawlerDB, slug: str) -> int:
     """Run a single crawler. Returns the process-exit code for it."""
     cls = get(slug)
-    if issubclass(cls, NotImplementedCrawler):
-        print(f"[{slug}] not implemented yet — skipping", file=sys.stderr)
-        return 0
     proxy_pool = await _get_proxy_pool() if cls.use_proxy_pool else None
     http = HttpClient(
         cls.rate,
@@ -149,8 +146,7 @@ def main() -> None:
 
     if args.list or not args.selector:
         for slug, cls in REGISTRY.items():
-            mark = "✓" if not issubclass(cls, NotImplementedCrawler) else "·"
-            print(f"  {mark} {slug:<18s} {cls.source_display_name}")
+            print(f"  {slug:<18s} {cls.source_display_name}")
         return
 
     slugs = tuple(resolve_slugs(args.selector))
