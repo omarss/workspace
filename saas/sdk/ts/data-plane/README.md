@@ -51,6 +51,13 @@ All URIs are relative to *https://dev.example.saas.omarss.net*
 
 Class | Method | HTTP request | Description
 ------------ | ------------- | ------------- | -------------
+*ApiKeysApi* | [**createAPIKey**](docs/ApiKeysApi.md#createapikey) | **POST** /v1/tenants/{tenant_id}/api-keys | Mint a new API key. Plaintext returned ONCE.
+*ApiKeysApi* | [**deleteAPIKey**](docs/ApiKeysApi.md#deleteapikey) | **DELETE** /v1/api-keys/{api_key_id} | Soft-revoke an API key (alias of revoke).
+*ApiKeysApi* | [**getAPIKey**](docs/ApiKeysApi.md#getapikey) | **GET** /v1/api-keys/{api_key_id} | Fetch an API key by id (no plaintext).
+*ApiKeysApi* | [**listAPIKeys**](docs/ApiKeysApi.md#listapikeys) | **GET** /v1/tenants/{tenant_id}/api-keys | List API keys for a tenant.
+*ApiKeysApi* | [**revokeAPIKey**](docs/ApiKeysApi.md#revokeapikey) | **POST** /v1/api-keys/{api_key_id}/revoke | Immediately revoke an API key (no grace).
+*ApiKeysApi* | [**rotateAPIKey**](docs/ApiKeysApi.md#rotateapikey) | **POST** /v1/api-keys/{api_key_id}/rotate | Rotate an API key with optional grace period.
+*ApiKeysApi* | [**updateAPIKey**](docs/ApiKeysApi.md#updateapikey) | **PATCH** /v1/api-keys/{api_key_id} | Update name, scopes, ip_allowlist, rate_limit.
 *AuthorizationApi* | [**assignMemberRole**](docs/AuthorizationApi.md#assignmemberrole) | **POST** /v1/members/{member_id}/roles | Assign a role to a member.
 *AuthorizationApi* | [**batchCheckAuthorization**](docs/AuthorizationApi.md#batchcheckauthorization) | **POST** /v1/authorization/batch-check | Evaluate many checks in one call (max 100).
 *AuthorizationApi* | [**checkAuthorization**](docs/AuthorizationApi.md#checkauthorization) | **POST** /v1/authorization/check | Evaluate a single (member, permission, tenant) check.
@@ -110,6 +117,9 @@ Class | Method | HTTP request | Description
 
 ### Documentation For Models
 
+ - [APIKey](docs/APIKey.md)
+ - [APIKeyListResponse](docs/APIKeyListResponse.md)
+ - [APIKeyResponse](docs/APIKeyResponse.md)
  - [AcceptInvitationRequest](docs/AcceptInvitationRequest.md)
  - [AssignMemberRoleRequest](docs/AssignMemberRoleRequest.md)
  - [BatchCheckAuthorizationRequest](docs/BatchCheckAuthorizationRequest.md)
@@ -117,6 +127,8 @@ Class | Method | HTTP request | Description
  - [CheckAuthorizationRequest](docs/CheckAuthorizationRequest.md)
  - [CheckAuthorizationResponse](docs/CheckAuthorizationResponse.md)
  - [CheckAuthorizationResponseData](docs/CheckAuthorizationResponseData.md)
+ - [CreateAPIKeyRequest](docs/CreateAPIKeyRequest.md)
+ - [CreateAPIKeyResponse](docs/CreateAPIKeyResponse.md)
  - [CreateInvitationRequest](docs/CreateInvitationRequest.md)
  - [CreateInvitationResponse](docs/CreateInvitationResponse.md)
  - [CreateNotificationChannelRequest](docs/CreateNotificationChannelRequest.md)
@@ -158,6 +170,8 @@ Class | Method | HTTP request | Description
  - [Role](docs/Role.md)
  - [RoleListResponse](docs/RoleListResponse.md)
  - [RoleResponse](docs/RoleResponse.md)
+ - [RotateAPIKeyRequest](docs/RotateAPIKeyRequest.md)
+ - [RotateAPIKeyResponse](docs/RotateAPIKeyResponse.md)
  - [RotateChannelCredentialsRequest](docs/RotateChannelCredentialsRequest.md)
  - [SESCredentials](docs/SESCredentials.md)
  - [SMTPCredentials](docs/SMTPCredentials.md)
@@ -169,6 +183,7 @@ Class | Method | HTTP request | Description
  - [Tenant](docs/Tenant.md)
  - [TenantListResponse](docs/TenantListResponse.md)
  - [TenantResponse](docs/TenantResponse.md)
+ - [UpdateAPIKeyRequest](docs/UpdateAPIKeyRequest.md)
  - [UpdateMemberRequest](docs/UpdateMemberRequest.md)
  - [UpdateNotificationChannelRequest](docs/UpdateNotificationChannelRequest.md)
  - [UpdateNotificationWorkflowRequest](docs/UpdateNotificationWorkflowRequest.md)

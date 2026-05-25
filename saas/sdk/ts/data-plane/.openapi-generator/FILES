@@ -2,6 +2,7 @@
 .npmignore
 README.md
 api.ts
+api/api-keys-api.ts
 api/authorization-api.ts
 api/invitations-api.ts
 api/members-api.ts
@@ -16,7 +17,11 @@ api/users-api.ts
 base.ts
 common.ts
 configuration.ts
+docs/APIKey.md
+docs/APIKeyListResponse.md
+docs/APIKeyResponse.md
 docs/AcceptInvitationRequest.md
+docs/ApiKeysApi.md
 docs/AssignMemberRoleRequest.md
 docs/AuthorizationApi.md
 docs/BatchCheckAuthorizationRequest.md
@@ -24,6 +29,8 @@ docs/BatchCheckAuthorizationResponse.md
 docs/CheckAuthorizationRequest.md
 docs/CheckAuthorizationResponse.md
 docs/CheckAuthorizationResponseData.md
+docs/CreateAPIKeyRequest.md
+docs/CreateAPIKeyResponse.md
 docs/CreateInvitationRequest.md
 docs/CreateInvitationResponse.md
 docs/CreateNotificationChannelRequest.md
@@ -72,6 +79,8 @@ docs/RegisterNotificationWorkflowRequest.md
 docs/Role.md
 docs/RoleListResponse.md
 docs/RoleResponse.md
+docs/RotateAPIKeyRequest.md
+docs/RotateAPIKeyResponse.md
 docs/RotateChannelCredentialsRequest.md
 docs/SESCredentials.md
 docs/SMTPCredentials.md
@@ -85,6 +94,7 @@ docs/Tenant.md
 docs/TenantListResponse.md
 docs/TenantResponse.md
 docs/TenantsApi.md
+docs/UpdateAPIKeyRequest.md
 docs/UpdateMemberRequest.md
 docs/UpdateNotificationChannelRequest.md
 docs/UpdateNotificationWorkflowRequest.md
@@ -99,12 +109,17 @@ docs/UsersApi.md
 git_push.sh
 index.ts
 models/accept-invitation-request.ts
+models/apikey-list-response.ts
+models/apikey-response.ts
+models/apikey.ts
 models/assign-member-role-request.ts
 models/batch-check-authorization-request.ts
 models/batch-check-authorization-response.ts
 models/check-authorization-request.ts
 models/check-authorization-response-data.ts
 models/check-authorization-response.ts
+models/create-apikey-request.ts
+models/create-apikey-response.ts
 models/create-invitation-request.ts
 models/create-invitation-response.ts
 models/create-notification-channel-request.ts
@@ -147,6 +162,8 @@ models/register-notification-workflow-request.ts
 models/role-list-response.ts
 models/role-response.ts
 models/role.ts
+models/rotate-apikey-request.ts
+models/rotate-apikey-response.ts
 models/rotate-channel-credentials-request.ts
 models/send-grid-credentials.ts
 models/send-notification-request-to.ts
@@ -158,6 +175,7 @@ models/social-provider.ts
 models/tenant-list-response.ts
 models/tenant-response.ts
 models/tenant.ts
+models/update-apikey-request.ts
 models/update-member-request.ts
 models/update-notification-channel-request.ts
 models/update-notification-workflow-request.ts
