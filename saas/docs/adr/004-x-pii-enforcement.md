@@ -87,3 +87,20 @@ etc.) that never flow through a tagged struct.
 When a new sensitive field type lands that doesn't fit the string-only
 walker (binary blobs, deeply nested PII), extend the walker rather than
 adding a parallel mechanism.
+
+## Reference implementation
+
+The persistence walker lives in
+`internal/platform/crypto/encrypt_persist.go`. Two entry points:
+
+- `EncryptPIIFields(ctx, enc, deploymentID, resourceType, resourceID, v)`
+- `EncryptPIIFieldsStrict(ctx, enc, deploymentID, resourceType, resourceID, v)`
+
+Both bind AAD to the quad
+`deployment_id || "|" || resource_type || "|" || resource_id || "|" ||
+field_name`. Read-path repositories MUST call `crypto.FieldAAD(...)` with
+the SAME triple when invoking `Decryptor.DecryptField` — a mismatched AAD
+fails the AEAD verify and the row fails closed. This is the regression
+guard against cross-resource ciphertext swap inside a single deployment
+(Phase 6 audit finding; test:
+`TestEncryptPIIFieldsStrict_AADRejectsCrossResourceSwap`).

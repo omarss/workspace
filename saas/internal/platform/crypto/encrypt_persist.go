@@ -68,9 +68,18 @@ const (
 // Phase 4+ migrations declare the sibling field; the walker populates it
 // when present.
 //
+// AAD binding (ADR 004 / 017 / CONVENTIONS.md §10.1):
+//
+//	deployment_id || "|" || resource_type || "|" || resource_id || "|" || field_name
+//
+// The pipe delimiter is non-collidable because deployment_id and
+// resource_id are ULID-derived strings (no pipes) and resource_type is a
+// closed enum ("user", "channel", "notification", …). Binding the full
+// quad blocks a cross-resource ciphertext swap inside a single deployment.
+//
 // ADR 004 documents the codegen → struct-tag → walker pipeline.
-func EncryptPIIFields(ctx context.Context, enc Encryptor, kid string, v any) error {
-	return encryptPIIFields(ctx, enc, kid, v, PermissiveMode)
+func EncryptPIIFields(ctx context.Context, enc Encryptor, deploymentID, resourceType, resourceID string, v any) error {
+	return encryptPIIFields(ctx, enc, deploymentID, resourceType, resourceID, v, PermissiveMode)
 }
 
 // EncryptPIIFieldsStrict is the Phase 5 PII persistence helper. It walks v
@@ -83,11 +92,28 @@ func EncryptPIIFields(ctx context.Context, enc Encryptor, kid string, v any) err
 // walker remains for Phase 3 callers that have not yet declared sibling
 // fields. See Phase 5 docs/plans/mvp/06-identity-keycloak.md for the
 // rationale (silent drop on Identity would leak PII through the read path).
-func EncryptPIIFieldsStrict(ctx context.Context, enc Encryptor, kid string, v any) error {
-	return encryptPIIFields(ctx, enc, kid, v, StrictMode)
+//
+// AAD binding is the same as EncryptPIIFields — see its doc comment. The
+// matching read-path AAD MUST be built with FieldAAD using the SAME
+// (deploymentID, resourceType, resourceID) triple or the AEAD verify will
+// fail and the row will fail closed.
+func EncryptPIIFieldsStrict(ctx context.Context, enc Encryptor, deploymentID, resourceType, resourceID string, v any) error {
+	return encryptPIIFields(ctx, enc, deploymentID, resourceType, resourceID, v, StrictMode)
 }
 
-func encryptPIIFields(ctx context.Context, enc Encryptor, kid string, v any, mode WalkMode) error {
+// FieldAAD computes the AAD bound to a single ciphertext column. Read-path
+// repository code MUST call this when invoking Decryptor.DecryptField so the
+// AEAD authentication tag matches the value emitted by the walker.
+//
+// Format: deploymentID|resourceType|resourceID|fieldName.
+//
+// Centralising the format here means a future change to the binding (e.g.
+// adding a key version) only needs one site to update, not every repo.
+func FieldAAD(deploymentID, resourceType, resourceID, fieldName string) []byte {
+	return []byte(deploymentID + "|" + resourceType + "|" + resourceID + "|" + fieldName)
+}
+
+func encryptPIIFields(ctx context.Context, enc Encryptor, deploymentID, resourceType, resourceID string, v any, mode WalkMode) error {
 	if enc == nil {
 		return ErrNoEncryptor
 	}
@@ -99,12 +125,12 @@ func encryptPIIFields(ctx context.Context, enc Encryptor, kid string, v any, mod
 	if rv.Kind() != reflect.Struct {
 		return ErrNotPointer
 	}
-	return walkEncrypt(ctx, enc, kid, rv, mode)
+	return walkEncrypt(ctx, enc, deploymentID, resourceType, resourceID, rv, mode)
 }
 
 // walkEncrypt is split out so future callers (e.g. nested struct support)
 // can recurse without duplicating the pointer-unwrap dance.
-func walkEncrypt(ctx context.Context, enc Encryptor, kid string, rv reflect.Value, mode WalkMode) error {
+func walkEncrypt(ctx context.Context, enc Encryptor, deploymentID, resourceType, resourceID string, rv reflect.Value, mode WalkMode) error {
 	t := rv.Type()
 	envelopeType := reflect.TypeOf(Envelope{})
 	for i := 0; i < t.NumField(); i++ {
@@ -150,7 +176,8 @@ func walkEncrypt(ctx context.Context, enc Encryptor, kid string, rv reflect.Valu
 		if plaintext == "" {
 			continue
 		}
-		env, err := enc.EncryptField(ctx, kid, []byte(plaintext), []byte(f.Name))
+		aad := FieldAAD(deploymentID, resourceType, resourceID, f.Name)
+		env, err := enc.EncryptField(ctx, deploymentID, []byte(plaintext), aad)
 		if err != nil {
 			return err
 		}
