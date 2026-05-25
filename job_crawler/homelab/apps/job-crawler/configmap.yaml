@@ -20,3 +20,8 @@ data:
   # sets `readOnlyRootFilesystem: true`. Switch to a PVC if cross-job
   # blacklist persistence ever matters.
   JC_PROXY_STATE_FILE: "/tmp/job_crawler/proxy_pool.json"
+  # Uvicorn proxy-headers trust list. Only the in-cluster nginx + the
+  # pod loopback should be trusted with X-Forwarded-* — anything else
+  # leaks attacker-supplied client metadata into the API. k3s pod CIDR
+  # is 10.42.0.0/16 (see workspace_personal/CLAUDE.md).
+  UVICORN_FORWARDED_ALLOW_IPS: "127.0.0.1,10.42.0.0/16"
