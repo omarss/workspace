@@ -267,12 +267,16 @@ async def load(db: JobCrawlerDB) -> SeedResult:
                 already = await db.companies.get_by_linkedin_url(linkedin_url)
             if already:
                 matched += 1
-                continue
-
-            company = await db.companies.resolve(
-                raw_name=name_en or name_ar,
-                linkedin_url=linkedin_url,
-            )
+                # Backfill missing fields from the CSV even on subsequent
+                # re-runs. Without this, websites added to the CSV after a
+                # company row was first seeded never reach the DB.
+                company = already
+            else:
+                company = await db.companies.resolve(
+                    raw_name=name_en or name_ar,
+                    linkedin_url=linkedin_url,
+                )
+                created += 1
             # Best-effort: fill in name_ar, website, industry if the resolved
             # row is missing them. resolve() returns the row pre-update so
             # we patch via update() when needed.
@@ -288,8 +292,6 @@ async def load(db: JobCrawlerDB) -> SeedResult:
                     await db.companies.update(company.id, **patch)
                 except Exception:
                     _LOG.exception("could not patch company %s", company.id)
-
-            created += 1
     _LOG.info(
         "seed loaded: total=%d created=%d matched_existing=%d",
         total,

@@ -21,6 +21,7 @@ from __future__ import annotations
 import contextlib
 import json
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
@@ -56,9 +57,26 @@ class JobPostingLD:
 
 
 def extract_job_posting(html: str | None) -> JobPostingLD | None:
-    """Find the first JSON-LD JobPosting block in `html` and parse it."""
+    """Find the first JSON-LD JobPosting block in `html` and parse it.
+
+    Convenience wrapper around `extract_job_postings` for detail-page
+    callers that only ever expect one posting per document.
+    """
+    postings = extract_job_postings(html)
+    return postings[0] if postings else None
+
+
+def extract_job_postings(html: str | None) -> list[JobPostingLD]:
+    """Find every JSON-LD JobPosting block in `html`.
+
+    A single page can declare many: company careers pages typically embed
+    an `ItemList` whose `itemListElement` array lists every open role with
+    a full JobPosting `@type` each. We walk @graph / ItemList / arrays so
+    nothing slips through.
+    """
     if not html:
-        return None
+        return []
+    out: list[JobPostingLD] = []
     for match in _JSONLD_BLOCK_RE.finditer(html):
         block = match.group(1).strip()
         try:
@@ -66,7 +84,6 @@ def extract_job_posting(html: str | None) -> JobPostingLD | None:
         except json.JSONDecodeError:
             continue
         nodes = data if isinstance(data, list) else [data]
-        # Some sites wrap nodes in an @graph array.
         flattened: list[dict[str, Any]] = []
         for node in nodes:
             if isinstance(node, dict):
@@ -75,17 +92,49 @@ def extract_job_posting(html: str | None) -> JobPostingLD | None:
                 else:
                     flattened.append(node)
         for node in flattened:
-            types = node.get("@type")
-            if isinstance(types, str):
-                types_set = {types}
-            elif isinstance(types, list):
-                types_set = {str(t) for t in types}
-            else:
+            for posting_node in _yield_job_postings(node):
+                out.append(_parse(posting_node))
+    return out
+
+
+def _yield_job_postings(node: dict[str, Any]) -> Iterable[dict[str, Any]]:
+    """Recurse a JSON-LD node yielding every JobPosting found.
+
+    Handles three shapes seen in the wild:
+      1. JobPosting directly.
+      2. ItemList whose itemListElement entries each *are* JobPosting
+         (or wrap one as `.item`).
+      3. CollectionPage / WebPage whose hasPart / mainEntity is one of
+         the above.
+    """
+    types = node.get("@type")
+    if isinstance(types, str):
+        types_set = {types}
+    elif isinstance(types, list):
+        types_set = {str(t) for t in types}
+    else:
+        types_set = set()
+    if "JobPosting" in types_set:
+        yield node
+        return
+    # ItemList of postings
+    if "ItemList" in types_set or "itemListElement" in node:
+        for entry in node.get("itemListElement", []) or []:
+            if not isinstance(entry, dict):
                 continue
-            if "JobPosting" not in types_set:
-                continue
-            return _parse(node)
-    return None
+            # entry may be a JobPosting itself or wrap one in `item`
+            item = entry.get("item") if isinstance(entry.get("item"), dict) else entry
+            if isinstance(item, dict):
+                yield from _yield_job_postings(item)
+    # CollectionPage / WebPage wrappers
+    for key in ("hasPart", "mainEntity"):
+        child = node.get(key)
+        if isinstance(child, dict):
+            yield from _yield_job_postings(child)
+        elif isinstance(child, list):
+            for sub in child:
+                if isinstance(sub, dict):
+                    yield from _yield_job_postings(sub)
 
 
 # ---------------------------------------------------------------------------

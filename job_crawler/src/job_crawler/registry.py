@@ -19,6 +19,7 @@ from .ats.successfactors import SuccessFactorsCrawler
 from .ats.workable import WorkableCrawler
 from .ats.workday import WorkdayCrawler
 from .boards.bayt import BaytCrawler
+from .boards.company_careers import CompanyCareersCrawler
 from .boards.glassdoor import GlassdoorCrawler
 from .boards.indeed import IndeedCrawler
 from .boards.jadarat import JadaratCrawler
@@ -47,6 +48,9 @@ REGISTRY: dict[str, type[BaseCrawler]] = {
     "tanqeeb": TanqeebCrawler,
     "mihnati": MihnatiCrawler,
     "jadarat": JadaratCrawler,
+    # Company-owned careers pages — the long-tail SA employers that
+    # don't show up in Bayt or any standard ATS. Playwright-driven.
+    "company_careers": CompanyCareersCrawler,
     # Aggregators — implemented; expect ~0 yield without residential proxies
     # or a captured session cookie (see each crawler's docstring).
     "linkedin": LinkedInCrawler,
