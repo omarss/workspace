@@ -1,16 +1,22 @@
 """BaseCrawler — the contract every per-site crawler implements.
 
-A crawler's job is to translate a remote source into a stream of
-JobPostingUpsert payloads. The runner (core.runner) handles the rest:
-HTTP, retries, snapshots, dedupe edges, cluster attach, fake-signal
+A crawler's job is to translate a remote source into structured
+`ParsedPosting`s. The runner (core.runner) handles the rest: HTTP,
+retries, normalisation into `JobPostingUpsert` via `core.normalise.
+to_upsert`, snapshots, dedupe edges, cluster attach, fake-signal
 scoring, health bookkeeping, alerting.
 
-Subclasses fill in four methods. Each one is small (~30-80 lines):
+Subclasses fill in three methods. Each one is small (~30-80 lines):
 
     discover_listings(since)      -> AsyncIterator[Listing]
     fetch_detail(listing)         -> RawPosting | None  (default: HttpClient.fetch)
     parse(raw)                    -> ParsedPosting | None
-    normalize(parsed)             -> JobPostingUpsert + side data
+
+(`normalize` was a fourth abstract method until Finding 16; the runner
+always bypassed it and called `to_upsert` directly, while every
+subclass shipped a placeholder body with `source_id=UUID(int=0)`. The
+abstract method + its placeholders were deleted; normalisation lives
+in `core.normalise` exclusively.)
 """
 
 from __future__ import annotations
@@ -20,7 +26,7 @@ from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 from typing import ClassVar
 
-from job_crawler_db import JobCrawlerDB, JobPostingUpsert, SourceKind
+from job_crawler_db import JobCrawlerDB, SourceKind
 
 from .config import RateConfig
 from .http import HttpClient
@@ -122,11 +128,3 @@ class BaseCrawler(ABC):
     def parse(self, raw: RawPosting) -> ParsedPosting | None:
         """Turn raw bytes into structured fields. Return None on parse failure
         — the runner counts this for the breakage detector."""
-
-    @abstractmethod
-    def normalize(self, parsed: ParsedPosting) -> JobPostingUpsert:
-        """Turn the parsed fields into the DB upsert struct.
-
-        Typically thin glue: copy fields, set source_id (the runner injects
-        it just before calling), default missing enums.
-        """

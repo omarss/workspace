@@ -213,17 +213,6 @@ class SuccessFactorsCrawler(ATSBoardCrawler):
             missing_fields=missing_fields,
             raw_payload={"source": "successfactors", "html_bytes": len(html)},
         )
-
-    def normalize(self, parsed: ParsedPosting):  # type: ignore[override]
-        from ..core.normalise import to_upsert
-
-        return to_upsert(
-            parsed,
-            source_id=__import__("uuid").UUID(int=0),
-            company_id=None, recruiter_id=None, location=None,
-        )
-
-
 # ---- helpers --------------------------------------------------------------
 def _parse_tenants(raw: str) -> tuple[_Tenant, ...]:
     """Parse 'aramco:career5,sabic:performancemanager4' into tenants."""

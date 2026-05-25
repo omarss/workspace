@@ -201,17 +201,6 @@ class PersonioCrawler(ATSBoardCrawler):
             missing_fields=missing_fields,
             raw_payload={"source": "personio", "position": pos},
         )
-
-    def normalize(self, parsed: ParsedPosting):  # type: ignore[override]
-        from ..core.normalise import to_upsert
-
-        return to_upsert(
-            parsed,
-            source_id=__import__("uuid").UUID(int=0),
-            company_id=None, recruiter_id=None, location=None,
-        )
-
-
 # ---- helpers --------------------------------------------------------------
 def _txt(element: ET.Element, tag: str) -> str:
     """Return the text of `element/tag` or empty string."""

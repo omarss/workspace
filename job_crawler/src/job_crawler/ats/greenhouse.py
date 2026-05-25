@@ -185,21 +185,6 @@ class GreenhouseCrawler(ATSBoardCrawler):
             missing_fields=missing_fields,
             raw_payload={"source": "greenhouse", "job": job},
         )
-
-    # ------------------------------------------------------------------
-    def normalize(self, parsed: ParsedPosting):  # type: ignore[override]
-        # Nothing source-specific to do — to_upsert handles the conversion.
-        from ..core.normalise import to_upsert
-
-        return to_upsert(
-            parsed,
-            source_id=__import__("uuid").UUID(int=0),  # placeholder; runner overrides
-            company_id=None,
-            recruiter_id=None,
-            location=None,
-        )
-
-
 # ---------------------------------------------------------------------------
 # helpers
 # ---------------------------------------------------------------------------

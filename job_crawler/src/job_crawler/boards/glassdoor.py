@@ -193,16 +193,6 @@ class GlassdoorCrawler(BoardCrawler):
             missing_fields=missing_fields,
             raw_payload={"source": "glassdoor"},
         )
-
-    def normalize(self, parsed: ParsedPosting):  # type: ignore[override]
-        from ..core.normalise import to_upsert
-
-        return to_upsert(
-            parsed,
-            source_id=__import__("uuid").UUID(int=0),
-            company_id=None, recruiter_id=None, location=None,
-        )
-
     # ------------------------------------------------------------------
     def _search_url(self, *, location_id: str, page: int) -> str:
         # Glassdoor's "SRCH_IL.0,12_IN{id}.htm" pattern is the SA listing.
