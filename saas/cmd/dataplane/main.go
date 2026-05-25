@@ -20,6 +20,7 @@ import (
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 
 	"github.com/omarss/saas/internal/dataplane/apikeys"
+	"github.com/omarss/saas/internal/dataplane/audit"
 	"github.com/omarss/saas/internal/dataplane/authorization"
 	db "github.com/omarss/saas/internal/dataplane/db/sqlc"
 	httpapi "github.com/omarss/saas/internal/dataplane/httpapi" // package dataplaneapi
@@ -61,6 +62,7 @@ type strictServer struct {
 	organizationsHandler *organizations.Handler
 	authorizationHandler *authorization.Handler
 	apikeysHandler       *apikeys.Handler
+	auditHandler         *audit.Handler
 }
 
 // GetHealthz implements the Phase-1 liveness probe inline so the data plane
@@ -331,6 +333,20 @@ func (s *strictServer) RevokeAPIKey(ctx context.Context, r httpapi.RevokeAPIKeyR
 	return s.apikeysHandler.RevokeAPIKey(ctx, r)
 }
 
+// Audit delegation — Phase 10.
+
+func (s *strictServer) ListAuditEvents(ctx context.Context, r httpapi.ListAuditEventsRequestObject) (httpapi.ListAuditEventsResponseObject, error) {
+	return s.auditHandler.ListAuditEvents(ctx, r)
+}
+
+func (s *strictServer) GetAuditEvent(ctx context.Context, r httpapi.GetAuditEventRequestObject) (httpapi.GetAuditEventResponseObject, error) {
+	return s.auditHandler.GetAuditEvent(ctx, r)
+}
+
+func (s *strictServer) ExportAuditEvents(ctx context.Context, r httpapi.ExportAuditEventsRequestObject) (httpapi.ExportAuditEventsResponseObject, error) {
+	return s.auditHandler.ExportAuditEvents(ctx, r)
+}
+
 func run() error {
 	// platformlog.New installs the PII-redacting JSON slog handler from
 	// internal/platform/log. Every log record passing through slog.Default()
@@ -530,6 +546,16 @@ func run() error {
 	}()
 	go runAPIKeySweeper(ctx, apikeysSvc)
 
+	// Phase 10 — Audit module. Wires the read-only HTTP surface against
+	// the pgx repository and exposes the subscriber as an outbox
+	// Publisher composed alongside the logger publisher. The subscriber
+	// is the SINGLE writer of audit_event rows; ad-hoc Append calls
+	// would bypass the §18.3 invariant.
+	auditRepo := audit.NewPgxRepository(pool)
+	auditSvc := audit.NewService(auditRepo)
+	auditHandler := audit.NewHandler(auditSvc)
+	auditSubscriber := audit.NewSubscriber(auditRepo, slog.Default())
+
 	srv := &strictServer{
 		tenancyHandler:       tenancy.NewHandler(tenantSvc, authzSvc),
 		identityHandler:      identity.NewHandler(identitySvc, authzSvc),
@@ -537,11 +563,17 @@ func run() error {
 		organizationsHandler: organizations.NewHandler(orgsService, authzSvc),
 		authorizationHandler: authorization.NewHandler(authzSvc),
 		apikeysHandler:       apikeysHandler,
+		auditHandler:         auditHandler,
 	}
 
-	// Outbox dispatcher: one goroutine per process. Phase 2 publisher is a
-	// stdout logger; real delivery (HTTP/NATS) is post-MVP.
-	dispatcher := outbox.New(queries, outbox.NewLoggerPublisher(slog.Default()))
+	// Outbox dispatcher: one goroutine per process. The publisher is a
+	// composed chain: log every event AND feed the audit subscriber. A
+	// failure from either branch is logged but does NOT stop the loop —
+	// the dispatcher's MarkOutboxFailed bookkeeping handles retries.
+	dispatcher := outbox.New(queries, &auditingPublisher{
+		log:        outbox.NewLoggerPublisher(slog.Default()),
+		subscriber: auditSubscriber,
+	})
 	go func() {
 		if err := dispatcher.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
 			slog.Error("outbox dispatcher exited", "err", err)
@@ -587,6 +619,11 @@ func run() error {
 	r.Use(auth.MockMiddleware)
 	// Idempotency-Key handling for POST + state-transition PATCH.
 	r.Use(idempotency.Middleware(idempotency.NewPgxStore(queries)))
+
+	// Phase 10 — Audit endpoints are wired through the StrictServer
+	// surface via the auditHandler delegation methods on strictServer
+	// below. The standalone Mount() in audit/handler.go remains in
+	// place for use by the package's own HTTP tests.
 
 	httpapi.HandlerFromMux(httpapi.NewStrictHandler(srv, nil), r)
 
@@ -875,4 +912,27 @@ func envDuration(k string, def time.Duration) time.Duration {
 		return def
 	}
 	return d
+}
+
+// auditingPublisher composes the outbox Publisher and the audit
+// subscriber. Phase 10 runs them inline so an outbox event is logged AND
+// translated into an audit_event row (where applicable) before the
+// dispatcher acks the outbox row. A subscriber failure surfaces as a
+// publisher error — the dispatcher records it via MarkOutboxFailed and
+// retries on the next tick. A logger failure (rare; slog never returns
+// an error) is also fatal to the publish.
+type auditingPublisher struct {
+	log        outbox.Publisher
+	subscriber *audit.Subscriber
+}
+
+// Publish runs the log publisher first (best-effort observability) then
+// the audit subscriber. The audit-subscriber error wins because audit
+// integrity is the more important invariant: a failed audit insert MUST
+// keep the outbox row retriable.
+func (p *auditingPublisher) Publish(ctx context.Context, e db.OutboxEvent) error {
+	if err := p.log.Publish(ctx, e); err != nil {
+		slog.Warn("outbox log publisher failed; continuing to audit subscriber", "event_id", e.EventID, "err", err)
+	}
+	return p.subscriber.Handle(ctx, e)
 }
