@@ -80,8 +80,8 @@ class MainActivity : ComponentActivity() {
                         composable(Destination.Tracking.route) {
                             OmonoMainRoute(contentPadding = PaddingValues(0.dp))
                         }
-                        composable(Destination.Prayer.route) {
-                            PrayerRoute(contentPadding = PaddingValues(0.dp))
+                        composable(Destination.Finance.route) {
+                            FinanceDashboardRoute(contentPadding = PaddingValues(0.dp))
                         }
                         composable(Destination.Places.route) {
                             PlacesRoute(contentPadding = PaddingValues(0.dp))
@@ -94,8 +94,8 @@ class MainActivity : ComponentActivity() {
                         }
                         // Secondary destinations are reached via the
                         // More screen — not shown in the bottom bar.
-                        composable(SecondaryDestination.Finance.route) {
-                            FinanceDashboardRoute(contentPadding = PaddingValues(0.dp))
+                        composable(SecondaryDestination.Prayer.route) {
+                            PrayerRoute(contentPadding = PaddingValues(0.dp))
                         }
                         composable(SecondaryDestination.Compass.route) {
                             CompassRoute(contentPadding = PaddingValues(0.dp))
@@ -119,31 +119,38 @@ class MainActivity : ComponentActivity() {
 // Primary destinations — what lives in the bottom bar. Kept to 4
 // per Material guidance so icons + labels don't crowd. "More" is
 // the overflow entry to every Secondary destination.
+//
+// Finance was previously a Secondary destination; it earns a primary
+// slot because the spending dashboard is the most data-dense surface
+// in the app and gets glanced at multiple times per day. Prayer moved
+// down to More — still one tap from the home screen, but no longer
+// competing with Finance for prime real estate.
 enum class Destination(
     val route: String,
     val label: String,
     val icon: ImageVector,
 ) {
     Tracking(route = "tracking", label = "Drive", icon = Icons.Filled.Speed),
-    Prayer(route = "prayer", label = "Prayer", icon = Icons.Filled.Mosque),
+    Finance(route = "finance", label = "Finance", icon = Icons.Filled.Payments),
     Places(route = "places", label = "Places", icon = Icons.Filled.LocationOn),
     More(route = "more", label = "More", icon = Icons.Filled.Apps),
 }
 
 // Secondary destinations — reachable from the More screen's grid.
-// Not in the bottom bar. Settings lives here rather than in the
-// primary nav because it's rarely opened during a drive.
+// Not in the bottom bar. Settings lives here because it's rarely
+// opened during a drive; Prayer lives here because it's a daily
+// utility, not an at-a-glance metric.
 enum class SecondaryDestination(
     val route: String,
     val label: String,
     val icon: ImageVector,
     val subtitle: String,
 ) {
-    Finance(
-        route = "finance",
-        label = "Finance",
-        icon = Icons.Filled.Payments,
-        subtitle = "Today's spending, monthly budget, SMS totals.",
+    Prayer(
+        route = "prayer",
+        label = "Prayer",
+        icon = Icons.Filled.Mosque,
+        subtitle = "Times, athan, next-prayer countdown.",
     ),
     Compass(
         route = "compass",
