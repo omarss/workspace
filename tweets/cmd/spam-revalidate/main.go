@@ -121,12 +121,18 @@ func main() {
 		return
 	}
 
-	// Apply: delete rows whose new score crosses the threshold, and
-	// update spam_score on the rest so /tweets serves accurate
-	// borderline scores. Single transaction — partial apply is worse
-	// than no apply.
-	deleteIDs := make([]string, 0, len(newDrops))
+	// Apply: delete every row whose NEW score crosses the threshold,
+	// regardless of what the OLD stored score was. The CachedSource
+	// doesn't re-filter on serve, so a row stored with spam_score = 0.50
+	// (exactly at threshold from a pre-bump scrape) keeps being served
+	// even though every fresh scrape would now drop it. Earlier versions
+	// of this tool only purged `newDrops` (old < threshold, new ≥
+	// threshold), which left those exact-threshold leaks behind.
+	deleteIDs := make([]string, 0, len(newDrops)+len(both))
 	for _, r := range newDrops {
+		deleteIDs = append(deleteIDs, r.id)
+	}
+	for _, r := range both {
 		deleteIDs = append(deleteIDs, r.id)
 	}
 	updates := make([]row, 0)
