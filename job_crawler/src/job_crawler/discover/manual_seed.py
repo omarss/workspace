@@ -260,6 +260,31 @@ async def _ensure_skills(db: JobCrawlerDB) -> None:
     _LOG.info("skills seeded: skills=%d aliases=%d", upserts, aliases_added)
 
 
+def audit_seed_duplicates(csv_path: Path) -> dict[str, list[str]]:
+    """Pre-scan: return {column: [duplicated_value, ...]} for website + linkedin_url.
+
+    Finding 5 from FINDINGS.md: the curated seed CSV had several rows
+    sharing an `https://www.linkedin.com/company/...` or `website` URL.
+    Some are intentional aliases (subsidiaries with their own row); others
+    are accidents. The loader can't tell them apart without an explicit
+    `alias_of` / `parent_name` column, but it CAN flag them so they don't
+    silently merge or get patched onto the wrong canonical row.
+    """
+    duplicates: dict[str, list[str]] = {"website": [], "linkedin_url": []}
+    seen: dict[str, dict[str, int]] = {"website": {}, "linkedin_url": {}}
+    with csv_path.open(newline="", encoding="utf-8") as fh:
+        rows = (line for line in fh if not line.lstrip().startswith("#"))
+        reader = csv.DictReader(rows)
+        for row in reader:
+            for col in seen:
+                val = (row.get(col) or "").strip().rstrip("/").lower()
+                if val:
+                    seen[col][val] = seen[col].get(val, 0) + 1
+    for col, counts in seen.items():
+        duplicates[col] = sorted(v for v, n in counts.items() if n > 1)
+    return duplicates
+
+
 async def load(db: JobCrawlerDB) -> SeedResult:
     """Upsert every row in the seed CSV via `db.companies.resolve`.
 
@@ -272,6 +297,20 @@ async def load(db: JobCrawlerDB) -> SeedResult:
     path = _seed_csv_path()
     if not path.is_file():
         raise FileNotFoundError(f"seed CSV missing at {path}")
+
+    # Pre-flight: surface accidental duplicate identifiers BEFORE upsert.
+    # Loader semantics merge on linkedin_url match (see below), so a
+    # duplicated LinkedIn URL silently makes the second row patch the
+    # first row's company — which is sometimes desired (alias) and
+    # sometimes a typo. Log a single WARNING so the operator notices.
+    dups = audit_seed_duplicates(path)
+    for col, values in dups.items():
+        if values:
+            _LOG.warning(
+                "seed CSV has %d duplicated %s value(s): %s — second row "
+                "patches the first; add an alias_of column if intentional",
+                len(values), col, ", ".join(values[:5]) + ("..." if len(values) > 5 else ""),
+            )
 
     total = 0
     created = 0
