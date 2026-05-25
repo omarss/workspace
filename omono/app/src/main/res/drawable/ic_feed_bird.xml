@@ -1,0 +1,15 @@
+<!-- Stylized songbird-in-flight silhouette for the feed tab.
+     The classic-Twitter look (single blue bird) is conveyed by the
+     silhouette + the Twitter-Blue tint we apply at the call site; the
+     path itself is a hand-drawn shape, intentionally distinct from the
+     specific trademarked Twitter logo path.
+     Fill is white so NavigationBarItem tint (or any other tint) carries. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="@android:color/white"
+        android:pathData="M3,14 Q8,5 14,8 L19,8 L19,10 L15,11 Q14,16 9,17 Q4,16 3,14 Z" />
+</vector>
