@@ -41,8 +41,14 @@ var staticRedactedKeys = map[string]struct{}{
 	"dek_plaintext": {},
 	// Notification BYOK creds — see ADR 017.
 	"smtp_password":         {},
+	"smtp_pass":             {}, // alt form some libraries emit
 	"sendgrid_api_key":      {},
 	"ses_secret_access_key": {},
+	"aws_secret":            {}, // generic AWS secret tag — catches misnamed copies
+	// Phase 6 notifications self-host — see ADR 013.
+	"novu_api_key":           {},
+	"novu_secret_key":        {},
+	"webhook_signing_secret": {},
 	// Identity PII (Phase 5). The struct-tag walker handles tagged fields
 	// inside Go values; this list covers loose JSON / map[string]any logs
 	// where pii:"true" cannot apply. Note: tenant/org "name" is NOT PII
