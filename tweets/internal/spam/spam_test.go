@@ -128,12 +128,26 @@ func TestScore_LocalBizAd_PhoneAloneNotSpam(t *testing.T) {
 }
 
 func TestScore_OffTopicPolitical(t *testing.T) {
+	// Now expected to clear 0.5 on its own — the 2-keyword combo is
+	// the whole signal, no need to combine with other penalties.
 	got, _ := Score(Compute(
 		"The Custodian of the Two Holy Mosques is great. Show respect and bow! #Saudi 🇸🇦",
 		time.Time{}, 0, 0, false,
 	))
-	if got < 0.4 {
-		t.Errorf("off-topic political glorification expected >= 0.4, got %.3f", got)
+	if got < 0.5 {
+		t.Errorf("off-topic political glorification expected >= 0.5, got %.3f", got)
+	}
+}
+
+func TestScore_PoliticalSingleKeyword_NotDropped(t *testing.T) {
+	// One keyword on its own is legitimate news reporting; must not
+	// fire. matchOffTopicPolitical requires 2+ hits.
+	got, _ := Score(Compute(
+		"The Custodian of the Two Holy Mosques chaired today's cabinet meeting.",
+		time.Time{}, 0, 0, false,
+	))
+	if got >= 0.5 {
+		t.Errorf("single political-keyword news quote must not fire, got %.3f", got)
 	}
 }
 
