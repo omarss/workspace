@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/omarss/saas/internal/dataplane/authorization"
 	httpapi "github.com/omarss/saas/internal/dataplane/httpapi"
 	"github.com/omarss/saas/internal/platform/auth"
 	"github.com/omarss/saas/internal/platform/cursor"
@@ -16,12 +17,20 @@ import (
 // implements the relevant subset of the StrictServerInterface; the
 // dataplane main binary composes this handler alongside tenancy +
 // identity (CONVENTIONS.md §3).
+//
+// Phase 8 retrofit: rotate-credentials consults the PermissionChecker
+// when SAAS_RBAC_ENFORCE_DESTRUCTIVE=true.
 type Handler struct {
-	svc *Service
+	svc     *Service
+	checker authorization.PermissionChecker
 }
 
-// NewHandler wires a Handler over the notifications service.
-func NewHandler(svc *Service) *Handler { return &Handler{svc: svc} }
+// NewHandler wires a Handler over the notifications service. checker is
+// the Phase 8 retrofit enforcer; pass nil in tests that don't exercise
+// the RBAC matrix.
+func NewHandler(svc *Service, checker authorization.PermissionChecker) *Handler {
+	return &Handler{svc: svc, checker: checker}
+}
 
 // Service returns the wrapped service.
 func (h *Handler) Service() *Service { return h.svc }
@@ -166,10 +175,15 @@ func (h *Handler) DeleteNotificationChannel(ctx context.Context, req httpapi.Del
 
 // RotateNotificationChannelCredentials handles POST
 // /v1/notification-channels/{channel_id}/rotate-credentials.
+// Phase 8 retrofit: requires notification_channel.write when
+// SAAS_RBAC_ENFORCE_DESTRUCTIVE=true.
 func (h *Handler) RotateNotificationChannelCredentials(ctx context.Context, req httpapi.RotateNotificationChannelCredentialsRequestObject) (httpapi.RotateNotificationChannelCredentialsResponseObject, error) {
 	tenantID, ok := auth.TenantFromContext(ctx)
 	if !ok {
 		return rotateChannelUnauthorized(), nil
+	}
+	if err := h.enforceChannelWrite(ctx, tenantID); err != nil {
+		return rotateChannelError(err), nil
 	}
 	if req.Body == nil {
 		return rotateChannelProblem422("validation-error", "request body required"), nil
@@ -616,6 +630,11 @@ func rotateChannelError(err error) httpapi.RotateNotificationChannelCredentialsR
 	switch {
 	case errors.Is(err, auth.ErrUnauthorized):
 		return rotateChannelUnauthorized()
+	case errors.Is(err, authorization.ErrPermissionDenied):
+		p := problem.New("forbidden", "Caller lacks the required permission.", http.StatusForbidden, "notification_channel.write required", pathChannels)
+		return httpapi.RotateNotificationChannelCredentials403ApplicationProblemPlusJSONResponse{
+			ForbiddenApplicationProblemPlusJSONResponse: httpapi.ForbiddenApplicationProblemPlusJSONResponse(toAPIProblem(p)),
+		}
 	case errors.Is(err, auth.ErrCrossTenant):
 		p := problem.New("forbidden", "Caller lacks permission for this resource.", http.StatusForbidden, "", pathChannels)
 		return httpapi.RotateNotificationChannelCredentials403ApplicationProblemPlusJSONResponse{
@@ -761,4 +780,12 @@ func getNotificationError(err error) httpapi.GetNotificationResponseObject {
 			NotFoundApplicationProblemPlusJSONResponse: httpapi.NotFoundApplicationProblemPlusJSONResponse(toAPIProblem(p)),
 		}
 	}
+}
+
+// enforceChannelWrite is the Phase 8 §8.11 retrofit gate for the
+// notification-channel rotation endpoint. See CONVENTIONS.md §2 for the
+// partial-retrofit policy.
+func (h *Handler) enforceChannelWrite(ctx context.Context, tenantID string) error {
+	p, _ := auth.PrincipalFromContext(ctx)
+	return authorization.EnforceDestructive(ctx, h.checker, p.ActorID, tenantID, "notification_channel.write")
 }

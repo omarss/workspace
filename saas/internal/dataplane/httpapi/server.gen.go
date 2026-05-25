@@ -346,6 +346,21 @@ func (e OrganizationStatus) Valid() bool {
 	}
 }
 
+// Defines values for RoleObject.
+const (
+	RoleObjectRole RoleObject = "role"
+)
+
+// Valid indicates whether the value is a known member of the RoleObject enum.
+func (e RoleObject) Valid() bool {
+	switch e {
+	case RoleObjectRole:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for SocialProviderProvider.
 const (
 	SocialProviderProviderApple  SocialProviderProvider = "apple"
@@ -517,6 +532,42 @@ type AcceptInvitationRequest struct {
 	Token string `json:"token" sensitive:"true"`
 }
 
+// AssignMemberRoleRequest defines model for AssignMemberRoleRequest.
+type AssignMemberRoleRequest struct {
+	RoleId   string `json:"role_id"`
+	TenantId string `json:"tenant_id"`
+}
+
+// BatchCheckAuthorizationRequest defines model for BatchCheckAuthorizationRequest.
+type BatchCheckAuthorizationRequest struct {
+	Checks []CheckAuthorizationRequest `json:"checks"`
+}
+
+// BatchCheckAuthorizationResponse defines model for BatchCheckAuthorizationResponse.
+type BatchCheckAuthorizationResponse struct {
+	Data []CheckAuthorizationResponseData `json:"data"`
+}
+
+// CheckAuthorizationRequest defines model for CheckAuthorizationRequest.
+type CheckAuthorizationRequest struct {
+	MemberId string `json:"member_id"`
+
+	// Permission resource_type.action — e.g. "tenant.read".
+	Permission string `json:"permission"`
+	TenantId   string `json:"tenant_id"`
+}
+
+// CheckAuthorizationResponse defines model for CheckAuthorizationResponse.
+type CheckAuthorizationResponse struct {
+	Data CheckAuthorizationResponseData `json:"data"`
+}
+
+// CheckAuthorizationResponseData defines model for CheckAuthorizationResponseData.
+type CheckAuthorizationResponseData struct {
+	Allowed bool    `json:"allowed"`
+	ViaRole *string `json:"via_role,omitempty"`
+}
+
 // CreateInvitationRequest defines model for CreateInvitationRequest.
 type CreateInvitationRequest struct {
 	ExpiresInSeconds *int                `json:"expires_in_seconds,omitempty"`
@@ -559,6 +610,14 @@ type CreateOrganizationRequest struct {
 	Metadata *Metadata `json:"metadata,omitempty"`
 	Name     string    `json:"name"`
 	Slug     string    `json:"slug"`
+}
+
+// CreateRoleRequest defines model for CreateRoleRequest.
+type CreateRoleRequest struct {
+	Description *string   `json:"description,omitempty"`
+	Metadata    *Metadata `json:"metadata,omitempty"`
+	Name        string    `json:"name"`
+	Permissions *[]string `json:"permissions,omitempty"`
 }
 
 // CreateTenantRequest defines model for CreateTenantRequest.
@@ -688,6 +747,25 @@ type MemberListResponse struct {
 // MemberResponse defines model for MemberResponse.
 type MemberResponse struct {
 	Data Member `json:"data"`
+}
+
+// MemberRoleAssignment defines model for MemberRoleAssignment.
+type MemberRoleAssignment struct {
+	AssignedAt time.Time `json:"assigned_at"`
+	AssignedBy string    `json:"assigned_by"`
+	MemberId   string    `json:"member_id"`
+	RoleId     string    `json:"role_id"`
+	TenantId   string    `json:"tenant_id"`
+}
+
+// MemberRoleListResponse defines model for MemberRoleListResponse.
+type MemberRoleListResponse struct {
+	Data []MemberRoleAssignment `json:"data"`
+}
+
+// MemberRoleResponse defines model for MemberRoleResponse.
+type MemberRoleResponse struct {
+	Data MemberRoleAssignment `json:"data"`
 }
 
 // Metadata defines model for Metadata.
@@ -828,6 +906,21 @@ type Pagination struct {
 	NextCursor *string `json:"next_cursor,omitempty"`
 }
 
+// Permission defines model for Permission.
+type Permission struct {
+	Action       string `json:"action"`
+	Description  string `json:"description"`
+	Id           string `json:"id"`
+	IsSystem     *bool  `json:"is_system,omitempty"`
+	Module       string `json:"module"`
+	ResourceType string `json:"resource_type"`
+}
+
+// PermissionListResponse defines model for PermissionListResponse.
+type PermissionListResponse struct {
+	Data []Permission `json:"data"`
+}
+
 // Problem defines model for Problem.
 type Problem struct {
 	Detail    *string       `json:"detail,omitempty"`
@@ -844,6 +937,37 @@ type RegisterNotificationWorkflowRequest struct {
 	Description    *string `json:"description,omitempty"`
 	Name           string  `json:"name"`
 	NovuWorkflowId string  `json:"novu_workflow_id"`
+}
+
+// Role defines model for Role.
+type Role struct {
+	CreatedAt   time.Time  `json:"created_at"`
+	Description *string    `json:"description,omitempty"`
+	Etag        string     `json:"etag"`
+	Id          string     `json:"id"`
+	IsSystem    bool       `json:"is_system"`
+	Metadata    *Metadata  `json:"metadata,omitempty"`
+	Name        string     `json:"name"`
+	Object      RoleObject `json:"object"`
+
+	// Permissions Permission ids granted to this role.
+	Permissions *[]string `json:"permissions,omitempty"`
+	TenantId    string    `json:"tenant_id"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+// RoleObject defines model for Role.Object.
+type RoleObject string
+
+// RoleListResponse defines model for RoleListResponse.
+type RoleListResponse struct {
+	Data       []Role     `json:"data"`
+	Pagination Pagination `json:"pagination"`
+}
+
+// RoleResponse defines model for RoleResponse.
+type RoleResponse struct {
+	Data Role `json:"data"`
 }
 
 // RotateChannelCredentialsRequest defines model for RotateChannelCredentialsRequest.
@@ -965,6 +1089,14 @@ type UpdateOrganizationRequest struct {
 // UpdateOrganizationRequestStatus defines model for UpdateOrganizationRequest.Status.
 type UpdateOrganizationRequestStatus string
 
+// UpdateRoleRequest defines model for UpdateRoleRequest.
+type UpdateRoleRequest struct {
+	Description *string   `json:"description,omitempty"`
+	Metadata    *Metadata `json:"metadata,omitempty"`
+	Name        *string   `json:"name,omitempty"`
+	Permissions *[]string `json:"permissions,omitempty"`
+}
+
 // UpdateTenantRequest defines model for UpdateTenantRequest.
 type UpdateTenantRequest struct {
 	Metadata *Metadata                  `json:"metadata,omitempty"`
@@ -1074,6 +1206,12 @@ type AcceptInvitationParams struct {
 	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
 }
 
+// AssignMemberRoleParams defines parameters for AssignMemberRole.
+type AssignMemberRoleParams struct {
+	// IdempotencyKey 24-hour idempotency key (idem_<ulid>).
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
 // ListNotificationChannelsParams defines parameters for ListNotificationChannels.
 type ListNotificationChannelsParams struct {
 	// Limit Max items to return (default 25, max 200).
@@ -1179,6 +1317,21 @@ type UpdateMemberParams struct {
 	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
 }
 
+// DeleteRoleParams defines parameters for DeleteRole.
+type DeleteRoleParams struct {
+	// IfMatch Weak ETag from a prior GET; rejects on mismatch with 412.
+	IfMatch IfMatch `json:"If-Match"`
+}
+
+// UpdateRoleParams defines parameters for UpdateRole.
+type UpdateRoleParams struct {
+	// IfMatch Weak ETag from a prior GET; rejects on mismatch with 412.
+	IfMatch IfMatch `json:"If-Match"`
+
+	// IdempotencyKey 24-hour idempotency key (idem_<ulid>).
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
 // ListTenantsParams defines parameters for ListTenants.
 type ListTenantsParams struct {
 	// Limit Max items to return (default 25, max 200).
@@ -1223,6 +1376,18 @@ type ListOrganizationsParams struct {
 
 // CreateOrganizationParams defines parameters for CreateOrganization.
 type CreateOrganizationParams struct {
+	// IdempotencyKey 24-hour idempotency key (idem_<ulid>).
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// ListRolesParams defines parameters for ListRoles.
+type ListRolesParams struct {
+	// Limit Max items to return (default 25, max 200).
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// CreateRoleParams defines parameters for CreateRole.
+type CreateRoleParams struct {
 	// IdempotencyKey 24-hour idempotency key (idem_<ulid>).
 	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
 }
@@ -1293,8 +1458,17 @@ type TriggerEmailVerifyParams struct {
 	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
 }
 
+// BatchCheckAuthorizationJSONRequestBody defines body for BatchCheckAuthorization for application/json ContentType.
+type BatchCheckAuthorizationJSONRequestBody = BatchCheckAuthorizationRequest
+
+// CheckAuthorizationJSONRequestBody defines body for CheckAuthorization for application/json ContentType.
+type CheckAuthorizationJSONRequestBody = CheckAuthorizationRequest
+
 // AcceptInvitationJSONRequestBody defines body for AcceptInvitation for application/json ContentType.
 type AcceptInvitationJSONRequestBody = AcceptInvitationRequest
+
+// AssignMemberRoleJSONRequestBody defines body for AssignMemberRole for application/json ContentType.
+type AssignMemberRoleJSONRequestBody = AssignMemberRoleRequest
 
 // CreateNotificationChannelJSONRequestBody defines body for CreateNotificationChannel for application/json ContentType.
 type CreateNotificationChannelJSONRequestBody = CreateNotificationChannelRequest
@@ -1323,6 +1497,9 @@ type CreateInvitationJSONRequestBody = CreateInvitationRequest
 // UpdateMemberJSONRequestBody defines body for UpdateMember for application/json ContentType.
 type UpdateMemberJSONRequestBody = UpdateMemberRequest
 
+// UpdateRoleJSONRequestBody defines body for UpdateRole for application/json ContentType.
+type UpdateRoleJSONRequestBody = UpdateRoleRequest
+
 // CreateTenantJSONRequestBody defines body for CreateTenant for application/json ContentType.
 type CreateTenantJSONRequestBody = CreateTenantRequest
 
@@ -1331,6 +1508,9 @@ type UpdateTenantJSONRequestBody = UpdateTenantRequest
 
 // CreateOrganizationJSONRequestBody defines body for CreateOrganization for application/json ContentType.
 type CreateOrganizationJSONRequestBody = CreateOrganizationRequest
+
+// CreateRoleJSONRequestBody defines body for CreateRole for application/json ContentType.
+type CreateRoleJSONRequestBody = CreateRoleRequest
 
 // CreateUserJSONRequestBody defines body for CreateUser for application/json ContentType.
 type CreateUserJSONRequestBody = CreateUserRequest
@@ -1346,6 +1526,12 @@ type ServerInterface interface {
 	// Liveness probe.
 	// (GET /healthz)
 	GetHealthz(w http.ResponseWriter, r *http.Request)
+	// Evaluate many checks in one call (max 100).
+	// (POST /v1/authorization/batch-check)
+	BatchCheckAuthorization(w http.ResponseWriter, r *http.Request)
+	// Evaluate a single (member, permission, tenant) check.
+	// (POST /v1/authorization/check)
+	CheckAuthorization(w http.ResponseWriter, r *http.Request)
 	// Revoke a pending invitation. Returns 204.
 	// (DELETE /v1/invitations/{invitation_id})
 	RevokeInvitation(w http.ResponseWriter, r *http.Request, invitationId string, params RevokeInvitationParams)
@@ -1355,6 +1541,15 @@ type ServerInterface interface {
 	// Accept a pending invitation. Creates the Member row.
 	// (POST /v1/invitations/{invitation_id}/accept)
 	AcceptInvitation(w http.ResponseWriter, r *http.Request, invitationId string, params AcceptInvitationParams)
+	// List roles assigned to a member.
+	// (GET /v1/members/{member_id}/roles)
+	ListMemberRoles(w http.ResponseWriter, r *http.Request, memberId string)
+	// Assign a role to a member.
+	// (POST /v1/members/{member_id}/roles)
+	AssignMemberRole(w http.ResponseWriter, r *http.Request, memberId string, params AssignMemberRoleParams)
+	// Unassign a role from a member.
+	// (DELETE /v1/members/{member_id}/roles/{role_id})
+	UnassignMemberRole(w http.ResponseWriter, r *http.Request, memberId string, roleId string)
 	// List BYOK notification channels in the caller's tenant.
 	// (GET /v1/notification-channels)
 	ListNotificationChannels(w http.ResponseWriter, r *http.Request, params ListNotificationChannelsParams)
@@ -1418,6 +1613,18 @@ type ServerInterface interface {
 	// Update a member's role assignment (Phase 8 RBAC placeholder).
 	// (PATCH /v1/organizations/{organization_id}/members/{member_id})
 	UpdateMember(w http.ResponseWriter, r *http.Request, organizationId string, memberId string, params UpdateMemberParams)
+	// List the deployment-wide permission catalogue.
+	// (GET /v1/permissions)
+	ListPermissions(w http.ResponseWriter, r *http.Request)
+	// Delete a role. System roles refuse delete with 422.
+	// (DELETE /v1/roles/{role_id})
+	DeleteRole(w http.ResponseWriter, r *http.Request, roleId string, params DeleteRoleParams)
+	// Fetch a role by id.
+	// (GET /v1/roles/{role_id})
+	GetRole(w http.ResponseWriter, r *http.Request, roleId string)
+	// Update a role. Permissions slice is set-replace.
+	// (PATCH /v1/roles/{role_id})
+	UpdateRole(w http.ResponseWriter, r *http.Request, roleId string, params UpdateRoleParams)
 	// List tenants visible to the caller's Deployment.
 	// (GET /v1/tenants)
 	ListTenants(w http.ResponseWriter, r *http.Request, params ListTenantsParams)
@@ -1439,6 +1646,12 @@ type ServerInterface interface {
 	// Create a new organization in a tenant (multi_org required).
 	// (POST /v1/tenants/{tenant_id}/organizations)
 	CreateOrganization(w http.ResponseWriter, r *http.Request, tenantId string, params CreateOrganizationParams)
+	// List roles in a tenant.
+	// (GET /v1/tenants/{tenant_id}/roles)
+	ListRoles(w http.ResponseWriter, r *http.Request, tenantId string, params ListRolesParams)
+	// Create a new role in a tenant.
+	// (POST /v1/tenants/{tenant_id}/roles)
+	CreateRole(w http.ResponseWriter, r *http.Request, tenantId string, params CreateRoleParams)
 	// List users in the caller's tenant.
 	// (GET /v1/users)
 	ListUsers(w http.ResponseWriter, r *http.Request, params ListUsersParams)
@@ -1487,6 +1700,18 @@ func (_ Unimplemented) GetHealthz(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
+// Evaluate many checks in one call (max 100).
+// (POST /v1/authorization/batch-check)
+func (_ Unimplemented) BatchCheckAuthorization(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Evaluate a single (member, permission, tenant) check.
+// (POST /v1/authorization/check)
+func (_ Unimplemented) CheckAuthorization(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // Revoke a pending invitation. Returns 204.
 // (DELETE /v1/invitations/{invitation_id})
 func (_ Unimplemented) RevokeInvitation(w http.ResponseWriter, r *http.Request, invitationId string, params RevokeInvitationParams) {
@@ -1502,6 +1727,24 @@ func (_ Unimplemented) GetInvitation(w http.ResponseWriter, r *http.Request, inv
 // Accept a pending invitation. Creates the Member row.
 // (POST /v1/invitations/{invitation_id}/accept)
 func (_ Unimplemented) AcceptInvitation(w http.ResponseWriter, r *http.Request, invitationId string, params AcceptInvitationParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// List roles assigned to a member.
+// (GET /v1/members/{member_id}/roles)
+func (_ Unimplemented) ListMemberRoles(w http.ResponseWriter, r *http.Request, memberId string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Assign a role to a member.
+// (POST /v1/members/{member_id}/roles)
+func (_ Unimplemented) AssignMemberRole(w http.ResponseWriter, r *http.Request, memberId string, params AssignMemberRoleParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Unassign a role from a member.
+// (DELETE /v1/members/{member_id}/roles/{role_id})
+func (_ Unimplemented) UnassignMemberRole(w http.ResponseWriter, r *http.Request, memberId string, roleId string) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1631,6 +1874,30 @@ func (_ Unimplemented) UpdateMember(w http.ResponseWriter, r *http.Request, orga
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
+// List the deployment-wide permission catalogue.
+// (GET /v1/permissions)
+func (_ Unimplemented) ListPermissions(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Delete a role. System roles refuse delete with 422.
+// (DELETE /v1/roles/{role_id})
+func (_ Unimplemented) DeleteRole(w http.ResponseWriter, r *http.Request, roleId string, params DeleteRoleParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Fetch a role by id.
+// (GET /v1/roles/{role_id})
+func (_ Unimplemented) GetRole(w http.ResponseWriter, r *http.Request, roleId string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Update a role. Permissions slice is set-replace.
+// (PATCH /v1/roles/{role_id})
+func (_ Unimplemented) UpdateRole(w http.ResponseWriter, r *http.Request, roleId string, params UpdateRoleParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // List tenants visible to the caller's Deployment.
 // (GET /v1/tenants)
 func (_ Unimplemented) ListTenants(w http.ResponseWriter, r *http.Request, params ListTenantsParams) {
@@ -1670,6 +1937,18 @@ func (_ Unimplemented) ListOrganizations(w http.ResponseWriter, r *http.Request,
 // Create a new organization in a tenant (multi_org required).
 // (POST /v1/tenants/{tenant_id}/organizations)
 func (_ Unimplemented) CreateOrganization(w http.ResponseWriter, r *http.Request, tenantId string, params CreateOrganizationParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// List roles in a tenant.
+// (GET /v1/tenants/{tenant_id}/roles)
+func (_ Unimplemented) ListRoles(w http.ResponseWriter, r *http.Request, tenantId string, params ListRolesParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Create a new role in a tenant.
+// (POST /v1/tenants/{tenant_id}/roles)
+func (_ Unimplemented) CreateRole(w http.ResponseWriter, r *http.Request, tenantId string, params CreateRoleParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1759,6 +2038,50 @@ func (siw *ServerInterfaceWrapper) GetHealthz(w http.ResponseWriter, r *http.Req
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetHealthz(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// BatchCheckAuthorization operation middleware
+func (siw *ServerInterfaceWrapper) BatchCheckAuthorization(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, ApiKeyAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.BatchCheckAuthorization(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CheckAuthorization operation middleware
+func (siw *ServerInterfaceWrapper) CheckAuthorization(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, ApiKeyAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CheckAuthorization(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1917,6 +2240,145 @@ func (siw *ServerInterfaceWrapper) AcceptInvitation(w http.ResponseWriter, r *ht
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.AcceptInvitation(w, r, invitationId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListMemberRoles operation middleware
+func (siw *ServerInterfaceWrapper) ListMemberRoles(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "member_id" -------------
+	var memberId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "member_id", chi.URLParam(r, "member_id"), &memberId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "member_id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, ApiKeyAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListMemberRoles(w, r, memberId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// AssignMemberRole operation middleware
+func (siw *ServerInterfaceWrapper) AssignMemberRole(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "member_id" -------------
+	var memberId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "member_id", chi.URLParam(r, "member_id"), &memberId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "member_id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, ApiKeyAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params AssignMemberRoleParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.AssignMemberRole(w, r, memberId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UnassignMemberRole operation middleware
+func (siw *ServerInterfaceWrapper) UnassignMemberRole(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "member_id" -------------
+	var memberId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "member_id", chi.URLParam(r, "member_id"), &memberId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "member_id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "role_id" -------------
+	var roleId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "role_id", chi.URLParam(r, "role_id"), &roleId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "role_id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, ApiKeyAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UnassignMemberRole(w, r, memberId, roleId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -3077,6 +3539,209 @@ func (siw *ServerInterfaceWrapper) UpdateMember(w http.ResponseWriter, r *http.R
 	handler.ServeHTTP(w, r)
 }
 
+// ListPermissions operation middleware
+func (siw *ServerInterfaceWrapper) ListPermissions(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, ApiKeyAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListPermissions(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteRole operation middleware
+func (siw *ServerInterfaceWrapper) DeleteRole(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "role_id" -------------
+	var roleId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "role_id", chi.URLParam(r, "role_id"), &roleId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "role_id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, ApiKeyAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params DeleteRoleParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch IfMatch
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = IfMatch
+
+	} else {
+		err := fmt.Errorf("Header parameter If-Match is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "If-Match", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteRole(w, r, roleId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetRole operation middleware
+func (siw *ServerInterfaceWrapper) GetRole(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "role_id" -------------
+	var roleId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "role_id", chi.URLParam(r, "role_id"), &roleId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "role_id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, ApiKeyAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetRole(w, r, roleId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateRole operation middleware
+func (siw *ServerInterfaceWrapper) UpdateRole(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "role_id" -------------
+	var roleId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "role_id", chi.URLParam(r, "role_id"), &roleId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "role_id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, ApiKeyAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params UpdateRoleParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch IfMatch
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = IfMatch
+
+	} else {
+		err := fmt.Errorf("Header parameter If-Match is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "If-Match", Err: err})
+		return
+	}
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateRole(w, r, roleId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListTenants operation middleware
 func (siw *ServerInterfaceWrapper) ListTenants(w http.ResponseWriter, r *http.Request) {
 
@@ -3494,6 +4159,118 @@ func (siw *ServerInterfaceWrapper) CreateOrganization(w http.ResponseWriter, r *
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CreateOrganization(w, r, tenantId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListRoles operation middleware
+func (siw *ServerInterfaceWrapper) ListRoles(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "tenant_id" -------------
+	var tenantId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tenant_id", chi.URLParam(r, "tenant_id"), &tenantId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tenant_id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, ApiKeyAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListRolesParams
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListRoles(w, r, tenantId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateRole operation middleware
+func (siw *ServerInterfaceWrapper) CreateRole(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "tenant_id" -------------
+	var tenantId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tenant_id", chi.URLParam(r, "tenant_id"), &tenantId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tenant_id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, ApiKeyAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateRoleParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateRole(w, r, tenantId, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -4321,6 +5098,12 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Get(options.BaseURL+"/healthz", wrapper.GetHealthz)
 	})
 	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/v1/authorization/batch-check", wrapper.BatchCheckAuthorization)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/v1/authorization/check", wrapper.CheckAuthorization)
+	})
+	r.Group(func(r chi.Router) {
 		r.Delete(options.BaseURL+"/v1/invitations/{invitation_id}", wrapper.RevokeInvitation)
 	})
 	r.Group(func(r chi.Router) {
@@ -4328,6 +5111,15 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/v1/invitations/{invitation_id}/accept", wrapper.AcceptInvitation)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/members/{member_id}/roles", wrapper.ListMemberRoles)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/v1/members/{member_id}/roles", wrapper.AssignMemberRole)
+	})
+	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/v1/members/{member_id}/roles/{role_id}", wrapper.UnassignMemberRole)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/v1/notification-channels", wrapper.ListNotificationChannels)
@@ -4393,6 +5185,18 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Patch(options.BaseURL+"/v1/organizations/{organization_id}/members/{member_id}", wrapper.UpdateMember)
 	})
 	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/permissions", wrapper.ListPermissions)
+	})
+	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/v1/roles/{role_id}", wrapper.DeleteRole)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/roles/{role_id}", wrapper.GetRole)
+	})
+	r.Group(func(r chi.Router) {
+		r.Patch(options.BaseURL+"/v1/roles/{role_id}", wrapper.UpdateRole)
+	})
+	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/v1/tenants", wrapper.ListTenants)
 	})
 	r.Group(func(r chi.Router) {
@@ -4412,6 +5216,12 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/v1/tenants/{tenant_id}/organizations", wrapper.CreateOrganization)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/tenants/{tenant_id}/roles", wrapper.ListRoles)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/v1/tenants/{tenant_id}/roles", wrapper.CreateRole)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/v1/users", wrapper.ListUsers)
@@ -4496,6 +5306,146 @@ func (response GetHealthz200JSONResponse) VisitGetHealthzResponse(w http.Respons
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type BatchCheckAuthorizationRequestObject struct {
+	Body *BatchCheckAuthorizationJSONRequestBody
+}
+
+type BatchCheckAuthorizationResponseObject interface {
+	VisitBatchCheckAuthorizationResponse(w http.ResponseWriter) error
+}
+
+type BatchCheckAuthorization200JSONResponse BatchCheckAuthorizationResponse
+
+func (response BatchCheckAuthorization200JSONResponse) VisitBatchCheckAuthorizationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type BatchCheckAuthorization401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response BatchCheckAuthorization401ApplicationProblemPlusJSONResponse) VisitBatchCheckAuthorizationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type BatchCheckAuthorization403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response BatchCheckAuthorization403ApplicationProblemPlusJSONResponse) VisitBatchCheckAuthorizationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type BatchCheckAuthorization422ApplicationProblemPlusJSONResponse struct {
+	IdempotencyConflictOrValidationApplicationProblemPlusJSONResponse
+}
+
+func (response BatchCheckAuthorization422ApplicationProblemPlusJSONResponse) VisitBatchCheckAuthorizationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CheckAuthorizationRequestObject struct {
+	Body *CheckAuthorizationJSONRequestBody
+}
+
+type CheckAuthorizationResponseObject interface {
+	VisitCheckAuthorizationResponse(w http.ResponseWriter) error
+}
+
+type CheckAuthorization200JSONResponse CheckAuthorizationResponse
+
+func (response CheckAuthorization200JSONResponse) VisitCheckAuthorizationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CheckAuthorization401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response CheckAuthorization401ApplicationProblemPlusJSONResponse) VisitCheckAuthorizationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CheckAuthorization403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response CheckAuthorization403ApplicationProblemPlusJSONResponse) VisitCheckAuthorizationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CheckAuthorization422ApplicationProblemPlusJSONResponse struct {
+	IdempotencyConflictOrValidationApplicationProblemPlusJSONResponse
+}
+
+func (response CheckAuthorization422ApplicationProblemPlusJSONResponse) VisitCheckAuthorizationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -4773,6 +5723,229 @@ func (response AcceptInvitation422ApplicationProblemPlusJSONResponse) VisitAccep
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListMemberRolesRequestObject struct {
+	MemberId string `json:"member_id"`
+}
+
+type ListMemberRolesResponseObject interface {
+	VisitListMemberRolesResponse(w http.ResponseWriter) error
+}
+
+type ListMemberRoles200JSONResponse MemberRoleListResponse
+
+func (response ListMemberRoles200JSONResponse) VisitListMemberRolesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListMemberRoles401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ListMemberRoles401ApplicationProblemPlusJSONResponse) VisitListMemberRolesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListMemberRoles403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListMemberRoles403ApplicationProblemPlusJSONResponse) VisitListMemberRolesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListMemberRoles404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ListMemberRoles404ApplicationProblemPlusJSONResponse) VisitListMemberRolesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AssignMemberRoleRequestObject struct {
+	MemberId string `json:"member_id"`
+	Params   AssignMemberRoleParams
+	Body     *AssignMemberRoleJSONRequestBody
+}
+
+type AssignMemberRoleResponseObject interface {
+	VisitAssignMemberRoleResponse(w http.ResponseWriter) error
+}
+
+type AssignMemberRole200JSONResponse MemberRoleResponse
+
+func (response AssignMemberRole200JSONResponse) VisitAssignMemberRoleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AssignMemberRole401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response AssignMemberRole401ApplicationProblemPlusJSONResponse) VisitAssignMemberRoleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AssignMemberRole403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response AssignMemberRole403ApplicationProblemPlusJSONResponse) VisitAssignMemberRoleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AssignMemberRole404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response AssignMemberRole404ApplicationProblemPlusJSONResponse) VisitAssignMemberRoleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AssignMemberRole422ApplicationProblemPlusJSONResponse struct {
+	IdempotencyConflictOrValidationApplicationProblemPlusJSONResponse
+}
+
+func (response AssignMemberRole422ApplicationProblemPlusJSONResponse) VisitAssignMemberRoleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UnassignMemberRoleRequestObject struct {
+	MemberId string `json:"member_id"`
+	RoleId   string `json:"role_id"`
+}
+
+type UnassignMemberRoleResponseObject interface {
+	VisitUnassignMemberRoleResponse(w http.ResponseWriter) error
+}
+
+type UnassignMemberRole204Response struct {
+}
+
+func (response UnassignMemberRole204Response) VisitUnassignMemberRoleResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type UnassignMemberRole401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response UnassignMemberRole401ApplicationProblemPlusJSONResponse) VisitUnassignMemberRoleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UnassignMemberRole403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response UnassignMemberRole403ApplicationProblemPlusJSONResponse) VisitUnassignMemberRoleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UnassignMemberRole404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response UnassignMemberRole404ApplicationProblemPlusJSONResponse) VisitUnassignMemberRoleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -6478,6 +7651,338 @@ func (response UpdateMember422ApplicationProblemPlusJSONResponse) VisitUpdateMem
 	return err
 }
 
+type ListPermissionsRequestObject struct {
+}
+
+type ListPermissionsResponseObject interface {
+	VisitListPermissionsResponse(w http.ResponseWriter) error
+}
+
+type ListPermissions200JSONResponse PermissionListResponse
+
+func (response ListPermissions200JSONResponse) VisitListPermissionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListPermissions401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ListPermissions401ApplicationProblemPlusJSONResponse) VisitListPermissionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListPermissions403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListPermissions403ApplicationProblemPlusJSONResponse) VisitListPermissionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteRoleRequestObject struct {
+	RoleId string `json:"role_id"`
+	Params DeleteRoleParams
+}
+
+type DeleteRoleResponseObject interface {
+	VisitDeleteRoleResponse(w http.ResponseWriter) error
+}
+
+type DeleteRole204Response struct {
+}
+
+func (response DeleteRole204Response) VisitDeleteRoleResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type DeleteRole401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteRole401ApplicationProblemPlusJSONResponse) VisitDeleteRoleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteRole403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteRole403ApplicationProblemPlusJSONResponse) VisitDeleteRoleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteRole404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteRole404ApplicationProblemPlusJSONResponse) VisitDeleteRoleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteRole412ApplicationProblemPlusJSONResponse struct {
+	PreconditionFailedApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteRole412ApplicationProblemPlusJSONResponse) VisitDeleteRoleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteRole422ApplicationProblemPlusJSONResponse Problem
+
+func (response DeleteRole422ApplicationProblemPlusJSONResponse) VisitDeleteRoleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetRoleRequestObject struct {
+	RoleId string `json:"role_id"`
+}
+
+type GetRoleResponseObject interface {
+	VisitGetRoleResponse(w http.ResponseWriter) error
+}
+
+type GetRole200JSONResponse RoleResponse
+
+func (response GetRole200JSONResponse) VisitGetRoleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetRole401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response GetRole401ApplicationProblemPlusJSONResponse) VisitGetRoleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetRole403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response GetRole403ApplicationProblemPlusJSONResponse) VisitGetRoleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetRole404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response GetRole404ApplicationProblemPlusJSONResponse) VisitGetRoleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateRoleRequestObject struct {
+	RoleId string `json:"role_id"`
+	Params UpdateRoleParams
+	Body   *UpdateRoleJSONRequestBody
+}
+
+type UpdateRoleResponseObject interface {
+	VisitUpdateRoleResponse(w http.ResponseWriter) error
+}
+
+type UpdateRole200ResponseHeaders struct {
+	ETag *string
+}
+
+type UpdateRole200JSONResponse struct {
+	Body    RoleResponse
+	Headers UpdateRole200ResponseHeaders
+}
+
+func (response UpdateRole200JSONResponse) VisitUpdateRoleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateRole401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateRole401ApplicationProblemPlusJSONResponse) VisitUpdateRoleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateRole403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateRole403ApplicationProblemPlusJSONResponse) VisitUpdateRoleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateRole404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateRole404ApplicationProblemPlusJSONResponse) VisitUpdateRoleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateRole412ApplicationProblemPlusJSONResponse struct {
+	PreconditionFailedApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateRole412ApplicationProblemPlusJSONResponse) VisitUpdateRoleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateRole422ApplicationProblemPlusJSONResponse struct {
+	IdempotencyConflictOrValidationApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateRole422ApplicationProblemPlusJSONResponse) VisitUpdateRoleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ListTenantsRequestObject struct {
 	Params ListTenantsParams
 }
@@ -7096,6 +8601,147 @@ type CreateOrganization422ApplicationProblemPlusJSONResponse struct {
 }
 
 func (response CreateOrganization422ApplicationProblemPlusJSONResponse) VisitCreateOrganizationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListRolesRequestObject struct {
+	TenantId string `json:"tenant_id"`
+	Params   ListRolesParams
+}
+
+type ListRolesResponseObject interface {
+	VisitListRolesResponse(w http.ResponseWriter) error
+}
+
+type ListRoles200JSONResponse RoleListResponse
+
+func (response ListRoles200JSONResponse) VisitListRolesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListRoles401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ListRoles401ApplicationProblemPlusJSONResponse) VisitListRolesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListRoles403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListRoles403ApplicationProblemPlusJSONResponse) VisitListRolesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateRoleRequestObject struct {
+	TenantId string `json:"tenant_id"`
+	Params   CreateRoleParams
+	Body     *CreateRoleJSONRequestBody
+}
+
+type CreateRoleResponseObject interface {
+	VisitCreateRoleResponse(w http.ResponseWriter) error
+}
+
+type CreateRole201ResponseHeaders struct {
+	ETag     *string
+	Location *string
+}
+
+type CreateRole201JSONResponse struct {
+	Body    RoleResponse
+	Headers CreateRole201ResponseHeaders
+}
+
+func (response CreateRole201JSONResponse) VisitCreateRoleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	if response.Headers.Location != nil {
+		w.Header().Set("Location", fmt.Sprint(*response.Headers.Location))
+	}
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateRole401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response CreateRole401ApplicationProblemPlusJSONResponse) VisitCreateRoleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateRole403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response CreateRole403ApplicationProblemPlusJSONResponse) VisitCreateRoleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateRole422ApplicationProblemPlusJSONResponse struct {
+	IdempotencyConflictOrValidationApplicationProblemPlusJSONResponse
+}
+
+func (response CreateRole422ApplicationProblemPlusJSONResponse) VisitCreateRoleResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -8049,6 +9695,12 @@ type StrictServerInterface interface {
 	// Liveness probe.
 	// (GET /healthz)
 	GetHealthz(ctx context.Context, request GetHealthzRequestObject) (GetHealthzResponseObject, error)
+	// Evaluate many checks in one call (max 100).
+	// (POST /v1/authorization/batch-check)
+	BatchCheckAuthorization(ctx context.Context, request BatchCheckAuthorizationRequestObject) (BatchCheckAuthorizationResponseObject, error)
+	// Evaluate a single (member, permission, tenant) check.
+	// (POST /v1/authorization/check)
+	CheckAuthorization(ctx context.Context, request CheckAuthorizationRequestObject) (CheckAuthorizationResponseObject, error)
 	// Revoke a pending invitation. Returns 204.
 	// (DELETE /v1/invitations/{invitation_id})
 	RevokeInvitation(ctx context.Context, request RevokeInvitationRequestObject) (RevokeInvitationResponseObject, error)
@@ -8058,6 +9710,15 @@ type StrictServerInterface interface {
 	// Accept a pending invitation. Creates the Member row.
 	// (POST /v1/invitations/{invitation_id}/accept)
 	AcceptInvitation(ctx context.Context, request AcceptInvitationRequestObject) (AcceptInvitationResponseObject, error)
+	// List roles assigned to a member.
+	// (GET /v1/members/{member_id}/roles)
+	ListMemberRoles(ctx context.Context, request ListMemberRolesRequestObject) (ListMemberRolesResponseObject, error)
+	// Assign a role to a member.
+	// (POST /v1/members/{member_id}/roles)
+	AssignMemberRole(ctx context.Context, request AssignMemberRoleRequestObject) (AssignMemberRoleResponseObject, error)
+	// Unassign a role from a member.
+	// (DELETE /v1/members/{member_id}/roles/{role_id})
+	UnassignMemberRole(ctx context.Context, request UnassignMemberRoleRequestObject) (UnassignMemberRoleResponseObject, error)
 	// List BYOK notification channels in the caller's tenant.
 	// (GET /v1/notification-channels)
 	ListNotificationChannels(ctx context.Context, request ListNotificationChannelsRequestObject) (ListNotificationChannelsResponseObject, error)
@@ -8121,6 +9782,18 @@ type StrictServerInterface interface {
 	// Update a member's role assignment (Phase 8 RBAC placeholder).
 	// (PATCH /v1/organizations/{organization_id}/members/{member_id})
 	UpdateMember(ctx context.Context, request UpdateMemberRequestObject) (UpdateMemberResponseObject, error)
+	// List the deployment-wide permission catalogue.
+	// (GET /v1/permissions)
+	ListPermissions(ctx context.Context, request ListPermissionsRequestObject) (ListPermissionsResponseObject, error)
+	// Delete a role. System roles refuse delete with 422.
+	// (DELETE /v1/roles/{role_id})
+	DeleteRole(ctx context.Context, request DeleteRoleRequestObject) (DeleteRoleResponseObject, error)
+	// Fetch a role by id.
+	// (GET /v1/roles/{role_id})
+	GetRole(ctx context.Context, request GetRoleRequestObject) (GetRoleResponseObject, error)
+	// Update a role. Permissions slice is set-replace.
+	// (PATCH /v1/roles/{role_id})
+	UpdateRole(ctx context.Context, request UpdateRoleRequestObject) (UpdateRoleResponseObject, error)
 	// List tenants visible to the caller's Deployment.
 	// (GET /v1/tenants)
 	ListTenants(ctx context.Context, request ListTenantsRequestObject) (ListTenantsResponseObject, error)
@@ -8142,6 +9815,12 @@ type StrictServerInterface interface {
 	// Create a new organization in a tenant (multi_org required).
 	// (POST /v1/tenants/{tenant_id}/organizations)
 	CreateOrganization(ctx context.Context, request CreateOrganizationRequestObject) (CreateOrganizationResponseObject, error)
+	// List roles in a tenant.
+	// (GET /v1/tenants/{tenant_id}/roles)
+	ListRoles(ctx context.Context, request ListRolesRequestObject) (ListRolesResponseObject, error)
+	// Create a new role in a tenant.
+	// (POST /v1/tenants/{tenant_id}/roles)
+	CreateRole(ctx context.Context, request CreateRoleRequestObject) (CreateRoleResponseObject, error)
 	// List users in the caller's tenant.
 	// (GET /v1/users)
 	ListUsers(ctx context.Context, request ListUsersRequestObject) (ListUsersResponseObject, error)
@@ -8233,6 +9912,68 @@ func (sh *strictHandler) GetHealthz(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// BatchCheckAuthorization operation middleware
+func (sh *strictHandler) BatchCheckAuthorization(w http.ResponseWriter, r *http.Request) {
+	var request BatchCheckAuthorizationRequestObject
+
+	var body BatchCheckAuthorizationJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.BatchCheckAuthorization(ctx, request.(BatchCheckAuthorizationRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "BatchCheckAuthorization")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(BatchCheckAuthorizationResponseObject); ok {
+		if err := validResponse.VisitBatchCheckAuthorizationResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CheckAuthorization operation middleware
+func (sh *strictHandler) CheckAuthorization(w http.ResponseWriter, r *http.Request) {
+	var request CheckAuthorizationRequestObject
+
+	var body CheckAuthorizationJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CheckAuthorization(ctx, request.(CheckAuthorizationRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CheckAuthorization")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CheckAuthorizationResponseObject); ok {
+		if err := validResponse.VisitCheckAuthorizationResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // RevokeInvitation operation middleware
 func (sh *strictHandler) RevokeInvitation(w http.ResponseWriter, r *http.Request, invitationId string, params RevokeInvitationParams) {
 	var request RevokeInvitationRequestObject
@@ -8313,6 +10054,93 @@ func (sh *strictHandler) AcceptInvitation(w http.ResponseWriter, r *http.Request
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(AcceptInvitationResponseObject); ok {
 		if err := validResponse.VisitAcceptInvitationResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListMemberRoles operation middleware
+func (sh *strictHandler) ListMemberRoles(w http.ResponseWriter, r *http.Request, memberId string) {
+	var request ListMemberRolesRequestObject
+
+	request.MemberId = memberId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListMemberRoles(ctx, request.(ListMemberRolesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListMemberRoles")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListMemberRolesResponseObject); ok {
+		if err := validResponse.VisitListMemberRolesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// AssignMemberRole operation middleware
+func (sh *strictHandler) AssignMemberRole(w http.ResponseWriter, r *http.Request, memberId string, params AssignMemberRoleParams) {
+	var request AssignMemberRoleRequestObject
+
+	request.MemberId = memberId
+	request.Params = params
+
+	var body AssignMemberRoleJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.AssignMemberRole(ctx, request.(AssignMemberRoleRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AssignMemberRole")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(AssignMemberRoleResponseObject); ok {
+		if err := validResponse.VisitAssignMemberRoleResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UnassignMemberRole operation middleware
+func (sh *strictHandler) UnassignMemberRole(w http.ResponseWriter, r *http.Request, memberId string, roleId string) {
+	var request UnassignMemberRoleRequestObject
+
+	request.MemberId = memberId
+	request.RoleId = roleId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UnassignMemberRole(ctx, request.(UnassignMemberRoleRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UnassignMemberRole")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UnassignMemberRoleResponseObject); ok {
+		if err := validResponse.VisitUnassignMemberRoleResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -8940,6 +10768,117 @@ func (sh *strictHandler) UpdateMember(w http.ResponseWriter, r *http.Request, or
 	}
 }
 
+// ListPermissions operation middleware
+func (sh *strictHandler) ListPermissions(w http.ResponseWriter, r *http.Request) {
+	var request ListPermissionsRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListPermissions(ctx, request.(ListPermissionsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListPermissions")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListPermissionsResponseObject); ok {
+		if err := validResponse.VisitListPermissionsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteRole operation middleware
+func (sh *strictHandler) DeleteRole(w http.ResponseWriter, r *http.Request, roleId string, params DeleteRoleParams) {
+	var request DeleteRoleRequestObject
+
+	request.RoleId = roleId
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteRole(ctx, request.(DeleteRoleRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteRole")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteRoleResponseObject); ok {
+		if err := validResponse.VisitDeleteRoleResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetRole operation middleware
+func (sh *strictHandler) GetRole(w http.ResponseWriter, r *http.Request, roleId string) {
+	var request GetRoleRequestObject
+
+	request.RoleId = roleId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetRole(ctx, request.(GetRoleRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetRole")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetRoleResponseObject); ok {
+		if err := validResponse.VisitGetRoleResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateRole operation middleware
+func (sh *strictHandler) UpdateRole(w http.ResponseWriter, r *http.Request, roleId string, params UpdateRoleParams) {
+	var request UpdateRoleRequestObject
+
+	request.RoleId = roleId
+	request.Params = params
+
+	var body UpdateRoleJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateRole(ctx, request.(UpdateRoleRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateRole")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateRoleResponseObject); ok {
+		if err := validResponse.VisitUpdateRoleResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // ListTenants operation middleware
 func (sh *strictHandler) ListTenants(w http.ResponseWriter, r *http.Request, params ListTenantsParams) {
 	var request ListTenantsRequestObject
@@ -9140,6 +11079,67 @@ func (sh *strictHandler) CreateOrganization(w http.ResponseWriter, r *http.Reque
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(CreateOrganizationResponseObject); ok {
 		if err := validResponse.VisitCreateOrganizationResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListRoles operation middleware
+func (sh *strictHandler) ListRoles(w http.ResponseWriter, r *http.Request, tenantId string, params ListRolesParams) {
+	var request ListRolesRequestObject
+
+	request.TenantId = tenantId
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListRoles(ctx, request.(ListRolesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListRoles")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListRolesResponseObject); ok {
+		if err := validResponse.VisitListRolesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateRole operation middleware
+func (sh *strictHandler) CreateRole(w http.ResponseWriter, r *http.Request, tenantId string, params CreateRoleParams) {
+	var request CreateRoleRequestObject
+
+	request.TenantId = tenantId
+	request.Params = params
+
+	var body CreateRoleJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateRole(ctx, request.(CreateRoleRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateRole")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateRoleResponseObject); ok {
+		if err := validResponse.VisitCreateRoleResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -9493,140 +11493,161 @@ func (sh *strictHandler) TriggerEmailVerify(w http.ResponseWriter, r *http.Reque
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
+	"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",
+	"AP//",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

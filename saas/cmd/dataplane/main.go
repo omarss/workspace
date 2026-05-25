@@ -18,6 +18,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 
+	"github.com/omarss/saas/internal/dataplane/authorization"
 	db "github.com/omarss/saas/internal/dataplane/db/sqlc"
 	httpapi "github.com/omarss/saas/internal/dataplane/httpapi" // package dataplaneapi
 	"github.com/omarss/saas/internal/dataplane/identity"
@@ -56,6 +57,7 @@ type strictServer struct {
 	identityHandler      *identity.Handler
 	notificationsHandler *notifications.Handler
 	organizationsHandler *organizations.Handler
+	authorizationHandler *authorization.Handler
 }
 
 // GetHealthz implements the Phase-1 liveness probe inline so the data plane
@@ -250,6 +252,52 @@ func (s *strictServer) AcceptInvitation(ctx context.Context, r httpapi.AcceptInv
 	return s.organizationsHandler.AcceptInvitation(ctx, r)
 }
 
+// Authorization delegation ------------------------------------------------------
+
+func (s *strictServer) ListRoles(ctx context.Context, r httpapi.ListRolesRequestObject) (httpapi.ListRolesResponseObject, error) {
+	return s.authorizationHandler.ListRoles(ctx, r)
+}
+
+func (s *strictServer) CreateRole(ctx context.Context, r httpapi.CreateRoleRequestObject) (httpapi.CreateRoleResponseObject, error) {
+	return s.authorizationHandler.CreateRole(ctx, r)
+}
+
+func (s *strictServer) GetRole(ctx context.Context, r httpapi.GetRoleRequestObject) (httpapi.GetRoleResponseObject, error) {
+	return s.authorizationHandler.GetRole(ctx, r)
+}
+
+func (s *strictServer) UpdateRole(ctx context.Context, r httpapi.UpdateRoleRequestObject) (httpapi.UpdateRoleResponseObject, error) {
+	return s.authorizationHandler.UpdateRole(ctx, r)
+}
+
+func (s *strictServer) DeleteRole(ctx context.Context, r httpapi.DeleteRoleRequestObject) (httpapi.DeleteRoleResponseObject, error) {
+	return s.authorizationHandler.DeleteRole(ctx, r)
+}
+
+func (s *strictServer) ListPermissions(ctx context.Context, r httpapi.ListPermissionsRequestObject) (httpapi.ListPermissionsResponseObject, error) {
+	return s.authorizationHandler.ListPermissions(ctx, r)
+}
+
+func (s *strictServer) ListMemberRoles(ctx context.Context, r httpapi.ListMemberRolesRequestObject) (httpapi.ListMemberRolesResponseObject, error) {
+	return s.authorizationHandler.ListMemberRoles(ctx, r)
+}
+
+func (s *strictServer) AssignMemberRole(ctx context.Context, r httpapi.AssignMemberRoleRequestObject) (httpapi.AssignMemberRoleResponseObject, error) {
+	return s.authorizationHandler.AssignMemberRole(ctx, r)
+}
+
+func (s *strictServer) UnassignMemberRole(ctx context.Context, r httpapi.UnassignMemberRoleRequestObject) (httpapi.UnassignMemberRoleResponseObject, error) {
+	return s.authorizationHandler.UnassignMemberRole(ctx, r)
+}
+
+func (s *strictServer) CheckAuthorization(ctx context.Context, r httpapi.CheckAuthorizationRequestObject) (httpapi.CheckAuthorizationResponseObject, error) {
+	return s.authorizationHandler.CheckAuthorization(ctx, r)
+}
+
+func (s *strictServer) BatchCheckAuthorization(ctx context.Context, r httpapi.BatchCheckAuthorizationRequestObject) (httpapi.BatchCheckAuthorizationResponseObject, error) {
+	return s.authorizationHandler.BatchCheckAuthorization(ctx, r)
+}
+
 func run() error {
 	// platformlog.New installs the PII-redacting JSON slog handler from
 	// internal/platform/log. Every log record passing through slog.Default()
@@ -377,13 +425,52 @@ func run() error {
 	// every new tenant. Phase 7 hooks it inline via the tenantEventFanout
 	// publisher; a future Phase 10 EventBus will route the same event
 	// through the same Handle method.
-	tenantEventFanout.subscriber = organizations.NewTenantCreatedSubscriber(orgsService)
+	tenantEventFanout.orgSubscriber = organizations.NewTenantCreatedSubscriber(orgsService)
+
+	// Phase 8 — Authorization module. Casbin v2 RBAC-with-domains; the
+	// pckhoi/casbin-pgx-adapter v3 owns reads/writes of casbin_rule. The
+	// enforcer loads the entire policy on startup (single-replica MVP —
+	// multi-replica policy sync via Redis watcher is deferred per
+	// ADR 005). The enforcer's pool reuse means every Casbin query goes
+	// through pgxpool.NewPool's PrepareConn hook; the casbin_rule table
+	// is intentionally NOT RLS-protected because LoadPolicy reads every
+	// row in one shot and the tenant scoping is encoded in v1/v2.
+	authzEnforcer, err := authorization.NewCasbinEnforcer(ctx, pool)
+	if err != nil {
+		return fmt.Errorf("authorization enforcer: %w", err)
+	}
+	authzSvc := authorization.NewService(authorization.Config{
+		RoleRepo:       authorization.NewPgxRoleRepo(queries),
+		PermissionRepo: authorization.NewPgxPermissionRepo(queries),
+		MemberRoleRepo: authorization.NewPgxMemberRoleRepo(queries),
+		PolicyStore:    authzEnforcer,
+		MemberLookup:   authorization.NewPgxMemberLookup(queries),
+		Events:         outbox.NewPgxEventPublisher(queries, deploymentID),
+	})
+
+	// Tenant.created subscriber #2: seed the default system roles
+	// (tenant_admin / tenant_member / billing_admin) for every new
+	// tenant. Idempotent; safe to re-run on subscriber crash recovery.
+	tenantEventFanout.authzSubscriber = authorization.NewTenantCreatedSubscriber(authzSvc)
+
+	// Phase 8 §8.11 retrofit toggle. Off by default so dev / first-run
+	// flows keep working before tenant_admin is assigned. Production
+	// deployments set SAAS_RBAC_ENFORCE_DESTRUCTIVE=true. See
+	// CONVENTIONS.md §2.
+	enforceDestructive := os.Getenv(authorization.EnforceDestructiveEnvVar) == "true"
+	authorization.SetDestructiveEnforcement(enforceDestructive)
+	if enforceDestructive {
+		slog.Info("authorization: destructive-op RBAC enforcement enabled")
+	} else {
+		slog.Warn("authorization: destructive-op RBAC enforcement DISABLED (set SAAS_RBAC_ENFORCE_DESTRUCTIVE=true in production)")
+	}
 
 	srv := &strictServer{
-		tenancyHandler:       tenancy.NewHandler(tenantSvc),
-		identityHandler:      identity.NewHandler(identitySvc),
-		notificationsHandler: notifications.NewHandler(notificationsSvc),
-		organizationsHandler: organizations.NewHandler(orgsService),
+		tenancyHandler:       tenancy.NewHandler(tenantSvc, authzSvc),
+		identityHandler:      identity.NewHandler(identitySvc, authzSvc),
+		notificationsHandler: notifications.NewHandler(notificationsSvc, authzSvc),
+		organizationsHandler: organizations.NewHandler(orgsService, authzSvc),
+		authorizationHandler: authorization.NewHandler(authzSvc),
 	}
 
 	// Outbox dispatcher: one goroutine per process. Phase 2 publisher is a
@@ -614,23 +701,39 @@ func (a *identityUserLookupAdapter) LookupUser(ctx context.Context, tenantID, us
 }
 
 // tenantEventFanout duplicates every event into the outbox (durable audit
-// log) AND a single in-process subscriber. The fan-out is intentionally
+// log) AND any in-process subscribers. The fan-out is intentionally
 // best-effort: a subscriber error is logged but does NOT roll back the
 // outbox write. The outbox stays authoritative; subscribers are reactive.
+//
+// Phase 8 adds the authorization subscriber alongside Phase 7's
+// organizations subscriber. Both observe tenant.created — order is
+// stable: organizations.AutoCreateDefault runs first (creates the
+// default Org), then authorization seeds the system role catalogue.
+// Each is independent — a failure in one does NOT block the other so
+// partial-seed failures still leave the rest of the bootstrap useful.
 type tenantEventFanout struct {
 	outbox interface {
 		Publish(ctx context.Context, eventType, tenantID string, payload map[string]any) error
 	}
-	subscriber *organizations.TenantCreatedSubscriber
+	orgSubscriber   *organizations.TenantCreatedSubscriber
+	authzSubscriber *authorization.TenantCreatedSubscriber
 }
 
 func (f *tenantEventFanout) Publish(ctx context.Context, eventType, tenantID string, payload map[string]any) error {
 	if err := f.outbox.Publish(ctx, eventType, tenantID, payload); err != nil {
 		return err
 	}
-	if f.subscriber != nil && eventType == "tenant.created" {
-		if err := f.subscriber.Handle(ctx, payload); err != nil {
-			slog.Warn("tenant.created subscriber handle failed", "tenant_id", tenantID, "err", err)
+	if eventType != "tenant.created" {
+		return nil
+	}
+	if f.orgSubscriber != nil {
+		if err := f.orgSubscriber.Handle(ctx, payload); err != nil {
+			slog.Warn("tenant.created organizations subscriber failed", "tenant_id", tenantID, "err", err)
+		}
+	}
+	if f.authzSubscriber != nil {
+		if err := f.authzSubscriber.Handle(ctx, payload); err != nil {
+			slog.Warn("tenant.created authorization subscriber failed", "tenant_id", tenantID, "err", err)
 		}
 	}
 	return nil

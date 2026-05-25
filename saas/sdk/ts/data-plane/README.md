@@ -51,6 +51,17 @@ All URIs are relative to *https://dev.example.saas.omarss.net*
 
 Class | Method | HTTP request | Description
 ------------ | ------------- | ------------- | -------------
+*AuthorizationApi* | [**assignMemberRole**](docs/AuthorizationApi.md#assignmemberrole) | **POST** /v1/members/{member_id}/roles | Assign a role to a member.
+*AuthorizationApi* | [**batchCheckAuthorization**](docs/AuthorizationApi.md#batchcheckauthorization) | **POST** /v1/authorization/batch-check | Evaluate many checks in one call (max 100).
+*AuthorizationApi* | [**checkAuthorization**](docs/AuthorizationApi.md#checkauthorization) | **POST** /v1/authorization/check | Evaluate a single (member, permission, tenant) check.
+*AuthorizationApi* | [**createRole**](docs/AuthorizationApi.md#createrole) | **POST** /v1/tenants/{tenant_id}/roles | Create a new role in a tenant.
+*AuthorizationApi* | [**deleteRole**](docs/AuthorizationApi.md#deleterole) | **DELETE** /v1/roles/{role_id} | Delete a role. System roles refuse delete with 422.
+*AuthorizationApi* | [**getRole**](docs/AuthorizationApi.md#getrole) | **GET** /v1/roles/{role_id} | Fetch a role by id.
+*AuthorizationApi* | [**listMemberRoles**](docs/AuthorizationApi.md#listmemberroles) | **GET** /v1/members/{member_id}/roles | List roles assigned to a member.
+*AuthorizationApi* | [**listPermissions**](docs/AuthorizationApi.md#listpermissions) | **GET** /v1/permissions | List the deployment-wide permission catalogue.
+*AuthorizationApi* | [**listRoles**](docs/AuthorizationApi.md#listroles) | **GET** /v1/tenants/{tenant_id}/roles | List roles in a tenant.
+*AuthorizationApi* | [**unassignMemberRole**](docs/AuthorizationApi.md#unassignmemberrole) | **DELETE** /v1/members/{member_id}/roles/{role_id} | Unassign a role from a member.
+*AuthorizationApi* | [**updateRole**](docs/AuthorizationApi.md#updaterole) | **PATCH** /v1/roles/{role_id} | Update a role. Permissions slice is set-replace.
 *InvitationsApi* | [**acceptInvitation**](docs/InvitationsApi.md#acceptinvitation) | **POST** /v1/invitations/{invitation_id}/accept | Accept a pending invitation. Creates the Member row.
 *InvitationsApi* | [**createInvitation**](docs/InvitationsApi.md#createinvitation) | **POST** /v1/organizations/{organization_id}/invitations | Create an invitation. Email is queued; plaintext token returned ONCE.
 *InvitationsApi* | [**getInvitation**](docs/InvitationsApi.md#getinvitation) | **GET** /v1/invitations/{invitation_id} | Fetch an invitation by id. Plaintext token never echoed.
@@ -100,10 +111,17 @@ Class | Method | HTTP request | Description
 ### Documentation For Models
 
  - [AcceptInvitationRequest](docs/AcceptInvitationRequest.md)
+ - [AssignMemberRoleRequest](docs/AssignMemberRoleRequest.md)
+ - [BatchCheckAuthorizationRequest](docs/BatchCheckAuthorizationRequest.md)
+ - [BatchCheckAuthorizationResponse](docs/BatchCheckAuthorizationResponse.md)
+ - [CheckAuthorizationRequest](docs/CheckAuthorizationRequest.md)
+ - [CheckAuthorizationResponse](docs/CheckAuthorizationResponse.md)
+ - [CheckAuthorizationResponseData](docs/CheckAuthorizationResponseData.md)
  - [CreateInvitationRequest](docs/CreateInvitationRequest.md)
  - [CreateInvitationResponse](docs/CreateInvitationResponse.md)
  - [CreateNotificationChannelRequest](docs/CreateNotificationChannelRequest.md)
  - [CreateOrganizationRequest](docs/CreateOrganizationRequest.md)
+ - [CreateRoleRequest](docs/CreateRoleRequest.md)
  - [CreateTenantRequest](docs/CreateTenantRequest.md)
  - [CreateUserRequest](docs/CreateUserRequest.md)
  - [CredentialsBundle](docs/CredentialsBundle.md)
@@ -117,6 +135,9 @@ Class | Method | HTTP request | Description
  - [Member](docs/Member.md)
  - [MemberListResponse](docs/MemberListResponse.md)
  - [MemberResponse](docs/MemberResponse.md)
+ - [MemberRoleAssignment](docs/MemberRoleAssignment.md)
+ - [MemberRoleListResponse](docs/MemberRoleListResponse.md)
+ - [MemberRoleResponse](docs/MemberRoleResponse.md)
  - [Notification](docs/Notification.md)
  - [NotificationChannel](docs/NotificationChannel.md)
  - [NotificationChannelListResponse](docs/NotificationChannelListResponse.md)
@@ -130,8 +151,13 @@ Class | Method | HTTP request | Description
  - [OrganizationListResponse](docs/OrganizationListResponse.md)
  - [OrganizationResponse](docs/OrganizationResponse.md)
  - [Pagination](docs/Pagination.md)
+ - [Permission](docs/Permission.md)
+ - [PermissionListResponse](docs/PermissionListResponse.md)
  - [Problem](docs/Problem.md)
  - [RegisterNotificationWorkflowRequest](docs/RegisterNotificationWorkflowRequest.md)
+ - [Role](docs/Role.md)
+ - [RoleListResponse](docs/RoleListResponse.md)
+ - [RoleResponse](docs/RoleResponse.md)
  - [RotateChannelCredentialsRequest](docs/RotateChannelCredentialsRequest.md)
  - [SESCredentials](docs/SESCredentials.md)
  - [SMTPCredentials](docs/SMTPCredentials.md)
@@ -147,6 +173,7 @@ Class | Method | HTTP request | Description
  - [UpdateNotificationChannelRequest](docs/UpdateNotificationChannelRequest.md)
  - [UpdateNotificationWorkflowRequest](docs/UpdateNotificationWorkflowRequest.md)
  - [UpdateOrganizationRequest](docs/UpdateOrganizationRequest.md)
+ - [UpdateRoleRequest](docs/UpdateRoleRequest.md)
  - [UpdateTenantRequest](docs/UpdateTenantRequest.md)
  - [UpdateUserRequest](docs/UpdateUserRequest.md)
  - [User](docs/User.md)

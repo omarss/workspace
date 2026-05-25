@@ -73,6 +73,33 @@ authentication; the AssertTenant call is replaced by the constant-time
 tenant match. See
 `internal/dataplane/organizations/invite.go:AcceptInvitation`.
 
+**Authorization enforcement on destructive ops** (Phase 8 partial retrofit):
+The `SAAS_RBAC_ENFORCE_DESTRUCTIVE` env flag controls whether the six
+retrofitted destructive endpoints actually enforce RBAC. The flag defaults
+to **off** so dev / first-run flows are not broken before the operator
+bootstrap assigns the `tenant_admin` role to a real user; production
+deployments MUST set it to `true`. Until v1 ships the full self-service
+"join your tenant" flow, the principal's `ActorID` (the user_id) is
+passed to the checker as the member identifier — the user→member
+resolution is the documented v1 hardening item.
+
+Retrofitted endpoints + their required permissions:
+
+| Endpoint | Permission |
+|---|---|
+| `PATCH /v1/tenants/{tenant_id}` | `tenant.write` |
+| `DELETE /v1/users/{user_id}` | `user.write` |
+| `POST /v1/users/{user_id}/disable` | `user.write` |
+| `DELETE /v1/organizations/{org_id}` | `organization.delete` |
+| `POST /v1/notification-channels/{id}/rotate-credentials` | `notification_channel.write` |
+| `POST /v1/organizations/{org_id}/invitations` | `invitation.write` |
+
+Full handler retrofit lands in v1 as part of the v1 RBAC hardening pass.
+Until then, `auth.AssertTenant` remains the only authorization gate for
+non-retrofitted endpoints (most read endpoints + non-destructive PATCH).
+The retrofitted handlers go through `authorization.EnforceDestructive`,
+which short-circuits when the flag is unset.
+
 ## 3. Handler error mapping
 
 Handlers translate errors with `problem.FromError` — never with raw

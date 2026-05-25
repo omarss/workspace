@@ -56,6 +56,13 @@ tags:
       Pending invitations for an Organization. POST returns 202 with the
       one-time accept URL + plaintext token; subsequent reads return only
       the token_prefix.
+  - name: authorization
+    description: |
+      RBAC roles, permissions, member-role assignments, and the
+      synchronous check API. Uses Casbin's RBAC-with-domains model with
+      dom = tenant_id (ADR 005). Wildcard domains are forbidden by DB
+      CHECK + service-layer validation. Every denied check emits an
+      `authorization.denied` outbox event for the Phase 10 audit log.
 security:
   - bearerAuth: []
   - apiKeyAuth: []
@@ -1352,6 +1359,304 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
 
+  /v1/tenants/{tenant_id}/roles:
+    parameters:
+      - in: path
+        name: tenant_id
+        required: true
+        schema:
+          type: string
+          pattern: "^tenant_[0-9A-HJKMNP-TV-Z]{26}$"
+    get:
+      operationId: listRoles
+      tags: [authorization]
+      summary: List roles in a tenant.
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoleListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      operationId: createRole
+      tags: [authorization]
+      summary: Create a new role in a tenant.
+      description: |
+        Roles are tenant-scoped. The optional `permissions` array seeds
+        the role's p-rows in a single transaction. Permission ids must
+        exist in the deployment-wide catalogue (`/v1/permissions`).
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateRoleRequest"
+      responses:
+        "201":
+          description: Created
+          headers:
+            ETag:
+              schema:
+                type: string
+            Location:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoleResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "422":
+          $ref: "#/components/responses/IdempotencyConflictOrValidation"
+
+  /v1/roles/{role_id}:
+    parameters:
+      - in: path
+        name: role_id
+        required: true
+        schema:
+          type: string
+          pattern: "^role_[0-9A-HJKMNP-TV-Z]{26}$"
+    get:
+      operationId: getRole
+      tags: [authorization]
+      summary: Fetch a role by id.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoleResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      operationId: updateRole
+      tags: [authorization]
+      summary: Update a role. Permissions slice is set-replace.
+      parameters:
+        - $ref: "#/components/parameters/IfMatch"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateRoleRequest"
+      responses:
+        "200":
+          description: OK
+          headers:
+            ETag:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoleResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "412":
+          $ref: "#/components/responses/PreconditionFailed"
+        "422":
+          $ref: "#/components/responses/IdempotencyConflictOrValidation"
+    delete:
+      operationId: deleteRole
+      tags: [authorization]
+      summary: Delete a role. System roles refuse delete with 422.
+      parameters:
+        - $ref: "#/components/parameters/IfMatch"
+      responses:
+        "204":
+          description: Deleted
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "412":
+          $ref: "#/components/responses/PreconditionFailed"
+        "422":
+          description: Role is system-protected.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+
+  /v1/permissions:
+    get:
+      operationId: listPermissions
+      tags: [authorization]
+      summary: List the deployment-wide permission catalogue.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PermissionListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /v1/members/{member_id}/roles:
+    parameters:
+      - in: path
+        name: member_id
+        required: true
+        schema:
+          type: string
+          pattern: "^member_[0-9A-HJKMNP-TV-Z]{26}$"
+    get:
+      operationId: listMemberRoles
+      tags: [authorization]
+      summary: List roles assigned to a member.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MemberRoleListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    post:
+      operationId: assignMemberRole
+      tags: [authorization]
+      summary: Assign a role to a member.
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AssignMemberRoleRequest"
+      responses:
+        "200":
+          description: Assigned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MemberRoleResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/IdempotencyConflictOrValidation"
+
+  /v1/members/{member_id}/roles/{role_id}:
+    parameters:
+      - in: path
+        name: member_id
+        required: true
+        schema:
+          type: string
+          pattern: "^member_[0-9A-HJKMNP-TV-Z]{26}$"
+      - in: path
+        name: role_id
+        required: true
+        schema:
+          type: string
+          pattern: "^role_[0-9A-HJKMNP-TV-Z]{26}$"
+    delete:
+      operationId: unassignMemberRole
+      tags: [authorization]
+      summary: Unassign a role from a member.
+      responses:
+        "204":
+          description: Unassigned
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /v1/authorization/check:
+    post:
+      operationId: checkAuthorization
+      tags: [authorization]
+      summary: Evaluate a single (member, permission, tenant) check.
+      description: |
+        Synchronous policy check. Returns `allowed=true` plus the role
+        that matched, or `allowed=false`. Denied checks emit an
+        `authorization.denied` outbox event so the audit log records the
+        attempt.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CheckAuthorizationRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CheckAuthorizationResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "422":
+          $ref: "#/components/responses/IdempotencyConflictOrValidation"
+
+  /v1/authorization/batch-check:
+    post:
+      operationId: batchCheckAuthorization
+      tags: [authorization]
+      summary: Evaluate many checks in one call (max 100).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BatchCheckAuthorizationRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BatchCheckAuthorizationResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "422":
+          $ref: "#/components/responses/IdempotencyConflictOrValidation"
+
 components:
   schemas:
     Health:
@@ -2218,6 +2523,196 @@ components:
           description: The one-time plaintext token from the invitation email.
           x-oapi-codegen-extra-tags:
             sensitive: "true"
+
+    Role:
+      type: object
+      required: [id, object, tenant_id, name, is_system, created_at, updated_at, etag]
+      properties:
+        id:
+          type: string
+          pattern: "^role_[0-9A-HJKMNP-TV-Z]{26}$"
+        object:
+          type: string
+          enum: [role]
+        tenant_id:
+          type: string
+          pattern: "^tenant_[0-9A-HJKMNP-TV-Z]{26}$"
+        name:
+          type: string
+          minLength: 1
+          maxLength: 64
+        description:
+          type: string
+          nullable: true
+        is_system:
+          type: boolean
+        permissions:
+          type: array
+          description: Permission ids granted to this role.
+          items:
+            type: string
+        metadata:
+          $ref: "#/components/schemas/Metadata"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        etag:
+          type: string
+    RoleResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: "#/components/schemas/Role"
+    RoleListResponse:
+      type: object
+      required: [data, pagination]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Role"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+    CreateRoleRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 64
+        description:
+          type: string
+        permissions:
+          type: array
+          items:
+            type: string
+        metadata:
+          $ref: "#/components/schemas/Metadata"
+    UpdateRoleRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        permissions:
+          type: array
+          items:
+            type: string
+        metadata:
+          $ref: "#/components/schemas/Metadata"
+
+    Permission:
+      type: object
+      required: [id, resource_type, action, description, module]
+      properties:
+        id:
+          type: string
+        resource_type:
+          type: string
+        action:
+          type: string
+        description:
+          type: string
+        module:
+          type: string
+        is_system:
+          type: boolean
+    PermissionListResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Permission"
+
+    MemberRoleAssignment:
+      type: object
+      required: [member_id, role_id, tenant_id, assigned_at, assigned_by]
+      properties:
+        member_id:
+          type: string
+        role_id:
+          type: string
+        tenant_id:
+          type: string
+        assigned_at:
+          type: string
+          format: date-time
+        assigned_by:
+          type: string
+    MemberRoleResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: "#/components/schemas/MemberRoleAssignment"
+    MemberRoleListResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/MemberRoleAssignment"
+    AssignMemberRoleRequest:
+      type: object
+      required: [role_id, tenant_id]
+      properties:
+        role_id:
+          type: string
+        tenant_id:
+          type: string
+
+    CheckAuthorizationRequest:
+      type: object
+      required: [member_id, permission, tenant_id]
+      properties:
+        member_id:
+          type: string
+        permission:
+          type: string
+          description: 'resource_type.action — e.g. "tenant.read".'
+        tenant_id:
+          type: string
+    CheckAuthorizationResponseData:
+      type: object
+      required: [allowed]
+      properties:
+        allowed:
+          type: boolean
+        via_role:
+          type: string
+          nullable: true
+    CheckAuthorizationResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: "#/components/schemas/CheckAuthorizationResponseData"
+    BatchCheckAuthorizationRequest:
+      type: object
+      required: [checks]
+      properties:
+        checks:
+          type: array
+          maxItems: 100
+          items:
+            $ref: "#/components/schemas/CheckAuthorizationRequest"
+    BatchCheckAuthorizationResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/CheckAuthorizationResponseData"
 
     Pagination:
       type: object

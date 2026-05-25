@@ -8,6 +8,17 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type CasbinRule struct {
+	ID    int64   `json:"id"`
+	Ptype string  `json:"ptype"`
+	V0    string  `json:"v0"`
+	V1    string  `json:"v1"`
+	V2    *string `json:"v2"`
+	V3    *string `json:"v3"`
+	V4    *string `json:"v4"`
+	V5    *string `json:"v5"`
+}
+
 type IdempotencyRecord struct {
 	ID              int64              `json:"id"`
 	TenantID        string             `json:"tenant_id"`
@@ -68,6 +79,14 @@ type Member struct {
 	JoinedAt       pgtype.Timestamptz `json:"joined_at"`
 	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
 	RemovedAt      pgtype.Timestamptz `json:"removed_at"`
+}
+
+type MemberRole struct {
+	MemberID   string             `json:"member_id"`
+	RoleID     string             `json:"role_id"`
+	TenantID   string             `json:"tenant_id"`
+	AssignedBy string             `json:"assigned_by"`
+	AssignedAt pgtype.Timestamptz `json:"assigned_at"`
 }
 
 type Notification struct {
@@ -155,6 +174,15 @@ type OutboxEvent struct {
 	LastError        *string            `json:"last_error"`
 }
 
+type Permission struct {
+	ID           string `json:"id"`
+	ResourceType string `json:"resource_type"`
+	Action       string `json:"action"`
+	Description  string `json:"description"`
+	Module       string `json:"module"`
+	IsSystem     bool   `json:"is_system"`
+}
+
 type PlatformUser struct {
 	ID              string             `json:"id"`
 	TenantID        string             `json:"tenant_id"`
@@ -182,6 +210,19 @@ type PlatformUser struct {
 	CreatedAt       pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
 	DeletedAt       pgtype.Timestamptz `json:"deleted_at"`
+}
+
+type Role struct {
+	ID          string             `json:"id"`
+	TenantID    string             `json:"tenant_id"`
+	Name        string             `json:"name"`
+	Description *string            `json:"description"`
+	IsSystem    bool               `json:"is_system"`
+	Metadata    []byte             `json:"metadata"`
+	RowSeq      int64              `json:"row_seq"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+	DeletedAt   pgtype.Timestamptz `json:"deleted_at"`
 }
 
 type SchemaBootstrapDataplane struct {

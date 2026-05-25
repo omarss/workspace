@@ -215,6 +215,55 @@ func (s *strictSrv) AcceptInvitation(_ context.Context, _ httpapi.AcceptInvitati
 	return nil, nil //nolint:nilnil
 }
 
+// Authorization delegation — Phase 8 stubs so the tenancy matrix keeps
+// satisfying StrictServerInterface. The tenancy tests never invoke the
+// RBAC endpoints; each stub returns nil so the wiring compiles without
+// dragging the authorization module's deps into this suite.
+
+func (s *strictSrv) ListRoles(_ context.Context, _ httpapi.ListRolesRequestObject) (httpapi.ListRolesResponseObject, error) {
+	return nil, nil //nolint:nilnil
+}
+
+func (s *strictSrv) CreateRole(_ context.Context, _ httpapi.CreateRoleRequestObject) (httpapi.CreateRoleResponseObject, error) {
+	return nil, nil //nolint:nilnil
+}
+
+func (s *strictSrv) GetRole(_ context.Context, _ httpapi.GetRoleRequestObject) (httpapi.GetRoleResponseObject, error) {
+	return nil, nil //nolint:nilnil
+}
+
+func (s *strictSrv) UpdateRole(_ context.Context, _ httpapi.UpdateRoleRequestObject) (httpapi.UpdateRoleResponseObject, error) {
+	return nil, nil //nolint:nilnil
+}
+
+func (s *strictSrv) DeleteRole(_ context.Context, _ httpapi.DeleteRoleRequestObject) (httpapi.DeleteRoleResponseObject, error) {
+	return nil, nil //nolint:nilnil
+}
+
+func (s *strictSrv) ListPermissions(_ context.Context, _ httpapi.ListPermissionsRequestObject) (httpapi.ListPermissionsResponseObject, error) {
+	return nil, nil //nolint:nilnil
+}
+
+func (s *strictSrv) ListMemberRoles(_ context.Context, _ httpapi.ListMemberRolesRequestObject) (httpapi.ListMemberRolesResponseObject, error) {
+	return nil, nil //nolint:nilnil
+}
+
+func (s *strictSrv) AssignMemberRole(_ context.Context, _ httpapi.AssignMemberRoleRequestObject) (httpapi.AssignMemberRoleResponseObject, error) {
+	return nil, nil //nolint:nilnil
+}
+
+func (s *strictSrv) UnassignMemberRole(_ context.Context, _ httpapi.UnassignMemberRoleRequestObject) (httpapi.UnassignMemberRoleResponseObject, error) {
+	return nil, nil //nolint:nilnil
+}
+
+func (s *strictSrv) CheckAuthorization(_ context.Context, _ httpapi.CheckAuthorizationRequestObject) (httpapi.CheckAuthorizationResponseObject, error) {
+	return nil, nil //nolint:nilnil
+}
+
+func (s *strictSrv) BatchCheckAuthorization(_ context.Context, _ httpapi.BatchCheckAuthorizationRequestObject) (httpapi.BatchCheckAuthorizationResponseObject, error) {
+	return nil, nil //nolint:nilnil
+}
+
 // noopIdentityProvider satisfies identity.IdentityProvider without doing any
 // work. Used to fulfil the strict interface in the tenancy security suite —
 // every method either returns "" / nil or an error that surfaces as a 5xx
@@ -270,7 +319,7 @@ func buildServer(t *testing.T, prodEnv bool) (*httptest.Server, *fakeRepo) {
 	}
 	repo := newFakeRepo()
 	svc := tenancy.NewService(repo, &captureEvents{})
-	h := tenancy.NewHandler(svc)
+	h := tenancy.NewHandler(svc, nil)
 
 	idSvc := identity.NewService(identity.Config{
 		Repo:         newTenancySuiteIdentityRepo(),
@@ -279,7 +328,7 @@ func buildServer(t *testing.T, prodEnv bool) (*httptest.Server, *fakeRepo) {
 		Events:       noopEvents{},
 		DeploymentID: "dep_test",
 	})
-	idH := identity.NewHandler(idSvc)
+	idH := identity.NewHandler(idSvc, nil)
 
 	// Phase 6: stub notifications handler so the strict-server interface
 	// is fully satisfied. The tenancy suite never calls /v1/notifications;
@@ -289,7 +338,7 @@ func buildServer(t *testing.T, prodEnv bool) (*httptest.Server, *fakeRepo) {
 		Events:       noopEvents{},
 		DeploymentID: "dep_test",
 	})
-	notifH := notifications.NewHandler(notifSvc)
+	notifH := notifications.NewHandler(notifSvc, nil)
 
 	r := chi.NewRouter()
 	r.Use(auth.MockMiddleware)

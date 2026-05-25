@@ -7,6 +7,7 @@ import (
 
 	openapi_types "github.com/oapi-codegen/runtime/types"
 
+	"github.com/omarss/saas/internal/dataplane/authorization"
 	httpapi "github.com/omarss/saas/internal/dataplane/httpapi" // package dataplaneapi
 	"github.com/omarss/saas/internal/platform/auth"
 	"github.com/omarss/saas/internal/platform/cursor"
@@ -23,12 +24,21 @@ import (
 // is enforced inside the service (auth.AssertTenant) — the handler only
 // extracts the caller tenant from the principal context (never from headers
 // per AGENTS.md §5.1) and forwards it.
+//
+// Phase 8 retrofit: destructive endpoints (DELETE /users/{id} and the
+// disable transition) consult the PermissionChecker when
+// SAAS_RBAC_ENFORCE_DESTRUCTIVE=true. The checker may be nil in tests.
 type Handler struct {
-	svc *Service
+	svc     *Service
+	checker authorization.PermissionChecker
 }
 
-// NewHandler wires a Handler over the identity service.
-func NewHandler(svc *Service) *Handler { return &Handler{svc: svc} }
+// NewHandler wires a Handler over the identity service. The checker is
+// the Phase 8 RBAC gate; pass nil in tests that don't exercise the
+// destructive enforcement matrix.
+func NewHandler(svc *Service, checker authorization.PermissionChecker) *Handler {
+	return &Handler{svc: svc, checker: checker}
+}
 
 // Service returns the wrapped service — handy for the eventual strict-server
 // composition in cmd/dataplane/main.go.
@@ -172,10 +182,14 @@ func (h *Handler) UpdateUser(ctx context.Context, req httpapi.UpdateUserRequestO
 }
 
 // DeleteUser handles DELETE /v1/users/{user_id} with mandatory If-Match.
+// Phase 8 retrofit: requires user.write when SAAS_RBAC_ENFORCE_DESTRUCTIVE=true.
 func (h *Handler) DeleteUser(ctx context.Context, req httpapi.DeleteUserRequestObject) (httpapi.DeleteUserResponseObject, error) {
 	tenantID, ok := auth.TenantFromContext(ctx)
 	if !ok {
 		return deleteUserUnauthorized("/v1/users/" + req.UserId), nil
+	}
+	if err := h.enforceUserWrite(ctx, tenantID); err != nil {
+		return deleteUserError(err, "/v1/users/"+req.UserId), nil
 	}
 	expected, parseErr := etag.Parse(req.Params.IfMatch)
 	if parseErr != nil {
@@ -188,10 +202,14 @@ func (h *Handler) DeleteUser(ctx context.Context, req httpapi.DeleteUserRequestO
 }
 
 // DisableUser handles POST /v1/users/{user_id}/disable.
+// Phase 8 retrofit: requires user.write when SAAS_RBAC_ENFORCE_DESTRUCTIVE=true.
 func (h *Handler) DisableUser(ctx context.Context, req httpapi.DisableUserRequestObject) (httpapi.DisableUserResponseObject, error) {
 	tenantID, ok := auth.TenantFromContext(ctx)
 	if !ok {
 		return disableUserUnauthorized("/v1/users/" + req.UserId + "/disable"), nil
+	}
+	if err := h.enforceUserWrite(ctx, tenantID); err != nil {
+		return disableUserError(err, "/v1/users/"+req.UserId+"/disable"), nil
 	}
 	u, err := h.svc.Disable(ctx, tenantID, req.UserId)
 	if err != nil {
@@ -515,6 +533,11 @@ func deleteUserError(err error, instance string) httpapi.DeleteUserResponseObjec
 	switch {
 	case errors.Is(err, auth.ErrUnauthorized):
 		return deleteUserUnauthorized(instance)
+	case errors.Is(err, authorization.ErrPermissionDenied):
+		p := problem.New("forbidden", "Caller lacks the required permission.", http.StatusForbidden, "user.write required", instance)
+		return httpapi.DeleteUser403ApplicationProblemPlusJSONResponse{
+			ForbiddenApplicationProblemPlusJSONResponse: httpapi.ForbiddenApplicationProblemPlusJSONResponse(toAPIProblem(p)),
+		}
 	case errors.Is(err, auth.ErrCrossTenant):
 		p := problem.New("forbidden", "Caller lacks permission for this resource.", http.StatusForbidden, "", instance)
 		return httpapi.DeleteUser403ApplicationProblemPlusJSONResponse{
@@ -543,6 +566,11 @@ func disableUserError(err error, instance string) httpapi.DisableUserResponseObj
 	switch {
 	case errors.Is(err, auth.ErrUnauthorized):
 		return disableUserUnauthorized(instance)
+	case errors.Is(err, authorization.ErrPermissionDenied):
+		p := problem.New("forbidden", "Caller lacks the required permission.", http.StatusForbidden, "user.write required", instance)
+		return httpapi.DisableUser403ApplicationProblemPlusJSONResponse{
+			ForbiddenApplicationProblemPlusJSONResponse: httpapi.ForbiddenApplicationProblemPlusJSONResponse(toAPIProblem(p)),
+		}
 	case errors.Is(err, auth.ErrCrossTenant):
 		p := problem.New("forbidden", "Caller lacks permission for this resource.", http.StatusForbidden, "", instance)
 		return httpapi.DisableUser403ApplicationProblemPlusJSONResponse{
@@ -756,4 +784,12 @@ func statusTitle(status int) string {
 	default:
 		return "Error."
 	}
+}
+
+// enforceUserWrite is the Phase 8 §8.11 retrofit gate for destructive
+// /v1/users transitions (delete, disable). See CONVENTIONS.md §2 for
+// the partial-retrofit policy and the user→member resolution gap.
+func (h *Handler) enforceUserWrite(ctx context.Context, tenantID string) error {
+	p, _ := auth.PrincipalFromContext(ctx)
+	return authorization.EnforceDestructive(ctx, h.checker, p.ActorID, tenantID, "user.write")
 }
