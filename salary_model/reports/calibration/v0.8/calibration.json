@@ -1,0 +1,32 @@
+{
+  "reference_year": 2020,
+  "rows_calibrated": 25000,
+  "steps": [
+    {
+      "name": "saudi_premium",
+      "before": 0.10068887389656436,
+      "after": 0.5532231709041509,
+      "target": 0.5532231709041507,
+      "multiplier": 3.5733333871015827
+    },
+    {
+      "name": "gender_gap",
+      "before": -0.133012990468119,
+      "after": -0.010857275980652786,
+      "target": -0.010857275980652784,
+      "multiplier": 1.1408968221489533
+    },
+    {
+      "name": "mean",
+      "before": 49539.462425408594,
+      "after": 10973.630986762595,
+      "target": 10973.630986762595,
+      "multiplier": 0.2215129201954009
+    }
+  ],
+  "skipped": [],
+  "notes": [
+    "mean pinned to Saudi-only published wage",
+    "anchor year 2020 is 6.0y old; trended forward by +12.62% via CPI (2.0%/yr compounded) to today"
+  ]
+}
