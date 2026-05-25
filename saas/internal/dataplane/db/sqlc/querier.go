@@ -11,6 +11,7 @@ import (
 )
 
 type Querier interface {
+	AssignMemberRole(ctx context.Context, arg AssignMemberRoleParams) (MemberRole, error)
 	// Insert-or-no-op claim. Returns the new row if the key is fresh; returns no
 	// rows when another concurrent request already claimed the slot (handler then
 	// calls GetIdempotencyRecord to fetch the cached state).
@@ -42,6 +43,13 @@ type Querier interface {
 	// email_lookup_hash and runs the persistence walker to populate the
 	// envelope columns before binding the parameters.
 	CreatePlatformUser(ctx context.Context, arg CreatePlatformUserParams) (PlatformUser, error)
+	// Authorization (Phase 8) queries.
+	//
+	// Owns the role catalogue, the permission catalogue, and the member_role
+	// assignment denormalisation. The casbin_rule table is owned by the Casbin
+	// pgx adapter; we never query it directly from sqlc — the adapter's
+	// AddPolicy / RemovePolicy / LoadPolicy is the only writer/reader.
+	CreateRole(ctx context.Context, arg CreateRoleParams) (Role, error)
 	CreateTenant(ctx context.Context, arg CreateTenantParams) (Tenant, error)
 	DeleteExpiredSocialLoginStates(ctx context.Context) (int64, error)
 	ExpireIdempotencyRecords(ctx context.Context) error
@@ -57,6 +65,10 @@ type Querier interface {
 	GetInvitationByTokenHash(ctx context.Context, tokenHash []byte) (Invitation, error)
 	GetMember(ctx context.Context, id string) (Member, error)
 	GetMemberByUser(ctx context.Context, arg GetMemberByUserParams) (Member, error)
+	// Resolves the tenant a member belongs to. Used by the authorization
+	// service before consulting the enforcer so cross-tenant Check requests
+	// can be rejected before any policy round-trip.
+	GetMemberTenantID(ctx context.Context, id string) (string, error)
 	GetNotification(ctx context.Context, id string) (Notification, error)
 	GetNotificationChannel(ctx context.Context, id string) (NotificationChannel, error)
 	GetNotificationChannelByName(ctx context.Context, arg GetNotificationChannelByNameParams) (NotificationChannel, error)
@@ -67,6 +79,7 @@ type Querier interface {
 	GetPlatformUser(ctx context.Context, id string) (PlatformUser, error)
 	GetPlatformUserByEmailHash(ctx context.Context, arg GetPlatformUserByEmailHashParams) (PlatformUser, error)
 	GetPlatformUserByKeycloakID(ctx context.Context, keycloakUserID string) (PlatformUser, error)
+	GetRole(ctx context.Context, id string) (Role, error)
 	GetTenant(ctx context.Context, id string) (Tenant, error)
 	GetTenantBySlug(ctx context.Context, slug string) (Tenant, error)
 	InsertNotificationAttempt(ctx context.Context, arg InsertNotificationAttemptParams) error
@@ -75,6 +88,7 @@ type Querier interface {
 	LinkIdentityProvider(ctx context.Context, arg LinkIdentityProviderParams) error
 	ListIdentityProviders(ctx context.Context, arg ListIdentityProvidersParams) ([]ListIdentityProvidersRow, error)
 	ListInvitationsByOrganization(ctx context.Context, arg ListInvitationsByOrganizationParams) ([]Invitation, error)
+	ListMemberRoles(ctx context.Context, memberID string) ([]MemberRole, error)
 	ListMembersByOrganization(ctx context.Context, arg ListMembersByOrganizationParams) ([]Member, error)
 	ListNotificationChannels(ctx context.Context, arg ListNotificationChannelsParams) ([]NotificationChannel, error)
 	ListNotificationWorkflows(ctx context.Context, tenantID string) ([]NotificationWorkflow, error)
@@ -82,9 +96,11 @@ type Querier interface {
 	// Keyset pagination on (created_at DESC, id DESC). row_limit is limit+1
 	// so the caller can detect has_more.
 	ListOrganizationsByTenant(ctx context.Context, arg ListOrganizationsByTenantParams) ([]Organization, error)
+	ListPermissions(ctx context.Context) ([]Permission, error)
 	// Keyset pagination on (created_at DESC, id DESC). row_limit is limit+1 so
 	// the caller can detect has_more.
 	ListPlatformUsers(ctx context.Context, arg ListPlatformUsersParams) ([]PlatformUser, error)
+	ListRolesByTenant(ctx context.Context, arg ListRolesByTenantParams) ([]Role, error)
 	// Keyset pagination on (created_at DESC, id DESC). Cursor passes the last
 	// emitted row's pair; the +1 returned row signals has_more (the handler
 	// trims and emits the cursor for the trailing row).
@@ -108,7 +124,9 @@ type Querier interface {
 	SoftDeleteNotificationChannel(ctx context.Context, arg SoftDeleteNotificationChannelParams) (int64, error)
 	SoftDeleteOrganization(ctx context.Context, arg SoftDeleteOrganizationParams) (Organization, error)
 	SoftDeletePlatformUser(ctx context.Context, arg SoftDeletePlatformUserParams) (PlatformUser, error)
+	SoftDeleteRole(ctx context.Context, arg SoftDeleteRoleParams) (Role, error)
 	SoftDeleteTenant(ctx context.Context, arg SoftDeleteTenantParams) (Tenant, error)
+	UnassignMemberRole(ctx context.Context, arg UnassignMemberRoleParams) (int64, error)
 	UnlinkIdentityProvider(ctx context.Context, arg UnlinkIdentityProviderParams) (int64, error)
 	UpdateMemberRole(ctx context.Context, arg UpdateMemberRoleParams) (Member, error)
 	// Metadata-only patch under optimistic concurrency. Does NOT accept new
@@ -124,6 +142,7 @@ type Querier interface {
 	// Each PII field updates the full five-column envelope set; the caller passes
 	// nil when the column should not change.
 	UpdatePlatformUser(ctx context.Context, arg UpdatePlatformUserParams) (PlatformUser, error)
+	UpdateRole(ctx context.Context, arg UpdateRoleParams) (Role, error)
 	// Optimistic concurrency: expected_row_seq must match the current row_seq,
 	// otherwise zero rows are returned and the service raises ErrETagMismatch.
 	UpdateTenant(ctx context.Context, arg UpdateTenantParams) (Tenant, error)
