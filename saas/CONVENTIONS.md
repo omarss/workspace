@@ -307,6 +307,62 @@ once the PR is open so CI runs; monitor and fix any failure. CI billing
 may be unavailable in dev — the maintainer notes this in the PR thread
 when it applies.
 
+## 14. Audit (Phase 10)
+
+Every tenant-bound mutating endpoint emits an outbox event that the audit
+subscriber translates into an `audit_event` row. The subscriber is the
+SINGLE writer of `audit_event`; service code never calls `repo.Append`
+directly. Adding a new audited action requires:
+
+1. Emit the outbox event from the mutating service (per §9).
+2. Add the event-type key to `audit.AuditedEventTypes` in
+   `internal/dataplane/audit/subscriber.go`.
+3. Add the type to `AGENTS.md §18.3` in the same PR.
+4. Cover the path with a §17.3 row + a subscriber test.
+
+### 14.1 Event payload conventions
+
+Audit-eligible outbox payloads should carry:
+
+```text
+actor_type     — user | api_key | operator | operator_impersonation | system
+actor_id       — user_<ulid> / apik_<ulid> / op_<ulid> / "system"
+resource_type  — e.g. "tenant", "user", "api_key" (defaults to action prefix)
+resource_id    — the affected resource id
+ip_address     — optional; carried verbatim into audit_event.ip_address
+user_agent     — optional
+request_id     — optional
+metadata       — optional nested object; PII keys are redacted at insert
+```
+
+Top-level PII keys in `metadata` are scrubbed via the platform redactor
+(`internal/platform/log/redact.go`). Nested keys are walked recursively.
+The subscriber NEVER receives plaintext PII into the audit table; the
+forensic-decrypt path (envelope-encrypted metadata column) lands in
+Phase 13 with operator step-up.
+
+### 14.2 Canonicalisation invariant
+
+`audit.Canonical` / `audit.CanonicalBytes` (RFC 8785 JCS via
+`github.com/gowebpki/jcs`) is the ONLY source of canonical bytes used
+for the hash chain. ADR 012 records the rationale. Computing an
+alternate hash through any other code path is a security incident.
+
+### 14.3 Append-only DB layer
+
+`migrations/dataplane/000008_audit.up.sql` REVOKES UPDATE / DELETE and
+installs BEFORE UPDATE / DELETE triggers that raise an exception. Any
+test that needs to corrupt a row to exercise the verifier MUST use the
+`MemoryRepository.TamperRowHash` / `TamperPrevHash` helpers — never a
+raw `UPDATE` against a pgx pool. The integration-build-tag test
+`TestAuditEvent_DBTriggerRejectsUpdate` proves the trigger surface.
+
+### 14.4 Authorization on audit reads
+
+MVP gates audit reads with `auth.AssertTenant` only. The `audit.read`
+permission exists in the catalogue (Phase 10 migration) and is reserved
+for the v1 RBAC hardening pass alongside the §2 retrofit set.
+
 ---
 
 ## Appendix A — Platform package map
