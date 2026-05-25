@@ -43,8 +43,8 @@ android {
 
     defaultConfig {
         applicationId = "net.omarss.omono"
-        versionCode = 74
-        versionName = "0.55.0"
+        versionCode = 75
+        versionName = "0.56.0"
 
         buildConfigField("String", "GPLACES_API_URL", "\"${gplacesApiUrl}\"")
         buildConfigField("String", "GPLACES_API_KEY", "\"${gplacesApiKey}\"")
