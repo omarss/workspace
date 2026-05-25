@@ -63,6 +63,16 @@ The Tenants module is the **one exception**: `Service.Create` takes no
 other module's `Service.Create` MUST take `tenantID` as the first non-ctx
 arg.
 
+**Documented exception — Invitation.Accept**: the accept-flow consumes a
+state token that ITSELF carries the tenant_id binding (via the invitation
+row's `tenant_id` column). The handler does NOT extract tenant_id from JWT
+for this single endpoint — it extracts the caller's tenant from JWT, then
+**also** verifies the invitation's stored `tenant_id` matches via
+`crypto/subtle.ConstantTimeCompare`. The token consumption is the
+authentication; the AssertTenant call is replaced by the constant-time
+tenant match. See
+`internal/dataplane/organizations/invite.go:AcceptInvitation`.
+
 ## 3. Handler error mapping
 
 Handlers translate errors with `problem.FromError` — never with raw
