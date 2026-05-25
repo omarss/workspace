@@ -1,0 +1,29 @@
+{
+  "reference_year": 2020,
+  "rows_calibrated": 25000,
+  "steps": [
+    {
+      "name": "saudi_premium",
+      "before": 0.10068887389656436,
+      "after": 0.5532231709041509,
+      "target": 0.5532231709041507,
+      "multiplier": 3.5733333871015827
+    },
+    {
+      "name": "gender_gap",
+      "before": -0.133012990468119,
+      "after": -0.010857275980652786,
+      "target": -0.010857275980652784,
+      "multiplier": 1.1408968221489533
+    },
+    {
+      "name": "mean",
+      "before": 49539.462425408594,
+      "after": 7065.070359705429,
+      "target": 7065.07035970543,
+      "multiplier": 0.1426149985043395
+    }
+  ],
+  "skipped": [],
+  "notes": []
+}

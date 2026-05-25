@@ -1,0 +1,6 @@
+{
+  "run_id": "v0.7",
+  "seed": 17,
+  "snapshot": "data/processed/observations_v0.7.parquet",
+  "snapshot_sha256": "79f287ba1b16a2eb6f35e4473c30c906fbf5187c78c48ea6e9e7868934f0c2a7"
+}
