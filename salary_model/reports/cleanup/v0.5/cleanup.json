@@ -1,0 +1,50 @@
+{
+  "rows_in": 25000,
+  "rows_out": 25000,
+  "rows_dropped": 0,
+  "rules": [
+    {
+      "name": "drop_missing_required",
+      "description": "NaN in any of ('observed_at', 'family', 'level', 'region', 'sector', 'ownership', 'base_monthly', 'is_saudi', 'source')",
+      "rows_dropped": 0,
+      "rows_flagged": 0
+    },
+    {
+      "name": "drop_stale",
+      "description": "observed_at older than 5.0 years",
+      "rows_dropped": 0,
+      "rows_flagged": 0
+    },
+    {
+      "name": "drop_below_minimum_wage",
+      "description": "base_monthly < 4000 for Saudis or < 1000 for non-Saudis",
+      "rows_dropped": 0,
+      "rows_flagged": 0
+    },
+    {
+      "name": "drop_above_ceiling",
+      "description": "base_monthly > 500000",
+      "rows_dropped": 0,
+      "rows_flagged": 0
+    },
+    {
+      "name": "drop_duplicates",
+      "description": "duplicate composite key ('source', 'observed_at', 'family', 'level', 'region', 'sector', 'ownership', 'is_saudi', 'base_monthly')",
+      "rows_dropped": 0,
+      "rows_flagged": 0
+    },
+    {
+      "name": "drop_low_confidence",
+      "description": "confidence (after recency decay) < 0.1",
+      "rows_dropped": 0,
+      "rows_flagged": 0
+    },
+    {
+      "name": "flag_segment_outliers",
+      "description": "|z| > 4.0 on log(base) flagged but kept",
+      "rows_dropped": 0,
+      "rows_flagged": 0
+    }
+  ],
+  "notes": []
+}
