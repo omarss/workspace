@@ -69,6 +69,11 @@ linters:
       # middleware where the read is deliberate.
       - path: internal/platform/auth/middleware_mock\.go
         linters: [forbidigo, gocritic]
+      # operatorjwt.MockMiddleware mirrors the data-plane MockMiddleware:
+      # one defensive os.Getenv("SAAS_ENV") read so a non-prod binary
+      # running with SAAS_ENV=prod refuses the X-Mock-Operator-Id header.
+      - path: internal/platform/auth/operatorjwt/mock_middleware\.go
+        linters: [forbidigo, gocritic]
       # cmd/* binaries legitimately read non-secret env vars (DSN, deployment
       # id, listen addr). The forbidigo bare-identifier rule against
       # `os.Getenv` is a defensive guard, not an absolute ban — main.go is
