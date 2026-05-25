@@ -1,0 +1,64 @@
+# Per-Deployment workload running the data-plane image. Phase 12b kustomize
+# overlay replaces `image`, the `saas.omarss.net/deployment-id` label, and
+# the env vars wiring the per-Deployment DSN + OpenBao kid.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dataplane
+  labels:
+    app.kubernetes.io/name: dataplane
+    app.kubernetes.io/managed-by: saas-controlplane
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: dataplane
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: dataplane
+    spec:
+      serviceAccountName: dataplane
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: dataplane
+          image: ghcr.io/omarss/saas/dataplane:placeholder
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 9090
+          env:
+            - name: SAAS_ENV
+              value: prod
+            # Wired by the overlay's per-Deployment kustomization.
+            - name: DATAPLANE_DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: dataplane-db
+                  key: dsn
+            - name: SAAS_DEPLOYMENT_ID
+              value: ""
+            - name: SAAS_BAO_KID
+              value: ""
+          readinessProbe:
+            httpGet: { path: /healthz, port: http }
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /healthz, port: http }
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          resources:
+            requests: { cpu: "50m",  memory: "128Mi" }
+            limits:   { cpu: "500m", memory: "512Mi" }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]

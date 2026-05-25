@@ -1,0 +1,50 @@
+# Managed by saas-controlplane. Generated from deploy/nginx/vhost.conf.tmpl.
+# Pre-certbot base config. After install:
+#   sudo certbot --nginx -d {{ .PrimaryDomain }}{{ range .CustomDomains }} -d {{ . }}{{ end }}
+#
+# Do NOT run homelab's bulk apply-nginx — it clobbers the certbot-added 443
+# blocks (workspace CLAUDE.md gotcha #1). This file is owned by the `saas`
+# user (mode 0644) and edited only by the controlplane process; nginx reload
+# is the one privileged step.
+#
+# BYOD note: additional custom domains are appended to `server_name` so
+# one vhost covers all attached domains for the Deployment. certbot expands
+# the cert SAN list per-domain on each `domains` mutation.
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name {{ .PrimaryDomain }}{{ range .CustomDomains }} {{ . }}{{ end }};
+
+    # ACME http-01 challenge stays unencrypted and reachable from the world;
+    # everything else is upgraded to TLS by certbot's auto-injected 443 block.
+    location ^~ /.well-known/acme-challenge/ {
+        root /var/www/letsencrypt;
+        default_type "text/plain";
+    }
+
+    # Per-Deployment access log keeps audit-relevant request-id + acting tenant
+    # out of the global nginx access log.
+    access_log /var/log/nginx/saas-{{ .DeploymentID }}.access.log combined;
+    error_log  /var/log/nginx/saas-{{ .DeploymentID }}.error.log warn;
+
+    # Default-deny method allow-list; explicit > implicit.
+    if ($request_method !~ ^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)$) {
+        return 405;
+    }
+
+    include /etc/nginx/snippets/saas-security-headers.conf;
+
+    location / {
+        include /etc/nginx/snippets/saas-security-headers.conf;
+        proxy_pass http://127.0.0.1:{{ .NodePort }};
+        proxy_http_version 1.1;
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Host  $host;
+        proxy_read_timeout 60s;
+        proxy_send_timeout 60s;
+    }
+}

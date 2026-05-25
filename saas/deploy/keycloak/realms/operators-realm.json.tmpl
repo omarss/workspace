@@ -1,0 +1,72 @@
+{
+  "_comment_": "Operators realm template. Phase 11 ships the template only — the real values land in Phase 13 when operator MFA + step-up + IP allowlist are wired (AGENTS.md §18.4). The audience saas-control is the operator JWT verifier's required aud claim; never mix with the per-Deployment saas-data-<dep_id> audience.",
+  "realm": "operators",
+  "enabled": true,
+  "displayName": "SaaS Operators",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "verifyEmail": true,
+  "resetPasswordAllowed": false,
+  "editUsernameAllowed": false,
+  "sslRequired": "all",
+  "accessTokenLifespan": 600,
+  "ssoSessionMaxLifespan": 3600,
+  "bruteForceProtected": true,
+  "permanentLockout": false,
+  "failureFactor": 5,
+  "_phase13_mfa_": {
+    "browserFlow": "browser-with-otp",
+    "directGrantFlow": "direct-grant-with-otp",
+    "requiredActions": ["CONFIGURE_TOTP"]
+  },
+  "clients": [
+    {
+      "_comment_": "Operator browser client; PKCE-required. The controlplane verifies aud=saas-control before reading any operator claim.",
+      "clientId": "saas-controlplane",
+      "name": "SaaS Control Plane",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "redirectUris": ["https://control.saas.omarss.net/*"],
+      "webOrigins": ["+"],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "https://control.saas.omarss.net"
+      },
+      "protocolMappers": [
+        {
+          "name": "audience-saas-control",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.client.audience": "saas-control",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "operator-id",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "config": {
+            "user.attribute": "operator_id",
+            "claim.name": "operator_id",
+            "jsonType.label": "String",
+            "access.token.claim": "true",
+            "id.token.claim": "true"
+          }
+        }
+      ]
+    }
+  ],
+  "roles": {
+    "realm": [
+      {"name": "operator-admin",   "description": "Full control plane access; required for impersonation."},
+      {"name": "operator-viewer",  "description": "Read-only control plane access."},
+      {"name": "operator-billing", "description": "Reserved for v1."}
+    ]
+  }
+}
