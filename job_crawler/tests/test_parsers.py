@@ -412,3 +412,50 @@ def test_company_careers_jsonld_company_name_wins_over_hint() -> None:
     )
     assert parsed is not None
     assert parsed.raw_company_name == "Acme Subsidiary"
+
+
+# ---------------------------------------------------------------------------
+# core/jsonld._html_to_text: same double-encoding trap as Finding 11
+# (Greenhouse), now in the JSON-LD path. Cisco/DXC embed
+# `"description":"&lt;p&gt;..."` in their JobPosting JSON-LD blocks.
+# Stripping tags BEFORE html.unescape was a no-op; to_upsert's
+# html.unescape then decoded the entities back into raw HTML in the DB.
+# Regression caught live with 3 Cisco postings showing `<p>...` in
+# `description_en`. Fix: html.unescape() first, then strip tags.
+# ---------------------------------------------------------------------------
+def test_jsonld_html_to_text_decodes_double_encoded_description() -> None:
+    from job_crawler.core.jsonld import _html_to_text
+
+    decoded = _html_to_text("&lt;p&gt;Build great software.&lt;/p&gt;")
+    assert decoded is not None
+    assert "<p>" not in decoded
+    assert "&lt;" not in decoded
+    assert "Build great software." in decoded
+
+
+def test_jsonld_html_to_text_handles_raw_html_too() -> None:
+    """Idempotent — raw HTML still gets stripped (no regression on the
+    Greenhouse / Hala-style content that's already plain HTML)."""
+    from job_crawler.core.jsonld import _html_to_text
+
+    decoded = _html_to_text("<p>Plain raw HTML.</p>")
+    assert decoded == "Plain raw HTML."
+
+
+def test_jsonld_extract_strips_cisco_style_double_encoded_description() -> None:
+    """End-to-end: a Cisco-shaped JSON-LD block in HTML yields a
+    JobPostingLD with a plain-text description (the live regression
+    that landed 3 rows with `<p>` in description_en)."""
+    from job_crawler.core.jsonld import extract_job_postings
+
+    cisco_html = '''<html><head><script type="application/ld+json">{
+        "@type": "JobPosting",
+        "title": "Senior Software Engineer",
+        "description": "&lt;p&gt;We are looking for a senior engineer.&lt;/p&gt;&lt;p&gt;Required: Python.&lt;/p&gt;"
+    }</script></head><body></body></html>'''
+    postings = extract_job_postings(cisco_html)
+    assert len(postings) == 1
+    assert postings[0].description is not None
+    assert "<p>" not in postings[0].description
+    assert "&lt;" not in postings[0].description
+    assert "senior engineer" in postings[0].description

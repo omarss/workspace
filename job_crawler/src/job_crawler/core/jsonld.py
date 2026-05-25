@@ -298,11 +298,17 @@ def _location(value: Any) -> dict[str, str | None]:
     return out
 
 
-def _html_to_text(html: str | None) -> str | None:
-    if not html:
+def _html_to_text(value: str | None) -> str | None:
+    if not value:
         return None
-    # Cheap tag strip — no library cost. The DOM parser is used elsewhere
-    # for richer extraction; here we just want plain text.
+    # Same double-encoding trap as Finding 11 (Greenhouse), now in the
+    # JSON-LD path: Cisco/DXC/etc. embed `"description":"&lt;p&gt;..."`
+    # in their JSON-LD `JobPosting` blocks. Stripping tags BEFORE
+    # `html.unescape` is a no-op (the parser sees plain text), then
+    # `to_upsert.html.unescape` decodes `&lt;p&gt;` back into raw `<p>`
+    # in the DB. Decode first so HTMLParser can actually strip tags.
+    import html as _html
+
     from selectolax.parser import HTMLParser
 
-    return HTMLParser(html).text(separator="\n", strip=True)
+    return HTMLParser(_html.unescape(value)).text(separator="\n", strip=True)
