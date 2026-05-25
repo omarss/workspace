@@ -260,33 +260,40 @@ k8s-logs:  ## Tail API logs (override with POD=...)
 #     make crawl SOURCE=all                         # every implemented
 #     make crawl-list                               # what's registered
 #
-# Per-source convenience targets with their well-known env knobs:
+# Per-source convenience targets with their well-known env knobs. Run
+# `make crawl-list` for the authoritative implementation status (sourced
+# from job_crawler.registry, not this comment block).
 #
 #   ATS:
 #     make crawl-greenhouse        JC_GREENHOUSE_BOARDS=neom,tabby,...
-#     make crawl-lever             JC_LEVER_BOARDS=...           (stub)
-#     make crawl-workday           JC_WORKDAY_TENANTS=...        (stub)
-#     make crawl-workable          JC_WORKABLE_BOARDS=...        (stub)
-#     make crawl-smartrecruiters   JC_SR_COMPANIES=...           (stub)
-#     make crawl-recruitee         JC_RECRUITEE_BOARDS=...       (stub)
-#     make crawl-personio          JC_PERSONIO_BOARDS=...        (stub)
+#     make crawl-lever             JC_LEVER_BOARDS=site1,site2,...
+#     make crawl-workday           JC_WORKDAY_TENANTS=tenant:wdN:site,...
+#     make crawl-workable          JC_WORKABLE_BOARDS=slug1,slug2,...
+#     make crawl-smartrecruiters   JC_SR_COMPANIES=co1,co2,...
+#     make crawl-successfactors    JC_SUCCESSFACTORS_TENANTS=...
+#     make crawl-recruitee         JC_RECRUITEE_BOARDS=slug1,...
+#     make crawl-personio          JC_PERSONIO_BOARDS=slug1,...
 #   Boards:
-#     make crawl-bayt              JC_BAYT_QUERY=... JC_BAYT_MAX_PAGES=5
-#     make crawl-naukrigulf        JC_NAUKRI_QUERY=...           (stub)
-#     make crawl-wuzzuf            JC_WUZZUF_QUERY=...           (stub)
-#     make crawl-tanqeeb           JC_TANQEEB_QUERY=...          (stub)
-#     make crawl-mihnati           JC_MIHNATI_QUERY=...          (stub)
-#     make crawl-jadarat                                         (stub)
-#   Aggregators (phase 3+ — bot-hostile):
+#     make crawl-bayt              JC_BAYT_QUERIES=... JC_BAYT_MAX_PAGES=5
+#     make crawl-naukrigulf        (SPA — yields ~0 without app-id)
+#     make crawl-wuzzuf            JC_WUZZUF_QUERY=... JC_WUZZUF_MAX_PAGES=...
+#     make crawl-tanqeeb           (homepage + regional landing pages)
+#     make crawl-mihnati           JC_MIHNATI_QUERY=... JC_MIHNATI_MAX_PAGES=...
+#     make crawl-jadarat           (Playwright — sits through Queue-It)
+#     make crawl-company-careers   (Playwright JSON-LD scrape of company websites)
+#   Aggregators (bot-hostile — expect ~0 yield without residential proxies):
 #     make crawl-linkedin          JC_LINKEDIN_KEYWORDS=... JC_LINKEDIN_LOCATION=...
-#     make crawl-indeed            JC_INDEED_QUERY=... JC_INDEED_LOCATION=...
-#     make crawl-glassdoor                                       (stub)
+#     make crawl-indeed            JC_INDEED_QUERY=... (set JC_INDEED_COOKIE for yield)
+#     make crawl-glassdoor         (set JC_GLASSDOOR_COOKIE for yield)
 #
 # All targets honour:
 #   JC_LOOKBACK_DAYS=30     # window the crawler filters to
 #   JC_FETCH_TIMEOUT_S=20   # per-request timeout
 #   JC_FETCH_MAX_CONCURRENCY=3
-#   RESEND_API_KEY=...      # alerts (optional)
+#   SMTP_HOST / SMTP_PORT / SMTP_USERNAME / SMTP_PASSWORD / SMTP_STARTTLS /
+#   SMTP_USE_SSL / ALERT_EMAIL_FROM / ALERT_EMAIL_TO — alerts via plain SMTP.
+#   The repo is OSS-first: alerts go through `alerts/email.py`, NOT Resend /
+#   Mailgun / SES — do not provision those API keys.
 # ===========================================================================
 .PHONY: crawl crawl-list canary canary-list discover discover-seed discover-wikidata \
         crawl-greenhouse crawl-lever crawl-workday crawl-workable \
