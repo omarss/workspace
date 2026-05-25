@@ -65,9 +65,24 @@ def build_dataset(
     spec = synthetic.default_spec(n_rows=n_rows, seed=seed)
     obs_raw = synthetic.generate(spec)
 
+    # ── 2a. calibration to live GASTAT wage anchors ──────────────────────────
+    # Pins the dataset mean, Saudi premium, and gender gap to the published
+    # values when the live wage index is available. Preserves sector × level ×
+    # region structure.
+    from salary_model.data.calibrate import calibrate_to_live
+    from salary_model.data.calibrate import write_report as write_calibration_report
+    obs_calibrated, calibration_report = calibrate_to_live(obs_raw, wage_index_df)
+    calibration_dir = settings.reports_dir / "calibration" / run_id
+    write_calibration_report(calibration_report, calibration_dir)
+    log.info(
+        "dataset_calibration_done",
+        steps=[s.name for s in calibration_report.steps],
+        skipped=calibration_report.skipped,
+    )
+
     # ── 2b. cleanup (§16 rules) ──────────────────────────────────────────────
     from salary_model.data.cleanup import clean_observations, write_report
-    obs, cleanup_report = clean_observations(obs_raw, drop_outliers=False)
+    obs, cleanup_report = clean_observations(obs_calibrated, drop_outliers=False)
     cleanup_dir = settings.reports_dir / "cleanup" / run_id
     write_report(cleanup_report, cleanup_dir)
     log.info(
@@ -130,6 +145,10 @@ def build_dataset(
         "macro_series": str(macro_series_path.relative_to(settings.repo_root)),
         "kapsarc": kapsarc_paths,
         "wage_index_live": wage_index_path,
+        "calibration_report": str(
+            (calibration_dir / "calibration.md").relative_to(settings.repo_root)
+        ),
+        "calibration": calibration_report.to_dict(),
         "cleanup_report": str((cleanup_dir / "cleanup.md").relative_to(settings.repo_root)),
         "cleanup": cleanup_report.to_dict(),
         "snapshot_sha256": _hash_dataframe(obs),

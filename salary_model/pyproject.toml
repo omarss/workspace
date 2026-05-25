@@ -95,6 +95,7 @@ select = [
 ignore = [
   "ANN401",   # allow Any in narrow places
   "PLR0911",  # multi-return is fine when each return is explicit early-exit
+  "PLR0912",  # branch count: calibrate has many branches but reads top-to-bottom
   "PLR0913",  # function arg counts in model training are unavoidable
   "PLR0915",  # iteration runner is intentionally long-form
   "PLR2004",  # magic numbers OK in eval thresholds with comments
