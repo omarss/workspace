@@ -139,7 +139,14 @@ func Score(f Features) (float64, map[string]float64) {
 		add(contrib, "local_biz_ad", 0.55)
 	}
 	if f.BlocklistOffTopicPol {
-		add(contrib, "off_topic_political", 0.4)
+		// 0.55 (was 0.4) so a single match drops the tweet on its own.
+		// matchOffTopicPolitical already requires 2 distinct keywords
+		// out of a narrow curated set, so a single match is itself the
+		// 2-keyword combo we wanted to catch — bumping the weight
+		// finishes the job instead of relying on coincident link /
+		// emoji penalties that the leak case ("Show respect and bow!
+		// ... Custodian of the Two Holy Mosques ...") doesn't have.
+		add(contrib, "off_topic_political", 0.55)
 	}
 	if f.BlocklistOffRegionPromo {
 		add(contrib, "off_region_promo", 0.55)
