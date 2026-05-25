@@ -3,7 +3,7 @@
 #
 #   crawl       (default)  Truncate all posting / cluster / crawl-run data.
 #                          Preserves: companies, source_profiles, sources,
-#                          skills, synonyms, sa_regions, sa_cities,
+#                          skills, synonyms, regions, cities,
 #                          countries, industries, job_categories, crawler_health.
 #
 #   all                    Also wipes companies + source_profiles +

@@ -310,7 +310,7 @@ class BaytCrawler(BoardCrawler):
             source_id=__import__("uuid").UUID(int=0),  # runner overrides
             company_id=None,
             recruiter_id=None,
-            city_id=None,
+            location=None,
         )
 
 

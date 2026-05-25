@@ -289,15 +289,18 @@ class CrawlerRunner:
             )
             recruiter_id = recruiter.id
 
-        city_id = await resolve_city(
-            self.db, parsed.city_name_hint, raw_location=parsed.raw_location,
+        location = await resolve_city(
+            self.db,
+            parsed.city_name_hint,
+            raw_location=parsed.raw_location,
+            country_code=parsed.country_code or None,
         )
         upsert: JobPostingUpsert = to_upsert(
             parsed,
             source_id=source_id,
             company_id=company_id,
             recruiter_id=recruiter_id,
-            city_id=city_id,
+            location=location,
         )
         # Was this an insert? Easiest test: check by external id before/after.
         existing = await self.db.postings.get_by_source(

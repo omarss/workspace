@@ -111,6 +111,17 @@ db-apply:  ## Apply db_schema.sql to the host DB
 		PGPASSWORD=$$JC_DB_PASSWORD psql -U job_crawler -h 127.0.0.1 -d job_crawler \
 		-v ON_ERROR_STOP=1 -f db_schema.sql
 
+db-migrate-geo:  ## One-shot: rename sa_regions/sa_cities → regions/cities (run db-clear first)
+	@echo "Pre-flight: this migration drops sa_regions + sa_cities."
+	@echo "It expects job_postings/jobs/job_locations to be empty (run db-clear)."
+	@if [ "$$CONFIRM" != "yes-migrate-geo" ]; then \
+		echo "set CONFIRM=yes-migrate-geo to proceed" >&2; exit 2; \
+	fi
+	$(call _load_env)
+	@set -a; . ./.env; set +a; \
+		PGPASSWORD=$$JC_DB_PASSWORD psql -U job_crawler -h 127.0.0.1 -d job_crawler \
+		-v ON_ERROR_STOP=1 -f scripts/migrate_geo_tables.sql
+
 db-shell:  ## psql shell as job_crawler against the host DB
 	$(call _load_env)
 	@set -a; . ./.env; set +a; \
@@ -451,7 +462,7 @@ data-stats-riyadh:  ## Riyadh postings in the last 30 days, top 20 by title
 		       to_char(p.posted_at, 'YYYY-MM-DD') \
 		FROM jobs j \
 		JOIN job_postings p ON p.id = j.canonical_posting_id \
-		JOIN sa_cities c ON c.id = j.city_id \
+		JOIN cities c ON c.id = j.city_id \
 		JOIN sources s ON s.id = p.source_id \
 		LEFT JOIN companies comp ON comp.id = p.company_id \
 		WHERE j.deleted_at IS NULL AND c.name_en = 'Riyadh' \

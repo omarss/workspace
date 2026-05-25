@@ -189,7 +189,7 @@ class GreenhouseCrawler(ATSBoardCrawler):
             source_id=__import__("uuid").UUID(int=0),  # placeholder; runner overrides
             company_id=None,
             recruiter_id=None,
-            city_id=None,
+            location=None,
         )
 
 

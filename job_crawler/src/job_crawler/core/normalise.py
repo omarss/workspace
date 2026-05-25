@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import html
 import logging
+from dataclasses import dataclass
 from typing import Final
 from uuid import UUID
 
@@ -22,11 +23,25 @@ from .types import ApplicationChannelRaw, ParsedPosting, RawSkillRaw
 _LOG: Final = logging.getLogger("job_crawler.normalise")
 
 
-# Free-text aliases + sub-city neighborhoods → canonical sa_cities.name_en.
+@dataclass(frozen=True, slots=True)
+class LocationResolution:
+    """Output of `resolve_city` — keeps city + region + country in sync.
+
+    All three fields default to None (unresolved). When `city_id` resolves,
+    the matching `cities` row's `region_code` and `country_code` are always
+    populated so the posting can be filtered by either dimension.
+    """
+
+    city_id: UUID | None = None
+    region_code: str | None = None
+    country_code: str | None = None
+
+
+# Free-text aliases + sub-city neighborhoods → canonical cities.name_en.
 # Bayt and a few other sources frequently emit raw_location values that are
 # neighborhoods (e.g. "An Narjis", "Al Olaya"), district names, or alternate
 # transliterations ("Jiddah", "Mecca"). The trigram lookup against
-# sa_cities can't bridge those, so we route them through a static map first.
+# cities can't bridge those, so we route them through a static map first.
 # Lowercased lookup. New entries: prefer real-world spellings observed in the
 # crawl_fetches sample over our internal canonical names.
 _CITY_ALIASES: Final[dict[str, str]] = {
@@ -41,7 +56,7 @@ _CITY_ALIASES: Final[dict[str, str]] = {
     "al-khobar": "Khobar",
     "al ahsa": "Hofuf (Al Hasa)",
     "al-ahsa": "Hofuf (Al Hasa)",
-    "alkhafji": "Khobar",  # Khafji has no sa_cities row; nearest large city
+    "alkhafji": "Khobar",  # Khafji has no cities row; nearest large city
     "eastern province": "Dammam",
     "al sharqia": "Dammam",
     "ash sharqiyah": "Dammam",
@@ -106,8 +121,9 @@ async def resolve_city(
     hint: str | None,
     *,
     raw_location: str | None = None,
-) -> UUID | None:
-    """Map a free-text hint to an `sa_cities.id`.
+    country_code: str | None = None,
+) -> LocationResolution:
+    """Map a free-text hint to a `cities` row, returning the full location triple.
 
     Tries (in order):
       1. The explicit hint (if any).
@@ -115,8 +131,11 @@ async def resolve_city(
          (city is usually one of the last tokens, e.g. "An Narjis, Riyadh").
       3. For each candidate token, consult `_CITY_ALIASES` first (covers
          alt transliterations and Riyadh/Jeddah neighborhoods) and only
-         fall back to trigram search against sa_cities when no alias hits.
-      4. Returns None when no token confidently matches.
+         fall back to trigram search against cities when no alias hits.
+      4. When `country_code` is given, the lookup is scoped to that country —
+         critical for ambiguous names ("Al Rayyan" exists in SA and Qatar;
+         "Ras Al Khaimah" in UAE collides with "Ras Al Khair" in SA).
+      5. Returns an empty resolution when no token confidently matches.
     """
     candidates: list[str] = []
     seen: set[str] = set()
@@ -131,10 +150,20 @@ async def resolve_city(
     for c in candidates:
         alias_target = _CITY_ALIASES.get(c.lower())
         lookup = alias_target or c
-        matches = await db.geo.find_city(lookup, limit=1, min_similarity=0.5)
+        matches = await db.geo.find_city(
+            lookup,
+            limit=1,
+            min_similarity=0.5,
+            country_code=country_code,
+        )
         if matches:
-            return matches[0][0].id
-    return None
+            city = matches[0][0]
+            return LocationResolution(
+                city_id=city.id,
+                region_code=city.region_code,
+                country_code=city.country_code,
+            )
+    return LocationResolution(country_code=country_code)
 
 
 def to_upsert(
@@ -143,13 +172,17 @@ def to_upsert(
     source_id: UUID,
     company_id: UUID | None,
     recruiter_id: UUID | None,
-    city_id: UUID | None,
+    location: LocationResolution | None = None,
 ) -> JobPostingUpsert:
     """Pure conversion — no DB calls.
 
     Caller is responsible for company/recruiter/city resolution and passes
-    the resulting ids in.
+    the resulting ids in. The `location` triple (city/region/country) comes
+    from `resolve_city`; when only a country is known (city not seeded),
+    `country_code` still mirrors through so country-level filters work.
     """
+    loc = location or LocationResolution()
+    country_code = loc.country_code or parsed.country_code or "sa"
     # Auto-detect Saudi-only + gender restrictions from title + description
     # when the parser didn't set them explicitly. This is a no-op when the
     # parser already populated the fields with a non-default value.
@@ -191,7 +224,9 @@ def to_upsert(
         work_arrangement=parsed.work_arrangement,
         experience_level=parsed.experience_level,
         raw_location=parsed.raw_location,
-        city_id=city_id,
+        city_id=loc.city_id,
+        region_code=loc.region_code,
+        country_code=country_code,
         office_address=parsed.office_address,
         hybrid_days_per_week=parsed.hybrid_days_per_week,
         remote_country_restriction=parsed.remote_country_restriction,

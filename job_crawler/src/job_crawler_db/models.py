@@ -72,15 +72,16 @@ class Country(_Base):
     currency: str
 
 
-class SaRegion(_Base):
+class Region(_Base):
+    country_code: str
     code: str
     name_en: str
     name_ar: str
-    country_code: str = "sa"
 
 
-class SaCity(_Base):
+class City(_Base):
     id: UUID
+    country_code: str
     region_code: str
     name_en: str
     name_ar: str
@@ -369,6 +370,8 @@ class JobPosting(_Base):
     experience_level: ExperienceLevel | None = None
     raw_location: str | None = None
     city_id: UUID | None = None
+    region_code: str | None = None
+    country_code: str = "sa"
     office_address: str | None = None
     hybrid_days_per_week: int | None = None
     remote_country_restriction: str | None = None
@@ -415,6 +418,8 @@ class JobPostingUpsert(_Base):
     experience_level: ExperienceLevel | None = None
     raw_location: str | None = None
     city_id: UUID | None = None
+    region_code: str | None = None
+    country_code: str = "sa"
     office_address: str | None = None
     hybrid_days_per_week: int | None = None
     remote_country_restriction: str | None = None
@@ -551,6 +556,7 @@ class JobSearchHit(_Base):
 
 __all__ = [
     "ApplicationChannel",
+    "City",
     "Company",
     "CompanyAlias",
     "CompanySourceProfile",
@@ -571,8 +577,7 @@ __all__ = [
     "PostingSkillRaw",
     "PostingSnapshot",
     "Recruiter",
-    "SaCity",
-    "SaRegion",
+    "Region",
     "Skill",
     "SkillAlias",
     "Source",

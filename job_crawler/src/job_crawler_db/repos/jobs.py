@@ -81,14 +81,14 @@ class JobsRepo(Repo):
                         INSERT INTO jobs
                           (company_id, title_en, title_ar, description_en, description_ar,
                            employment_type, work_arrangement, experience_level,
-                           city_id, country_code,
+                           city_id, region_code, country_code,
                            salary_min, salary_max, salary_currency, salary_period,
                            canonical_posting_id, posting_count,
                            first_seen_at, last_seen_at)
                         VALUES
                           (%(c)s, %(t_en)s, %(t_ar)s, %(d_en)s, %(d_ar)s,
                            %(emp)s, %(work)s, %(exp)s,
-                           %(city)s, 'sa',
+                           %(city)s, %(region)s, %(country)s,
                            %(smin)s, %(smax)s, %(scur)s, %(sper)s,
                            %(pid)s, 1,
                            %(first)s, %(last)s)
@@ -104,6 +104,10 @@ class JobsRepo(Repo):
                         "work": posting["work_arrangement"],
                         "exp": posting["experience_level"],
                         "city": posting["city_id"],
+                        "region": posting["region_code"],
+                        # country_code on a posting is NOT NULL with a default of
+                        # 'sa', so a missing column would be a bug. Mirror it.
+                        "country": posting["country_code"],
                         "smin": posting["salary_min"],
                         "smax": posting["salary_max"],
                         "scur": posting["salary_currency"],
@@ -281,6 +285,8 @@ class JobsRepo(Repo):
                             work_arrangement= COALESCE(%(work)s, work_arrangement),
                             experience_level= COALESCE(%(exp)s, experience_level),
                             city_id         = COALESCE(%(city)s, city_id),
+                            region_code     = COALESCE(%(region)s, region_code),
+                            country_code    = COALESCE(%(country)s, country_code),
                             office_address  = COALESCE(%(office)s, office_address),
                             hybrid_days_per_week = COALESCE(%(hdays)s, hybrid_days_per_week),
                             remote_country_restriction = COALESCE(%(remote)s, remote_country_restriction),
@@ -306,6 +312,8 @@ class JobsRepo(Repo):
                             "work": chosen["work_arrangement"],
                             "exp": chosen["experience_level"],
                             "city": chosen["city_id"],
+                            "region": chosen["region_code"],
+                            "country": chosen["country_code"],
                             "office": chosen["office_address"],
                             "hdays": chosen["hybrid_days_per_week"],
                             "remote": chosen["remote_country_restriction"],
