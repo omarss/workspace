@@ -111,8 +111,17 @@ func (s *HTTPScraper) Search(ctx context.Context, country server.Country, max in
 	switch resp.StatusCode {
 	case http.StatusOK:
 		// fall through
-	case http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound:
+	case http.StatusUnauthorized, http.StatusForbidden:
 		return nil, fmt.Errorf("%w: status %d %s", ErrAuthFailed, resp.StatusCode, snippet(body))
+	case http.StatusNotFound:
+		// Observed behaviour in production: X returns 404 (empty body)
+		// for some otherwise-valid GraphQL searches — notably
+		// `place_country:EG` always 404s while `place_country:SA`
+		// returns a real timeline with the identical cookie jar +
+		// transaction id. Treating 404 as auth failure flooded the
+		// log and triggered useless CDP refreshes. Read it as
+		// "no results for this query" instead.
+		return nil, nil
 	default:
 		return nil, fmt.Errorf("search status %d: %s", resp.StatusCode, snippet(body))
 	}
