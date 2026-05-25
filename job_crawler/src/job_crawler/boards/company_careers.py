@@ -30,12 +30,14 @@ from __future__ import annotations
 import hashlib
 import logging
 import os
+import re
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 from typing import ClassVar, Final
 from urllib.parse import urljoin, urlparse
 
 from psycopg.rows import dict_row
+from selectolax.parser import HTMLParser
 
 from job_crawler_db import (
     ApplicationChannelKind,
@@ -69,6 +71,61 @@ _CANDIDATE_PATHS: Final[tuple[str, ...]] = (
     "/en/jobs",
 )
 
+# DOM-pattern fallback: scan rendered DOM for <a> tags whose path
+# contains an explicit job marker followed by a digit-bearing OR long
+# slug. Excludes /career(s)/ markers — they match localized landing
+# pages (apple.com/careers/sa-ar/) and About pages — keep this list
+# restricted to terms that unambiguously identify an *individual* posting.
+_JOB_HREF_RE: Final[re.Pattern[str]] = re.compile(
+    r"/(?:job|jobs|req|requisition|requisitions|position|positions|"
+    r"vacancy|vacancies|opening|openings|opportunity|opportunities|"
+    r"role|roles|posting|postings|job-detail|job-details|jobdetails|"
+    r"view-job|viewjob|job-listing|job-openings|"
+    r"career|careers|career-detail|career-details)/"
+    r"(?:[a-z0-9._-]+/){0,3}"           # 0-3 intermediate segments
+    # final slug MUST contain a ≥5-digit run — real job IDs are 5-8 digits
+    # (Workday `R-12345`, Greenhouse `4567890`, custom `req-12345`).
+    # 3-digit allows years (`2026`) and version numbers; 5+ is rare in
+    # marketing copy.
+    r"[a-z0-9._-]*\d{5,}[a-z0-9._-]*",
+    re.IGNORECASE,
+)
+
+# URL substrings that mean "marketing/about/navigation", not a job.
+_JOB_HREF_DENYLIST_RE: Final[re.Pattern[str]] = re.compile(
+    r"/(?:" + "|".join((
+        # localized homepage variants (apple.com/careers/befr/, /sa-ar/)
+        "[a-z]{2}-[a-z]{2}",
+        # common about/marketing siblings
+        "about", "faq", "candidate-faq", "diversity", "benefits",
+        "life", "culture", "values", "students", "early-careers",
+        "graduates", "internship", "internships", "team",
+        "stories", "blog", "news", "events", "press", "press-releases",
+        "locations", "offices", "work-at", "why",
+        "privacy", "terms", "legal", "cookie", "cookies",
+    )) + r")(?:/|$|\.html?$)",
+    re.IGNORECASE,
+)
+
+# Hard cap on detail fetches per company so a careers page with hundreds
+# of job links doesn't burn the whole run on one tenant.
+_MAX_DETAILS_PER_COMPANY: Final[int] = 25
+
+# Selectors used by the detail-page parser. Ordered by specificity.
+_DETAIL_TITLE_CSS: Final[str] = (
+    "h1[itemprop='title'], h1.job-title, h1.posting-headline, "
+    "h1[class*='job'], h1[class*='title'], h1, h2.job-title"
+)
+_DETAIL_BODY_CSS: Final[str] = (
+    "[itemprop='description'], div.job-description, "
+    "section[class*='description'], div[class*='description'], "
+    "main, article"
+)
+_DETAIL_LOCATION_CSS: Final[str] = (
+    "[itemprop='jobLocation'], .job-location, [class*='location'], "
+    "[data-test*='location']"
+)
+
 
 class CompanyCareersCrawler(BoardCrawler):
     source_slug: ClassVar[str] = "company_careers"
@@ -98,19 +155,20 @@ class CompanyCareersCrawler(BoardCrawler):
             base_url = self._normalize_homepage(website)
             if not base_url:
                 continue
-            yielded_for_company = 0
+            yielded = 0
+            landing_html = ""
+            landing_url = ""
             for path in _CANDIDATE_PATHS:
                 target = urljoin(base_url + "/", path.lstrip("/"))
+                # Use `networkidle` because most enterprise careers pages
+                # are SPAs that XHR their listings after first paint. The
+                # 12s budget is the practical max — anything longer makes
+                # 280-company runs unbearable.
                 try:
-                    # Short per-path timeout. We do NOT wait on the JSON-LD
-                    # selector — many pages render it inline via SSR; we
-                    # only need the DOM committed. networkidle would be
-                    # nicer for SPAs but blows the per-company budget out
-                    # of the water (the 280-row tail has many slow sites).
                     result = await self.http.fetch(  # type: ignore[call-arg]
                         target,
-                        wait_until="domcontentloaded",
-                        timeout_ms=8000,
+                        wait_until="networkidle",
+                        timeout_ms=12000,
                     )
                 except Exception as exc:
                     _LOG.debug(
@@ -119,51 +177,119 @@ class CompanyCareersCrawler(BoardCrawler):
                     continue
                 if result.status >= 400:
                     continue
+                # PATH 1: JSON-LD JobPosting on the listing page (cheapest,
+                # most accurate, ~0% hit-rate on SA enterprises in practice
+                # but expensive sites like Workday-hosted boards do expose it).
                 postings = extract_job_postings(result.text or "")
-                if not postings:
-                    continue
-                _LOG.info(
-                    "company_careers: %s → %d JSON-LD postings via %s",
-                    name_en or company_id, len(postings), path,
-                )
-                for ld in postings:
-                    listing = self._listing_from_ld(
-                        ld, company_id=company_id, fallback_url=target,
+                if postings:
+                    _LOG.info(
+                        "company_careers: %s → %d JSON-LD postings via %s",
+                        name_en or company_id, len(postings), path,
                     )
-                    if listing is not None:
-                        yielded_for_company += 1
-                        yield listing
-                # First path with postings wins; skip the remaining ones.
-                break
-            if yielded_for_company == 0:
+                    for ld in postings:
+                        listing = self._listing_from_ld(
+                            ld, company_id=company_id, fallback_url=target,
+                        )
+                        if listing is not None:
+                            yielded += 1
+                            yield listing
+                    break
+                # Remember the first non-empty landing page so the DOM
+                # fallback below has something to scan.
+                if not landing_html and result.text:
+                    landing_html = result.text
+                    landing_url = result.url or target
+            else:
+                # No JSON-LD on any candidate path. Fall back to DOM scrape.
+                pass
+
+            if yielded > 0:
+                continue
+            if not landing_html:
                 _LOG.info(
-                    "company_careers: %s — no JSON-LD postings on %d paths",
-                    name_en or company_id, len(_CANDIDATE_PATHS),
+                    "company_careers: %s — no reachable careers page",
+                    name_en or company_id,
+                )
+                continue
+
+            # PATH 2: DOM-pattern fallback. Scan for hrefs that look like
+            # individual job links. Yield each as a Listing pointing at
+            # the detail URL; runner will call fetch_detail for the content.
+            job_links = self._extract_job_links_dom(landing_html, landing_url)
+            if not job_links:
+                _LOG.info(
+                    "company_careers: %s — no job-shaped links on %s",
+                    name_en or company_id, landing_url,
+                )
+                continue
+            _LOG.info(
+                "company_careers: %s → %d job-shaped links via %s",
+                name_en or company_id, len(job_links), landing_url,
+            )
+            for href in list(job_links)[:_MAX_DETAILS_PER_COMPANY]:
+                yielded += 1
+                yield Listing(
+                    source_job_external_id=_stable_id(href),
+                    detail_url=href,
+                    extra={"company_id": company_id, "from_dom": True},
                 )
 
     async def fetch_detail(self, listing: Listing) -> RawPosting | None:
-        # The listing already carries the full JSON-LD posting; no extra
-        # HTTP needed. We pack it into payload so parse() picks it up.
+        # Two paths:
+        #  (a) JSON-LD listing on landing page → snapshot already in
+        #      listing.extra; no extra HTTP.
+        #  (b) DOM-pattern fallback → we need to fetch the actual detail
+        #      page to extract title/description.
         ld_snapshot = listing.extra.get("ld_snapshot")
-        if not isinstance(ld_snapshot, dict):
-            return await super().fetch_detail(listing)
+        if isinstance(ld_snapshot, dict):
+            return RawPosting(
+                listing=listing,
+                canonical_url=listing.detail_url,
+                payload={
+                    "ld": ld_snapshot,
+                    "company_id": listing.extra.get("company_id"),
+                },
+                fetched_at=datetime.now(UTC),
+                duration_ms=0,
+                http_status=200,
+                bytes=len(str(ld_snapshot)),
+            )
+        # DOM-fallback path: fetch the detail page via Playwright.
+        try:
+            result = await self.http.fetch(  # type: ignore[call-arg]
+                listing.detail_url,
+                wait_until="domcontentloaded",
+                timeout_ms=10000,
+            )
+        except Exception:
+            return None
         return RawPosting(
             listing=listing,
-            canonical_url=listing.detail_url,
-            payload={"ld": ld_snapshot, "company_id": listing.extra.get("company_id")},
+            canonical_url=result.url or listing.detail_url,
+            payload={
+                "html": result.text or "",
+                "company_id": listing.extra.get("company_id"),
+            },
             fetched_at=datetime.now(UTC),
-            duration_ms=0,
-            http_status=200,
-            bytes=len(str(ld_snapshot)),
+            duration_ms=result.duration_ms,
+            http_status=result.status,
+            bytes=result.bytes,
         )
 
     def parse(self, raw: RawPosting) -> ParsedPosting | None:
+        # Two payload shapes:
+        #  - "ld":   pre-extracted JSON-LD snapshot (landing-page path).
+        #  - "html": fetched detail-page HTML (DOM-fallback path).
         ld_dict = raw.payload.get("ld")
-        if not isinstance(ld_dict, dict):
+        html_body = raw.payload.get("html")
+        if isinstance(ld_dict, dict):
+            ld = _ld_from_dict(ld_dict)
+        elif isinstance(html_body, str) and html_body:
+            ld = _ld_from_detail_html(html_body)
+            ld_dict = _ld_to_dict(ld)
+        else:
             return None
-        # Re-hydrate JobPostingLD from the snapshot so we go through the
-        # same field-coercion path as detail-page scrapers.
-        ld = _ld_from_dict(ld_dict)
+
         external_id = str(raw.payload.get("external_id") or "").strip() or (
             _stable_id(raw.canonical_url)
         )
@@ -267,6 +393,45 @@ class CompanyCareersCrawler(BoardCrawler):
             rows = await cur.fetchall()
         return [(r["id"], r["name_en"] or "", r["website"]) for r in rows]
 
+    def _extract_job_links_dom(self, html: str, base_url: str) -> set[str]:
+        """Walk anchor tags and keep those whose final URL looks like an
+        individual job posting page.
+
+        Filters:
+          * `href` must match `_JOB_HREF_RE` (sub-path after job-marker).
+          * Resolved URL must be on the same host as `base_url` — avoids
+            footer links to LinkedIn/Twitter, etc.
+          * Path must be deeper than 2 segments — `/careers` is the
+            landing page, not a posting.
+        """
+        try:
+            tree = HTMLParser(html)
+        except Exception:
+            return set()
+        base_host = urlparse(base_url).netloc.lower()
+        out: set[str] = set()
+        for anchor in tree.css("a[href]"):
+            href = anchor.attributes.get("href") or ""
+            if not href or href.startswith(("mailto:", "tel:", "javascript:", "#")):
+                continue
+            full = urljoin(base_url, href)
+            parsed = urlparse(full)
+            if parsed.netloc.lower() != base_host:
+                continue
+            path = parsed.path or ""
+            if not _JOB_HREF_RE.search(path):
+                continue
+            if _JOB_HREF_DENYLIST_RE.search(path):
+                continue
+            # At least 3 segments after the marker — drops `/careers`,
+            # `/jobs/` (trailing-slash landings) etc.
+            if path.rstrip("/").count("/") < 2:
+                continue
+            # Strip URL fragment so we dedupe.
+            full = parsed._replace(fragment="").geturl()
+            out.add(full)
+        return out
+
     def _normalize_homepage(self, website: str) -> str | None:
         """Take whatever the CSV captured (e.g. `aramco.com`,
         `https://example.com/`) and return a usable origin or None."""
@@ -308,6 +473,37 @@ class CompanyCareersCrawler(BoardCrawler):
 def _stable_id(url: str) -> str:
     """Deterministic id for a posting URL — survives across runs."""
     return hashlib.sha1(url.encode("utf-8")).hexdigest()[:24]
+
+
+def _ld_from_detail_html(html: str) -> JobPostingLD:
+    """Build a JobPostingLD from a detail-page HTML.
+
+    JSON-LD wins when present. Otherwise we fall back to generic DOM
+    selectors that cover the majority of HR-managed careers pages: an
+    `<h1>` near the top for the title, the largest plausible content
+    block for the description, and any `[class*="location"]` node we
+    can find.
+    """
+    ld = extract_job_postings(html)
+    if ld:
+        return ld[0]
+    try:
+        tree = HTMLParser(html)
+    except Exception:
+        return JobPostingLD()
+
+    def _txt(node: object) -> str | None:
+        if node is None:
+            return None
+        text = node.text(separator=" ", strip=True) if hasattr(node, "text") else ""
+        text = re.sub(r"\s+", " ", text or "").strip()
+        return text or None
+
+    return JobPostingLD(
+        title=_txt(tree.css_first(_DETAIL_TITLE_CSS)),
+        description=_txt(tree.css_first(_DETAIL_BODY_CSS)),
+        city=_txt(tree.css_first(_DETAIL_LOCATION_CSS)),
+    )
 
 
 def _join_location(ld: JobPostingLD) -> str | None:
