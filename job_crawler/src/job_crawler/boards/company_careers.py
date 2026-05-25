@@ -193,7 +193,10 @@ class CompanyCareersCrawler(BoardCrawler):
                     )
                     for ld in postings:
                         listing = self._listing_from_ld(
-                            ld, company_id=company_id, fallback_url=target,
+                            ld,
+                            company_id=company_id,
+                            company_name=name_en,
+                            fallback_url=target,
                         )
                         if listing is not None:
                             yielded += 1
@@ -236,7 +239,14 @@ class CompanyCareersCrawler(BoardCrawler):
                 yield Listing(
                     source_job_external_id=_stable_id(href),
                     detail_url=href,
-                    extra={"company_id": company_id, "from_dom": True},
+                    extra={
+                        "company_id": company_id,
+                        # Used by parse() as raw_company_name fallback
+                        # when ld.company_name is None (the common case
+                        # for DOM-fallback DOM extractions).
+                        "company_name": name_en,
+                        "from_dom": True,
+                    },
                 )
 
     async def fetch_detail(self, listing: Listing) -> RawPosting | None:
@@ -253,6 +263,7 @@ class CompanyCareersCrawler(BoardCrawler):
                 payload={
                     "ld": ld_snapshot,
                     "company_id": listing.extra.get("company_id"),
+                    "company_name": listing.extra.get("company_name"),
                 },
                 fetched_at=datetime.now(UTC),
                 duration_ms=0,
@@ -274,6 +285,7 @@ class CompanyCareersCrawler(BoardCrawler):
             payload={
                 "html": result.text or "",
                 "company_id": listing.extra.get("company_id"),
+                "company_name": listing.extra.get("company_name"),
             },
             fetched_at=datetime.now(UTC),
             duration_ms=result.duration_ms,
@@ -298,12 +310,37 @@ class CompanyCareersCrawler(BoardCrawler):
         external_id = str(raw.payload.get("external_id") or "").strip() or (
             _stable_id(raw.canonical_url)
         )
-        title = ld.title
+        # `.strip()` because some DOM extractors leave a whitespace-only
+        # title (KKU's gov-portal pages were storing rows with title = '   '
+        # and the page's verification-banner text as description). Reject
+        # those at the parser instead of writing junk into the DB.
+        title = (ld.title or "").strip()
         if not title:
+            return None
+
+        # Short descriptions on the DOM-fallback path are usually the page
+        # chrome ("Search Jobs | Post Your CV" — 42 chars on DACO). 100
+        # chars is enough to rule out navbars while keeping legitimate
+        # one-paragraph postings.
+        description = (ld.description or "").strip() or None
+        if description is None or len(description) < 100:
+            _LOG.info(
+                "company_careers: rejecting low-quality parse "
+                "(title=%r, desc_len=%d) for %s",
+                title[:60], len(description or ""), raw.canonical_url,
+            )
             return None
 
         raw_location = _join_location(ld)
         company_id_str = raw.payload.get("company_id")
+        # discover_listings stores the parent company's name in
+        # listing.extra so we can fall back to it when JSON-LD or DOM
+        # didn't surface the employer (every Batterjee / Hala / etc.
+        # detail page where ld.company_name is None).
+        company_name_hint = raw.payload.get("company_name") or None
+        if isinstance(company_name_hint, str):
+            company_name_hint = company_name_hint.strip() or None
+        raw_company_name = ld.company_name or company_name_hint
 
         channels: list[ApplicationChannelRaw] = [
             ApplicationChannelRaw(
@@ -314,12 +351,11 @@ class CompanyCareersCrawler(BoardCrawler):
             ),
         ]
 
-        parsed_fields = {"title"}
+        parsed_fields = {"title", "description"}
         missing_fields: set[str] = set()
         for name, value in (
-            ("description", ld.description),
             ("raw_location", raw_location),
-            ("raw_company_name", ld.company_name),
+            ("raw_company_name", raw_company_name),
         ):
             (parsed_fields if value else missing_fields).add(name)
 
@@ -333,9 +369,9 @@ class CompanyCareersCrawler(BoardCrawler):
             posted_at=ld.posted_at,
             source_updated_at=ld.posted_at,
             expires_at=ld.valid_through,
-            description=ld.description,
+            description=description,
             description_html=None,
-            raw_company_name=ld.company_name,
+            raw_company_name=raw_company_name,
             company_external_id=(
                 company_id_str if isinstance(company_id_str, str) else None
             ),
@@ -489,6 +525,7 @@ class CompanyCareersCrawler(BoardCrawler):
         ld: JobPostingLD,
         *,
         company_id: str,
+        company_name: str = "",
         fallback_url: str,
     ) -> Listing | None:
         if not ld.title:
@@ -503,6 +540,7 @@ class CompanyCareersCrawler(BoardCrawler):
                 "ld_snapshot": _ld_to_dict(ld),
                 "external_id": external_id,
                 "company_id": company_id,
+                "company_name": company_name,
             },
         )
 
