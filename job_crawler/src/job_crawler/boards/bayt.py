@@ -17,7 +17,7 @@ import re
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime, timedelta
 from typing import ClassVar, Final
-from urllib.parse import urljoin
+from urllib.parse import quote, urljoin
 
 from selectolax.parser import HTMLParser
 
@@ -206,7 +206,13 @@ class BaytCrawler(BoardCrawler):
     def _search_url(self, *, page: int, query: str) -> str:
         params = []
         if query:
-            params.append(f"keywords={query.replace(' ', '+')}")
+            # Percent-encode the keyword. Raw substitution worked for the
+            # request URL (httpx forgives non-ASCII path/query bytes) but
+            # the page-1 URL also gets reused as the Referer header on
+            # page>1, and HTTP headers must be latin-1 — Arabic queries
+            # like "مهندس" raised UnicodeEncodeError there. `quote` with
+            # `safe="+"` preserves the space-as-`+` convention Bayt uses.
+            params.append(f"keywords={quote(query, safe='+').replace('%20', '+')}")
         params.append(f"date={lookback_days()}")
         if page > 1:
             params.append(f"page={page}")
