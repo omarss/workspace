@@ -31,6 +31,45 @@ type IdentityProviderMapping struct {
 	LinkedAt        pgtype.Timestamptz `json:"linked_at"`
 }
 
+type Invitation struct {
+	ID                     string             `json:"id"`
+	TenantID               string             `json:"tenant_id"`
+	OrganizationID         string             `json:"organization_id"`
+	InviteeEmailLookupHash []byte             `json:"invitee_email_lookup_hash"`
+	InviteeEmailCiphertext []byte             `json:"invitee_email_ciphertext"`
+	InviteeEmailWrappedDek string             `json:"invitee_email_wrapped_dek"`
+	InviteeEmailNonce      []byte             `json:"invitee_email_nonce"`
+	InviteeEmailKid        string             `json:"invitee_email_kid"`
+	InviteeEmailKeyVersion int32              `json:"invitee_email_key_version"`
+	TokenHash              []byte             `json:"token_hash"`
+	TokenPrefix            string             `json:"token_prefix"`
+	InvitedByUserID        string             `json:"invited_by_user_id"`
+	ProposedRoleID         *string            `json:"proposed_role_id"`
+	Status                 string             `json:"status"`
+	ExpiresAt              pgtype.Timestamptz `json:"expires_at"`
+	AcceptedAt             pgtype.Timestamptz `json:"accepted_at"`
+	AcceptedByUserID       *string            `json:"accepted_by_user_id"`
+	RevokedAt              pgtype.Timestamptz `json:"revoked_at"`
+	RevokedByUserID        *string            `json:"revoked_by_user_id"`
+	RowSeq                 int64              `json:"row_seq"`
+	CreatedAt              pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt              pgtype.Timestamptz `json:"updated_at"`
+}
+
+type Member struct {
+	ID             string             `json:"id"`
+	TenantID       string             `json:"tenant_id"`
+	OrganizationID string             `json:"organization_id"`
+	UserID         string             `json:"user_id"`
+	RoleID         *string            `json:"role_id"`
+	Status         string             `json:"status"`
+	Metadata       []byte             `json:"metadata"`
+	RowSeq         int64              `json:"row_seq"`
+	JoinedAt       pgtype.Timestamptz `json:"joined_at"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+	RemovedAt      pgtype.Timestamptz `json:"removed_at"`
+}
+
 type Notification struct {
 	ID                string             `json:"id"`
 	TenantID          string             `json:"tenant_id"`
@@ -87,6 +126,19 @@ type NotificationWorkflow struct {
 	NovuWorkflowID string             `json:"novu_workflow_id"`
 	Description    *string            `json:"description"`
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+}
+
+type Organization struct {
+	ID        string             `json:"id"`
+	TenantID  string             `json:"tenant_id"`
+	Slug      string             `json:"slug"`
+	Name      string             `json:"name"`
+	Status    string             `json:"status"`
+	Metadata  []byte             `json:"metadata"`
+	RowSeq    int64              `json:"row_seq"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+	DeletedAt pgtype.Timestamptz `json:"deleted_at"`
 }
 
 type OutboxEvent struct {

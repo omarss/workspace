@@ -22,6 +22,7 @@ import (
 	httpapi "github.com/omarss/saas/internal/dataplane/httpapi" // package dataplaneapi
 	"github.com/omarss/saas/internal/dataplane/identity"
 	"github.com/omarss/saas/internal/dataplane/notifications"
+	"github.com/omarss/saas/internal/dataplane/organizations"
 	"github.com/omarss/saas/internal/dataplane/tenancy"
 	"github.com/omarss/saas/internal/platform/auth"
 	platformcrypto "github.com/omarss/saas/internal/platform/crypto"
@@ -54,6 +55,7 @@ type strictServer struct {
 	tenancyHandler       *tenancy.Handler
 	identityHandler      *identity.Handler
 	notificationsHandler *notifications.Handler
+	organizationsHandler *organizations.Handler
 }
 
 // GetHealthz implements the Phase-1 liveness probe inline so the data plane
@@ -190,6 +192,64 @@ func (s *strictServer) GetNotification(ctx context.Context, r httpapi.GetNotific
 	return s.notificationsHandler.GetNotification(ctx, r)
 }
 
+// Organizations delegation -------------------------------------------------------
+
+func (s *strictServer) ListOrganizations(ctx context.Context, r httpapi.ListOrganizationsRequestObject) (httpapi.ListOrganizationsResponseObject, error) {
+	return s.organizationsHandler.ListOrganizations(ctx, r)
+}
+
+func (s *strictServer) CreateOrganization(ctx context.Context, r httpapi.CreateOrganizationRequestObject) (httpapi.CreateOrganizationResponseObject, error) {
+	return s.organizationsHandler.CreateOrganization(ctx, r)
+}
+
+func (s *strictServer) GetOrganization(ctx context.Context, r httpapi.GetOrganizationRequestObject) (httpapi.GetOrganizationResponseObject, error) {
+	return s.organizationsHandler.GetOrganization(ctx, r)
+}
+
+func (s *strictServer) UpdateOrganization(ctx context.Context, r httpapi.UpdateOrganizationRequestObject) (httpapi.UpdateOrganizationResponseObject, error) {
+	return s.organizationsHandler.UpdateOrganization(ctx, r)
+}
+
+func (s *strictServer) DeleteOrganization(ctx context.Context, r httpapi.DeleteOrganizationRequestObject) (httpapi.DeleteOrganizationResponseObject, error) {
+	return s.organizationsHandler.DeleteOrganization(ctx, r)
+}
+
+func (s *strictServer) ListMembers(ctx context.Context, r httpapi.ListMembersRequestObject) (httpapi.ListMembersResponseObject, error) {
+	return s.organizationsHandler.ListMembers(ctx, r)
+}
+
+func (s *strictServer) GetMember(ctx context.Context, r httpapi.GetMemberRequestObject) (httpapi.GetMemberResponseObject, error) {
+	return s.organizationsHandler.GetMember(ctx, r)
+}
+
+func (s *strictServer) UpdateMember(ctx context.Context, r httpapi.UpdateMemberRequestObject) (httpapi.UpdateMemberResponseObject, error) {
+	return s.organizationsHandler.UpdateMember(ctx, r)
+}
+
+func (s *strictServer) RemoveMember(ctx context.Context, r httpapi.RemoveMemberRequestObject) (httpapi.RemoveMemberResponseObject, error) {
+	return s.organizationsHandler.RemoveMember(ctx, r)
+}
+
+func (s *strictServer) ListInvitations(ctx context.Context, r httpapi.ListInvitationsRequestObject) (httpapi.ListInvitationsResponseObject, error) {
+	return s.organizationsHandler.ListInvitations(ctx, r)
+}
+
+func (s *strictServer) CreateInvitation(ctx context.Context, r httpapi.CreateInvitationRequestObject) (httpapi.CreateInvitationResponseObject, error) {
+	return s.organizationsHandler.CreateInvitation(ctx, r)
+}
+
+func (s *strictServer) GetInvitation(ctx context.Context, r httpapi.GetInvitationRequestObject) (httpapi.GetInvitationResponseObject, error) {
+	return s.organizationsHandler.GetInvitation(ctx, r)
+}
+
+func (s *strictServer) RevokeInvitation(ctx context.Context, r httpapi.RevokeInvitationRequestObject) (httpapi.RevokeInvitationResponseObject, error) {
+	return s.organizationsHandler.RevokeInvitation(ctx, r)
+}
+
+func (s *strictServer) AcceptInvitation(ctx context.Context, r httpapi.AcceptInvitationRequestObject) (httpapi.AcceptInvitationResponseObject, error) {
+	return s.organizationsHandler.AcceptInvitation(ctx, r)
+}
+
 func run() error {
 	// platformlog.New installs the PII-redacting JSON slog handler from
 	// internal/platform/log. Every log record passing through slog.Default()
@@ -252,9 +312,18 @@ func run() error {
 	// User.Email + Name + Phone go through the strict walker.
 	envAdapter := platformcrypto.NewEnvelopeAdapter(encClient)
 
+	// Tenant service uses a fan-out publisher so the organizations
+	// subscriber can react to tenant.created in-process. The outbox
+	// remains the durable audit log; the in-memory fan-out is best-effort
+	// (a future Phase 10 EventBus will replace it with a real subscriber
+	// pool). Subscribers see the event AFTER the outbox row is persisted
+	// so a subscriber crash never loses the audit row.
+	tenantEventFanout := &tenantEventFanout{
+		outbox: outbox.NewPgxEventPublisher(queries, deploymentID),
+	}
 	tenantSvc := tenancy.NewService(
 		tenancy.NewPgxRepository(queries),
-		outbox.NewPgxEventPublisher(queries, deploymentID),
+		tenantEventFanout,
 	)
 
 	// Phase 6 — Notifications module. Wired first so the Identity service
@@ -284,10 +353,37 @@ func run() error {
 		ClientID:     envOr("SAAS_KEYCLOAK_CLIENT_ID", ""),
 	})
 
+	// Phase 7 — Organizations module. Members + invitations.
+	//
+	// The invitation accept path is a documented CONVENTIONS.md §2 exception:
+	// it consumes a state token whose hash matches a single invitation row;
+	// the caller's JWT tenant is constant-time-compared to inv.tenant_id
+	// before the service mutates state. The repo uses the same envelope
+	// adapter as Identity / Notifications.
+	orgsService := organizations.NewService(organizations.Config{
+		OrganizationRepo: organizations.NewPgxOrganizationRepo(queries),
+		MemberRepo:       organizations.NewPgxMemberRepo(queries),
+		InvitationRepo:   organizations.NewPgxInvitationRepo(queries, envAdapter, envAdapter, deploymentID),
+		EmailHasher:      identity.NewHMACEmailHasher(encClient),
+		Notifier:         organizations.NewNotificationsEmailNotifier(notificationsSvc),
+		Tenants:          organizations.NewTenantLookupAdapter(tenantSvc),
+		Users:            &identityUserLookupAdapter{svc: identitySvc},
+		Events:           outbox.NewPgxEventPublisher(queries, deploymentID),
+		DeploymentID:     deploymentID,
+		PublicBaseURL:    envOr("SAAS_PUBLIC_BASE_URL", ""),
+	})
+
+	// Tenant.created subscriber: auto-creates the default Organization for
+	// every new tenant. Phase 7 hooks it inline via the tenantEventFanout
+	// publisher; a future Phase 10 EventBus will route the same event
+	// through the same Handle method.
+	tenantEventFanout.subscriber = organizations.NewTenantCreatedSubscriber(orgsService)
+
 	srv := &strictServer{
 		tenancyHandler:       tenancy.NewHandler(tenantSvc),
 		identityHandler:      identity.NewHandler(identitySvc),
 		notificationsHandler: notifications.NewHandler(notificationsSvc),
+		organizationsHandler: organizations.NewHandler(orgsService),
 	}
 
 	// Outbox dispatcher: one goroutine per process. Phase 2 publisher is a
@@ -495,6 +591,49 @@ func (h *notificationsIdentityHook) SendPasswordReset(ctx context.Context, tenan
 func (h *notificationsIdentityHook) SendEmailVerify(ctx context.Context, tenantID, userID, verifyURL string, ttlMinutes int) error {
 	_, err := h.svc.SendEmailVerify(ctx, tenantID, userID, verifyURL, ttlMinutes)
 	return err
+}
+
+// identityUserLookupAdapter bridges organizations.UserLookup to the
+// Identity service. The adapter is here (not in the organizations
+// package) so the organizations module does not import identity directly
+// — keeps the dep graph one-way and the test surface narrow.
+type identityUserLookupAdapter struct {
+	svc *identity.Service
+}
+
+func (a *identityUserLookupAdapter) LookupUser(ctx context.Context, tenantID, userID string) (organizations.UserInfo, error) {
+	u, err := a.svc.Get(ctx, tenantID, userID)
+	if err != nil {
+		return organizations.UserInfo{}, err
+	}
+	return organizations.UserInfo{
+		UserID: u.ID,
+		Email:  u.Email,
+		Name:   u.Name,
+	}, nil
+}
+
+// tenantEventFanout duplicates every event into the outbox (durable audit
+// log) AND a single in-process subscriber. The fan-out is intentionally
+// best-effort: a subscriber error is logged but does NOT roll back the
+// outbox write. The outbox stays authoritative; subscribers are reactive.
+type tenantEventFanout struct {
+	outbox interface {
+		Publish(ctx context.Context, eventType, tenantID string, payload map[string]any) error
+	}
+	subscriber *organizations.TenantCreatedSubscriber
+}
+
+func (f *tenantEventFanout) Publish(ctx context.Context, eventType, tenantID string, payload map[string]any) error {
+	if err := f.outbox.Publish(ctx, eventType, tenantID, payload); err != nil {
+		return err
+	}
+	if f.subscriber != nil && eventType == "tenant.created" {
+		if err := f.subscriber.Handle(ctx, payload); err != nil {
+			slog.Warn("tenant.created subscriber handle failed", "tenant_id", tenantID, "err", err)
+		}
+	}
+	return nil
 }
 
 // envDuration reads an env var as a duration ("250ms", "5s", "15m"). On parse

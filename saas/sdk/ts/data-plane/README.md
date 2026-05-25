@@ -51,6 +51,15 @@ All URIs are relative to *https://dev.example.saas.omarss.net*
 
 Class | Method | HTTP request | Description
 ------------ | ------------- | ------------- | -------------
+*InvitationsApi* | [**acceptInvitation**](docs/InvitationsApi.md#acceptinvitation) | **POST** /v1/invitations/{invitation_id}/accept | Accept a pending invitation. Creates the Member row.
+*InvitationsApi* | [**createInvitation**](docs/InvitationsApi.md#createinvitation) | **POST** /v1/organizations/{organization_id}/invitations | Create an invitation. Email is queued; plaintext token returned ONCE.
+*InvitationsApi* | [**getInvitation**](docs/InvitationsApi.md#getinvitation) | **GET** /v1/invitations/{invitation_id} | Fetch an invitation by id. Plaintext token never echoed.
+*InvitationsApi* | [**listInvitations**](docs/InvitationsApi.md#listinvitations) | **GET** /v1/organizations/{organization_id}/invitations | List invitations for an organization.
+*InvitationsApi* | [**revokeInvitation**](docs/InvitationsApi.md#revokeinvitation) | **DELETE** /v1/invitations/{invitation_id} | Revoke a pending invitation. Returns 204.
+*MembersApi* | [**getMember**](docs/MembersApi.md#getmember) | **GET** /v1/organizations/{organization_id}/members/{member_id} | Fetch a member by id.
+*MembersApi* | [**listMembers**](docs/MembersApi.md#listmembers) | **GET** /v1/organizations/{organization_id}/members | List members of an organization.
+*MembersApi* | [**removeMember**](docs/MembersApi.md#removemember) | **DELETE** /v1/organizations/{organization_id}/members/{member_id} | Remove a member (soft-delete; status&#x3D;\&#39;removed\&#39;).
+*MembersApi* | [**updateMember**](docs/MembersApi.md#updatemember) | **PATCH** /v1/organizations/{organization_id}/members/{member_id} | Update a member\&#39;s role assignment (Phase 8 RBAC placeholder).
 *MetaApi* | [**getHealthz**](docs/MetaApi.md#gethealthz) | **GET** /healthz | Liveness probe.
 *NotificationChannelsApi* | [**createNotificationChannel**](docs/NotificationChannelsApi.md#createnotificationchannel) | **POST** /v1/notification-channels | Create a BYOK notification channel.
 *NotificationChannelsApi* | [**deleteNotificationChannel**](docs/NotificationChannelsApi.md#deletenotificationchannel) | **DELETE** /v1/notification-channels/{channel_id} | Soft-delete a notification channel.
@@ -64,6 +73,11 @@ Class | Method | HTTP request | Description
 *NotificationsApi* | [**getNotification**](docs/NotificationsApi.md#getnotification) | **GET** /v1/notifications/{notification_id} | Fetch a notification by id.
 *NotificationsApi* | [**listNotifications**](docs/NotificationsApi.md#listnotifications) | **GET** /v1/notifications | List notifications in the caller\&#39;s tenant.
 *NotificationsApi* | [**sendNotification**](docs/NotificationsApi.md#sendnotification) | **POST** /v1/notifications/send | Queue a notification for delivery via Novu.
+*OrganizationsApi* | [**createOrganization**](docs/OrganizationsApi.md#createorganization) | **POST** /v1/tenants/{tenant_id}/organizations | Create a new organization in a tenant (multi_org required).
+*OrganizationsApi* | [**deleteOrganization**](docs/OrganizationsApi.md#deleteorganization) | **DELETE** /v1/organizations/{organization_id} | Soft-delete an organization. Refuses while active members remain.
+*OrganizationsApi* | [**getOrganization**](docs/OrganizationsApi.md#getorganization) | **GET** /v1/organizations/{organization_id} | Fetch an organization by id.
+*OrganizationsApi* | [**listOrganizations**](docs/OrganizationsApi.md#listorganizations) | **GET** /v1/tenants/{tenant_id}/organizations | List organizations in a tenant.
+*OrganizationsApi* | [**updateOrganization**](docs/OrganizationsApi.md#updateorganization) | **PATCH** /v1/organizations/{organization_id} | Update an organization.
 *SocialProvidersApi* | [**linkSocialProvider**](docs/SocialProvidersApi.md#linksocialprovider) | **POST** /v1/users/{user_id}/social-providers | Start a social-provider link flow. Returns the Keycloak link URL.
 *SocialProvidersApi* | [**listSocialProviders**](docs/SocialProvidersApi.md#listsocialproviders) | **GET** /v1/users/{user_id}/social-providers | List linked social providers for a user.
 *SocialProvidersApi* | [**unlinkSocialProvider**](docs/SocialProvidersApi.md#unlinksocialprovider) | **DELETE** /v1/users/{user_id}/social-providers/{provider} | Unlink a social provider. Emits user.social_unlinked.
@@ -85,14 +99,24 @@ Class | Method | HTTP request | Description
 
 ### Documentation For Models
 
+ - [AcceptInvitationRequest](docs/AcceptInvitationRequest.md)
+ - [CreateInvitationRequest](docs/CreateInvitationRequest.md)
+ - [CreateInvitationResponse](docs/CreateInvitationResponse.md)
  - [CreateNotificationChannelRequest](docs/CreateNotificationChannelRequest.md)
+ - [CreateOrganizationRequest](docs/CreateOrganizationRequest.md)
  - [CreateTenantRequest](docs/CreateTenantRequest.md)
  - [CreateUserRequest](docs/CreateUserRequest.md)
  - [CredentialsBundle](docs/CredentialsBundle.md)
  - [FieldError](docs/FieldError.md)
  - [Health](docs/Health.md)
+ - [Invitation](docs/Invitation.md)
+ - [InvitationListResponse](docs/InvitationListResponse.md)
+ - [InvitationResponse](docs/InvitationResponse.md)
  - [LinkSocialProviderRequest](docs/LinkSocialProviderRequest.md)
  - [LinkSocialProviderResponse](docs/LinkSocialProviderResponse.md)
+ - [Member](docs/Member.md)
+ - [MemberListResponse](docs/MemberListResponse.md)
+ - [MemberResponse](docs/MemberResponse.md)
  - [Notification](docs/Notification.md)
  - [NotificationChannel](docs/NotificationChannel.md)
  - [NotificationChannelListResponse](docs/NotificationChannelListResponse.md)
@@ -102,6 +126,9 @@ Class | Method | HTTP request | Description
  - [NotificationWorkflow](docs/NotificationWorkflow.md)
  - [NotificationWorkflowListResponse](docs/NotificationWorkflowListResponse.md)
  - [NotificationWorkflowResponse](docs/NotificationWorkflowResponse.md)
+ - [Organization](docs/Organization.md)
+ - [OrganizationListResponse](docs/OrganizationListResponse.md)
+ - [OrganizationResponse](docs/OrganizationResponse.md)
  - [Pagination](docs/Pagination.md)
  - [Problem](docs/Problem.md)
  - [RegisterNotificationWorkflowRequest](docs/RegisterNotificationWorkflowRequest.md)
@@ -116,8 +143,10 @@ Class | Method | HTTP request | Description
  - [Tenant](docs/Tenant.md)
  - [TenantListResponse](docs/TenantListResponse.md)
  - [TenantResponse](docs/TenantResponse.md)
+ - [UpdateMemberRequest](docs/UpdateMemberRequest.md)
  - [UpdateNotificationChannelRequest](docs/UpdateNotificationChannelRequest.md)
  - [UpdateNotificationWorkflowRequest](docs/UpdateNotificationWorkflowRequest.md)
+ - [UpdateOrganizationRequest](docs/UpdateOrganizationRequest.md)
  - [UpdateTenantRequest](docs/UpdateTenantRequest.md)
  - [UpdateUserRequest](docs/UpdateUserRequest.md)
  - [User](docs/User.md)

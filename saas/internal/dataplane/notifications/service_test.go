@@ -665,3 +665,69 @@ func TestService_UpdateWorkflow_EmptyPatchRejected(t *testing.T) {
 		t.Errorf("expected ErrInvalidInput on empty patch, got %v", err)
 	}
 }
+
+// --- SendInvitationByEmail (Phase 7 cross-phase) --------------------------
+
+// TestSendInvitationByEmail_NewSubscriber confirms the sync dispatch path:
+// when the Novu adapter is wired the call succeeds and emits queued +
+// sent outbox events without persisting a notification row (the
+// notification table requires a non-NULL to_user_id; pre-signup invitees
+// have no platform_user yet — see SendInvitationByEmail godoc).
+func TestSendInvitationByEmail_NewSubscriber(t *testing.T) {
+	novu := &fakeNovu{triggerID: "novu_tx_INV1"}
+	svc, events := newServiceWithNovu(t, novu)
+	ctx := withTenant(fixtureTenant)
+	err := svc.SendInvitationByEmail(ctx, fixtureTenant, notifications.InvitationByEmailRequest{
+		InviteeEmail: "newcomer@example.com",
+		AcceptURL:    "https://example.com/invitations/inv_X/accept?token=t",
+		OrgName:      "Acme",
+		InviterName:  "Inviter",
+		TTL:          24 * time.Hour,
+	})
+	if err != nil {
+		t.Fatalf("SendInvitationByEmail returned err: %v", err)
+	}
+	if !events.has("notification.queued") {
+		t.Errorf("expected notification.queued event")
+	}
+	if !events.has("notification.sent") {
+		t.Errorf("expected notification.sent event")
+	}
+	if novu.called != 1 {
+		t.Errorf("expected novu.TriggerWorkflow called once, got %d", novu.called)
+	}
+}
+
+// TestSendInvitationByEmail_NovuFailure_Wraps confirms the Novu transport
+// failure is wrapped into ErrProviderUnavailable and the delivery-failed
+// event fires.
+func TestSendInvitationByEmail_NovuFailure_Wraps(t *testing.T) {
+	novu := &fakeNovu{triggerEr: errors.New("network down")}
+	svc, events := newServiceWithNovu(t, novu)
+	ctx := withTenant(fixtureTenant)
+	err := svc.SendInvitationByEmail(ctx, fixtureTenant, notifications.InvitationByEmailRequest{
+		InviteeEmail: "newcomer@example.com",
+		AcceptURL:    "https://example.com/invitations/inv_X/accept?token=t",
+		OrgName:      "Acme",
+		InviterName:  "Inviter",
+	})
+	if !errors.Is(err, notifications.ErrProviderUnavailable) {
+		t.Fatalf("expected ErrProviderUnavailable, got %v", err)
+	}
+	if !events.has("notification.delivery_failed") {
+		t.Errorf("expected notification.delivery_failed event")
+	}
+}
+
+// TestSendInvitationByEmail_RejectsBlankEmail confirms input validation.
+func TestSendInvitationByEmail_RejectsBlankEmail(t *testing.T) {
+	svc, _ := newServiceWithNovu(t, &fakeNovu{})
+	ctx := withTenant(fixtureTenant)
+	err := svc.SendInvitationByEmail(ctx, fixtureTenant, notifications.InvitationByEmailRequest{
+		InviteeEmail: "",
+		AcceptURL:    "https://example.com/x",
+	})
+	if !errors.Is(err, notifications.ErrInvalidInput) {
+		t.Errorf("expected ErrInvalidInput for empty email, got %v", err)
+	}
+}
