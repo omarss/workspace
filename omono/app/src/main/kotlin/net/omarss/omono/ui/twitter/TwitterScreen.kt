@@ -21,12 +21,15 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FilterList
+import androidx.compose.material.icons.outlined.ChatBubbleOutline
+import androidx.compose.material.icons.outlined.FavoriteBorder
+import androidx.compose.material.icons.outlined.IosShare
+import androidx.compose.material.icons.outlined.Repeat
 import androidx.compose.material3.AssistChip
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -35,6 +38,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -45,7 +49,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -54,12 +61,25 @@ import coil3.compose.AsyncImage
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import net.omarss.omono.R
 import net.omarss.omono.feature.twitter.CityOption
 import net.omarss.omono.feature.twitter.Country
 import net.omarss.omono.feature.twitter.CountryOption
 import net.omarss.omono.feature.twitter.LocationCatalog
 import net.omarss.omono.feature.twitter.LocationOption
 import net.omarss.omono.feature.twitter.Tweet
+
+// Classic Twitter blue (pre-X rebrand). Used for the bird logo tint,
+// link spans, action-row icons on press, and the tab-selected indicator.
+// Public so MainActivity's NavigationBarItem can reach it without
+// duplicating the constant.
+val TwitterBlue: Color = Color(0xFF1DA1F2)
+
+// Muted neutral for the action-row icons in their default (unpressed)
+// state. Matches the classic Twitter app: gray-on-white at rest, blue
+// on press. We don't have press-state plumbing yet — icons stay muted
+// and the count colour shifts only when the count is non-zero.
+private val ClassicActionMuted: Color = Color(0xFF6E767D)
 
 @Composable
 fun TwitterRoute(
@@ -94,11 +114,34 @@ private fun TwitterScreen(
             .fillMaxSize()
             .padding(contentPadding),
         topBar = {
+            // Classic Twitter top bar: blue bird centered in lieu of a
+            // title, filter overflow on the right. We keep the filter
+            // affordance — location picking is unique to this app and
+            // there's no analog in the original Twitter app.
             TopAppBar(
-                title = { Text("Feed") },
+                title = {
+                    Box(
+                        modifier = Modifier.fillMaxWidth(),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_feed_bird),
+                            contentDescription = "Feed",
+                            tint = TwitterBlue,
+                            modifier = Modifier.size(28.dp),
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                ),
                 actions = {
                     IconButton(onClick = onOpenFilter) {
-                        Icon(Icons.Filled.FilterList, contentDescription = "Filter locations")
+                        Icon(
+                            Icons.Filled.FilterList,
+                            contentDescription = "Filter locations",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
                 },
             )
@@ -214,11 +257,12 @@ private fun TweetList(
         if (nearEnd && !endReached && !loadingMore) onLoadMore()
     }
 
+    // Classic Twitter feed: zero outer padding, no row spacing, a hairline
+    // divider between each post. The TweetRow itself owns its internal
+    // padding so dividers run edge-to-edge.
     LazyColumn(
         state = listState,
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         if (errorMessage != null) {
             item {
@@ -226,11 +270,18 @@ private fun TweetList(
                     text = errorMessage,
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
                 )
             }
         }
         items(tweets, key = Tweet::id) { tweet ->
-            TweetCard(tweet)
+            TweetRow(tweet)
+            HorizontalDivider(
+                color = MaterialTheme.colorScheme.outlineVariant,
+                thickness = 0.5.dp,
+            )
         }
         if (!endReached) {
             item("__loadmore__") {
@@ -240,7 +291,11 @@ private fun TweetList(
                         .padding(12.dp),
                     contentAlignment = Alignment.Center,
                 ) {
-                    CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.size(20.dp))
+                    CircularProgressIndicator(
+                        strokeWidth = 2.dp,
+                        color = TwitterBlue,
+                        modifier = Modifier.size(20.dp),
+                    )
                 }
             }
         } else if (tweets.isNotEmpty()) {
@@ -252,76 +307,76 @@ private fun TweetList(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(8.dp),
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    textAlign = TextAlign.Center,
                 )
             }
         }
     }
 }
 
+// Classic-Twitter tweet row. Flat (no card), avatar on the left,
+// header line (display name · @handle · time), body, optional
+// place / event chips, then the action row (reply / retweet / like /
+// share). Dividers are drawn by the caller so they run edge-to-edge.
 @Composable
-private fun TweetCard(tweet: Tweet) {
+private fun TweetRow(tweet: Tweet) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val xUrl = remember(tweet.handle, tweet.id) {
         if (tweet.handle.isNotBlank() && tweet.id.isNotBlank()) {
             "https://x.com/${tweet.handle}/status/${tweet.id}"
         } else null
     }
-    Card(
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            // Tapping anywhere on the card outside a link opens the
-            // post in the X app (or browser fallback). Lets the user
-            // jump to the original thread without hunting for a button.
             .then(
                 if (xUrl != null) Modifier.clickable { openExternal(context, xUrl) }
                 else Modifier,
-            ),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-        ),
+            )
+            .padding(horizontal = 16.dp, vertical = 12.dp),
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(14.dp),
-        ) {
-            Avatar(tweet.avatarUrl, tweet.author.ifBlank { tweet.handle })
-            Spacer(Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+        Avatar(tweet.avatarUrl, tweet.author.ifBlank { tweet.handle })
+        Spacer(Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            // Header — classic Twitter shape: "Name @handle · time".
+            // Bullet separators replace the trailing right-aligned time
+            // the previous design used.
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = tweet.author.ifBlank { tweet.handle },
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+                if (tweet.handle.isNotBlank()) {
+                    Spacer(Modifier.width(4.dp))
                     Text(
-                        text = tweet.author.ifBlank { tweet.handle },
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.weight(1f, fill = false),
-                    )
-                    if (tweet.handle.isNotBlank()) {
-                        Spacer(Modifier.width(6.dp))
-                        Text(
-                            text = "@${tweet.handle}",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    Spacer(Modifier.weight(1f))
-                    Text(
-                        text = formatRelativeTime(tweet.createdAtMillis),
-                        style = MaterialTheme.typography.labelSmall,
+                        text = "@${tweet.handle}",
+                        style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
                     )
                 }
-                Spacer(Modifier.height(4.dp))
-                LinkifiedTweetText(
-                    text = tweet.text,
-                    onClickLink = { url -> openExternal(context, url) },
+                Spacer(Modifier.width(4.dp))
+                Text(
+                    text = "· ${formatRelativeTime(tweet.createdAtMillis)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+            }
+            Spacer(Modifier.height(2.dp))
+            LinkifiedTweetText(
+                text = tweet.text,
+                onClickLink = { url -> openExternal(context, url) },
+            )
+            val place = tweet.place?.takeIf { it.isNotBlank() }
+            if (place != null || tweet.eventCategories.isNotEmpty()) {
                 Spacer(Modifier.height(6.dp))
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    val place = tweet.place?.takeIf { it.isNotBlank() }
                     if (place != null) {
                         Text(
                             text = place,
@@ -330,19 +385,95 @@ private fun TweetCard(tweet: Tweet) {
                         )
                     }
                     EventBadges(tweet.eventCategories)
-                    Spacer(Modifier.weight(1f))
-                    val stats = buildStatsLine(tweet)
-                    if (stats.isNotEmpty()) {
-                        Text(
-                            text = stats,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
                 }
             }
+            Spacer(Modifier.height(8.dp))
+            ActionRow(tweet)
         }
     }
+}
+
+// ── Action row ──────────────────────────────────────────────────────
+// Classic Twitter action row: reply, retweet, like, share. Spaced so
+// the four icons sit at fixed positions across the row width (not
+// pulled together at the start). Counts render right next to each
+// icon when > 0; share has no count. The icons are not tap-actionable
+// yet — they're cosmetic for parity with the original UI. Tapping
+// the row falls through to the parent clickable (open in X).
+@Composable
+private fun ActionRow(tweet: Tweet) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(end = 32.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        ActionItem(
+            icon = Icons.Outlined.ChatBubbleOutline,
+            description = "Reply",
+            count = tweet.replyCount,
+        )
+        ActionItem(
+            icon = Icons.Outlined.Repeat,
+            description = "Retweet",
+            count = tweet.retweetCount,
+        )
+        ActionItem(
+            icon = Icons.Outlined.FavoriteBorder,
+            description = "Like",
+            count = tweet.likeCount,
+        )
+        ActionItem(
+            icon = Icons.Outlined.IosShare,
+            description = "Share",
+            count = 0,
+        )
+    }
+}
+
+@Composable
+private fun ActionItem(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    description: String,
+    count: Int,
+) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(
+            imageVector = icon,
+            contentDescription = description,
+            tint = ClassicActionMuted,
+            modifier = Modifier.size(18.dp),
+        )
+        if (count > 0) {
+            Spacer(Modifier.width(6.dp))
+            Text(
+                text = formatActionCount(count),
+                style = MaterialTheme.typography.labelMedium,
+                color = ClassicActionMuted,
+            )
+        }
+    }
+}
+
+// Twitter-style abbreviated counts: 1,234 → "1.2K"; 12,345 → "12K";
+// 1,234,567 → "1.2M". The single-digit-prefix slot keeps a decimal so
+// "1.2K" reads naturally; ten or more drops to a whole-number prefix
+// (matches the real Twitter app's behavior).
+internal fun formatActionCount(count: Int): String = when {
+    count < 1_000 -> count.toString()
+    count < 10_000 -> {
+        val whole = count / 1_000
+        val tenths = (count % 1_000) / 100
+        if (tenths == 0) "${whole}K" else "$whole.${tenths}K"
+    }
+    count < 1_000_000 -> "${count / 1_000}K"
+    count < 10_000_000 -> {
+        val whole = count / 1_000_000
+        val tenths = (count % 1_000_000) / 100_000
+        if (tenths == 0) "${whole}M" else "$whole.${tenths}M"
+    }
+    else -> "${count / 1_000_000}M"
 }
 
 // LinkifiedTweetText renders the body text with embedded URLs styled
@@ -369,8 +500,10 @@ private fun LinkifiedTweetText(
                 pushStringAnnotation(tag = "URL", annotation = m.value)
                 withStyle(
                     androidx.compose.ui.text.SpanStyle(
-                        color = androidx.compose.ui.graphics.Color(0xFF3B82F6),
-                        textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline,
+                        // Classic Twitter Blue for in-text links — no
+                        // underline (matches the original app: blue
+                        // colour is the affordance).
+                        color = TwitterBlue,
                     ),
                 ) {
                     append(m.value)
@@ -483,18 +616,6 @@ private fun EventBadges(categories: List<String>) {
                 )
             }
         }
-    }
-}
-
-private fun buildStatsLine(t: Tweet): String = buildString {
-    if (t.likeCount > 0) append("♥ ${t.likeCount}")
-    if (t.retweetCount > 0) {
-        if (isNotEmpty()) append("   ")
-        append("⇄ ${t.retweetCount}")
-    }
-    if (t.replyCount > 0) {
-        if (isNotEmpty()) append("   ")
-        append("↩ ${t.replyCount}")
     }
 }
 

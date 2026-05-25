@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.MenuBook
-import androidx.compose.material.icons.filled.AlternateEmail
 import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.LocationOn
@@ -23,13 +22,16 @@ import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import net.omarss.omono.ui.twitter.TwitterBlue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -133,16 +135,19 @@ class MainActivity : ComponentActivity() {
 enum class Destination(
     val route: String,
     val label: String,
-    val icon: ImageVector,
+    val icon: ImageVector?,
+    // Optional drawable-resource icon for destinations that ship a
+    // custom vector outside Material Icons. Mutually exclusive with
+    // `icon` — call sites pick whichever is non-null.
+    val iconRes: Int? = null,
 ) {
     Tracking(route = "tracking", label = "Drive", icon = Icons.Filled.Speed),
     Finance(route = "finance", label = "Finance", icon = Icons.Filled.Payments),
     Places(route = "places", label = "Places", icon = Icons.Filled.LocationOn),
-    // 5-item nav crosses Material's recommended 3-5 ceiling at the top
-    // edge; that's still inside spec. AlternateEmail (@) reads as "social
-    // feed" without using X branding (which would be a ToS/trademark
-    // headache anyway).
-    Twitter(route = "twitter", label = "Feed", icon = Icons.Filled.AlternateEmail),
+    // Bird-silhouette icon + Twitter-blue tint (applied at the call site)
+    // make this tab read as the classic Twitter app. The vector is a
+    // stylized hand-drawn shape, not the trademarked logo.
+    Twitter(route = "twitter", label = "Feed", icon = null, iconRes = R.drawable.ic_feed_bird),
     More(route = "more", label = "More", icon = Icons.Filled.Apps),
 }
 
@@ -212,8 +217,22 @@ private fun OmonoBottomNav(navController: NavHostController) {
             // secondary — that breadcrumb is helpful — but onClick
             // below navigates anyway instead of short-circuiting.
             val selected = onRoute || inSecondary
+            // The Twitter tab gets the classic-Twitter blue selected tint;
+            // every other tab inherits the global Material defaults. Pull
+            // colors out conditionally rather than branching on the call
+            // path so each tab keeps a single composable.
+            val itemColors = if (dest == Destination.Twitter) {
+                NavigationBarItemDefaults.colors(
+                    selectedIconColor = TwitterBlue,
+                    selectedTextColor = TwitterBlue,
+                    indicatorColor = TwitterBlue.copy(alpha = 0.15f),
+                )
+            } else {
+                NavigationBarItemDefaults.colors()
+            }
             NavigationBarItem(
                 selected = selected,
+                colors = itemColors,
                 onClick = {
                     val sameTopLevel = onRoute
                     if (!sameTopLevel) {
@@ -226,7 +245,18 @@ private fun OmonoBottomNav(navController: NavHostController) {
                         }
                     }
                 },
-                icon = { Icon(dest.icon, contentDescription = dest.label) },
+                icon = {
+                    when {
+                        dest.iconRes != null -> Icon(
+                            painter = painterResource(dest.iconRes),
+                            contentDescription = dest.label,
+                        )
+                        dest.icon != null -> Icon(
+                            imageVector = dest.icon,
+                            contentDescription = dest.label,
+                        )
+                    }
+                },
                 label = { Text(dest.label) },
             )
         }
