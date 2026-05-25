@@ -331,6 +331,48 @@ class SmsParserTest {
         SmsParser.parse("AlRajhiBank", body).shouldBeNull()
     }
 
+    @Test
+    fun `alrajhi do not disclose otp is ignored`() {
+        // 3DS-style OTP that omits the "OTP Code" / "One Time Password"
+        // strings — the only signal is "Do not disclose ... Code:NNNNNN".
+        // The body carries Amount + At: fields that would otherwise look
+        // like a real online purchase, so an explicit reject locks it in.
+        val body = """
+            Do not disclose your OTP to ANYONE
+            Code:756125
+            Card:*4527
+            Amount:SAR 156.05
+            At:www.ananinja.com
+            Date:26/05/14 20:01
+        """.trimIndent()
+        SmsParser.parse("AlRajhiBank", body).shouldBeNull()
+    }
+
+    @Test
+    fun `alrajhi cashback credit is ignored`() {
+        // Reward credit; not a purchase and not a transfer the user
+        // initiated. No "Amount:" prefix in the body (it's free-form text)
+        // so it was safe by accident — pin it down explicitly.
+        val body = "Your total Cashback 0.64 SAR on your transactions has been credited to your Digital Prepaid card ending with 4527"
+        SmsParser.parse("AlRajhiBank", body).shouldBeNull()
+    }
+
+    @Test
+    fun `alrajhi notification login is ignored`() {
+        SmsParser.parse(
+            "AlRajhiBank",
+            "Notification: Login using Touch/Face ID service activated",
+        ).shouldBeNull()
+    }
+
+    @Test
+    fun `alrajhi notification new device is ignored`() {
+        SmsParser.parse(
+            "AlRajhiBank",
+            "Notification: New device registered in Login using Touch/Face ID service",
+        ).shouldBeNull()
+    }
+
     // ── STC Bank: purchases ─────────────────────────────────────────────
 
     @Test
@@ -519,6 +561,62 @@ class SmsParserTest {
             24/02/26 04:40
         """.trimIndent()
         SmsParser.parse("STC Bank", body).shouldBeNull()
+    }
+
+    @Test
+    fun `stc western union transfer is captured as transfer_out with receiver`() {
+        // Real export shape — outbound WU remittance to Morocco. The
+        // recipient name is on a "Receiver:" line, not "To:", and the
+        // body's "At:" line carries the timestamp rather than a merchant,
+        // so the parser must consult Receiver: for the transfer kind.
+        val body = """
+            Transfer via WU
+            Amount:1,260.00 SAR
+            Fees:0.00 SAR
+            MTCN:5894826839
+            Receiver:SALOUA BOUAQA
+            Country:Morocco
+            At:23/05/26 23:13
+        """.trimIndent()
+        val parsed = SmsParser.parse("STC Bank", body)
+        parsed.shouldNotBeNull()
+        parsed.bank shouldBe Transaction.Bank.STC
+        parsed.kind shouldBe Transaction.Kind.TRANSFER_OUT
+        parsed.originalAmount shouldBe 1260.0
+        parsed.originalCurrency shouldBe "SAR"
+        parsed.merchant shouldBe "SALOUA BOUAQA"
+    }
+
+    @Test
+    fun `stc insufficient balance decline is ignored`() {
+        // Decline phrasing other than "not allowed" — the body still says
+        // "Online Purchase" / "Amount: 107 SAR / At: Jahez" so an explicit
+        // reject prevents future kind-matching from picking it up.
+        val body = """
+            Insufficient balance
+            Transaction: Online Purchase
+            Card: ***6066
+            Amount: 107 SAR
+            At: Jahez
+            Date: 20/05/26 20:15
+        """.trimIndent()
+        SmsParser.parse("STC Bank", body).shouldBeNull()
+    }
+
+    @Test
+    fun `stc declined invalid card status is ignored`() {
+        SmsParser.parse(
+            "STC Bank",
+            "Declined transaction due to invalid card status.",
+        ).shouldBeNull()
+    }
+
+    @Test
+    fun `stc beneficiary added admin notice is ignored`() {
+        SmsParser.parse(
+            "STC Bank",
+            "Beneficiary: AJMAL ANWAR has been added.",
+        ).shouldBeNull()
     }
 
     // ── Unknown senders ────────────────────────────────────────────────

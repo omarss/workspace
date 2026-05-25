@@ -82,6 +82,23 @@ object SmsParser {
         if (body.containsIgnoreCase("Dear customer") || body.containsIgnoreCase("Dear Customer")) return null
         if (body.containsIgnoreCase("Your card") && body.containsIgnoreCase("MadaPay")) return null
         if (body.containsIgnoreCase("verification code")) return null
+        // "Do not disclose your OTP to ANYONE" — credit-card 3DS OTP shape
+        // that does not include the literal "OTP Code" / "One Time Password"
+        // strings, so it slips past the standard OTP rejects above. The body
+        // also carries Amount: + At: fields which would otherwise look like a
+        // genuine purchase if a future capture branch ever uses "Card:" as a
+        // discriminator.
+        if (body.containsIgnoreCase("Do not disclose")) return null
+        // Cashback credits ("Your total Cashback X SAR ... has been credited
+        // ...") — currently safe-by-accident because the amount is not
+        // prefixed with "Amount:", but lock it in explicitly so a future
+        // amount-regex tweak can't accidentally turn these into purchases.
+        if (body.containsIgnoreCase("Cashback")) return null
+        // Auth-only notices: "Notification: Login using Touch/Face ID service
+        // activated", "Notification: New device registered ...". STC's own
+        // "Notification: Refund" is handled in parseStcBank() and never
+        // reaches this branch, so a substring reject here is AlRajhi-scoped.
+        if (body.containsIgnoreCase("Notification:")) return null
         // STC Pay top-ups show up as Bill Payment / Biller:207 /
         // Service:STC PAY. They're the user moving money between
         // their own accounts, not spending — reject outright.
@@ -144,18 +161,33 @@ object SmsParser {
     //   "Online Purchase Transaction Amount 111.75 From: Ninja Retail ..."
     //   "Local Purchase Card: *6066; mada Pay Amount: 13 SAR At: ucoffe ..."
     //   "Internal outward transfer Amount:150.00SAR To:AJMAL ANWAR ..."
+    //   "Transfer via WU Amount:1,260.00 SAR ... Receiver:<name> Country:..."
     //   "Notification: Refund Transaction: ATM Cashwithdrawal ..."
     //
     // Shapes we skip:
     //   OTPs (both "… is your OTP" and "Please use one time password")
-    //   "The transaction is not allowed…" (declined)
-    //   "Adding money to account" (incoming own-account top-up)
-    //   "Pre-Auth" / "Pre-Auth void"  (temporary hold + reversal pair)
+    //   "The transaction is not allowed…" (declined — phrasing #1)
+    //   "Insufficient balance ..." (declined — phrasing #2; body still
+    //     contains "Online Purchase" / "Amount: X SAR", currently safe by
+    //     accident because no kind matches contiguously but worth being
+    //     explicit about).
+    //   "Declined transaction due to invalid card status" (status decline)
+    //   "Beneficiary: X has been added"   (admin notice, no Amount)
+    //   "Adding money to account"          (incoming own-account top-up)
+    //   "Pre-Auth" / "Pre-Auth void"       (temporary hold + reversal pair)
     private fun parseStcBank(body: String): ParsedSms? {
         if (body.containsIgnoreCase("is your OTP")) return null
         if (body.containsIgnoreCase("one time password")) return null
         if (body.containsIgnoreCase("not allowed")) return null
         if (body.containsIgnoreCase("Do not share")) return null
+        // Declined-transaction phrasings other than "not allowed". Both
+        // "Insufficient balance" (echoes the merchant + amount of a failed
+        // online purchase) and "Declined transaction due to invalid card
+        // status" land here.
+        if (body.containsIgnoreCase("Insufficient balance")) return null
+        if (body.containsIgnoreCase("Declined")) return null
+        // Beneficiary-added admin notice — no amount, but defensive.
+        if (body.containsIgnoreCase("Beneficiary:")) return null
         // Own-account credit (user sent cash from Al Rajhi). Noise, not
         // spending; the outgoing leg is already rejected on the Al Rajhi
         // side via "STC PAY".
@@ -177,6 +209,11 @@ object SmsParser {
             // subscription service is always "online".
             body.containsIgnoreCase("VISA Purchase") -> Kind.ONLINE_PURCHASE
             body.containsIgnoreCase("Internal outward transfer") -> Kind.TRANSFER_OUT
+            // Western Union outbound remittance — the recipient name is on
+            // a "Receiver:" line (not "To:"), and the only "At:" line on
+            // these bodies is a timestamp, so the merchant lookup below
+            // must consult Receiver: first for this kind.
+            body.containsIgnoreCase("Transfer via WU") -> Kind.TRANSFER_OUT
             body.containsIgnoreCase("Notification: Refund") -> Kind.REFUND
             else -> return null
         }
@@ -184,11 +221,16 @@ object SmsParser {
         val extracted = extractStcAmount(body) ?: return null
         val (originalAmount, rawCurrency) = extracted
         val originalCurrency = canonicalizeCurrency(rawCurrency)
-        // Transfers use "To:<recipient name>"; refunds identify the
-        // reversed transaction with "Transaction:<kind>". Everything
-        // else uses From:/At:.
+        // Transfers use "To:<recipient name>" (Internal outward transfer)
+        // or "Receiver:<recipient name>" (Transfer via WU); refunds
+        // identify the reversed transaction with "Transaction:<kind>".
+        // Everything else uses From:/At:. The WU body also has an
+        // "At:<timestamp>" line that must NOT win over Receiver:, so the
+        // transfer branch returns explicitly when either field matches.
         val merchant = when (kind) {
-            Kind.TRANSFER_OUT -> STC_TO_RE.find(body)?.groupValues?.get(1)?.trim()
+            Kind.TRANSFER_OUT ->
+                STC_TO_RE.find(body)?.groupValues?.get(1)?.trim()
+                    ?: STC_RECEIVER_RE.find(body)?.groupValues?.get(1)?.trim()
             Kind.REFUND -> STC_TRANSACTION_RE.find(body)?.groupValues?.get(1)?.trim()
             else -> null
         } ?: STC_FROM_RE.find(body)?.groupValues?.get(1)?.trim()
@@ -332,6 +374,11 @@ object SmsParser {
     // win — negative lookahead excludes the all-digits variant.
     private val STC_TO_RE = Regex(
         """To\s*:\s*(?!\d+\s*$)([^\r\n]+)""",
+        RegexOption.IGNORE_CASE,
+    )
+    // Western Union outbound — "Receiver:<name>" carries the recipient.
+    private val STC_RECEIVER_RE = Regex(
+        """Receiver\s*:\s*([^\r\n]+)""",
         RegexOption.IGNORE_CASE,
     )
     // Refund shape carries "Transaction:ATM Cashwithdrawal" (or
