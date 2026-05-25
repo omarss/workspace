@@ -133,6 +133,34 @@ build today:
   understate to manage budget pressure. The data quality / fraud module (§16 of
   the design doc) must run on incoming surveys, not just synthetic.
 
+## Data freshness policy (hard rule)
+
+> **Never use data older than 2 years as an anchor / current-level input.**
+> Data up to 20-30 years old is fine for trend modeling, lag features, and
+> forecasting.
+
+Codified in `src/salary_model/data/policy.py`:
+
+- `MAX_AGE_YEARS_FOR_ANCHOR = 2.0` — anchors / "what's the level now"
+- `MAX_AGE_YEARS_FOR_TRENDLINE = 30.0` — trend / lag / forecasting features
+
+How to comply when adding a new fetcher:
+
+1. Tag the result with `anchor_year` (the publication year of the values).
+2. Before using it as a current-level anchor, call `policy.freshness(anchor_year)`
+   and either:
+   - use it as-is if `ok_as_anchor` is True, or
+   - trend it forward by `verdict.trend_factor(cpi_yoy)` (compound CPI), or
+   - refuse to use it for absolute anchoring and only feed it into trend
+     features.
+3. For trend / lag features, check `ok_as_trendline` and never extrapolate
+   beyond 30 years.
+
+The calibration pipeline (`data/calibrate.py`) already enforces this — the 2020
+KAPSARC anchor gets trended forward by ~12% (6 years of 2% CPI) before pinning
+the synthetic mean. Future anchor refreshes that bring the data within 2 years
+will skip the trend step automatically.
+
 ## Always consider the time factor
 
 Salary is a time-varying quantity. Any number, recommendation, or feature must carry

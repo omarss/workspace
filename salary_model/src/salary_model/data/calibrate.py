@@ -39,6 +39,7 @@ import numpy as np
 import pandas as pd
 
 from salary_model.config import get_logger
+from salary_model.data.policy import freshness, today
 from salary_model.data.sources.wage_index_live import (
     gender_gap_pct,
     lookup_wage,
@@ -100,7 +101,12 @@ class CalibrationReport:
 
 
 def _annual_cpi_factor_to_year(cpi_yoy_per_year: float, n_years: int) -> float:
-    """Compound annual CPI factor (e.g. 0.02 + 6 -> 1.126)."""
+    """Compound annual CPI factor.
+
+    Positive ``n_years`` lifts (e.g. 0.02 + 6 -> 1.126). Negative ``n_years``
+    deflates back in time. The caller is responsible for not extrapolating
+    further than the trendline policy allows.
+    """
     return float((1.0 + cpi_yoy_per_year) ** n_years)
 
 
@@ -273,9 +279,34 @@ def calibrate_to_live(
     if published_mean is None:
         report.skipped.append("mean")
     else:
+        # Freshness policy: if the anchor year is older than 2y, trend it forward
+        # to today via cumulative CPI before using it as a current-level anchor.
+        verdict = freshness(use_year)
+        raw_published_mean = published_mean
+        if not verdict.ok_as_anchor:
+            trend_factor = verdict.trend_factor(cpi_yoy)
+            published_mean = published_mean * trend_factor
+            report.notes.append(
+                f"anchor year {use_year} is {verdict.age_years:.1f}y old "
+                f"(policy: max 2y for anchors); raw published mean "
+                f"{raw_published_mean:,.0f} SAR was trended forward by "
+                f"{(trend_factor - 1.0):+.2%} via CPI ({cpi_yoy:.1%}/yr compounded "
+                f"over {int(verdict.age_years)}y) to today-equivalent "
+                f"{published_mean:,.0f} SAR"
+            )
+        else:
+            report.notes.append(
+                f"anchor year {use_year} is fresh (within {verdict.age_years:.1f}y); "
+                f"no CPI trending applied"
+            )
+
         obs_year = pd.to_datetime(work["observed_at"], utc=True).dt.year
+        # Trend each row's target from the (possibly already-trended) reference
+        # to the row's own observed year. This stays within trendline policy
+        # because we never extend more than a few years.
+        ref_year = today().year
         trend = obs_year.apply(
-            lambda y: _annual_cpi_factor_to_year(cpi_yoy, max(int(y) - use_year, 0))
+            lambda y: _annual_cpi_factor_to_year(cpi_yoy, int(y) - ref_year)
         )
         target_per_row = published_mean * trend.to_numpy(dtype=float)
         current_mean = float(work["base_monthly"].astype(float).mean())
