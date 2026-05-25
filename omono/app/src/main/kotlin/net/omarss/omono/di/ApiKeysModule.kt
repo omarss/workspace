@@ -25,4 +25,9 @@ object ApiKeysModule {
     @Singleton
     @Named("gplacesApiKey")
     fun provideGPlacesApiKey(): String = BuildConfig.GPLACES_API_KEY
+
+    @Provides
+    @Singleton
+    @Named("tweetsApiUrl")
+    fun provideTweetsApiUrl(): String = BuildConfig.TWEETS_API_URL
 }
