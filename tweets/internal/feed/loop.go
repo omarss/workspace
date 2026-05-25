@@ -8,6 +8,8 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/omarss/workspace/tweets/internal/events"
@@ -133,25 +135,40 @@ func (l *Loop) refreshOne(ctx context.Context, country server.Country) {
 		return
 	}
 	var (
-		kept       = make([]server.Tweet, 0, len(tweets))
-		spamDrops  int
-		eventHits  int
+		kept      = make([]server.Tweet, 0, len(tweets))
+		spamDrops int
+		eventHits int
 	)
+	// Per-tick author dedup. The scraper sometimes pulls in 3-7
+	// near-identical posts from the same handle when X re-surfaces an
+	// engagement-farming pattern (`#اهب_مكذبك_ياكذبان https://t.co/X`
+	// posted three times in a row with different shortlink suffixes).
+	// We flag everything except the first occurrence per (handle,
+	// hashtag-bearing-text-sans-urls) as DuplicateRecent so the
+	// existing 0.35 score penalty applies. Stripping URLs is the
+	// trick — identical posts with different t.co suffixes match.
+	seen := make(map[string]bool, len(tweets))
 	for i := range tweets {
 		t := &tweets[i]
-		// Spam — same heuristics, lower default threshold so the
-		// feed errs on the side of fewer noisy tweets.
-		ss, _ := spam.Score(spam.Compute(t.Text, time.Time{}, 0, 0, false))
+		dupKey := t.Handle + "|" + normalizeForDedup(t.Text)
+		dup := false
+		if t.Handle != "" {
+			if seen[dupKey] {
+				dup = true
+			} else {
+				seen[dupKey] = true
+			}
+		}
+
+		ss, _ := spam.Score(spam.Compute(t.Text, time.Time{}, 0, 0, dup))
 		t.SpamScore = ss
-		// >= so the borderline 0.50 cases (multi-hashtag adult promo
-		// before the blocklist matched) still drop. The blocklist
-		// already pushes those past 0.5, but the tight inequality
-		// keeps the safety margin on score collisions.
+		// >= so borderline 0.50 cases drop (was > before; the
+		// blocklist comfortably puts real spam past 0.5, the strict
+		// gate guards against score collisions).
 		if ss >= l.spamThreshold {
 			spamDrops++
 			continue
 		}
-		// Event scoring — drives the sort order downstream.
 		ev := events.Compute(t.Text)
 		t.EventScore = ev.Value
 		t.EventCategories = ev.Categories
@@ -203,4 +220,18 @@ func (l *Loop) maybeRefreshAuth(ctx context.Context) {
 // (tests substitute fakes that don't need to reload anything).
 type reloadable interface {
 	Reload() error
+}
+
+// normalizeForDedup lowercases + strips URLs + collapses whitespace so
+// the same logical post with different t.co shortlink suffixes still
+// hashes to the same key. We DON'T strip hashtags — the dedup signal
+// hinges on identical hashtag content from the same handle.
+var dedupUrlRe = regexp.MustCompile(`https?://\S+|t\.co/\S+`)
+var dedupSpaceRe = regexp.MustCompile(`\s+`)
+
+func normalizeForDedup(text string) string {
+	low := strings.ToLower(text)
+	low = dedupUrlRe.ReplaceAllString(low, "")
+	low = dedupSpaceRe.ReplaceAllString(low, " ")
+	return strings.TrimSpace(low)
 }
