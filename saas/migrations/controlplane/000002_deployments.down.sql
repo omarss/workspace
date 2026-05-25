@@ -1,0 +1,11 @@
+DROP TRIGGER IF EXISTS operator_audit_event_no_delete ON operator_audit_event;
+DROP TRIGGER IF EXISTS operator_audit_event_no_update ON operator_audit_event;
+DROP FUNCTION IF EXISTS operator_audit_event_immutable();
+DROP TABLE IF EXISTS operator_audit_event;
+DROP TABLE IF EXISTS operator;
+DROP TABLE IF EXISTS deployment_provision_step;
+DROP TABLE IF EXISTS deployment_domain;
+DROP TABLE IF EXISTS deployment_revision;
+DROP TRIGGER IF EXISTS deployment_bump_row_seq ON deployment;
+DROP FUNCTION IF EXISTS bump_row_seq();
+DROP TABLE IF EXISTS deployment;
