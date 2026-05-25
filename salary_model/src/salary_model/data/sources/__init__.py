@@ -23,10 +23,16 @@ from salary_model.data.sources.lever import fetch_lever_postings
 from salary_model.data.sources.macro_series import fetch_macro_series, lookup_at
 from salary_model.data.sources.postings import fetch_all_postings
 from salary_model.data.sources.sama import fetch_sama_indicators
+from salary_model.data.sources.wage_index_live import (
+    build_wage_index,
+    gender_gap_pct,
+    saudi_gap_pct,
+)
 from salary_model.data.sources.workable import fetch_workable_postings
 from salary_model.data.sources.worldbank import fetch_worldbank_macro
 
 __all__ = [
+    "build_wage_index",
     "fetch_all_postings",
     "fetch_ashby_postings",
     "fetch_gastat_wage_index",
@@ -43,5 +49,7 @@ __all__ = [
     "fetch_sama_indicators",
     "fetch_workable_postings",
     "fetch_worldbank_macro",
+    "gender_gap_pct",
     "lookup_at",
+    "saudi_gap_pct",
 ]

@@ -57,6 +57,9 @@ def build_dataset(
         "cpi_mom": sources.fetch_kapsarc_cpi_mom(),
         "population": sources.fetch_kapsarc_population(),
     }
+    # Derived live wage index from main_labor; first real authoritative wage series
+    # in the project. Used by the fairness audit to compare model gap vs GASTAT gap.
+    wage_index_df, wage_index_manifest = sources.build_wage_index()
 
     # ── 2. synthetic observations anchored to the public tables ───────────────
     spec = synthetic.default_spec(n_rows=n_rows, seed=seed)
@@ -95,6 +98,14 @@ def build_dataset(
             p = out_dir / f"kapsarc_{key}_{run_id}.parquet"
             df_k.to_parquet(p, index=False)
             kapsarc_paths[f"kapsarc_{key}"] = str(p.relative_to(settings.repo_root))
+    # Live wage index (always written when non-empty so the iteration runner finds it)
+    wage_index_path: str | None = None
+    if len(wage_index_df) > 0:
+        wp = out_dir / f"wage_index_live_{run_id}.parquet"
+        wage_index_df.to_parquet(wp, index=False)
+        wage_index_latest = out_dir / "wage_index_live_latest.parquet"
+        wage_index_df.to_parquet(wage_index_latest, index=False)
+        wage_index_path = str(wp.relative_to(settings.repo_root))
 
     # ── 4. manifest ───────────────────────────────────────────────────────────
     source_manifests = {
@@ -105,6 +116,7 @@ def build_dataset(
     }
     for key, (_df_k, m_k) in kapsarc_results.items():
         source_manifests[f"kapsarc_{key}"] = asdict(m_k)
+    source_manifests["wage_index_live"] = asdict(wage_index_manifest)
     live_sources = [k for k, v in source_manifests.items() if not v.get("is_estimate", True)]
     manifest: dict[str, Any] = {
         "run_id": run_id,
@@ -117,6 +129,7 @@ def build_dataset(
         "sama": str(sama_path.relative_to(settings.repo_root)),
         "macro_series": str(macro_series_path.relative_to(settings.repo_root)),
         "kapsarc": kapsarc_paths,
+        "wage_index_live": wage_index_path,
         "cleanup_report": str((cleanup_dir / "cleanup.md").relative_to(settings.repo_root)),
         "cleanup": cleanup_report.to_dict(),
         "snapshot_sha256": _hash_dataframe(obs),
@@ -164,4 +177,16 @@ def load_latest_macro_series() -> pd.DataFrame:
         from salary_model.data.sources.macro_series import fetch_macro_series
         df, _ = fetch_macro_series()
         return df
+    return pd.read_parquet(path)
+
+
+def load_latest_wage_index() -> pd.DataFrame:
+    """Load the live GASTAT wage index written alongside the latest snapshot.
+
+    Returns an empty DataFrame if no snapshot exists yet — callers handle that.
+    """
+    settings = get_settings()
+    path = settings.processed_dir / "wage_index_live_latest.parquet"
+    if not path.exists():
+        return pd.DataFrame()
     return pd.read_parquet(path)
