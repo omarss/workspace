@@ -13,6 +13,13 @@
  */
 
 
-export * from "./api";
-export * from "./configuration";
-export * from "./models";
+
+export interface DeploymentRevision {
+    'id'?: string;
+    'deployment_id'?: string;
+    'image_version'?: string;
+    'applied_at'?: string;
+    'is_rolled_back'?: boolean;
+    'applied_by'?: string;
+}
+

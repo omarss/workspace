@@ -13,6 +13,9 @@
  */
 
 
-export * from "./api";
-export * from "./configuration";
-export * from "./models";
+
+export interface Pagination {
+    'has_more'?: boolean;
+    'next_cursor'?: string;
+}
+

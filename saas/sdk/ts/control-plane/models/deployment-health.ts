@@ -13,6 +13,24 @@
  */
 
 
-export * from "./api";
-export * from "./configuration";
-export * from "./models";
+// May contain unused imports in some cases
+// @ts-ignore
+import type { DeploymentHealthComponentsInner } from './deployment-health-components-inner';
+
+export interface DeploymentHealth {
+    'deployment_id'?: string;
+    'overall'?: DeploymentHealthOverallEnum;
+    'components'?: Array<DeploymentHealthComponentsInner>;
+    'checked_at'?: string;
+}
+
+export const DeploymentHealthOverallEnum = {
+    Healthy: 'healthy',
+    Degraded: 'degraded',
+    Unhealthy: 'unhealthy',
+    Unknown: 'unknown',
+} as const;
+
+export type DeploymentHealthOverallEnum = typeof DeploymentHealthOverallEnum[keyof typeof DeploymentHealthOverallEnum];
+
+

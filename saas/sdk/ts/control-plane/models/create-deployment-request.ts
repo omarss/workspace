@@ -13,6 +13,14 @@
  */
 
 
-export * from "./api";
-export * from "./configuration";
-export * from "./models";
+
+export interface CreateDeploymentRequest {
+    'project_slug': string;
+    'environment_slug': string;
+    'region'?: string;
+    'modules'?: Array<string>;
+    'image_version': string;
+    'data_residency'?: string;
+    'metadata'?: { [key: string]: string; };
+}
+

@@ -13,6 +13,17 @@
  */
 
 
-export * from "./api";
-export * from "./configuration";
-export * from "./models";
+
+export interface DeploymentDomainVerificationRecord {
+    'record_name': string;
+    'record_type': DeploymentDomainVerificationRecordRecordTypeEnum;
+    'record_value': string;
+}
+
+export const DeploymentDomainVerificationRecordRecordTypeEnum = {
+    Txt: 'TXT',
+} as const;
+
+export type DeploymentDomainVerificationRecordRecordTypeEnum = typeof DeploymentDomainVerificationRecordRecordTypeEnum[keyof typeof DeploymentDomainVerificationRecordRecordTypeEnum];
+
+

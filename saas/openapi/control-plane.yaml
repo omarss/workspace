@@ -1,22 +1,28 @@
 openapi: 3.1.0
 info:
   title: SaaS Control Plane API
-  version: 0.0.1
-  description: Operator-only API for provisioning and operating isolated SaaS deployments.
+  version: 0.1.0
+  description: |
+    Operator-only API for provisioning and operating isolated SaaS
+    deployments. Audience saas-control; the operators Keycloak realm is the
+    sole issuer (Phase 13 wires MFA + step-up + IP allowlist). The
+    Bring-Your-Own-Domain endpoints live alongside core deployment CRUD
+    because the verification + cert lifecycle is operator-owned (ADR 015).
 servers:
   - url: https://control.saas.omarss.net
 tags:
   - name: meta
     description: Health and metadata.
+  - name: deployments
+    description: Provision, operate, and decommission isolated SaaS deployments.
+  - name: domains
+    description: Bring-Your-Own-Domain attachments for a Deployment.
+  - name: operators
+    description: Operator inventory (extended in Phase 13).
   - name: audit
     description: |
-      Audit-integrity verify endpoint. Operator-only — walks the
-      data-plane hash chain and reports the first row whose stored
-      row_hash disagrees with sha256(prev_hash || JCS(canonical body)),
-      or sequence gaps in the per-tenant chain (AGENTS.md §8.6 + ADR
-      012). The chain-walk logic ships in Phase 10; this endpoint's
-      Go wiring lands in Phase 11 when the control-plane binary is
-      assembled.
+      Audit-integrity verify endpoint + control-plane audit feed.
+      Operator-only — walks the data-plane hash chain per AGENTS.md §8.6.
 paths:
   /healthz:
     get:
@@ -31,49 +37,582 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Health"
-  /control/v1/deployments/{deployment_id}/audit-integrity:
+
+  /control/v1/deployments:
+    get:
+      operationId: listDeployments
+      tags: [deployments]
+      summary: List Deployments.
+      parameters:
+        - { in: query, name: limit,  schema: { type: integer, minimum: 1, maximum: 100, default: 25 } }
+        - { in: query, name: cursor, schema: { type: string } }
+        - { in: query, name: status, schema: { type: string } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/DeploymentListResponse" } } } }
+    post:
+      operationId: createDeployment
+      tags: [deployments]
+      summary: Provision a new Deployment.
+      parameters:
+        - in: header
+          name: Idempotency-Key
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateDeploymentRequest" }
+      responses:
+        "201":
+          description: Created.
+          headers: { ETag: { schema: { type: string } } }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CreateDeploymentResponse" }
+
+  /control/v1/deployments/{deployment_id}:
     parameters:
       - in: path
         name: deployment_id
         required: true
-        schema:
-          type: string
+        schema: { type: string }
+    get:
+      operationId: getDeployment
+      tags: [deployments]
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/DeploymentResponse" } } } }
+    patch:
+      operationId: updateDeployment
+      tags: [deployments]
+      parameters:
+        - in: header
+          name: If-Match
+          required: true
+          schema: { type: string }
+        - in: header
+          name: Idempotency-Key
+          required: false
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateDeploymentRequest" }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/DeploymentResponse" } } } }
+    delete:
+      operationId: deleteDeployment
+      tags: [deployments]
+      parameters:
+        - in: query
+          name: retain_days
+          schema: { type: integer, minimum: 0, maximum: 365, default: 30 }
+      responses:
+        "204": { description: Soft-deleted; retention applies. }
+
+  /control/v1/deployments/{deployment_id}/upgrade:
+    parameters:
+      - in: path
+        name: deployment_id
+        required: true
+        schema: { type: string }
+    post:
+      operationId: upgradeDeployment
+      tags: [deployments]
+      parameters:
+        - in: header
+          name: Idempotency-Key
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpgradeDeploymentRequest" }
+      responses:
+        "202": { description: Accepted, content: { application/json: { schema: { $ref: "#/components/schemas/DeploymentResponse" } } } }
+
+  /control/v1/deployments/{deployment_id}/rollback:
+    parameters: [ { in: path, name: deployment_id, required: true, schema: { type: string } } ]
+    post:
+      operationId: rollbackDeployment
+      tags: [deployments]
+      parameters:
+        - in: header
+          name: Idempotency-Key
+          required: true
+          schema: { type: string }
+      responses:
+        "202": { description: Accepted, content: { application/json: { schema: { $ref: "#/components/schemas/DeploymentResponse" } } } }
+
+  /control/v1/deployments/{deployment_id}/restart:
+    parameters: [ { in: path, name: deployment_id, required: true, schema: { type: string } } ]
+    post:
+      operationId: restartDeployment
+      tags: [deployments]
+      parameters:
+        - in: header
+          name: Idempotency-Key
+          required: true
+          schema: { type: string }
+      responses:
+        "202": { description: Accepted, content: { application/json: { schema: { $ref: "#/components/schemas/DeploymentResponse" } } } }
+
+  /control/v1/deployments/{deployment_id}/restore:
+    parameters: [ { in: path, name: deployment_id, required: true, schema: { type: string } } ]
+    post:
+      operationId: restoreDeployment
+      tags: [deployments]
+      parameters:
+        - in: header
+          name: Idempotency-Key
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RestoreDeploymentRequest" }
+      responses:
+        "202": { description: Accepted, content: { application/json: { schema: { $ref: "#/components/schemas/DeploymentResponse" } } } }
+
+  /control/v1/deployments/{deployment_id}/purge:
+    parameters: [ { in: path, name: deployment_id, required: true, schema: { type: string } } ]
+    post:
+      operationId: purgeDeployment
+      tags: [deployments]
+      parameters:
+        - in: header
+          name: Idempotency-Key
+          required: true
+          schema: { type: string }
+      responses:
+        "202": { description: Accepted, content: { application/json: { schema: { $ref: "#/components/schemas/DeploymentResponse" } } } }
+
+  /control/v1/deployments/{deployment_id}/revisions:
+    parameters: [ { in: path, name: deployment_id, required: true, schema: { type: string } } ]
+    get:
+      operationId: listDeploymentRevisions
+      tags: [deployments]
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/DeploymentRevisionListResponse" } } } }
+
+  /control/v1/deployments/{deployment_id}/health:
+    parameters: [ { in: path, name: deployment_id, required: true, schema: { type: string } } ]
+    get:
+      operationId: getDeploymentHealth
+      tags: [deployments]
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/DeploymentHealthResponse" } } } }
+
+  /control/v1/deployments/{deployment_id}/logs:
+    parameters: [ { in: path, name: deployment_id, required: true, schema: { type: string } } ]
+    get:
+      operationId: tailDeploymentLogs
+      tags: [deployments]
+      parameters:
+        - { in: query, name: since,  schema: { type: string, format: date-time } }
+        - { in: query, name: filter, schema: { type: string } }
+        - { in: query, name: tail,   schema: { type: integer, minimum: 1, maximum: 10000, default: 100 } }
+      responses:
+        "200":
+          description: NDJSON log stream.
+          content:
+            application/x-ndjson:
+              schema: { type: string }
+
+  /control/v1/deployments/{deployment_id}/impersonation-sessions:
+    parameters: [ { in: path, name: deployment_id, required: true, schema: { type: string } } ]
+    post:
+      operationId: startImpersonationSession
+      tags: [deployments]
+      parameters:
+        - in: header
+          name: Idempotency-Key
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/StartImpersonationRequest" }
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/StartImpersonationResponse" }
+
+  /control/v1/deployments/{deployment_id}/freeze-keys:
+    parameters: [ { in: path, name: deployment_id, required: true, schema: { type: string } } ]
+    post:
+      operationId: freezeDeploymentKeys
+      tags: [deployments]
+      parameters:
+        - in: header
+          name: Idempotency-Key
+          required: true
+          schema: { type: string }
+      responses:
+        "202":
+          description: Accepted; subsequent API key rotations refused.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DeploymentResponse" }
+
+  /control/v1/deployments/{deployment_id}/domains:
+    parameters: [ { in: path, name: deployment_id, required: true, schema: { type: string } } ]
+    get:
+      operationId: listDeploymentDomains
+      tags: [domains]
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/DeploymentDomainListResponse" } } } }
+    post:
+      operationId: attachDeploymentDomain
+      tags: [domains]
+      parameters:
+        - in: header
+          name: Idempotency-Key
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AttachDomainRequest" }
+      responses:
+        "201":
+          description: Created; verification record returned.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DeploymentDomainResponse" }
+
+  /control/v1/deployments/{deployment_id}/domains/{domain_id}:
+    parameters:
+      - { in: path, name: deployment_id, required: true, schema: { type: string } }
+      - { in: path, name: domain_id,     required: true, schema: { type: string } }
+    get:
+      operationId: getDeploymentDomain
+      tags: [domains]
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/DeploymentDomainResponse" } } } }
+    delete:
+      operationId: detachDeploymentDomain
+      tags: [domains]
+      parameters:
+        - in: header
+          name: If-Match
+          required: false
+          schema: { type: string }
+      responses:
+        "204": { description: Detached. }
+
+  /control/v1/deployments/{deployment_id}/domains/{domain_id}/verify:
+    parameters:
+      - { in: path, name: deployment_id, required: true, schema: { type: string } }
+      - { in: path, name: domain_id,     required: true, schema: { type: string } }
+    post:
+      operationId: verifyDeploymentDomain
+      tags: [domains]
+      parameters:
+        - in: header
+          name: Idempotency-Key
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Verification attempted; check status field.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DeploymentDomainResponse" }
+
+  /control/v1/deployments/{deployment_id}/audit-integrity:
+    parameters:
+      - { in: path, name: deployment_id, required: true, schema: { type: string } }
     get:
       operationId: verifyDeploymentAuditIntegrity
       tags: [audit]
       summary: Walk the audit chain and report the first mismatch (if any).
-      description: |
-        Operator-only. The chain walk is in-order per tenant; the
-        result terminates at the first mismatch. Reasons: sequence-gap,
-        prev_hash, row_hash. For very large deployments this endpoint
-        is long-running; the v1 roadmap moves it onto a background
-        job. Phase 10 ships the synchronous shape.
       parameters:
-        - in: query
-          name: tenant_id
-          description: Optional — verify a single tenant's chain instead of every tenant on the Deployment.
-          schema:
-            type: string
+        - { in: query, name: tenant_id, schema: { type: string } }
       responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/AuditIntegrityResponse"
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/AuditIntegrityResponse" } } } }
+
+  /control/v1/audit-events:
+    get:
+      operationId: listControlPlaneAuditEvents
+      tags: [audit]
+      summary: List control-plane operator audit events.
+      parameters:
+        - { in: query, name: limit,  schema: { type: integer, minimum: 1, maximum: 100, default: 25 } }
+        - { in: query, name: cursor, schema: { type: string } }
+        - { in: query, name: deployment_id, schema: { type: string } }
+        - { in: query, name: operator_id,   schema: { type: string } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/ControlPlaneAuditEventListResponse" } } } }
+
+  /control/v1/operators:
+    get:
+      operationId: listOperators
+      tags: [operators]
+      summary: List operators (Phase 13 extends with MFA status).
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/OperatorListResponse" } } } }
+
 components:
   schemas:
     Health:
       type: object
       required: [status]
       properties:
-        status:
+        status:  { type: string, enum: [ok] }
+        version: { type: string }
+        commit:  { type: string }
+
+    Pagination:
+      type: object
+      properties:
+        has_more:    { type: boolean }
+        next_cursor: { type: string }
+
+    Deployment:
+      type: object
+      required: [id, project_slug, environment_slug, status, image_version, primary_vhost, created_at]
+      properties:
+        id:               { type: string }
+        project_slug:     { type: string }
+        environment_slug: { type: string }
+        region:           { type: string }
+        modules:          { type: array, items: { type: string } }
+        image_version:    { type: string }
+        data_residency:   { type: string }
+        primary_vhost:    { type: string }
+        custom_domains:   { type: array, items: { type: string } }
+        status:           { type: string, enum: [provisioning, active, suspended, upgrading, failed, destroying, destroyed, restoring, purging, purged] }
+        metadata:
+          type: object
+          additionalProperties: { type: string }
+        last_event_id:
           type: string
-          enum: [ok]
-        version:
+          nullable: true
+        retain_until:
           type: string
-        commit:
+          format: date-time
+          nullable: true
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        etag:       { type: string }
+
+    CreateDeploymentRequest:
+      type: object
+      required: [project_slug, environment_slug, image_version]
+      properties:
+        project_slug:     { type: string }
+        environment_slug: { type: string }
+        region:           { type: string }
+        modules:          { type: array, items: { type: string } }
+        image_version:    { type: string }
+        data_residency:   { type: string }
+        metadata:
+          type: object
+          additionalProperties: { type: string }
+
+    CreateDeploymentResponse:
+      type: object
+      required: [data, bootstrap_api_key]
+      properties:
+        data: { $ref: "#/components/schemas/Deployment" }
+        bootstrap_api_key:
+          type: object
+          required: [id, secret, tenant_id]
+          properties:
+            id:        { type: string }
+            secret:    { type: string }
+            tenant_id: { type: string }
+
+    UpdateDeploymentRequest:
+      type: object
+      properties:
+        image_version: { type: string }
+        metadata:
+          type: object
+          additionalProperties: { type: string }
+
+    UpgradeDeploymentRequest:
+      type: object
+      required: [image_version]
+      properties:
+        image_version:  { type: string }
+        run_migrations: { type: boolean, default: true }
+
+    RestoreDeploymentRequest:
+      type: object
+      required: [to_timestamp]
+      properties:
+        to_timestamp: { type: string, format: date-time }
+
+    StartImpersonationRequest:
+      type: object
+      required: [target_member_id, reason]
+      properties:
+        target_member_id: { type: string }
+        reason:           { type: string, minLength: 1, maxLength: 256 }
+        duration_seconds: { type: integer, minimum: 60, maximum: 900, default: 900 }
+
+    StartImpersonationResponse:
+      type: object
+      required: [token, expires_at]
+      properties:
+        token:      { type: string }
+        expires_at: { type: string, format: date-time }
+
+    DeploymentDomain:
+      type: object
+      required: [id, deployment_id, domain, status, verification_method, verification_record, created_at]
+      properties:
+        id:                  { type: string }
+        deployment_id:       { type: string }
+        domain:              { type: string }
+        is_primary:          { type: boolean }
+        status:              { type: string, enum: [pending, verified, failed, removed] }
+        verification_method: { type: string, enum: [dns_txt] }
+        verification_record:
+          type: object
+          required: [record_name, record_type, record_value]
+          properties:
+            record_name:  { type: string }
+            record_type:  { type: string, enum: [TXT] }
+            record_value: { type: string }
+        verified_at:
           type: string
+          format: date-time
+          nullable: true
+        last_check_at:
+          type: string
+          format: date-time
+          nullable: true
+        last_check_error:
+          type: string
+          nullable: true
+        cert_status:
+          type: string
+          enum: [pending, issued, renewing, failed, revoked]
+        created_at: { type: string, format: date-time }
+
+    AttachDomainRequest:
+      type: object
+      required: [domain]
+      properties:
+        domain: { type: string }
+
+    DeploymentResponse:
+      type: object
+      required: [data]
+      properties:
+        data: { $ref: "#/components/schemas/Deployment" }
+
+    DeploymentListResponse:
+      type: object
+      required: [data, pagination]
+      properties:
+        data: { type: array, items: { $ref: "#/components/schemas/Deployment" } }
+        pagination: { $ref: "#/components/schemas/Pagination" }
+
+    DeploymentDomainResponse:
+      type: object
+      required: [data]
+      properties:
+        data: { $ref: "#/components/schemas/DeploymentDomain" }
+
+    DeploymentDomainListResponse:
+      type: object
+      required: [data]
+      properties:
+        data: { type: array, items: { $ref: "#/components/schemas/DeploymentDomain" } }
+
+    DeploymentRevision:
+      type: object
+      properties:
+        id:             { type: string }
+        deployment_id:  { type: string }
+        image_version:  { type: string }
+        applied_at:     { type: string, format: date-time }
+        is_rolled_back: { type: boolean }
+        applied_by:     { type: string }
+
+    DeploymentRevisionListResponse:
+      type: object
+      required: [data]
+      properties:
+        data: { type: array, items: { $ref: "#/components/schemas/DeploymentRevision" } }
+
+    DeploymentHealth:
+      type: object
+      properties:
+        deployment_id: { type: string }
+        overall:       { type: string, enum: [healthy, degraded, unhealthy, unknown] }
+        components:
+          type: array
+          items:
+            type: object
+            properties:
+              name:   { type: string }
+              status: { type: string }
+              detail: { type: string }
+        checked_at: { type: string, format: date-time }
+
+    DeploymentHealthResponse:
+      type: object
+      required: [data]
+      properties:
+        data: { $ref: "#/components/schemas/DeploymentHealth" }
+
+    Operator:
+      type: object
+      properties:
+        id:           { type: string }
+        email:        { type: string }
+        name:         { type: string }
+        is_active:    { type: boolean }
+        mfa_enabled:  { type: boolean }
+        ip_allowlist: { type: array, items: { type: string } }
+
+    OperatorListResponse:
+      type: object
+      required: [data]
+      properties:
+        data: { type: array, items: { $ref: "#/components/schemas/Operator" } }
+
+    ControlPlaneAuditEvent:
+      type: object
+      properties:
+        id:            { type: string }
+        operator_id:   { type: string }
+        action:        { type: string }
+        deployment_id:
+          type: string
+          nullable: true
+        resource_type:
+          type: string
+          nullable: true
+        resource_id:
+          type: string
+          nullable: true
+        occurred_at:   { type: string, format: date-time }
+        ip_address:    { type: string }
+        request_id:    { type: string }
+        metadata:
+          type: object
+          additionalProperties: true
+
+    ControlPlaneAuditEventListResponse:
+      type: object
+      required: [data]
+      properties:
+        data: { type: array, items: { $ref: "#/components/schemas/ControlPlaneAuditEvent" } }
+        pagination: { $ref: "#/components/schemas/Pagination" }
+
     AuditIntegrityResponse:
       type: object
       required: [data]
@@ -82,12 +621,9 @@ components:
           type: object
           required: [verified, rows_checked, tenants_checked, verified_at]
           properties:
-            verified:
-              type: boolean
-            rows_checked:
-              type: integer
-            tenants_checked:
-              type: integer
+            verified:                 { type: boolean }
+            rows_checked:             { type: integer }
+            tenants_checked:          { type: integer }
             first_mismatch_id:
               type: string
               nullable: true
@@ -102,6 +638,4 @@ components:
               type: string
               nullable: true
               enum: [sequence-gap, prev_hash, row_hash]
-            verified_at:
-              type: string
-              format: date-time
+            verified_at: { type: string, format: date-time }

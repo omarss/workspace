@@ -13,6 +13,9 @@
  */
 
 
-export * from "./api";
-export * from "./configuration";
-export * from "./models";
+
+export interface UpgradeDeploymentRequest {
+    'image_version': string;
+    'run_migrations'?: boolean;
+}
+

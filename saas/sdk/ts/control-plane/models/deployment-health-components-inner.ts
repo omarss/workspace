@@ -13,6 +13,10 @@
  */
 
 
-export * from "./api";
-export * from "./configuration";
-export * from "./models";
+
+export interface DeploymentHealthComponentsInner {
+    'name'?: string;
+    'status'?: string;
+    'detail'?: string;
+}
+

@@ -13,6 +13,11 @@
  */
 
 
-export * from "./api";
-export * from "./configuration";
-export * from "./models";
+// May contain unused imports in some cases
+// @ts-ignore
+import type { DeploymentRevision } from './deployment-revision';
+
+export interface DeploymentRevisionListResponse {
+    'data': Array<DeploymentRevision>;
+}
+

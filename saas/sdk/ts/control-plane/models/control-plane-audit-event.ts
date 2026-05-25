@@ -13,6 +13,17 @@
  */
 
 
-export * from "./api";
-export * from "./configuration";
-export * from "./models";
+
+export interface ControlPlaneAuditEvent {
+    'id'?: string;
+    'operator_id'?: string;
+    'action'?: string;
+    'deployment_id'?: string;
+    'resource_type'?: string;
+    'resource_id'?: string;
+    'occurred_at'?: string;
+    'ip_address'?: string;
+    'request_id'?: string;
+    'metadata'?: { [key: string]: any; };
+}
+

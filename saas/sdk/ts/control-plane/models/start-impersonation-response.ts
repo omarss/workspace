@@ -13,6 +13,9 @@
  */
 
 
-export * from "./api";
-export * from "./configuration";
-export * from "./models";
+
+export interface StartImpersonationResponse {
+    'token': string;
+    'expires_at': string;
+}
+

@@ -22,20 +22,20 @@ import { DUMMY_BASE_URL, assertParamExists, setApiKeyToObject, setBasicAuthToObj
 // @ts-ignore
 import { BASE_PATH, COLLECTION_FORMATS, type RequestArgs, BaseAPI, RequiredError, operationServerMap } from '../base';
 // @ts-ignore
-import type { Health } from '../models';
+import type { OperatorListResponse } from '../models';
 /**
- * MetaApi - axios parameter creator
+ * OperatorsApi - axios parameter creator
  */
-export const MetaApiAxiosParamCreator = function (configuration?: Configuration) {
+export const OperatorsApiAxiosParamCreator = function (configuration?: Configuration) {
     return {
         /**
-         * Returns 200 with a small status payload when the control plane is alive.
-         * @summary Liveness probe.
+         * 
+         * @summary List operators (Phase 13 extends with MFA status).
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        getHealthz: async (options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
-            const localVarPath = `/healthz`;
+        listOperators: async (options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/control/v1/operators`;
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
             let baseOptions;
@@ -62,70 +62,70 @@ export const MetaApiAxiosParamCreator = function (configuration?: Configuration)
 };
 
 /**
- * MetaApi - functional programming interface
+ * OperatorsApi - functional programming interface
  */
-export const MetaApiFp = function(configuration?: Configuration) {
-    const localVarAxiosParamCreator = MetaApiAxiosParamCreator(configuration)
+export const OperatorsApiFp = function(configuration?: Configuration) {
+    const localVarAxiosParamCreator = OperatorsApiAxiosParamCreator(configuration)
     return {
         /**
-         * Returns 200 with a small status payload when the control plane is alive.
-         * @summary Liveness probe.
+         * 
+         * @summary List operators (Phase 13 extends with MFA status).
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async getHealthz(options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<Health>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.getHealthz(options);
+        async listOperators(options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<OperatorListResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.listOperators(options);
             const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
-            const localVarOperationServerBasePath = operationServerMap['MetaApi.getHealthz']?.[localVarOperationServerIndex]?.url;
+            const localVarOperationServerBasePath = operationServerMap['OperatorsApi.listOperators']?.[localVarOperationServerIndex]?.url;
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
     }
 };
 
 /**
- * MetaApi - factory interface
+ * OperatorsApi - factory interface
  */
-export const MetaApiFactory = function (configuration?: Configuration, basePath?: string, axios?: AxiosInstance) {
-    const localVarFp = MetaApiFp(configuration)
+export const OperatorsApiFactory = function (configuration?: Configuration, basePath?: string, axios?: AxiosInstance) {
+    const localVarFp = OperatorsApiFp(configuration)
     return {
         /**
-         * Returns 200 with a small status payload when the control plane is alive.
-         * @summary Liveness probe.
+         * 
+         * @summary List operators (Phase 13 extends with MFA status).
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        getHealthz(options?: RawAxiosRequestConfig): AxiosPromise<Health> {
-            return localVarFp.getHealthz(options).then((request) => request(axios, basePath));
+        listOperators(options?: RawAxiosRequestConfig): AxiosPromise<OperatorListResponse> {
+            return localVarFp.listOperators(options).then((request) => request(axios, basePath));
         },
     };
 };
 
 /**
- * MetaApi - interface
+ * OperatorsApi - interface
  */
-export interface MetaApiInterface {
+export interface OperatorsApiInterface {
     /**
-     * Returns 200 with a small status payload when the control plane is alive.
-     * @summary Liveness probe.
+     * 
+     * @summary List operators (Phase 13 extends with MFA status).
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      */
-    getHealthz(options?: RawAxiosRequestConfig): AxiosPromise<Health>;
+    listOperators(options?: RawAxiosRequestConfig): AxiosPromise<OperatorListResponse>;
 
 }
 
 /**
- * MetaApi - object-oriented interface
+ * OperatorsApi - object-oriented interface
  */
-export class MetaApi extends BaseAPI implements MetaApiInterface {
+export class OperatorsApi extends BaseAPI implements OperatorsApiInterface {
     /**
-     * Returns 200 with a small status payload when the control plane is alive.
-     * @summary Liveness probe.
+     * 
+     * @summary List operators (Phase 13 extends with MFA status).
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      */
-    public getHealthz(options?: RawAxiosRequestConfig) {
-        return MetaApiFp(this.configuration).getHealthz(options).then((request) => request(this.axios, this.basePath));
+    public listOperators(options?: RawAxiosRequestConfig) {
+        return OperatorsApiFp(this.configuration).listOperators(options).then((request) => request(this.axios, this.basePath));
     }
 }
 

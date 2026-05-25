@@ -13,6 +13,13 @@
  */
 
 
-export * from "./api";
-export * from "./configuration";
-export * from "./models";
+
+export interface Operator {
+    'id'?: string;
+    'email'?: string;
+    'name'?: string;
+    'is_active'?: boolean;
+    'mfa_enabled'?: boolean;
+    'ip_allowlist'?: Array<string>;
+}
+

@@ -13,6 +13,15 @@
  */
 
 
-export * from "./api";
-export * from "./configuration";
-export * from "./models";
+// May contain unused imports in some cases
+// @ts-ignore
+import type { ControlPlaneAuditEvent } from './control-plane-audit-event';
+// May contain unused imports in some cases
+// @ts-ignore
+import type { Pagination } from './pagination';
+
+export interface ControlPlaneAuditEventListResponse {
+    'data': Array<ControlPlaneAuditEvent>;
+    'pagination'?: Pagination;
+}
+

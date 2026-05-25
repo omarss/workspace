@@ -13,6 +13,9 @@
  */
 
 
-export * from "./api";
-export * from "./configuration";
-export * from "./models";
+
+export interface UpdateDeploymentRequest {
+    'image_version'?: string;
+    'metadata'?: { [key: string]: string; };
+}
+

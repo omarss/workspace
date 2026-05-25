@@ -13,6 +13,10 @@
  */
 
 
-export * from "./api";
-export * from "./configuration";
-export * from "./models";
+
+export interface CreateDeploymentResponseBootstrapApiKey {
+    'id': string;
+    'secret': string;
+    'tenant_id': string;
+}
+

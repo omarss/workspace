@@ -13,6 +13,8 @@
  */
 
 
-export * from "./api";
-export * from "./configuration";
-export * from "./models";
+
+export interface RestoreDeploymentRequest {
+    'to_timestamp': string;
+}
+

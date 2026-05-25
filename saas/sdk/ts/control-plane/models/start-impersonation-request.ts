@@ -13,6 +13,10 @@
  */
 
 
-export * from "./api";
-export * from "./configuration";
-export * from "./models";
+
+export interface StartImpersonationRequest {
+    'target_member_id': string;
+    'reason': string;
+    'duration_seconds'?: number;
+}
+
