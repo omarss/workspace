@@ -58,6 +58,9 @@ Class | Method | HTTP request | Description
 *ApiKeysApi* | [**revokeAPIKey**](docs/ApiKeysApi.md#revokeapikey) | **POST** /v1/api-keys/{api_key_id}/revoke | Immediately revoke an API key (no grace).
 *ApiKeysApi* | [**rotateAPIKey**](docs/ApiKeysApi.md#rotateapikey) | **POST** /v1/api-keys/{api_key_id}/rotate | Rotate an API key with optional grace period.
 *ApiKeysApi* | [**updateAPIKey**](docs/ApiKeysApi.md#updateapikey) | **PATCH** /v1/api-keys/{api_key_id} | Update name, scopes, ip_allowlist, rate_limit.
+*AuditApi* | [**exportAuditEvents**](docs/AuditApi.md#exportauditevents) | **POST** /v1/audit-events/export | Export filtered audit events as JSON or CSV.
+*AuditApi* | [**getAuditEvent**](docs/AuditApi.md#getauditevent) | **GET** /v1/audit-events/{audit_event_id} | Fetch a single audit event by id.
+*AuditApi* | [**listAuditEvents**](docs/AuditApi.md#listauditevents) | **GET** /v1/tenants/{tenant_id}/audit-events | List audit events for a tenant.
 *AuthorizationApi* | [**assignMemberRole**](docs/AuthorizationApi.md#assignmemberrole) | **POST** /v1/members/{member_id}/roles | Assign a role to a member.
 *AuthorizationApi* | [**batchCheckAuthorization**](docs/AuthorizationApi.md#batchcheckauthorization) | **POST** /v1/authorization/batch-check | Evaluate many checks in one call (max 100).
 *AuthorizationApi* | [**checkAuthorization**](docs/AuthorizationApi.md#checkauthorization) | **POST** /v1/authorization/check | Evaluate a single (member, permission, tenant) check.
@@ -122,6 +125,9 @@ Class | Method | HTTP request | Description
  - [APIKeyResponse](docs/APIKeyResponse.md)
  - [AcceptInvitationRequest](docs/AcceptInvitationRequest.md)
  - [AssignMemberRoleRequest](docs/AssignMemberRoleRequest.md)
+ - [AuditEvent](docs/AuditEvent.md)
+ - [AuditEventListResponse](docs/AuditEventListResponse.md)
+ - [AuditEventResponse](docs/AuditEventResponse.md)
  - [BatchCheckAuthorizationRequest](docs/BatchCheckAuthorizationRequest.md)
  - [BatchCheckAuthorizationResponse](docs/BatchCheckAuthorizationResponse.md)
  - [CheckAuthorizationRequest](docs/CheckAuthorizationRequest.md)
@@ -137,6 +143,7 @@ Class | Method | HTTP request | Description
  - [CreateTenantRequest](docs/CreateTenantRequest.md)
  - [CreateUserRequest](docs/CreateUserRequest.md)
  - [CredentialsBundle](docs/CredentialsBundle.md)
+ - [ExportAuditEventsRequest](docs/ExportAuditEventsRequest.md)
  - [FieldError](docs/FieldError.md)
  - [Health](docs/Health.md)
  - [Invitation](docs/Invitation.md)

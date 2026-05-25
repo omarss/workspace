@@ -13,7 +13,11 @@
  */
 
 
+// May contain unused imports in some cases
+// @ts-ignore
+import type { AuditIntegrityResponseData } from './audit-integrity-response-data';
 
-export * from './api/audit-api';
-export * from './api/meta-api';
+export interface AuditIntegrityResponse {
+    'data': AuditIntegrityResponseData;
+}
 

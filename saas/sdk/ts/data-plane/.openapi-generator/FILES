@@ -3,6 +3,7 @@
 README.md
 api.ts
 api/api-keys-api.ts
+api/audit-api.ts
 api/authorization-api.ts
 api/invitations-api.ts
 api/members-api.ts
@@ -23,6 +24,10 @@ docs/APIKeyResponse.md
 docs/AcceptInvitationRequest.md
 docs/ApiKeysApi.md
 docs/AssignMemberRoleRequest.md
+docs/AuditApi.md
+docs/AuditEvent.md
+docs/AuditEventListResponse.md
+docs/AuditEventResponse.md
 docs/AuthorizationApi.md
 docs/BatchCheckAuthorizationRequest.md
 docs/BatchCheckAuthorizationResponse.md
@@ -39,6 +44,7 @@ docs/CreateRoleRequest.md
 docs/CreateTenantRequest.md
 docs/CreateUserRequest.md
 docs/CredentialsBundle.md
+docs/ExportAuditEventsRequest.md
 docs/FieldError.md
 docs/Health.md
 docs/Invitation.md
@@ -113,6 +119,9 @@ models/apikey-list-response.ts
 models/apikey-response.ts
 models/apikey.ts
 models/assign-member-role-request.ts
+models/audit-event-list-response.ts
+models/audit-event-response.ts
+models/audit-event.ts
 models/batch-check-authorization-request.ts
 models/batch-check-authorization-response.ts
 models/check-authorization-request.ts
@@ -128,6 +137,7 @@ models/create-role-request.ts
 models/create-tenant-request.ts
 models/create-user-request.ts
 models/credentials-bundle.ts
+models/export-audit-events-request.ts
 models/field-error.ts
 models/health.ts
 models/index.ts

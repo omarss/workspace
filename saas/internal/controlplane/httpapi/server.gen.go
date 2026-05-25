@@ -9,15 +9,39 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
 	"path"
 	"strings"
+	"time"
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/go-chi/chi/v5"
+	"github.com/oapi-codegen/runtime"
 )
+
+// Defines values for AuditIntegrityResponseDataFirstMismatchReason.
+const (
+	PrevHash    AuditIntegrityResponseDataFirstMismatchReason = "prev_hash"
+	RowHash     AuditIntegrityResponseDataFirstMismatchReason = "row_hash"
+	SequenceGap AuditIntegrityResponseDataFirstMismatchReason = "sequence-gap"
+)
+
+// Valid indicates whether the value is a known member of the AuditIntegrityResponseDataFirstMismatchReason enum.
+func (e AuditIntegrityResponseDataFirstMismatchReason) Valid() bool {
+	switch e {
+	case PrevHash:
+		return true
+	case RowHash:
+		return true
+	case SequenceGap:
+		return true
+	default:
+		return false
+	}
+}
 
 // Defines values for HealthStatus.
 const (
@@ -34,6 +58,23 @@ func (e HealthStatus) Valid() bool {
 	}
 }
 
+// AuditIntegrityResponse defines model for AuditIntegrityResponse.
+type AuditIntegrityResponse struct {
+	Data struct {
+		FirstMismatchId       *string                                        `json:"first_mismatch_id,omitempty"`
+		FirstMismatchReason   *AuditIntegrityResponseDataFirstMismatchReason `json:"first_mismatch_reason,omitempty"`
+		FirstMismatchSequence *int64                                         `json:"first_mismatch_sequence,omitempty"`
+		FirstMismatchTenantId *string                                        `json:"first_mismatch_tenant_id,omitempty"`
+		RowsChecked           int                                            `json:"rows_checked"`
+		TenantsChecked        int                                            `json:"tenants_checked"`
+		Verified              bool                                           `json:"verified"`
+		VerifiedAt            time.Time                                      `json:"verified_at"`
+	} `json:"data"`
+}
+
+// AuditIntegrityResponseDataFirstMismatchReason defines model for AuditIntegrityResponse.Data.FirstMismatchReason.
+type AuditIntegrityResponseDataFirstMismatchReason string
+
 // Health defines model for Health.
 type Health struct {
 	Commit  *string      `json:"commit,omitempty"`
@@ -44,8 +85,17 @@ type Health struct {
 // HealthStatus defines model for Health.Status.
 type HealthStatus string
 
+// VerifyDeploymentAuditIntegrityParams defines parameters for VerifyDeploymentAuditIntegrity.
+type VerifyDeploymentAuditIntegrityParams struct {
+	// TenantId Optional — verify a single tenant's chain instead of every tenant on the Deployment.
+	TenantId *string `form:"tenant_id,omitempty" json:"tenant_id,omitempty"`
+}
+
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// Walk the audit chain and report the first mismatch (if any).
+	// (GET /control/v1/deployments/{deployment_id}/audit-integrity)
+	VerifyDeploymentAuditIntegrity(w http.ResponseWriter, r *http.Request, deploymentId string, params VerifyDeploymentAuditIntegrityParams)
 	// Liveness probe.
 	// (GET /healthz)
 	GetHealthz(w http.ResponseWriter, r *http.Request)
@@ -54,6 +104,12 @@ type ServerInterface interface {
 // Unimplemented server implementation that returns http.StatusNotImplemented for each endpoint.
 
 type Unimplemented struct{}
+
+// Walk the audit chain and report the first mismatch (if any).
+// (GET /control/v1/deployments/{deployment_id}/audit-integrity)
+func (_ Unimplemented) VerifyDeploymentAuditIntegrity(w http.ResponseWriter, r *http.Request, deploymentId string, params VerifyDeploymentAuditIntegrityParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
 
 // Liveness probe.
 // (GET /healthz)
@@ -69,6 +125,48 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.Handler) http.Handler
+
+// VerifyDeploymentAuditIntegrity operation middleware
+func (siw *ServerInterfaceWrapper) VerifyDeploymentAuditIntegrity(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "deployment_id" -------------
+	var deploymentId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "deployment_id", chi.URLParam(r, "deployment_id"), &deploymentId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "deployment_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params VerifyDeploymentAuditIntegrityParams
+
+	// ------------- Optional query parameter "tenant_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "tenant_id", r.URL.Query(), &params.TenantId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "tenant_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tenant_id", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.VerifyDeploymentAuditIntegrity(w, r, deploymentId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
 
 // GetHealthz operation middleware
 func (siw *ServerInterfaceWrapper) GetHealthz(w http.ResponseWriter, r *http.Request) {
@@ -198,10 +296,36 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	}
 
 	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/control/v1/deployments/{deployment_id}/audit-integrity", wrapper.VerifyDeploymentAuditIntegrity)
+	})
+	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/healthz", wrapper.GetHealthz)
 	})
 
 	return r
+}
+
+type VerifyDeploymentAuditIntegrityRequestObject struct {
+	DeploymentId string `json:"deployment_id"`
+	Params       VerifyDeploymentAuditIntegrityParams
+}
+
+type VerifyDeploymentAuditIntegrityResponseObject interface {
+	VisitVerifyDeploymentAuditIntegrityResponse(w http.ResponseWriter) error
+}
+
+type VerifyDeploymentAuditIntegrity200JSONResponse AuditIntegrityResponse
+
+func (response VerifyDeploymentAuditIntegrity200JSONResponse) VisitVerifyDeploymentAuditIntegrityResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
 }
 
 type GetHealthzRequestObject struct {
@@ -227,6 +351,9 @@ func (response GetHealthz200JSONResponse) VisitGetHealthzResponse(w http.Respons
 
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
+	// Walk the audit chain and report the first mismatch (if any).
+	// (GET /control/v1/deployments/{deployment_id}/audit-integrity)
+	VerifyDeploymentAuditIntegrity(ctx context.Context, request VerifyDeploymentAuditIntegrityRequestObject) (VerifyDeploymentAuditIntegrityResponseObject, error)
 	// Liveness probe.
 	// (GET /healthz)
 	GetHealthz(ctx context.Context, request GetHealthzRequestObject) (GetHealthzResponseObject, error)
@@ -261,6 +388,33 @@ type strictHandler struct {
 	options     StrictHTTPServerOptions
 }
 
+// VerifyDeploymentAuditIntegrity operation middleware
+func (sh *strictHandler) VerifyDeploymentAuditIntegrity(w http.ResponseWriter, r *http.Request, deploymentId string, params VerifyDeploymentAuditIntegrityParams) {
+	var request VerifyDeploymentAuditIntegrityRequestObject
+
+	request.DeploymentId = deploymentId
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.VerifyDeploymentAuditIntegrity(ctx, request.(VerifyDeploymentAuditIntegrityRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "VerifyDeploymentAuditIntegrity")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(VerifyDeploymentAuditIntegrityResponseObject); ok {
+		if err := validResponse.VisitVerifyDeploymentAuditIntegrityResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // GetHealthz operation middleware
 func (sh *strictHandler) GetHealthz(w http.ResponseWriter, r *http.Request) {
 	var request GetHealthzRequestObject
@@ -290,14 +444,25 @@ func (sh *strictHandler) GetHealthz(w http.ResponseWriter, r *http.Request) {
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"bFLBbtRADP2VkeG4JKG95YY40AokKnqs9uAm3s2UmfEwdrZaVvl35ElEUcvt7cbz3vN7vsDAMXOipAL9",
-	"BWSYKGKFN4RBJ0O5cKainur/A8fo1ZCeM0EPosWnIyw7EEWd6xClOUL/APwT9ru3gycq4jn9h2TZQaFf",
-	"sy802vuN8YWDH59oUFhs0KcDG8VIMhSftTLC90wFlcsHTuHsPt3dugMXlwufvGn6dHSYRsd1zH554YBK",
-	"o7tHvHcj5cDnaIE0sAP1Gky3fvvMSQsHdxcwkVHDP6tA13TNR9uOMyXMHnq4brrmGnaQUaeaSzvVVH8b",
-	"PpK+df+DdC5J3FXXuWevk0MnEUNwaxIu4zkwju55ouR0IjdsnnL15MVh8Ccy69uGnG5H6OEL6c2mbRFL",
-	"5iRroVddt/aalFK1hDkHP9S37ZOsPa2XYeh9oQP08K59OZ12u5t2O5paz6tavtZyZY4Ryxl6+OZPlEjE",
-	"qnmshhWPYqVHUoR95RAqFjD0DxeYS4AeJtUsfdtuezeCKA1HLCJNIoVl/5fodbarudq+SYyoaLIJozVc",
-	"VZf98icAAP//",
+	"tFVtbhs3EL3KgC0QG5VWstMGxeaXkbRJ2qIN7KD9ERnGaHe8y5g7ZDhcCdtEQA/RO/QePUpPUpC7slaW",
+	"89Ef/bcSyceZN+89vlOFbZxl4iAqf6ekqKnB9HnWljq84ECV16E7J3GWheKK89aRD5rSvhIDHv57rb2E",
+	"q0ZLg6Gor3QZ/+TWGFwaUnnwLU1U6BypXEnwmiu1mdw95QnFcjxJ3DYqf62E3rbEBU0rdGqinKfVVY1S",
+	"q4nydt1/Xk7+80Vb2FS59Q0GlSvN4dHX6oNgOlJD/h60QIwcPrdnb9dyVdRU3FA6cAjf431i04q8vtZ7",
+	"q0trDSGPV69iZ6MeSww0DbohdVBZLI3ettpHzNc7/DsVH5a3f9vlLbBdvqEiHAAn/RzumqjnhCbUh9Iq",
+	"bNPoMOpzx6UEDK2MBWNvRti7jSvyontpfbztAfGeLjYTpfnaJguQFF67kBDVL448Buunlk0HZy9fwLX1",
+	"4Lxd6Xin5gqQS7BpW/ylxRoMVMIF4gWU5IztmujILLKrQxSPSmtPLAdvDbw0yBSh1agVNc/m2Unszjpi",
+	"dFrl6mE2zx5Go2CoEy+zooeYrU5mo5tm73Y/rnS5mWF0/1Rv7R+PVhQ+0WwGr2qCokbNsEZzA1pA89T6",
+	"kjw48tBL5TGEmhbsSVoTIJBvNGMgAQxxBZKdYGunDM5TDEgOY/dPFnzr/glszZ/B99bDinwHBn1FYzYh",
+	"1FqAuHRWc1iwFjCWq6lvOQ4lVQWrE/AWywYdNHZFAjqA5WABYYnFTeVty+WC39hlBi9rFIKTOUitnaTj",
+	"0nFRe8u2FZAaHWULVmkgcdaWX5QqV79Ge3RPbyvbT9o0LY8NBfKi8teHjMcPNPDPH39CcloHCKK5MjQQ",
+	"/ECGIWiWQFiCvQZKpPTrYDlVuyshKk1H9Lct+VgCYxNVt4uyyfA23GeZy+iZ/n1IIjudz3ujciBOokHn",
+	"jC4SBbM3Q6bv8L70dK1y9cVs9xjNhpdo9oFnKPnvDjE/JvdK2zToO5Wr36IEY59JzAMl0XqenPX3aQ2O",
+	"9DUgd8fJeVhF/lU6rS43B3NJhEVn7fjac5EaR0mf/h/hcDNRszpF3u8fdNs5hdazwOl8Dmsd6jj4Bo2B",
+	"PqbAYWcslrCuqZ/w4HZwKTC0ABq9ouxAks8oPB/u/h9nOST658zuJ70iJpGYm0saj6Oh+F4kDCG/2g6j",
+	"9Ublqg7BST7bplwmiJLZBr1IxhRUlOoAdJfbvrikj3hFfJay3WDTrZvJ3UNn+zG59eM2ZDLYfwyiZWMw",
+	"Sp+A8Y5pP5oYXgcKlZFEvV3DurZCIMF6Khe8zTwotWDliaTXhNR4+s2jo9t0hPfv4YcnF0cFsmVdoIGl",
+	"Lbvj48mCrb/NVKjQxbROVzry0yEq+pqOzp599/Ori6wp4e+/vs0ewVdw9vR8wfOT0+NR6k9T6htb6WII",
+	"Rc23Mfl4P4AfyIKfWVjraAAwyOV498mBhgeilprRd6BlwShCzdJQ2YfsMKnerpvLzb8BAAD//w==",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

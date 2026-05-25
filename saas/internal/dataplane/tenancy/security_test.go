@@ -247,6 +247,22 @@ func (s *strictSrv) RevokeAPIKey(_ context.Context, _ httpapi.RevokeAPIKeyReques
 	return nil, nil //nolint:nilnil
 }
 
+// Audit delegation — Phase 10 stubs so the tenancy matrix keeps
+// satisfying StrictServerInterface. The tenancy tests never invoke the
+// audit endpoints; the stubs return nil so wiring compiles.
+
+func (s *strictSrv) ListAuditEvents(_ context.Context, _ httpapi.ListAuditEventsRequestObject) (httpapi.ListAuditEventsResponseObject, error) {
+	return nil, nil //nolint:nilnil
+}
+
+func (s *strictSrv) GetAuditEvent(_ context.Context, _ httpapi.GetAuditEventRequestObject) (httpapi.GetAuditEventResponseObject, error) {
+	return nil, nil //nolint:nilnil
+}
+
+func (s *strictSrv) ExportAuditEvents(_ context.Context, _ httpapi.ExportAuditEventsRequestObject) (httpapi.ExportAuditEventsResponseObject, error) {
+	return nil, nil //nolint:nilnil
+}
+
 // Authorization delegation — Phase 8 stubs so the tenancy matrix keeps
 // satisfying StrictServerInterface. The tenancy tests never invoke the
 // RBAC endpoints; each stub returns nil so the wiring compiles without

@@ -72,6 +72,15 @@ tags:
       Rotation preserves the previous secret for a configurable grace
       window (default 24h, max 7d) so clients can roll over without
       downtime.
+  - name: audit
+    description: |
+      Append-only audit log with a per-tenant SHA-256 hash chain
+      (AGENTS.md §8.6, §18.3, ADR 012). Rows enter the table only via
+      the outbox subscriber; the HTTP surface is read-only. Each row
+      carries prev_hash and row_hash so external auditors can verify
+      integrity via the control-plane /audit-integrity endpoint
+      without trusting the data-plane. Canonicalisation is RFC 8785
+      JCS — see ADR 012.
 security:
   - bearerAuth: []
   - apiKeyAuth: []
@@ -1881,6 +1890,117 @@ paths:
         "422":
           $ref: "#/components/responses/IdempotencyConflictOrValidation"
 
+  /v1/tenants/{tenant_id}/audit-events:
+    parameters:
+      - in: path
+        name: tenant_id
+        required: true
+        schema:
+          type: string
+          pattern: "^tenant_[0-9A-HJKMNP-TV-Z]{26}$"
+    get:
+      operationId: listAuditEvents
+      tags: [audit]
+      summary: List audit events for a tenant.
+      description: |
+        Returns audit events ordered by occurred_at DESC. MVP gates this
+        endpoint with AssertTenant only; the audit.read permission lands
+        with the v1 RBAC hardening pass (ADR 012).
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+        - in: query
+          name: action
+          schema: { type: string }
+        - in: query
+          name: resource_type
+          schema: { type: string }
+        - in: query
+          name: resource_id
+          schema: { type: string }
+        - in: query
+          name: actor_id
+          schema: { type: string }
+        - in: query
+          name: occurred_after
+          schema: { type: string, format: date-time }
+        - in: query
+          name: occurred_before
+          schema: { type: string, format: date-time }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuditEventListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /v1/audit-events/{audit_event_id}:
+    parameters:
+      - in: path
+        name: audit_event_id
+        required: true
+        schema:
+          type: string
+          pattern: "^audit_[0-9A-HJKMNP-TV-Z]{26}$"
+    get:
+      operationId: getAuditEvent
+      tags: [audit]
+      summary: Fetch a single audit event by id.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuditEventResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /v1/audit-events/export:
+    post:
+      operationId: exportAuditEvents
+      tags: [audit]
+      summary: Export filtered audit events as JSON or CSV.
+      description: |
+        Synchronous export bounded to ExportSyncBudget (1 MiB). Larger
+        exports return 413; the async export path (background worker
+        + signed URL) lands with the v1 Files module.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExportAuditEventsRequest"
+      responses:
+        "200":
+          description: Inline export.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuditEventListResponse"
+            text/csv:
+              schema:
+                type: string
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "413":
+          description: Export exceeds sync size budget.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+
 components:
   schemas:
     Health:
@@ -3125,6 +3245,110 @@ components:
           type: string
           format: date-time
           description: When the previous secret stops authenticating.
+
+    AuditEvent:
+      type: object
+      required:
+        - id
+        - tenant_id
+        - actor_type
+        - actor_id
+        - action
+        - resource_type
+        - occurred_at
+        - prev_hash
+        - row_hash
+        - chain_sequence
+      properties:
+        id:
+          type: string
+          pattern: "^audit_[0-9A-HJKMNP-TV-Z]{26}$"
+        tenant_id:
+          type: string
+        actor_type:
+          type: string
+          enum: [user, api_key, operator, operator_impersonation, system]
+        actor_id:
+          type: string
+        action:
+          type: string
+        resource_type:
+          type: string
+        resource_id:
+          type: string
+          nullable: true
+        occurred_at:
+          type: string
+          format: date-time
+        ip_address:
+          type: string
+          nullable: true
+          x-oapi-codegen-extra-tags:
+            pii: "true"
+        user_agent:
+          type: string
+          nullable: true
+          x-oapi-codegen-extra-tags:
+            pii: "true"
+        request_id:
+          type: string
+          nullable: true
+        metadata:
+          type: object
+          additionalProperties: true
+        prev_hash:
+          type: string
+          description: Lowercase hex SHA-256 of the previous row, or the per-tenant Genesis seed for chain_sequence=1.
+        row_hash:
+          type: string
+          description: Lowercase hex SHA-256 of (prev_hash || JCS(canonical row body)).
+        chain_sequence:
+          type: integer
+          format: int64
+          description: Per-tenant monotonic sequence number starting at 1.
+    AuditEventResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: "#/components/schemas/AuditEvent"
+    AuditEventListResponse:
+      type: object
+      required: [data, pagination]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/AuditEvent"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+    ExportAuditEventsRequest:
+      type: object
+      properties:
+        tenant_id:
+          type: string
+        action:
+          type: string
+        resource_type:
+          type: string
+        resource_id:
+          type: string
+        actor_id:
+          type: string
+        occurred_after:
+          type: string
+          format: date-time
+        occurred_before:
+          type: string
+          format: date-time
+        format:
+          type: string
+          enum: [json, csv]
+          default: json
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 10000
 
     Pagination:
       type: object
