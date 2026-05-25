@@ -112,15 +112,28 @@ func extractTweet(m map[string]any, country server.Country) (server.Tweet, bool)
 	}
 
 	// Author info lives under core.user_results.result.legacy.{name,screen_name}.
+	// Author info path. X moved {name, screen_name} from the user's
+	// legacy block up into a sibling `core` block in mid-2026:
+	//   tweet.core.user_results.result.core.{name, screen_name}
+	// The legacy path still exists for some account types (suspended,
+	// quoted, etc.), so try the new path first and fall back to the
+	// old one. Both staying empty just leaves the handle blank — the
+	// UI tolerates it.
 	if c, ok := core["core"].(map[string]any); ok {
 		if ur, ok := c["user_results"].(map[string]any); ok {
 			if r, ok := ur["result"].(map[string]any); ok {
-				if l, ok := r["legacy"].(map[string]any); ok {
-					if n, _ := l["name"].(string); n != "" {
-						out.Author = n
-					}
-					if sn, _ := l["screen_name"].(string); sn != "" {
-						out.Handle = sn
+				if uc, ok := r["core"].(map[string]any); ok {
+					out.Author, _ = uc["name"].(string)
+					out.Handle, _ = uc["screen_name"].(string)
+				}
+				if out.Author == "" || out.Handle == "" {
+					if l, ok := r["legacy"].(map[string]any); ok {
+						if n, _ := l["name"].(string); n != "" && out.Author == "" {
+							out.Author = n
+						}
+						if sn, _ := l["screen_name"].(string); sn != "" && out.Handle == "" {
+							out.Handle = sn
+						}
 					}
 				}
 			}

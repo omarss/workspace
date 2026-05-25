@@ -129,6 +129,25 @@ nginx -t
 echo "==> Reloading nginx"
 systemctl reload nginx
 
+# Idempotent certbot. Copying the vhost from source wipes out the
+# `listen 443 ssl;` block certbot previously injected, so every apply
+# must re-inject it. certbot reuses the cached cert with no LE API
+# call when one already exists for this domain (--reinstall). We only
+# do this if certbot is installed AND a cert already exists; first-run
+# setups still need the operator to do an interactive certbot to prove
+# domain ownership.
+if command -v certbot >/dev/null 2>&1 && \
+   [[ -f "/etc/letsencrypt/live/$DOMAIN/fullchain.pem" ]]; then
+    echo "==> Re-injecting TLS via certbot --reinstall"
+    if certbot --nginx --reinstall -d "$DOMAIN" --non-interactive; then
+        echo "==> Reloading nginx (post-certbot)"
+        systemctl reload nginx
+    else
+        echo "    certbot --reinstall failed — re-run interactively:" >&2
+        echo "      sudo certbot --nginx -d $DOMAIN" >&2
+    fi
+fi
+
 echo
 echo "==> Done."
 systemctl --no-pager status tweets-browser.service | head -6 || true
@@ -147,7 +166,7 @@ if [[ "$SEEDED_STATE" == "1" ]]; then
     echo "       sudo systemctl restart tweets-browser.service"
     echo "       make -C homelab tweets-refresh"
 fi
-echo "  $( [[ "$SEEDED_STATE" == "1" ]] && echo 3 || echo 1 ). TLS — first run only:"
+echo "  $( [[ "$SEEDED_STATE" == "1" ]] && echo 3 || echo 1 ). TLS — first run only (subsequent runs re-use the cached cert):"
 echo "       sudo certbot --nginx -d ${DOMAIN}"
 echo
 echo "  Logs:"
