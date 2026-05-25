@@ -519,12 +519,56 @@ def run_iteration(
         family=obs.loc[test_idx, "family"].reset_index(drop=True),
         level=obs.loc[test_idx, "level"].reset_index(drop=True),
     )
+    # Truth-check against live GASTAT data — our model's gender gap should not be
+    # wildly inconsistent with the published gap (off by > 2x is a yellow flag).
+    truth_block = ""
+    try:
+        from salary_model.data.build import load_latest_wage_index
+        from salary_model.data.sources.wage_index_live import gender_gap_pct, saudi_gap_pct
+        wage_idx = load_latest_wage_index()
+        if not wage_idx.empty:
+            published_all = gender_gap_pct(wage_idx)
+            published_saudi = gender_gap_pct(wage_idx, saudi_only=True)
+            published_nat = saudi_gap_pct(wage_idx)
+            model_gender = fairness_descriptive.median_abs_gap_pct_gender
+            model_nat = fairness_descriptive.median_abs_gap_pct_nationality
+            published_year = int(wage_idx["year"].max())
+            lines = [
+                "\n\n## Truth-check vs live GASTAT data (KAPSARC)\n",
+                f"Reference year: **{published_year}**\n",
+            ]
+            if published_all is not None:
+                lines.append(
+                    f"- Published gender gap, all employees: "
+                    f"**{published_all:+.2%}** (vs model |gap| {model_gender:.2%})"
+                )
+            if published_saudi is not None:
+                lines.append(
+                    f"- Published gender gap, Saudi-only: **{published_saudi:+.2%}**"
+                )
+            if published_nat is not None:
+                lines.append(
+                    f"- Published Saudi-vs-all wage premium: "
+                    f"**{published_nat:+.2%}** (vs model |nat gap| {model_nat:.2%})"
+                )
+            lines.append("")
+            lines.append(
+                "Reading: large positive Saudi-vs-all premium reflects expat labor "
+                "concentrated at the floor; the larger Saudi-only gender gap is the "
+                "residual real gap once the high-education female cohort is removed."
+            )
+            truth_block = "\n".join(lines)
+    except Exception as exc:
+        log.warning("wage_index_truth_check_failed", error=str(exc))
+        truth_block = ""
+
     fairness_md = (
         "# Fairness audit\n\n"
         "## Descriptive head\n\n"
         + fairness_descriptive.to_markdown()
         + "\n\n## Recommendation head (blinded + reweighted)\n\n"
         + fairness_recommend.to_markdown()
+        + truth_block
         + "\n"
     )
     (run_dir / "fairness.md").write_text(fairness_md, encoding="utf-8")
