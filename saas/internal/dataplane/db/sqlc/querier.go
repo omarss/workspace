@@ -17,6 +17,11 @@ type Querier interface {
 	// state is already consumed or expired — the caller surfaces this as a 400
 	// "state-already-used" or "state-expired" problem.
 	ConsumeSocialLoginState(ctx context.Context, state string) (SocialLoginState, error)
+	CreateNotification(ctx context.Context, arg CreateNotificationParams) (Notification, error)
+	// Inserts a new channel row. The repo layer runs the strict envelope walker
+	// on the secrets payload before binding the parameters; this query is a thin
+	// shim over a fully-formed row.
+	CreateNotificationChannel(ctx context.Context, arg CreateNotificationChannelParams) (NotificationChannel, error)
 	// Inserts a fully-formed envelope row. The caller (PgxRepository) computes
 	// email_lookup_hash and runs the persistence walker to populate the
 	// envelope columns before binding the parameters.
@@ -26,15 +31,24 @@ type Querier interface {
 	ExpireIdempotencyRecords(ctx context.Context) error
 	FinishIdempotencyRecord(ctx context.Context, arg FinishIdempotencyRecordParams) error
 	GetIdempotencyRecord(ctx context.Context, arg GetIdempotencyRecordParams) (IdempotencyRecord, error)
+	GetNotification(ctx context.Context, id string) (Notification, error)
+	GetNotificationChannel(ctx context.Context, id string) (NotificationChannel, error)
+	GetNotificationChannelByName(ctx context.Context, arg GetNotificationChannelByNameParams) (NotificationChannel, error)
+	GetNotificationWorkflow(ctx context.Context, id string) (NotificationWorkflow, error)
+	GetNotificationWorkflowByName(ctx context.Context, arg GetNotificationWorkflowByNameParams) (NotificationWorkflow, error)
 	GetPlatformUser(ctx context.Context, id string) (PlatformUser, error)
 	GetPlatformUserByEmailHash(ctx context.Context, arg GetPlatformUserByEmailHashParams) (PlatformUser, error)
 	GetPlatformUserByKeycloakID(ctx context.Context, keycloakUserID string) (PlatformUser, error)
 	GetTenant(ctx context.Context, id string) (Tenant, error)
 	GetTenantBySlug(ctx context.Context, slug string) (Tenant, error)
+	InsertNotificationAttempt(ctx context.Context, arg InsertNotificationAttemptParams) error
 	InsertOutboxEvent(ctx context.Context, arg InsertOutboxEventParams) (OutboxEvent, error)
 	InsertSocialLoginState(ctx context.Context, arg InsertSocialLoginStateParams) error
 	LinkIdentityProvider(ctx context.Context, arg LinkIdentityProviderParams) error
 	ListIdentityProviders(ctx context.Context, arg ListIdentityProvidersParams) ([]ListIdentityProvidersRow, error)
+	ListNotificationChannels(ctx context.Context, arg ListNotificationChannelsParams) ([]NotificationChannel, error)
+	ListNotificationWorkflows(ctx context.Context, tenantID string) ([]NotificationWorkflow, error)
+	ListNotifications(ctx context.Context, arg ListNotificationsParams) ([]Notification, error)
 	// Keyset pagination on (created_at DESC, id DESC). row_limit is limit+1 so
 	// the caller can detect has_more.
 	ListPlatformUsers(ctx context.Context, arg ListPlatformUsersParams) ([]PlatformUser, error)
@@ -45,14 +59,28 @@ type Querier interface {
 	ListUnpublishedOutbox(ctx context.Context, limit int32) ([]OutboxEvent, error)
 	MarkOutboxFailed(ctx context.Context, arg MarkOutboxFailedParams) error
 	MarkOutboxPublished(ctx context.Context, id int64) error
+	RegisterNotificationWorkflow(ctx context.Context, arg RegisterNotificationWorkflowParams) (NotificationWorkflow, error)
+	// Rotation endpoint: swaps the envelope columns and stamps last_rotated_at.
+	// Bumps row_seq via the trigger.
+	RotateNotificationChannelSecrets(ctx context.Context, arg RotateNotificationChannelSecretsParams) (NotificationChannel, error)
 	SetDefaultOrganization(ctx context.Context, arg SetDefaultOrganizationParams) error
+	SetNotificationChannelNovuIntegration(ctx context.Context, arg SetNotificationChannelNovuIntegrationParams) error
 	SetPlatformUserEmailVerified(ctx context.Context, arg SetPlatformUserEmailVerifiedParams) (PlatformUser, error)
 	// Disable/enable transitions go through here so the row_seq trigger fires
 	// and outbox subscribers see the change. Cannot transition out of 'deleted'.
 	SetPlatformUserStatus(ctx context.Context, arg SetPlatformUserStatusParams) (PlatformUser, error)
+	SoftDeleteNotificationChannel(ctx context.Context, arg SoftDeleteNotificationChannelParams) (int64, error)
 	SoftDeletePlatformUser(ctx context.Context, arg SoftDeletePlatformUserParams) (PlatformUser, error)
 	SoftDeleteTenant(ctx context.Context, arg SoftDeleteTenantParams) (Tenant, error)
 	UnlinkIdentityProvider(ctx context.Context, arg UnlinkIdentityProviderParams) (int64, error)
+	// Metadata-only patch under optimistic concurrency. Does NOT accept new
+	// credentials (per ADR 017 rotation is a distinct verb).
+	UpdateNotificationChannelMeta(ctx context.Context, arg UpdateNotificationChannelMetaParams) (NotificationChannel, error)
+	UpdateNotificationStatus(ctx context.Context, arg UpdateNotificationStatusParams) (Notification, error)
+	// COALESCE keeps each column unchanged when the caller passes NULL. The
+	// description column accepts an explicit NULL only by clearing the patch
+	// field at the service layer; the wire-level patch model carries a flag.
+	UpdateNotificationWorkflow(ctx context.Context, arg UpdateNotificationWorkflowParams) (NotificationWorkflow, error)
 	// Patch name/phone envelope columns + metadata under optimistic concurrency.
 	// Each PII field updates the full five-column envelope set; the caller passes
 	// nil when the column should not change.

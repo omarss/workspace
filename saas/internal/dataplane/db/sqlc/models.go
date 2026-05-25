@@ -31,6 +31,64 @@ type IdentityProviderMapping struct {
 	LinkedAt        pgtype.Timestamptz `json:"linked_at"`
 }
 
+type Notification struct {
+	ID                string             `json:"id"`
+	TenantID          string             `json:"tenant_id"`
+	WorkflowName      string             `json:"workflow_name"`
+	ToUserID          string             `json:"to_user_id"`
+	PayloadCiphertext []byte             `json:"payload_ciphertext"`
+	PayloadWrappedDek string             `json:"payload_wrapped_dek"`
+	PayloadNonce      []byte             `json:"payload_nonce"`
+	PayloadKid        string             `json:"payload_kid"`
+	PayloadKeyVersion int32              `json:"payload_key_version"`
+	NovuTransactionID *string            `json:"novu_transaction_id"`
+	Status            string             `json:"status"`
+	QueuedAt          pgtype.Timestamptz `json:"queued_at"`
+	SentAt            pgtype.Timestamptz `json:"sent_at"`
+	DeliveredAt       pgtype.Timestamptz `json:"delivered_at"`
+	FailedAt          pgtype.Timestamptz `json:"failed_at"`
+	FailureReason     *string            `json:"failure_reason"`
+	RowSeq            int64              `json:"row_seq"`
+}
+
+type NotificationAttempt struct {
+	ID             int64              `json:"id"`
+	NotificationID string             `json:"notification_id"`
+	AttemptedAt    pgtype.Timestamptz `json:"attempted_at"`
+	Status         string             `json:"status"`
+	FailureReason  *string            `json:"failure_reason"`
+}
+
+type NotificationChannel struct {
+	ID                string             `json:"id"`
+	TenantID          string             `json:"tenant_id"`
+	Provider          string             `json:"provider"`
+	Name              string             `json:"name"`
+	Config            []byte             `json:"config"`
+	SecretsCiphertext []byte             `json:"secrets_ciphertext"`
+	SecretsWrappedDek *string            `json:"secrets_wrapped_dek"`
+	SecretsNonce      []byte             `json:"secrets_nonce"`
+	SecretsKid        *string            `json:"secrets_kid"`
+	SecretsKeyVersion *int32             `json:"secrets_key_version"`
+	IsDefaultFor      []string           `json:"is_default_for"`
+	Status            string             `json:"status"`
+	NovuIntegrationID *string            `json:"novu_integration_id"`
+	LastRotatedAt     pgtype.Timestamptz `json:"last_rotated_at"`
+	RowSeq            int64              `json:"row_seq"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+	DeletedAt         pgtype.Timestamptz `json:"deleted_at"`
+}
+
+type NotificationWorkflow struct {
+	ID             string             `json:"id"`
+	TenantID       string             `json:"tenant_id"`
+	Name           string             `json:"name"`
+	NovuWorkflowID string             `json:"novu_workflow_id"`
+	Description    *string            `json:"description"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+}
+
 type OutboxEvent struct {
 	ID               int64              `json:"id"`
 	EventID          string             `json:"event_id"`
