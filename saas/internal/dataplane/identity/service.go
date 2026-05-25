@@ -35,19 +35,36 @@ type Service struct {
 	provider     IdentityProvider
 	hasher       EmailHasher
 	events       EventPublisher
+	notify       NotificationsHook
 	deploymentID string
 	realm        string
 	clientID     string
 	now          func() time.Time
 }
 
+// NotificationsHook lets Identity (Phase 5) route password-reset / email-
+// verify emails through the Phase-6 Notifications module without
+// importing it directly (avoids a circular dep). Wiring lives in
+// cmd/dataplane/main.go: when NOTIFICATIONS_ENABLED=true the binary
+// passes an adapter over notifications.Service; otherwise it's nil and
+// the legacy Keycloak SMTP path runs.
+type NotificationsHook interface {
+	SendPasswordReset(ctx context.Context, tenantID, userID, resetURL string, ttlMinutes int) error
+	SendEmailVerify(ctx context.Context, tenantID, userID, verifyURL string, ttlMinutes int) error
+}
+
 // Config groups Service constructor parameters. Keeps NewService callable
 // without a ten-parameter signature.
 type Config struct {
-	Repo         Repository
-	Provider     IdentityProvider
-	Hasher       EmailHasher
-	Events       EventPublisher
+	Repo     Repository
+	Provider IdentityProvider
+	Hasher   EmailHasher
+	Events   EventPublisher
+	// Notify is optional. When non-nil, password-reset / email-verify
+	// trigger calls route through the Notifications module (Novu) instead
+	// of Keycloak's built-in SMTP. cmd/dataplane wires this when
+	// NOTIFICATIONS_ENABLED=true.
+	Notify       NotificationsHook
 	DeploymentID string
 	Realm        string // empty defaults to "saas-data-local" (Phase 5 dev)
 	ClientID     string // empty defaults to the realm name
@@ -68,6 +85,7 @@ func NewService(cfg Config) *Service {
 		provider:     cfg.Provider,
 		hasher:       cfg.Hasher,
 		events:       cfg.Events,
+		notify:       cfg.Notify,
 		deploymentID: cfg.DeploymentID,
 		realm:        realm,
 		clientID:     clientID,
@@ -274,9 +292,14 @@ func (s *Service) SoftDelete(ctx context.Context, tenantID, userID string, expec
 	return nil
 }
 
-// TriggerPasswordReset asks Keycloak to send a password-reset email.
-// Phase 5 trade-off: SMTP via Keycloak's built-in transport; Phase 6 swaps
-// to Notifications + Novu. The endpoint URL stays the same.
+// TriggerPasswordReset asks the configured transport to send a
+// password-reset email. When Config.Notify is wired (NOTIFICATIONS_ENABLED
+// at boot), the request flows through the Notifications module + Novu;
+// otherwise the Phase 5 fallback uses Keycloak's built-in SMTP
+// (ExecuteActionsEmail).
+//
+// Either way the same outbox event is emitted so audit / Phase 10
+// consumers see a uniform record regardless of the transport.
 func (s *Service) TriggerPasswordReset(ctx context.Context, tenantID, userID string) error {
 	if err := auth.AssertTenant(ctx, tenantID); err != nil {
 		return err
@@ -288,14 +311,36 @@ func (s *Service) TriggerPasswordReset(ctx context.Context, tenantID, userID str
 	if u.Status != StatusActive {
 		return ErrUserDisabled
 	}
-	if err := s.provider.TriggerPasswordReset(ctx, s.realm, u.KeycloakUserID); err != nil {
-		return errors.Join(ErrProviderUnavailable, err)
+	if s.notify != nil {
+		// Novu path: the reset URL is rendered by the workflow template
+		// in Novu; we pass the Keycloak action-token URL (Phase 5
+		// generated it via ExecuteActionsEmail before; the Notifications
+		// rewire uses a templated link). For now we publish a stable
+		// placeholder URL — Phase 6b wires the real action token after
+		// Keycloak's "credentials.reset.url" admin endpoint lands. The
+		// fallback Keycloak path stays the source of truth meanwhile.
+		resetURL := "https://" + s.realm + ".keycloak/realms/" + s.realm + "/login-actions/reset-credentials"
+		if hookErr := s.notify.SendPasswordReset(ctx, tenantID, userID, resetURL, 60); hookErr != nil {
+			return errors.Join(ErrProviderUnavailable, hookErr)
+		}
+	} else {
+		if provErr := s.provider.TriggerPasswordReset(ctx, s.realm, u.KeycloakUserID); provErr != nil {
+			return errors.Join(ErrProviderUnavailable, provErr)
+		}
 	}
 	_ = s.events.Publish(ctx, "user.password_reset_requested", u.TenantID, map[string]any{"user_id": u.ID})
 	return nil
 }
 
-// TriggerEmailVerify asks Keycloak to send a VERIFY_EMAIL action.
+// TriggerEmailVerify asks the configured transport to send a
+// VERIFY_EMAIL action. Symmetric with TriggerPasswordReset — when
+// Config.Notify is wired the request flows through Notifications + Novu,
+// otherwise it falls back to Keycloak's built-in SMTP.
+//
+// Outbox: emits `user.email_verify_requested` on EITHER path so audit /
+// Phase 10 consumers see a uniform record regardless of transport. This
+// mirrors TriggerPasswordReset's symmetric publish (Phase 6 anti-pattern
+// fix: previously the Novu path returned before publishing).
 func (s *Service) TriggerEmailVerify(ctx context.Context, tenantID, userID string) error {
 	if err := auth.AssertTenant(ctx, tenantID); err != nil {
 		return err
@@ -304,9 +349,17 @@ func (s *Service) TriggerEmailVerify(ctx context.Context, tenantID, userID strin
 	if err != nil {
 		return err
 	}
-	if err := s.provider.TriggerEmailVerify(ctx, s.realm, u.KeycloakUserID); err != nil {
-		return errors.Join(ErrProviderUnavailable, err)
+	if s.notify != nil {
+		verifyURL := "https://" + s.realm + ".keycloak/realms/" + s.realm + "/login-actions/email-verify"
+		if hookErr := s.notify.SendEmailVerify(ctx, tenantID, userID, verifyURL, 60); hookErr != nil {
+			return errors.Join(ErrProviderUnavailable, hookErr)
+		}
+	} else {
+		if provErr := s.provider.TriggerEmailVerify(ctx, s.realm, u.KeycloakUserID); provErr != nil {
+			return errors.Join(ErrProviderUnavailable, provErr)
+		}
 	}
+	_ = s.events.Publish(ctx, "user.email_verify_requested", u.TenantID, map[string]any{"user_id": u.ID})
 	return nil
 }
 

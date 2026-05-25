@@ -28,6 +28,48 @@ const (
 	BearerAuthScopes bearerAuthContextKey = "bearerAuth.Scopes"
 )
 
+// Defines values for CreateNotificationChannelRequestIsDefaultFor.
+const (
+	CreateNotificationChannelRequestIsDefaultForEmail CreateNotificationChannelRequestIsDefaultFor = "email"
+	CreateNotificationChannelRequestIsDefaultForInApp CreateNotificationChannelRequestIsDefaultFor = "in_app"
+)
+
+// Valid indicates whether the value is a known member of the CreateNotificationChannelRequestIsDefaultFor enum.
+func (e CreateNotificationChannelRequestIsDefaultFor) Valid() bool {
+	switch e {
+	case CreateNotificationChannelRequestIsDefaultForEmail:
+		return true
+	case CreateNotificationChannelRequestIsDefaultForInApp:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CreateNotificationChannelRequestProvider.
+const (
+	CreateNotificationChannelRequestProviderInApp    CreateNotificationChannelRequestProvider = "in_app"
+	CreateNotificationChannelRequestProviderSendgrid CreateNotificationChannelRequestProvider = "sendgrid"
+	CreateNotificationChannelRequestProviderSes      CreateNotificationChannelRequestProvider = "ses"
+	CreateNotificationChannelRequestProviderSmtp     CreateNotificationChannelRequestProvider = "smtp"
+)
+
+// Valid indicates whether the value is a known member of the CreateNotificationChannelRequestProvider enum.
+func (e CreateNotificationChannelRequestProvider) Valid() bool {
+	switch e {
+	case CreateNotificationChannelRequestProviderInApp:
+		return true
+	case CreateNotificationChannelRequestProviderSendgrid:
+		return true
+	case CreateNotificationChannelRequestProviderSes:
+		return true
+	case CreateNotificationChannelRequestProviderSmtp:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for HealthStatus.
 const (
 	Ok HealthStatus = "ok"
@@ -58,6 +100,135 @@ func (e LinkSocialProviderRequestProvider) Valid() bool {
 	case LinkSocialProviderRequestProviderGithub:
 		return true
 	case LinkSocialProviderRequestProviderGoogle:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for NotificationObject.
+const (
+	NotificationObjectNotification NotificationObject = "notification"
+)
+
+// Valid indicates whether the value is a known member of the NotificationObject enum.
+func (e NotificationObject) Valid() bool {
+	switch e {
+	case NotificationObjectNotification:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for NotificationStatus.
+const (
+	Delivered NotificationStatus = "delivered"
+	Failed    NotificationStatus = "failed"
+	Queued    NotificationStatus = "queued"
+	Sent      NotificationStatus = "sent"
+)
+
+// Valid indicates whether the value is a known member of the NotificationStatus enum.
+func (e NotificationStatus) Valid() bool {
+	switch e {
+	case Delivered:
+		return true
+	case Failed:
+		return true
+	case Queued:
+		return true
+	case Sent:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for NotificationChannelIsDefaultFor.
+const (
+	NotificationChannelIsDefaultForEmail NotificationChannelIsDefaultFor = "email"
+	NotificationChannelIsDefaultForInApp NotificationChannelIsDefaultFor = "in_app"
+)
+
+// Valid indicates whether the value is a known member of the NotificationChannelIsDefaultFor enum.
+func (e NotificationChannelIsDefaultFor) Valid() bool {
+	switch e {
+	case NotificationChannelIsDefaultForEmail:
+		return true
+	case NotificationChannelIsDefaultForInApp:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for NotificationChannelObject.
+const (
+	NotificationChannelObjectNotificationChannel NotificationChannelObject = "notification_channel"
+)
+
+// Valid indicates whether the value is a known member of the NotificationChannelObject enum.
+func (e NotificationChannelObject) Valid() bool {
+	switch e {
+	case NotificationChannelObjectNotificationChannel:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for NotificationChannelProvider.
+const (
+	NotificationChannelProviderInApp    NotificationChannelProvider = "in_app"
+	NotificationChannelProviderSendgrid NotificationChannelProvider = "sendgrid"
+	NotificationChannelProviderSes      NotificationChannelProvider = "ses"
+	NotificationChannelProviderSmtp     NotificationChannelProvider = "smtp"
+)
+
+// Valid indicates whether the value is a known member of the NotificationChannelProvider enum.
+func (e NotificationChannelProvider) Valid() bool {
+	switch e {
+	case NotificationChannelProviderInApp:
+		return true
+	case NotificationChannelProviderSendgrid:
+		return true
+	case NotificationChannelProviderSes:
+		return true
+	case NotificationChannelProviderSmtp:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for NotificationChannelStatus.
+const (
+	NotificationChannelStatusActive   NotificationChannelStatus = "active"
+	NotificationChannelStatusDisabled NotificationChannelStatus = "disabled"
+)
+
+// Valid indicates whether the value is a known member of the NotificationChannelStatus enum.
+func (e NotificationChannelStatus) Valid() bool {
+	switch e {
+	case NotificationChannelStatusActive:
+		return true
+	case NotificationChannelStatusDisabled:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for NotificationWorkflowObject.
+const (
+	NotificationWorkflowObjectNotificationWorkflow NotificationWorkflowObject = "notification_workflow"
+)
+
+// Valid indicates whether the value is a known member of the NotificationWorkflowObject enum.
+func (e NotificationWorkflowObject) Valid() bool {
+	switch e {
+	case NotificationWorkflowObjectNotificationWorkflow:
 		return true
 	default:
 		return false
@@ -121,6 +292,42 @@ func (e TenantStatus) Valid() bool {
 	}
 }
 
+// Defines values for UpdateNotificationChannelRequestIsDefaultFor.
+const (
+	Email UpdateNotificationChannelRequestIsDefaultFor = "email"
+	InApp UpdateNotificationChannelRequestIsDefaultFor = "in_app"
+)
+
+// Valid indicates whether the value is a known member of the UpdateNotificationChannelRequestIsDefaultFor enum.
+func (e UpdateNotificationChannelRequestIsDefaultFor) Valid() bool {
+	switch e {
+	case Email:
+		return true
+	case InApp:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for UpdateNotificationChannelRequestStatus.
+const (
+	UpdateNotificationChannelRequestStatusActive   UpdateNotificationChannelRequestStatus = "active"
+	UpdateNotificationChannelRequestStatusDisabled UpdateNotificationChannelRequestStatus = "disabled"
+)
+
+// Valid indicates whether the value is a known member of the UpdateNotificationChannelRequestStatus enum.
+func (e UpdateNotificationChannelRequestStatus) Valid() bool {
+	switch e {
+	case UpdateNotificationChannelRequestStatusActive:
+		return true
+	case UpdateNotificationChannelRequestStatusDisabled:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for UpdateTenantRequestStatus.
 const (
 	UpdateTenantRequestStatusActive    UpdateTenantRequestStatus = "active"
@@ -175,6 +382,25 @@ func (e UserStatus) Valid() bool {
 	}
 }
 
+// CreateNotificationChannelRequest defines model for CreateNotificationChannelRequest.
+type CreateNotificationChannelRequest struct {
+	Config *map[string]string `json:"config,omitempty"`
+
+	// Credentials Per-provider credential bundle. Exactly one of smtp / sendgrid / ses
+	// is populated based on the channel provider; the in_app provider
+	// rejects any credential payload.
+	Credentials  *CredentialsBundle                              `json:"credentials,omitempty"`
+	IsDefaultFor *[]CreateNotificationChannelRequestIsDefaultFor `json:"is_default_for,omitempty"`
+	Name         string                                          `json:"name"`
+	Provider     CreateNotificationChannelRequestProvider        `json:"provider"`
+}
+
+// CreateNotificationChannelRequestIsDefaultFor defines model for CreateNotificationChannelRequest.IsDefaultFor.
+type CreateNotificationChannelRequestIsDefaultFor string
+
+// CreateNotificationChannelRequestProvider defines model for CreateNotificationChannelRequest.Provider.
+type CreateNotificationChannelRequestProvider string
+
 // CreateTenantRequest defines model for CreateTenantRequest.
 type CreateTenantRequest struct {
 	Metadata *Metadata `json:"metadata,omitempty"`
@@ -188,6 +414,15 @@ type CreateUserRequest struct {
 	Metadata              *Metadata           `json:"metadata,omitempty"`
 	Name                  *string             `json:"name,omitempty" pii:"true"`
 	SendVerificationEmail *bool               `json:"send_verification_email,omitempty"`
+}
+
+// CredentialsBundle Per-provider credential bundle. Exactly one of smtp / sendgrid / ses
+// is populated based on the channel provider; the in_app provider
+// rejects any credential payload.
+type CredentialsBundle struct {
+	Sendgrid *SendGridCredentials `json:"sendgrid,omitempty"`
+	Ses      *SESCredentials      `json:"ses,omitempty"`
+	Smtp     *SMTPCredentials     `json:"smtp,omitempty"`
 }
 
 // FieldError defines model for FieldError.
@@ -226,6 +461,103 @@ type LinkSocialProviderResponse struct {
 // Metadata defines model for Metadata.
 type Metadata map[string]string
 
+// Notification defines model for Notification.
+type Notification struct {
+	DeliveredAt       *time.Time         `json:"delivered_at,omitempty"`
+	FailedAt          *time.Time         `json:"failed_at,omitempty"`
+	FailureReason     *string            `json:"failure_reason,omitempty"`
+	Id                string             `json:"id"`
+	NovuTransactionId *string            `json:"novu_transaction_id,omitempty"`
+	Object            NotificationObject `json:"object"`
+	QueuedAt          time.Time          `json:"queued_at"`
+	SentAt            *time.Time         `json:"sent_at,omitempty"`
+	Status            NotificationStatus `json:"status"`
+	TenantId          string             `json:"tenant_id"`
+	ToUserId          string             `json:"to_user_id"`
+	WorkflowName      string             `json:"workflow_name"`
+}
+
+// NotificationObject defines model for Notification.Object.
+type NotificationObject string
+
+// NotificationStatus defines model for Notification.Status.
+type NotificationStatus string
+
+// NotificationChannel defines model for NotificationChannel.
+type NotificationChannel struct {
+	Config    *map[string]string `json:"config,omitempty"`
+	CreatedAt time.Time          `json:"created_at"`
+
+	// CredentialsPresent True iff the channel row currently carries envelope-encrypted
+	// credentials. The platform NEVER returns the credential bytes.
+	CredentialsPresent bool                               `json:"credentials_present"`
+	Etag               string                             `json:"etag"`
+	Id                 string                             `json:"id"`
+	IsDefaultFor       *[]NotificationChannelIsDefaultFor `json:"is_default_for,omitempty"`
+	LastRotatedAt      *time.Time                         `json:"last_rotated_at,omitempty"`
+	Name               string                             `json:"name"`
+	Object             NotificationChannelObject          `json:"object"`
+	Provider           NotificationChannelProvider        `json:"provider"`
+	Status             NotificationChannelStatus          `json:"status"`
+	UpdatedAt          time.Time                          `json:"updated_at"`
+}
+
+// NotificationChannelIsDefaultFor defines model for NotificationChannel.IsDefaultFor.
+type NotificationChannelIsDefaultFor string
+
+// NotificationChannelObject defines model for NotificationChannel.Object.
+type NotificationChannelObject string
+
+// NotificationChannelProvider defines model for NotificationChannel.Provider.
+type NotificationChannelProvider string
+
+// NotificationChannelStatus defines model for NotificationChannel.Status.
+type NotificationChannelStatus string
+
+// NotificationChannelListResponse defines model for NotificationChannelListResponse.
+type NotificationChannelListResponse struct {
+	Data []NotificationChannel `json:"data"`
+}
+
+// NotificationChannelResponse defines model for NotificationChannelResponse.
+type NotificationChannelResponse struct {
+	Data NotificationChannel `json:"data"`
+}
+
+// NotificationListResponse defines model for NotificationListResponse.
+type NotificationListResponse struct {
+	Data       []Notification `json:"data"`
+	Pagination Pagination     `json:"pagination"`
+}
+
+// NotificationResponse defines model for NotificationResponse.
+type NotificationResponse struct {
+	Data Notification `json:"data"`
+}
+
+// NotificationWorkflow defines model for NotificationWorkflow.
+type NotificationWorkflow struct {
+	CreatedAt      time.Time                  `json:"created_at"`
+	Description    *string                    `json:"description,omitempty"`
+	Id             string                     `json:"id"`
+	Name           string                     `json:"name"`
+	NovuWorkflowId string                     `json:"novu_workflow_id"`
+	Object         NotificationWorkflowObject `json:"object"`
+}
+
+// NotificationWorkflowObject defines model for NotificationWorkflow.Object.
+type NotificationWorkflowObject string
+
+// NotificationWorkflowListResponse defines model for NotificationWorkflowListResponse.
+type NotificationWorkflowListResponse struct {
+	Data []NotificationWorkflow `json:"data"`
+}
+
+// NotificationWorkflowResponse defines model for NotificationWorkflowResponse.
+type NotificationWorkflowResponse struct {
+	Data NotificationWorkflow `json:"data"`
+}
+
 // Pagination defines model for Pagination.
 type Pagination struct {
 	HasMore    bool    `json:"has_more"`
@@ -241,6 +573,47 @@ type Problem struct {
 	Status    int           `json:"status"`
 	Title     string        `json:"title"`
 	Type      string        `json:"type"`
+}
+
+// RegisterNotificationWorkflowRequest defines model for RegisterNotificationWorkflowRequest.
+type RegisterNotificationWorkflowRequest struct {
+	Description    *string `json:"description,omitempty"`
+	Name           string  `json:"name"`
+	NovuWorkflowId string  `json:"novu_workflow_id"`
+}
+
+// RotateChannelCredentialsRequest defines model for RotateChannelCredentialsRequest.
+type RotateChannelCredentialsRequest struct {
+	// Credentials Per-provider credential bundle. Exactly one of smtp / sendgrid / ses
+	// is populated based on the channel provider; the in_app provider
+	// rejects any credential payload.
+	Credentials CredentialsBundle `json:"credentials"`
+}
+
+// SESCredentials defines model for SESCredentials.
+type SESCredentials struct {
+	AccessKeyId     string `json:"access_key_id" sensitive:"true"`
+	SecretAccessKey string `json:"secret_access_key" pii:"true" sensitive:"true"`
+}
+
+// SMTPCredentials defines model for SMTPCredentials.
+type SMTPCredentials struct {
+	Password string `json:"password" pii:"true" sensitive:"true"`
+	Username string `json:"username" sensitive:"true"`
+}
+
+// SendGridCredentials defines model for SendGridCredentials.
+type SendGridCredentials struct {
+	ApiKey string `json:"api_key" pii:"true" sensitive:"true"`
+}
+
+// SendNotificationRequest defines model for SendNotificationRequest.
+type SendNotificationRequest struct {
+	Payload *map[string]interface{} `json:"payload,omitempty" sensitive:"true"`
+	To      struct {
+		UserId string `json:"user_id"`
+	} `json:"to"`
+	WorkflowName string `json:"workflow_name"`
 }
 
 // SocialProvider defines model for SocialProvider.
@@ -290,6 +663,27 @@ type TenantListResponse struct {
 // TenantResponse defines model for TenantResponse.
 type TenantResponse struct {
 	Data Tenant `json:"data"`
+}
+
+// UpdateNotificationChannelRequest defines model for UpdateNotificationChannelRequest.
+type UpdateNotificationChannelRequest struct {
+	Config       *map[string]string                              `json:"config,omitempty"`
+	IsDefaultFor *[]UpdateNotificationChannelRequestIsDefaultFor `json:"is_default_for,omitempty"`
+	Name         *string                                         `json:"name,omitempty"`
+	Status       *UpdateNotificationChannelRequestStatus         `json:"status,omitempty"`
+}
+
+// UpdateNotificationChannelRequestIsDefaultFor defines model for UpdateNotificationChannelRequest.IsDefaultFor.
+type UpdateNotificationChannelRequestIsDefaultFor string
+
+// UpdateNotificationChannelRequestStatus defines model for UpdateNotificationChannelRequest.Status.
+type UpdateNotificationChannelRequestStatus string
+
+// UpdateNotificationWorkflowRequest Partial-update payload. Both fields are optional; omit a field to
+// leave it unchanged. At least one MUST be provided.
+type UpdateNotificationWorkflowRequest struct {
+	Description    *string `json:"description,omitempty"`
+	NovuWorkflowId *string `json:"novu_workflow_id,omitempty"`
 }
 
 // UpdateTenantRequest defines model for UpdateTenantRequest.
@@ -388,6 +782,60 @@ type apiKeyAuthContextKey string
 
 // bearerAuthContextKey is the context key for bearerAuth security scheme
 type bearerAuthContextKey string
+
+// ListNotificationChannelsParams defines parameters for ListNotificationChannels.
+type ListNotificationChannelsParams struct {
+	// Limit Max items to return (default 25, max 200).
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// CreateNotificationChannelParams defines parameters for CreateNotificationChannel.
+type CreateNotificationChannelParams struct {
+	// IdempotencyKey 24-hour idempotency key (idem_<ulid>).
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// DeleteNotificationChannelParams defines parameters for DeleteNotificationChannel.
+type DeleteNotificationChannelParams struct {
+	// IfMatch Weak ETag from a prior GET; rejects on mismatch with 412.
+	IfMatch IfMatch `json:"If-Match"`
+}
+
+// UpdateNotificationChannelParams defines parameters for UpdateNotificationChannel.
+type UpdateNotificationChannelParams struct {
+	// IfMatch Weak ETag from a prior GET; rejects on mismatch with 412.
+	IfMatch IfMatch `json:"If-Match"`
+
+	// IdempotencyKey 24-hour idempotency key (idem_<ulid>).
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// RotateNotificationChannelCredentialsParams defines parameters for RotateNotificationChannelCredentials.
+type RotateNotificationChannelCredentialsParams struct {
+	// IdempotencyKey 24-hour idempotency key (idem_<ulid>).
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// RegisterNotificationWorkflowParams defines parameters for RegisterNotificationWorkflow.
+type RegisterNotificationWorkflowParams struct {
+	// IdempotencyKey 24-hour idempotency key (idem_<ulid>).
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// ListNotificationsParams defines parameters for ListNotifications.
+type ListNotificationsParams struct {
+	// Limit Max items to return (default 25, max 200).
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Cursor Opaque pagination cursor; obtained from a previous response.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+}
+
+// SendNotificationParams defines parameters for SendNotification.
+type SendNotificationParams struct {
+	// IdempotencyKey 24-hour idempotency key (idem_<ulid>).
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
 
 // ListTenantsParams defines parameters for ListTenants.
 type ListTenantsParams struct {
@@ -488,6 +936,24 @@ type TriggerEmailVerifyParams struct {
 	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
 }
 
+// CreateNotificationChannelJSONRequestBody defines body for CreateNotificationChannel for application/json ContentType.
+type CreateNotificationChannelJSONRequestBody = CreateNotificationChannelRequest
+
+// UpdateNotificationChannelJSONRequestBody defines body for UpdateNotificationChannel for application/json ContentType.
+type UpdateNotificationChannelJSONRequestBody = UpdateNotificationChannelRequest
+
+// RotateNotificationChannelCredentialsJSONRequestBody defines body for RotateNotificationChannelCredentials for application/json ContentType.
+type RotateNotificationChannelCredentialsJSONRequestBody = RotateChannelCredentialsRequest
+
+// RegisterNotificationWorkflowJSONRequestBody defines body for RegisterNotificationWorkflow for application/json ContentType.
+type RegisterNotificationWorkflowJSONRequestBody = RegisterNotificationWorkflowRequest
+
+// UpdateNotificationWorkflowJSONRequestBody defines body for UpdateNotificationWorkflow for application/json ContentType.
+type UpdateNotificationWorkflowJSONRequestBody = UpdateNotificationWorkflowRequest
+
+// SendNotificationJSONRequestBody defines body for SendNotification for application/json ContentType.
+type SendNotificationJSONRequestBody = SendNotificationRequest
+
 // CreateTenantJSONRequestBody defines body for CreateTenant for application/json ContentType.
 type CreateTenantJSONRequestBody = CreateTenantRequest
 
@@ -508,6 +974,42 @@ type ServerInterface interface {
 	// Liveness probe.
 	// (GET /healthz)
 	GetHealthz(w http.ResponseWriter, r *http.Request)
+	// List BYOK notification channels in the caller's tenant.
+	// (GET /v1/notification-channels)
+	ListNotificationChannels(w http.ResponseWriter, r *http.Request, params ListNotificationChannelsParams)
+	// Create a BYOK notification channel.
+	// (POST /v1/notification-channels)
+	CreateNotificationChannel(w http.ResponseWriter, r *http.Request, params CreateNotificationChannelParams)
+	// Soft-delete a notification channel.
+	// (DELETE /v1/notification-channels/{channel_id})
+	DeleteNotificationChannel(w http.ResponseWriter, r *http.Request, channelId string, params DeleteNotificationChannelParams)
+	// Fetch a notification channel by id.
+	// (GET /v1/notification-channels/{channel_id})
+	GetNotificationChannel(w http.ResponseWriter, r *http.Request, channelId string)
+	// Update a notification channel (metadata only).
+	// (PATCH /v1/notification-channels/{channel_id})
+	UpdateNotificationChannel(w http.ResponseWriter, r *http.Request, channelId string, params UpdateNotificationChannelParams)
+	// Rotate a channel's BYOK credentials.
+	// (POST /v1/notification-channels/{channel_id}/rotate-credentials)
+	RotateNotificationChannelCredentials(w http.ResponseWriter, r *http.Request, channelId string, params RotateNotificationChannelCredentialsParams)
+	// List registered notification workflows for the caller's tenant.
+	// (GET /v1/notification-workflows)
+	ListNotificationWorkflows(w http.ResponseWriter, r *http.Request)
+	// Register a (name → Novu workflow id) mapping.
+	// (POST /v1/notification-workflows)
+	RegisterNotificationWorkflow(w http.ResponseWriter, r *http.Request, params RegisterNotificationWorkflowParams)
+	// Update the Novu workflow id and/or description for a registered workflow.
+	// (PATCH /v1/notification-workflows/{workflow_id})
+	UpdateNotificationWorkflow(w http.ResponseWriter, r *http.Request, workflowId string)
+	// List notifications in the caller's tenant.
+	// (GET /v1/notifications)
+	ListNotifications(w http.ResponseWriter, r *http.Request, params ListNotificationsParams)
+	// Queue a notification for delivery via Novu.
+	// (POST /v1/notifications/send)
+	SendNotification(w http.ResponseWriter, r *http.Request, params SendNotificationParams)
+	// Fetch a notification by id.
+	// (GET /v1/notifications/{notification_id})
+	GetNotification(w http.ResponseWriter, r *http.Request, notificationId string)
 	// List tenants visible to the caller's Deployment.
 	// (GET /v1/tenants)
 	ListTenants(w http.ResponseWriter, r *http.Request, params ListTenantsParams)
@@ -568,6 +1070,78 @@ type Unimplemented struct{}
 // Liveness probe.
 // (GET /healthz)
 func (_ Unimplemented) GetHealthz(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// List BYOK notification channels in the caller's tenant.
+// (GET /v1/notification-channels)
+func (_ Unimplemented) ListNotificationChannels(w http.ResponseWriter, r *http.Request, params ListNotificationChannelsParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Create a BYOK notification channel.
+// (POST /v1/notification-channels)
+func (_ Unimplemented) CreateNotificationChannel(w http.ResponseWriter, r *http.Request, params CreateNotificationChannelParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Soft-delete a notification channel.
+// (DELETE /v1/notification-channels/{channel_id})
+func (_ Unimplemented) DeleteNotificationChannel(w http.ResponseWriter, r *http.Request, channelId string, params DeleteNotificationChannelParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Fetch a notification channel by id.
+// (GET /v1/notification-channels/{channel_id})
+func (_ Unimplemented) GetNotificationChannel(w http.ResponseWriter, r *http.Request, channelId string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Update a notification channel (metadata only).
+// (PATCH /v1/notification-channels/{channel_id})
+func (_ Unimplemented) UpdateNotificationChannel(w http.ResponseWriter, r *http.Request, channelId string, params UpdateNotificationChannelParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Rotate a channel's BYOK credentials.
+// (POST /v1/notification-channels/{channel_id}/rotate-credentials)
+func (_ Unimplemented) RotateNotificationChannelCredentials(w http.ResponseWriter, r *http.Request, channelId string, params RotateNotificationChannelCredentialsParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// List registered notification workflows for the caller's tenant.
+// (GET /v1/notification-workflows)
+func (_ Unimplemented) ListNotificationWorkflows(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Register a (name → Novu workflow id) mapping.
+// (POST /v1/notification-workflows)
+func (_ Unimplemented) RegisterNotificationWorkflow(w http.ResponseWriter, r *http.Request, params RegisterNotificationWorkflowParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Update the Novu workflow id and/or description for a registered workflow.
+// (PATCH /v1/notification-workflows/{workflow_id})
+func (_ Unimplemented) UpdateNotificationWorkflow(w http.ResponseWriter, r *http.Request, workflowId string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// List notifications in the caller's tenant.
+// (GET /v1/notifications)
+func (_ Unimplemented) ListNotifications(w http.ResponseWriter, r *http.Request, params ListNotificationsParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Queue a notification for delivery via Novu.
+// (POST /v1/notifications/send)
+func (_ Unimplemented) SendNotification(w http.ResponseWriter, r *http.Request, params SendNotificationParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Fetch a notification by id.
+// (GET /v1/notifications/{notification_id})
+func (_ Unimplemented) GetNotification(w http.ResponseWriter, r *http.Request, notificationId string) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -687,6 +1261,593 @@ func (siw *ServerInterfaceWrapper) GetHealthz(w http.ResponseWriter, r *http.Req
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetHealthz(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListNotificationChannels operation middleware
+func (siw *ServerInterfaceWrapper) ListNotificationChannels(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, ApiKeyAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListNotificationChannelsParams
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListNotificationChannels(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateNotificationChannel operation middleware
+func (siw *ServerInterfaceWrapper) CreateNotificationChannel(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, ApiKeyAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateNotificationChannelParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateNotificationChannel(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteNotificationChannel operation middleware
+func (siw *ServerInterfaceWrapper) DeleteNotificationChannel(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "channel_id" -------------
+	var channelId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "channel_id", chi.URLParam(r, "channel_id"), &channelId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "channel_id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, ApiKeyAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params DeleteNotificationChannelParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch IfMatch
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = IfMatch
+
+	} else {
+		err := fmt.Errorf("Header parameter If-Match is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "If-Match", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteNotificationChannel(w, r, channelId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetNotificationChannel operation middleware
+func (siw *ServerInterfaceWrapper) GetNotificationChannel(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "channel_id" -------------
+	var channelId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "channel_id", chi.URLParam(r, "channel_id"), &channelId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "channel_id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, ApiKeyAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetNotificationChannel(w, r, channelId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateNotificationChannel operation middleware
+func (siw *ServerInterfaceWrapper) UpdateNotificationChannel(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "channel_id" -------------
+	var channelId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "channel_id", chi.URLParam(r, "channel_id"), &channelId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "channel_id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, ApiKeyAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params UpdateNotificationChannelParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch IfMatch
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = IfMatch
+
+	} else {
+		err := fmt.Errorf("Header parameter If-Match is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "If-Match", Err: err})
+		return
+	}
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateNotificationChannel(w, r, channelId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RotateNotificationChannelCredentials operation middleware
+func (siw *ServerInterfaceWrapper) RotateNotificationChannelCredentials(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "channel_id" -------------
+	var channelId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "channel_id", chi.URLParam(r, "channel_id"), &channelId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "channel_id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, ApiKeyAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params RotateNotificationChannelCredentialsParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RotateNotificationChannelCredentials(w, r, channelId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListNotificationWorkflows operation middleware
+func (siw *ServerInterfaceWrapper) ListNotificationWorkflows(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, ApiKeyAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListNotificationWorkflows(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RegisterNotificationWorkflow operation middleware
+func (siw *ServerInterfaceWrapper) RegisterNotificationWorkflow(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, ApiKeyAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params RegisterNotificationWorkflowParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RegisterNotificationWorkflow(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateNotificationWorkflow operation middleware
+func (siw *ServerInterfaceWrapper) UpdateNotificationWorkflow(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "workflow_id" -------------
+	var workflowId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "workflow_id", chi.URLParam(r, "workflow_id"), &workflowId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "workflow_id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, ApiKeyAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateNotificationWorkflow(w, r, workflowId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListNotifications operation middleware
+func (siw *ServerInterfaceWrapper) ListNotifications(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, ApiKeyAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListNotificationsParams
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListNotifications(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SendNotification operation middleware
+func (siw *ServerInterfaceWrapper) SendNotification(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, ApiKeyAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params SendNotificationParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SendNotification(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetNotification operation middleware
+func (siw *ServerInterfaceWrapper) GetNotification(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "notification_id" -------------
+	var notificationId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "notification_id", chi.URLParam(r, "notification_id"), &notificationId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "notification_id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, ApiKeyAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetNotification(w, r, notificationId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1815,6 +2976,42 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Get(options.BaseURL+"/healthz", wrapper.GetHealthz)
 	})
 	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/notification-channels", wrapper.ListNotificationChannels)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/v1/notification-channels", wrapper.CreateNotificationChannel)
+	})
+	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/v1/notification-channels/{channel_id}", wrapper.DeleteNotificationChannel)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/notification-channels/{channel_id}", wrapper.GetNotificationChannel)
+	})
+	r.Group(func(r chi.Router) {
+		r.Patch(options.BaseURL+"/v1/notification-channels/{channel_id}", wrapper.UpdateNotificationChannel)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/v1/notification-channels/{channel_id}/rotate-credentials", wrapper.RotateNotificationChannelCredentials)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/notification-workflows", wrapper.ListNotificationWorkflows)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/v1/notification-workflows", wrapper.RegisterNotificationWorkflow)
+	})
+	r.Group(func(r chi.Router) {
+		r.Patch(options.BaseURL+"/v1/notification-workflows/{workflow_id}", wrapper.UpdateNotificationWorkflow)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/notifications", wrapper.ListNotifications)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/v1/notifications/send", wrapper.SendNotification)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/notifications/{notification_id}", wrapper.GetNotification)
+	})
+	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/v1/tenants", wrapper.ListTenants)
 	})
 	r.Group(func(r chi.Router) {
@@ -1912,6 +3109,876 @@ func (response GetHealthz200JSONResponse) VisitGetHealthzResponse(w http.Respons
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListNotificationChannelsRequestObject struct {
+	Params ListNotificationChannelsParams
+}
+
+type ListNotificationChannelsResponseObject interface {
+	VisitListNotificationChannelsResponse(w http.ResponseWriter) error
+}
+
+type ListNotificationChannels200JSONResponse NotificationChannelListResponse
+
+func (response ListNotificationChannels200JSONResponse) VisitListNotificationChannelsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListNotificationChannels401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ListNotificationChannels401ApplicationProblemPlusJSONResponse) VisitListNotificationChannelsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateNotificationChannelRequestObject struct {
+	Params CreateNotificationChannelParams
+	Body   *CreateNotificationChannelJSONRequestBody
+}
+
+type CreateNotificationChannelResponseObject interface {
+	VisitCreateNotificationChannelResponse(w http.ResponseWriter) error
+}
+
+type CreateNotificationChannel201ResponseHeaders struct {
+	ETag     *string
+	Location *string
+}
+
+type CreateNotificationChannel201JSONResponse struct {
+	Body    NotificationChannelResponse
+	Headers CreateNotificationChannel201ResponseHeaders
+}
+
+func (response CreateNotificationChannel201JSONResponse) VisitCreateNotificationChannelResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	if response.Headers.Location != nil {
+		w.Header().Set("Location", fmt.Sprint(*response.Headers.Location))
+	}
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateNotificationChannel401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response CreateNotificationChannel401ApplicationProblemPlusJSONResponse) VisitCreateNotificationChannelResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateNotificationChannel409ApplicationProblemPlusJSONResponse struct {
+	IdempotencyInFlightApplicationProblemPlusJSONResponse
+}
+
+func (response CreateNotificationChannel409ApplicationProblemPlusJSONResponse) VisitCreateNotificationChannelResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateNotificationChannel422ApplicationProblemPlusJSONResponse struct {
+	IdempotencyConflictOrValidationApplicationProblemPlusJSONResponse
+}
+
+func (response CreateNotificationChannel422ApplicationProblemPlusJSONResponse) VisitCreateNotificationChannelResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteNotificationChannelRequestObject struct {
+	ChannelId string `json:"channel_id"`
+	Params    DeleteNotificationChannelParams
+}
+
+type DeleteNotificationChannelResponseObject interface {
+	VisitDeleteNotificationChannelResponse(w http.ResponseWriter) error
+}
+
+type DeleteNotificationChannel204Response struct {
+}
+
+func (response DeleteNotificationChannel204Response) VisitDeleteNotificationChannelResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type DeleteNotificationChannel401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteNotificationChannel401ApplicationProblemPlusJSONResponse) VisitDeleteNotificationChannelResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteNotificationChannel403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteNotificationChannel403ApplicationProblemPlusJSONResponse) VisitDeleteNotificationChannelResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteNotificationChannel404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteNotificationChannel404ApplicationProblemPlusJSONResponse) VisitDeleteNotificationChannelResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteNotificationChannel412ApplicationProblemPlusJSONResponse struct {
+	PreconditionFailedApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteNotificationChannel412ApplicationProblemPlusJSONResponse) VisitDeleteNotificationChannelResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetNotificationChannelRequestObject struct {
+	ChannelId string `json:"channel_id"`
+}
+
+type GetNotificationChannelResponseObject interface {
+	VisitGetNotificationChannelResponse(w http.ResponseWriter) error
+}
+
+type GetNotificationChannel200ResponseHeaders struct {
+	ETag *string
+}
+
+type GetNotificationChannel200JSONResponse struct {
+	Body    NotificationChannelResponse
+	Headers GetNotificationChannel200ResponseHeaders
+}
+
+func (response GetNotificationChannel200JSONResponse) VisitGetNotificationChannelResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetNotificationChannel401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response GetNotificationChannel401ApplicationProblemPlusJSONResponse) VisitGetNotificationChannelResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetNotificationChannel403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response GetNotificationChannel403ApplicationProblemPlusJSONResponse) VisitGetNotificationChannelResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetNotificationChannel404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response GetNotificationChannel404ApplicationProblemPlusJSONResponse) VisitGetNotificationChannelResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateNotificationChannelRequestObject struct {
+	ChannelId string `json:"channel_id"`
+	Params    UpdateNotificationChannelParams
+	Body      *UpdateNotificationChannelJSONRequestBody
+}
+
+type UpdateNotificationChannelResponseObject interface {
+	VisitUpdateNotificationChannelResponse(w http.ResponseWriter) error
+}
+
+type UpdateNotificationChannel200ResponseHeaders struct {
+	ETag *string
+}
+
+type UpdateNotificationChannel200JSONResponse struct {
+	Body    NotificationChannelResponse
+	Headers UpdateNotificationChannel200ResponseHeaders
+}
+
+func (response UpdateNotificationChannel200JSONResponse) VisitUpdateNotificationChannelResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateNotificationChannel401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateNotificationChannel401ApplicationProblemPlusJSONResponse) VisitUpdateNotificationChannelResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateNotificationChannel403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateNotificationChannel403ApplicationProblemPlusJSONResponse) VisitUpdateNotificationChannelResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateNotificationChannel404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateNotificationChannel404ApplicationProblemPlusJSONResponse) VisitUpdateNotificationChannelResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateNotificationChannel412ApplicationProblemPlusJSONResponse struct {
+	PreconditionFailedApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateNotificationChannel412ApplicationProblemPlusJSONResponse) VisitUpdateNotificationChannelResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateNotificationChannel422ApplicationProblemPlusJSONResponse struct {
+	IdempotencyConflictOrValidationApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateNotificationChannel422ApplicationProblemPlusJSONResponse) VisitUpdateNotificationChannelResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RotateNotificationChannelCredentialsRequestObject struct {
+	ChannelId string `json:"channel_id"`
+	Params    RotateNotificationChannelCredentialsParams
+	Body      *RotateNotificationChannelCredentialsJSONRequestBody
+}
+
+type RotateNotificationChannelCredentialsResponseObject interface {
+	VisitRotateNotificationChannelCredentialsResponse(w http.ResponseWriter) error
+}
+
+type RotateNotificationChannelCredentials200ResponseHeaders struct {
+	ETag *string
+}
+
+type RotateNotificationChannelCredentials200JSONResponse struct {
+	Body    NotificationChannelResponse
+	Headers RotateNotificationChannelCredentials200ResponseHeaders
+}
+
+func (response RotateNotificationChannelCredentials200JSONResponse) VisitRotateNotificationChannelCredentialsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RotateNotificationChannelCredentials401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response RotateNotificationChannelCredentials401ApplicationProblemPlusJSONResponse) VisitRotateNotificationChannelCredentialsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RotateNotificationChannelCredentials403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response RotateNotificationChannelCredentials403ApplicationProblemPlusJSONResponse) VisitRotateNotificationChannelCredentialsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RotateNotificationChannelCredentials404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response RotateNotificationChannelCredentials404ApplicationProblemPlusJSONResponse) VisitRotateNotificationChannelCredentialsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RotateNotificationChannelCredentials422ApplicationProblemPlusJSONResponse struct {
+	IdempotencyConflictOrValidationApplicationProblemPlusJSONResponse
+}
+
+func (response RotateNotificationChannelCredentials422ApplicationProblemPlusJSONResponse) VisitRotateNotificationChannelCredentialsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListNotificationWorkflowsRequestObject struct {
+}
+
+type ListNotificationWorkflowsResponseObject interface {
+	VisitListNotificationWorkflowsResponse(w http.ResponseWriter) error
+}
+
+type ListNotificationWorkflows200JSONResponse NotificationWorkflowListResponse
+
+func (response ListNotificationWorkflows200JSONResponse) VisitListNotificationWorkflowsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListNotificationWorkflows401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ListNotificationWorkflows401ApplicationProblemPlusJSONResponse) VisitListNotificationWorkflowsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RegisterNotificationWorkflowRequestObject struct {
+	Params RegisterNotificationWorkflowParams
+	Body   *RegisterNotificationWorkflowJSONRequestBody
+}
+
+type RegisterNotificationWorkflowResponseObject interface {
+	VisitRegisterNotificationWorkflowResponse(w http.ResponseWriter) error
+}
+
+type RegisterNotificationWorkflow201JSONResponse NotificationWorkflowResponse
+
+func (response RegisterNotificationWorkflow201JSONResponse) VisitRegisterNotificationWorkflowResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RegisterNotificationWorkflow401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response RegisterNotificationWorkflow401ApplicationProblemPlusJSONResponse) VisitRegisterNotificationWorkflowResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RegisterNotificationWorkflow422ApplicationProblemPlusJSONResponse struct {
+	IdempotencyConflictOrValidationApplicationProblemPlusJSONResponse
+}
+
+func (response RegisterNotificationWorkflow422ApplicationProblemPlusJSONResponse) VisitRegisterNotificationWorkflowResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateNotificationWorkflowRequestObject struct {
+	WorkflowId string `json:"workflow_id"`
+	Body       *UpdateNotificationWorkflowJSONRequestBody
+}
+
+type UpdateNotificationWorkflowResponseObject interface {
+	VisitUpdateNotificationWorkflowResponse(w http.ResponseWriter) error
+}
+
+type UpdateNotificationWorkflow200JSONResponse NotificationWorkflowResponse
+
+func (response UpdateNotificationWorkflow200JSONResponse) VisitUpdateNotificationWorkflowResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateNotificationWorkflow401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateNotificationWorkflow401ApplicationProblemPlusJSONResponse) VisitUpdateNotificationWorkflowResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateNotificationWorkflow403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateNotificationWorkflow403ApplicationProblemPlusJSONResponse) VisitUpdateNotificationWorkflowResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateNotificationWorkflow404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateNotificationWorkflow404ApplicationProblemPlusJSONResponse) VisitUpdateNotificationWorkflowResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateNotificationWorkflow422ApplicationProblemPlusJSONResponse struct {
+	IdempotencyConflictOrValidationApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateNotificationWorkflow422ApplicationProblemPlusJSONResponse) VisitUpdateNotificationWorkflowResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListNotificationsRequestObject struct {
+	Params ListNotificationsParams
+}
+
+type ListNotificationsResponseObject interface {
+	VisitListNotificationsResponse(w http.ResponseWriter) error
+}
+
+type ListNotifications200JSONResponse NotificationListResponse
+
+func (response ListNotifications200JSONResponse) VisitListNotificationsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListNotifications401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ListNotifications401ApplicationProblemPlusJSONResponse) VisitListNotificationsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListNotifications410ApplicationProblemPlusJSONResponse struct {
+	CursorGoneApplicationProblemPlusJSONResponse
+}
+
+func (response ListNotifications410ApplicationProblemPlusJSONResponse) VisitListNotificationsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(410)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SendNotificationRequestObject struct {
+	Params SendNotificationParams
+	Body   *SendNotificationJSONRequestBody
+}
+
+type SendNotificationResponseObject interface {
+	VisitSendNotificationResponse(w http.ResponseWriter) error
+}
+
+type SendNotification202JSONResponse NotificationResponse
+
+func (response SendNotification202JSONResponse) VisitSendNotificationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(202)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SendNotification401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response SendNotification401ApplicationProblemPlusJSONResponse) VisitSendNotificationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SendNotification404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response SendNotification404ApplicationProblemPlusJSONResponse) VisitSendNotificationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SendNotification422ApplicationProblemPlusJSONResponse struct {
+	IdempotencyConflictOrValidationApplicationProblemPlusJSONResponse
+}
+
+func (response SendNotification422ApplicationProblemPlusJSONResponse) VisitSendNotificationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetNotificationRequestObject struct {
+	NotificationId string `json:"notification_id"`
+}
+
+type GetNotificationResponseObject interface {
+	VisitGetNotificationResponse(w http.ResponseWriter) error
+}
+
+type GetNotification200JSONResponse NotificationResponse
+
+func (response GetNotification200JSONResponse) VisitGetNotificationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetNotification401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response GetNotification401ApplicationProblemPlusJSONResponse) VisitGetNotificationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetNotification403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response GetNotification403ApplicationProblemPlusJSONResponse) VisitGetNotificationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetNotification404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response GetNotification404ApplicationProblemPlusJSONResponse) VisitGetNotificationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -3300,6 +5367,42 @@ type StrictServerInterface interface {
 	// Liveness probe.
 	// (GET /healthz)
 	GetHealthz(ctx context.Context, request GetHealthzRequestObject) (GetHealthzResponseObject, error)
+	// List BYOK notification channels in the caller's tenant.
+	// (GET /v1/notification-channels)
+	ListNotificationChannels(ctx context.Context, request ListNotificationChannelsRequestObject) (ListNotificationChannelsResponseObject, error)
+	// Create a BYOK notification channel.
+	// (POST /v1/notification-channels)
+	CreateNotificationChannel(ctx context.Context, request CreateNotificationChannelRequestObject) (CreateNotificationChannelResponseObject, error)
+	// Soft-delete a notification channel.
+	// (DELETE /v1/notification-channels/{channel_id})
+	DeleteNotificationChannel(ctx context.Context, request DeleteNotificationChannelRequestObject) (DeleteNotificationChannelResponseObject, error)
+	// Fetch a notification channel by id.
+	// (GET /v1/notification-channels/{channel_id})
+	GetNotificationChannel(ctx context.Context, request GetNotificationChannelRequestObject) (GetNotificationChannelResponseObject, error)
+	// Update a notification channel (metadata only).
+	// (PATCH /v1/notification-channels/{channel_id})
+	UpdateNotificationChannel(ctx context.Context, request UpdateNotificationChannelRequestObject) (UpdateNotificationChannelResponseObject, error)
+	// Rotate a channel's BYOK credentials.
+	// (POST /v1/notification-channels/{channel_id}/rotate-credentials)
+	RotateNotificationChannelCredentials(ctx context.Context, request RotateNotificationChannelCredentialsRequestObject) (RotateNotificationChannelCredentialsResponseObject, error)
+	// List registered notification workflows for the caller's tenant.
+	// (GET /v1/notification-workflows)
+	ListNotificationWorkflows(ctx context.Context, request ListNotificationWorkflowsRequestObject) (ListNotificationWorkflowsResponseObject, error)
+	// Register a (name → Novu workflow id) mapping.
+	// (POST /v1/notification-workflows)
+	RegisterNotificationWorkflow(ctx context.Context, request RegisterNotificationWorkflowRequestObject) (RegisterNotificationWorkflowResponseObject, error)
+	// Update the Novu workflow id and/or description for a registered workflow.
+	// (PATCH /v1/notification-workflows/{workflow_id})
+	UpdateNotificationWorkflow(ctx context.Context, request UpdateNotificationWorkflowRequestObject) (UpdateNotificationWorkflowResponseObject, error)
+	// List notifications in the caller's tenant.
+	// (GET /v1/notifications)
+	ListNotifications(ctx context.Context, request ListNotificationsRequestObject) (ListNotificationsResponseObject, error)
+	// Queue a notification for delivery via Novu.
+	// (POST /v1/notifications/send)
+	SendNotification(ctx context.Context, request SendNotificationRequestObject) (SendNotificationResponseObject, error)
+	// Fetch a notification by id.
+	// (GET /v1/notifications/{notification_id})
+	GetNotification(ctx context.Context, request GetNotificationRequestObject) (GetNotificationResponseObject, error)
 	// List tenants visible to the caller's Deployment.
 	// (GET /v1/tenants)
 	ListTenants(ctx context.Context, request ListTenantsRequestObject) (ListTenantsResponseObject, error)
@@ -3399,6 +5502,361 @@ func (sh *strictHandler) GetHealthz(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetHealthzResponseObject); ok {
 		if err := validResponse.VisitGetHealthzResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListNotificationChannels operation middleware
+func (sh *strictHandler) ListNotificationChannels(w http.ResponseWriter, r *http.Request, params ListNotificationChannelsParams) {
+	var request ListNotificationChannelsRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListNotificationChannels(ctx, request.(ListNotificationChannelsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListNotificationChannels")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListNotificationChannelsResponseObject); ok {
+		if err := validResponse.VisitListNotificationChannelsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateNotificationChannel operation middleware
+func (sh *strictHandler) CreateNotificationChannel(w http.ResponseWriter, r *http.Request, params CreateNotificationChannelParams) {
+	var request CreateNotificationChannelRequestObject
+
+	request.Params = params
+
+	var body CreateNotificationChannelJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateNotificationChannel(ctx, request.(CreateNotificationChannelRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateNotificationChannel")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateNotificationChannelResponseObject); ok {
+		if err := validResponse.VisitCreateNotificationChannelResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteNotificationChannel operation middleware
+func (sh *strictHandler) DeleteNotificationChannel(w http.ResponseWriter, r *http.Request, channelId string, params DeleteNotificationChannelParams) {
+	var request DeleteNotificationChannelRequestObject
+
+	request.ChannelId = channelId
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteNotificationChannel(ctx, request.(DeleteNotificationChannelRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteNotificationChannel")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteNotificationChannelResponseObject); ok {
+		if err := validResponse.VisitDeleteNotificationChannelResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetNotificationChannel operation middleware
+func (sh *strictHandler) GetNotificationChannel(w http.ResponseWriter, r *http.Request, channelId string) {
+	var request GetNotificationChannelRequestObject
+
+	request.ChannelId = channelId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetNotificationChannel(ctx, request.(GetNotificationChannelRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetNotificationChannel")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetNotificationChannelResponseObject); ok {
+		if err := validResponse.VisitGetNotificationChannelResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateNotificationChannel operation middleware
+func (sh *strictHandler) UpdateNotificationChannel(w http.ResponseWriter, r *http.Request, channelId string, params UpdateNotificationChannelParams) {
+	var request UpdateNotificationChannelRequestObject
+
+	request.ChannelId = channelId
+	request.Params = params
+
+	var body UpdateNotificationChannelJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateNotificationChannel(ctx, request.(UpdateNotificationChannelRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateNotificationChannel")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateNotificationChannelResponseObject); ok {
+		if err := validResponse.VisitUpdateNotificationChannelResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RotateNotificationChannelCredentials operation middleware
+func (sh *strictHandler) RotateNotificationChannelCredentials(w http.ResponseWriter, r *http.Request, channelId string, params RotateNotificationChannelCredentialsParams) {
+	var request RotateNotificationChannelCredentialsRequestObject
+
+	request.ChannelId = channelId
+	request.Params = params
+
+	var body RotateNotificationChannelCredentialsJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RotateNotificationChannelCredentials(ctx, request.(RotateNotificationChannelCredentialsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RotateNotificationChannelCredentials")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RotateNotificationChannelCredentialsResponseObject); ok {
+		if err := validResponse.VisitRotateNotificationChannelCredentialsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListNotificationWorkflows operation middleware
+func (sh *strictHandler) ListNotificationWorkflows(w http.ResponseWriter, r *http.Request) {
+	var request ListNotificationWorkflowsRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListNotificationWorkflows(ctx, request.(ListNotificationWorkflowsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListNotificationWorkflows")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListNotificationWorkflowsResponseObject); ok {
+		if err := validResponse.VisitListNotificationWorkflowsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RegisterNotificationWorkflow operation middleware
+func (sh *strictHandler) RegisterNotificationWorkflow(w http.ResponseWriter, r *http.Request, params RegisterNotificationWorkflowParams) {
+	var request RegisterNotificationWorkflowRequestObject
+
+	request.Params = params
+
+	var body RegisterNotificationWorkflowJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RegisterNotificationWorkflow(ctx, request.(RegisterNotificationWorkflowRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RegisterNotificationWorkflow")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RegisterNotificationWorkflowResponseObject); ok {
+		if err := validResponse.VisitRegisterNotificationWorkflowResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateNotificationWorkflow operation middleware
+func (sh *strictHandler) UpdateNotificationWorkflow(w http.ResponseWriter, r *http.Request, workflowId string) {
+	var request UpdateNotificationWorkflowRequestObject
+
+	request.WorkflowId = workflowId
+
+	var body UpdateNotificationWorkflowJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateNotificationWorkflow(ctx, request.(UpdateNotificationWorkflowRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateNotificationWorkflow")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateNotificationWorkflowResponseObject); ok {
+		if err := validResponse.VisitUpdateNotificationWorkflowResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListNotifications operation middleware
+func (sh *strictHandler) ListNotifications(w http.ResponseWriter, r *http.Request, params ListNotificationsParams) {
+	var request ListNotificationsRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListNotifications(ctx, request.(ListNotificationsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListNotifications")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListNotificationsResponseObject); ok {
+		if err := validResponse.VisitListNotificationsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// SendNotification operation middleware
+func (sh *strictHandler) SendNotification(w http.ResponseWriter, r *http.Request, params SendNotificationParams) {
+	var request SendNotificationRequestObject
+
+	request.Params = params
+
+	var body SendNotificationJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SendNotification(ctx, request.(SendNotificationRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SendNotification")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SendNotificationResponseObject); ok {
+		if err := validResponse.VisitSendNotificationResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetNotification operation middleware
+func (sh *strictHandler) GetNotification(w http.ResponseWriter, r *http.Request, notificationId string) {
+	var request GetNotificationRequestObject
+
+	request.NotificationId = notificationId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetNotification(ctx, request.(GetNotificationRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetNotification")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetNotificationResponseObject); ok {
+		if err := validResponse.VisitGetNotificationResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -3898,76 +6356,111 @@ func (sh *strictHandler) TriggerEmailVerify(w http.ResponseWriter, r *http.Reque
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
+	"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",
+	"//8=",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

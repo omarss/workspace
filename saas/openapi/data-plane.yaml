@@ -28,6 +28,20 @@ tags:
       Keycloak-brokered authorization URL — the caller redirects there
       and Keycloak completes the OAuth dance + writes the federated_identity
       row itself. ADR 014 records the design.
+  - name: notification-channels
+    description: |
+      BYOK vendor channel configurations. Per ADR 017 every channel stores
+      provider-shaped credentials envelope-encrypted at rest; rotation is a
+      distinct verb and credential plaintext is never echoed in any response.
+  - name: notification-workflows
+    description: |
+      Workflow registry: mapping platform-stable workflow names to Novu
+      workflow ids. Templates themselves live in Novu.
+  - name: notifications
+    description: |
+      Send and inspect transactional notifications. POST /send returns 202
+      Accepted; status transitions are owned by the outbox-consuming worker
+      (ADR 013).
 security:
   - bearerAuth: []
   - apiKeyAuth: []
@@ -551,6 +565,343 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+
+  /v1/notification-channels:
+    get:
+      operationId: listNotificationChannels
+      tags: [notification-channels]
+      summary: List BYOK notification channels in the caller's tenant.
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationChannelListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      operationId: createNotificationChannel
+      tags: [notification-channels]
+      summary: Create a BYOK notification channel.
+      description: |
+        Idempotent. Per ADR 017 credentials in the body are envelope-encrypted
+        before the row is inserted and the persisted plaintext is zeroed
+        immediately. The response NEVER echoes credentials — only a
+        credentials_present flag and last_rotated_at timestamp.
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateNotificationChannelRequest"
+      responses:
+        "201":
+          description: Created
+          headers:
+            ETag:
+              schema:
+                type: string
+              description: 'Weak ETag, format W/"v<sequence>".'
+            Location:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationChannelResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          $ref: "#/components/responses/IdempotencyInFlight"
+        "422":
+          $ref: "#/components/responses/IdempotencyConflictOrValidation"
+
+  /v1/notification-channels/{channel_id}:
+    parameters:
+      - in: path
+        name: channel_id
+        required: true
+        schema:
+          type: string
+          pattern: "^chan_[0-9A-HJKMNP-TV-Z]{26}$"
+    get:
+      operationId: getNotificationChannel
+      tags: [notification-channels]
+      summary: Fetch a notification channel by id.
+      responses:
+        "200":
+          description: OK
+          headers:
+            ETag:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationChannelResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      operationId: updateNotificationChannel
+      tags: [notification-channels]
+      summary: Update a notification channel (metadata only).
+      description: |
+        Per ADR 017 PATCH never accepts credentials. Use the dedicated
+        rotate-credentials endpoint to change secrets.
+      parameters:
+        - $ref: "#/components/parameters/IfMatch"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateNotificationChannelRequest"
+      responses:
+        "200":
+          description: OK
+          headers:
+            ETag:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationChannelResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "412":
+          $ref: "#/components/responses/PreconditionFailed"
+        "422":
+          $ref: "#/components/responses/IdempotencyConflictOrValidation"
+    delete:
+      operationId: deleteNotificationChannel
+      tags: [notification-channels]
+      summary: Soft-delete a notification channel.
+      parameters:
+        - $ref: "#/components/parameters/IfMatch"
+      responses:
+        "204":
+          description: Soft-deleted.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "412":
+          $ref: "#/components/responses/PreconditionFailed"
+
+  /v1/notification-channels/{channel_id}/rotate-credentials:
+    parameters:
+      - in: path
+        name: channel_id
+        required: true
+        schema:
+          type: string
+          pattern: "^chan_[0-9A-HJKMNP-TV-Z]{26}$"
+    post:
+      operationId: rotateNotificationChannelCredentials
+      tags: [notification-channels]
+      summary: Rotate a channel's BYOK credentials.
+      description: |
+        ADR 017: rotation is the only verb that accepts new credentials.
+        Bumps row_seq and stamps last_rotated_at; emits the
+        notification_channel.rotated audit event.
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RotateChannelCredentialsRequest"
+      responses:
+        "200":
+          description: OK
+          headers:
+            ETag:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationChannelResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/IdempotencyConflictOrValidation"
+
+  /v1/notification-workflows:
+    get:
+      operationId: listNotificationWorkflows
+      tags: [notification-workflows]
+      summary: List registered notification workflows for the caller's tenant.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationWorkflowListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      operationId: registerNotificationWorkflow
+      tags: [notification-workflows]
+      summary: Register a (name → Novu workflow id) mapping.
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterNotificationWorkflowRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationWorkflowResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/IdempotencyConflictOrValidation"
+
+  /v1/notification-workflows/{workflow_id}:
+    parameters:
+      - in: path
+        name: workflow_id
+        required: true
+        schema: { type: string }
+    patch:
+      operationId: updateNotificationWorkflow
+      tags: [notification-workflows]
+      summary: Update the Novu workflow id and/or description for a registered workflow.
+      description: |
+        Partial-update endpoint. Either field may be omitted to leave it
+        unchanged. Emits a `notification_workflow.updated` outbox event so
+        downstream consumers can refresh their cache. Workflow renames
+        (changing the `name`) are not supported in v1 — register a new
+        workflow with the new name and deprecate the old one.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateNotificationWorkflowRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationWorkflowResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/IdempotencyConflictOrValidation"
+
+  /v1/notifications:
+    get:
+      operationId: listNotifications
+      tags: [notifications]
+      summary: List notifications in the caller's tenant.
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "410":
+          $ref: "#/components/responses/CursorGone"
+
+  /v1/notifications/send:
+    post:
+      operationId: sendNotification
+      tags: [notifications]
+      summary: Queue a notification for delivery via Novu.
+      description: |
+        Returns 202 Accepted; Novu trigger happens via the outbox worker so
+        Novu downtime does not block the request response. Status transitions
+        live on the worker — clients poll GET /v1/notifications/{id}.
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendNotificationRequest"
+      responses:
+        "202":
+          description: Accepted; notification queued.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/IdempotencyConflictOrValidation"
+
+  /v1/notifications/{notification_id}:
+    parameters:
+      - in: path
+        name: notification_id
+        required: true
+        schema:
+          type: string
+          pattern: "^notif_[0-9A-HJKMNP-TV-Z]{26}$"
+    get:
+      operationId: getNotification
+      tags: [notifications]
+      summary: Fetch a notification by id.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
 components:
   schemas:
     Health:
@@ -811,6 +1162,319 @@ components:
         expires_at:
           type: string
           format: date-time
+
+    NotificationChannel:
+      type: object
+      required:
+        - id
+        - object
+        - provider
+        - name
+        - status
+        - credentials_present
+        - created_at
+        - updated_at
+        - etag
+      properties:
+        id:
+          type: string
+          pattern: "^chan_[0-9A-HJKMNP-TV-Z]{26}$"
+        object:
+          type: string
+          enum: [notification_channel]
+        provider:
+          type: string
+          enum: [smtp, sendgrid, ses, in_app]
+        name:
+          type: string
+          minLength: 1
+          maxLength: 64
+        status:
+          type: string
+          enum: [active, disabled]
+        is_default_for:
+          type: array
+          items:
+            type: string
+            enum: [email, in_app]
+        config:
+          type: object
+          additionalProperties:
+            type: string
+        credentials_present:
+          type: boolean
+          description: |
+            True iff the channel row currently carries envelope-encrypted
+            credentials. The platform NEVER returns the credential bytes.
+        last_rotated_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        etag:
+          type: string
+    NotificationChannelResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: "#/components/schemas/NotificationChannel"
+    NotificationChannelListResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/NotificationChannel"
+
+    SMTPCredentials:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+          x-oapi-codegen-extra-tags:
+            sensitive: "true"
+        password:
+          type: string
+          x-oapi-codegen-extra-tags:
+            sensitive: "true"
+            pii: "true"
+    SendGridCredentials:
+      type: object
+      required: [api_key]
+      properties:
+        api_key:
+          type: string
+          x-oapi-codegen-extra-tags:
+            sensitive: "true"
+            pii: "true"
+    SESCredentials:
+      type: object
+      required: [access_key_id, secret_access_key]
+      properties:
+        access_key_id:
+          type: string
+          x-oapi-codegen-extra-tags:
+            sensitive: "true"
+        secret_access_key:
+          type: string
+          x-oapi-codegen-extra-tags:
+            sensitive: "true"
+            pii: "true"
+    CredentialsBundle:
+      type: object
+      description: |
+        Per-provider credential bundle. Exactly one of smtp / sendgrid / ses
+        is populated based on the channel provider; the in_app provider
+        rejects any credential payload.
+      properties:
+        smtp:
+          $ref: "#/components/schemas/SMTPCredentials"
+        sendgrid:
+          $ref: "#/components/schemas/SendGridCredentials"
+        ses:
+          $ref: "#/components/schemas/SESCredentials"
+
+    CreateNotificationChannelRequest:
+      type: object
+      required: [provider, name]
+      properties:
+        provider:
+          type: string
+          enum: [smtp, sendgrid, ses, in_app]
+        name:
+          type: string
+          minLength: 1
+          maxLength: 64
+        config:
+          type: object
+          additionalProperties:
+            type: string
+        is_default_for:
+          type: array
+          items:
+            type: string
+            enum: [email, in_app]
+        credentials:
+          $ref: "#/components/schemas/CredentialsBundle"
+
+    UpdateNotificationChannelRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 64
+        status:
+          type: string
+          enum: [active, disabled]
+        is_default_for:
+          type: array
+          items:
+            type: string
+            enum: [email, in_app]
+        config:
+          type: object
+          additionalProperties:
+            type: string
+
+    RotateChannelCredentialsRequest:
+      type: object
+      required: [credentials]
+      properties:
+        credentials:
+          $ref: "#/components/schemas/CredentialsBundle"
+
+    NotificationWorkflow:
+      type: object
+      required: [id, object, name, novu_workflow_id, created_at]
+      properties:
+        id:
+          type: string
+          pattern: "^wf_[0-9A-HJKMNP-TV-Z]{26}$"
+        object:
+          type: string
+          enum: [notification_workflow]
+        name:
+          type: string
+          minLength: 1
+          maxLength: 64
+        novu_workflow_id:
+          type: string
+        description:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+    NotificationWorkflowResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: "#/components/schemas/NotificationWorkflow"
+    NotificationWorkflowListResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/NotificationWorkflow"
+    RegisterNotificationWorkflowRequest:
+      type: object
+      required: [name, novu_workflow_id]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 64
+        novu_workflow_id:
+          type: string
+        description:
+          type: string
+          maxLength: 256
+    UpdateNotificationWorkflowRequest:
+      type: object
+      description: |
+        Partial-update payload. Both fields are optional; omit a field to
+        leave it unchanged. At least one MUST be provided.
+      properties:
+        novu_workflow_id:
+          type: string
+        description:
+          type: string
+          maxLength: 256
+
+    Notification:
+      type: object
+      required:
+        - id
+        - object
+        - tenant_id
+        - workflow_name
+        - to_user_id
+        - status
+        - queued_at
+      properties:
+        id:
+          type: string
+          pattern: "^notif_[0-9A-HJKMNP-TV-Z]{26}$"
+        object:
+          type: string
+          enum: [notification]
+        tenant_id:
+          type: string
+        workflow_name:
+          type: string
+        to_user_id:
+          type: string
+        status:
+          type: string
+          enum: [queued, sent, delivered, failed]
+        novu_transaction_id:
+          type: string
+          nullable: true
+        queued_at:
+          type: string
+          format: date-time
+        sent_at:
+          type: string
+          format: date-time
+          nullable: true
+        delivered_at:
+          type: string
+          format: date-time
+          nullable: true
+        failed_at:
+          type: string
+          format: date-time
+          nullable: true
+        failure_reason:
+          type: string
+          nullable: true
+    NotificationResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: "#/components/schemas/Notification"
+    NotificationListResponse:
+      type: object
+      required: [data, pagination]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Notification"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+
+    SendNotificationRequest:
+      type: object
+      required: [workflow_name, to]
+      properties:
+        workflow_name:
+          type: string
+        to:
+          type: object
+          required: [user_id]
+          properties:
+            user_id:
+              type: string
+              pattern: "^user_[0-9A-HJKMNP-TV-Z]{26}$"
+        payload:
+          type: object
+          additionalProperties: true
+          x-oapi-codegen-extra-tags:
+            sensitive: "true"
+
     Pagination:
       type: object
       required: [has_more]

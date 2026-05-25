@@ -21,6 +21,7 @@ import (
 	db "github.com/omarss/saas/internal/dataplane/db/sqlc"
 	httpapi "github.com/omarss/saas/internal/dataplane/httpapi" // package dataplaneapi
 	"github.com/omarss/saas/internal/dataplane/identity"
+	"github.com/omarss/saas/internal/dataplane/notifications"
 	"github.com/omarss/saas/internal/dataplane/tenancy"
 	"github.com/omarss/saas/internal/platform/auth"
 	platformcrypto "github.com/omarss/saas/internal/platform/crypto"
@@ -47,10 +48,12 @@ func main() {
 // strictServer composes the per-module handlers into the single
 // StrictServerInterface oapi-codegen expects. Phase 2 ships /healthz and the
 // tenancy handler; Phase 5 adds the identity handler (/v1/users +
-// social-providers); later phases extend this with organisations, etc.
+// social-providers); Phase 6 adds the notifications handler (channels,
+// workflows, send).
 type strictServer struct {
-	tenancyHandler  *tenancy.Handler
-	identityHandler *identity.Handler
+	tenancyHandler       *tenancy.Handler
+	identityHandler      *identity.Handler
+	notificationsHandler *notifications.Handler
 }
 
 // GetHealthz implements the Phase-1 liveness probe inline so the data plane
@@ -137,6 +140,56 @@ func (s *strictServer) UnlinkSocialProvider(ctx context.Context, r httpapi.Unlin
 	return s.identityHandler.UnlinkSocialProvider(ctx, r)
 }
 
+// Notifications delegation -------------------------------------------------------
+
+func (s *strictServer) ListNotificationChannels(ctx context.Context, r httpapi.ListNotificationChannelsRequestObject) (httpapi.ListNotificationChannelsResponseObject, error) {
+	return s.notificationsHandler.ListNotificationChannels(ctx, r)
+}
+
+func (s *strictServer) CreateNotificationChannel(ctx context.Context, r httpapi.CreateNotificationChannelRequestObject) (httpapi.CreateNotificationChannelResponseObject, error) {
+	return s.notificationsHandler.CreateNotificationChannel(ctx, r)
+}
+
+func (s *strictServer) GetNotificationChannel(ctx context.Context, r httpapi.GetNotificationChannelRequestObject) (httpapi.GetNotificationChannelResponseObject, error) {
+	return s.notificationsHandler.GetNotificationChannel(ctx, r)
+}
+
+func (s *strictServer) UpdateNotificationChannel(ctx context.Context, r httpapi.UpdateNotificationChannelRequestObject) (httpapi.UpdateNotificationChannelResponseObject, error) {
+	return s.notificationsHandler.UpdateNotificationChannel(ctx, r)
+}
+
+func (s *strictServer) DeleteNotificationChannel(ctx context.Context, r httpapi.DeleteNotificationChannelRequestObject) (httpapi.DeleteNotificationChannelResponseObject, error) {
+	return s.notificationsHandler.DeleteNotificationChannel(ctx, r)
+}
+
+func (s *strictServer) RotateNotificationChannelCredentials(ctx context.Context, r httpapi.RotateNotificationChannelCredentialsRequestObject) (httpapi.RotateNotificationChannelCredentialsResponseObject, error) {
+	return s.notificationsHandler.RotateNotificationChannelCredentials(ctx, r)
+}
+
+func (s *strictServer) ListNotificationWorkflows(ctx context.Context, r httpapi.ListNotificationWorkflowsRequestObject) (httpapi.ListNotificationWorkflowsResponseObject, error) {
+	return s.notificationsHandler.ListNotificationWorkflows(ctx, r)
+}
+
+func (s *strictServer) RegisterNotificationWorkflow(ctx context.Context, r httpapi.RegisterNotificationWorkflowRequestObject) (httpapi.RegisterNotificationWorkflowResponseObject, error) {
+	return s.notificationsHandler.RegisterNotificationWorkflow(ctx, r)
+}
+
+func (s *strictServer) UpdateNotificationWorkflow(ctx context.Context, r httpapi.UpdateNotificationWorkflowRequestObject) (httpapi.UpdateNotificationWorkflowResponseObject, error) {
+	return s.notificationsHandler.UpdateNotificationWorkflow(ctx, r)
+}
+
+func (s *strictServer) ListNotifications(ctx context.Context, r httpapi.ListNotificationsRequestObject) (httpapi.ListNotificationsResponseObject, error) {
+	return s.notificationsHandler.ListNotifications(ctx, r)
+}
+
+func (s *strictServer) SendNotification(ctx context.Context, r httpapi.SendNotificationRequestObject) (httpapi.SendNotificationResponseObject, error) {
+	return s.notificationsHandler.SendNotification(ctx, r)
+}
+
+func (s *strictServer) GetNotification(ctx context.Context, r httpapi.GetNotificationRequestObject) (httpapi.GetNotificationResponseObject, error) {
+	return s.notificationsHandler.GetNotification(ctx, r)
+}
+
 func run() error {
 	// platformlog.New installs the PII-redacting JSON slog handler from
 	// internal/platform/log. Every log record passing through slog.Default()
@@ -204,19 +257,37 @@ func run() error {
 		outbox.NewPgxEventPublisher(queries, deploymentID),
 	)
 
+	// Phase 6 — Notifications module. Wired first so the Identity service
+	// can take a non-nil Notify hook when NOTIFICATIONS_ENABLED=true.
+	notificationsSvc := notifications.NewService(notifications.Config{
+		Repo:         notifications.NewPgxRepository(queries, envAdapter, envAdapter, deploymentID),
+		Events:       outbox.NewPgxEventPublisher(queries, deploymentID),
+		DeploymentID: deploymentID,
+	})
+
+	var identityNotify identity.NotificationsHook
+	if envOr("NOTIFICATIONS_ENABLED", "false") == "true" {
+		identityNotify = &notificationsIdentityHook{svc: notificationsSvc}
+		slog.Info("identity password-reset / email-verify routed through notifications module")
+	} else {
+		slog.Info("identity password-reset / email-verify uses keycloak SMTP fallback (NOTIFICATIONS_ENABLED unset)")
+	}
+
 	identitySvc := identity.NewService(identity.Config{
 		Repo:         identity.NewPgxRepository(queries, envAdapter, envAdapter, deploymentID),
 		Provider:     newKeycloakProvider(),
 		Hasher:       identity.NewHMACEmailHasher(encClient),
 		Events:       outbox.NewPgxEventPublisher(queries, deploymentID),
+		Notify:       identityNotify,
 		DeploymentID: deploymentID,
 		Realm:        envOr("SAAS_KEYCLOAK_REALM", ""),
 		ClientID:     envOr("SAAS_KEYCLOAK_CLIENT_ID", ""),
 	})
 
 	srv := &strictServer{
-		tenancyHandler:  tenancy.NewHandler(tenantSvc),
-		identityHandler: identity.NewHandler(identitySvc),
+		tenancyHandler:       tenancy.NewHandler(tenantSvc),
+		identityHandler:      identity.NewHandler(identitySvc),
+		notificationsHandler: notifications.NewHandler(notificationsSvc),
 	}
 
 	// Outbox dispatcher: one goroutine per process. Phase 2 publisher is a
@@ -406,6 +477,24 @@ func newJWTVerifier(ctx context.Context) (*auth.JWTVerifier, error) {
 		return nil, nil
 	}
 	return auth.NewJWTVerifier(ctx, jwksURL, issuer, audience)
+}
+
+// notificationsIdentityHook adapts notifications.Service to the
+// identity.NotificationsHook interface. The adapter exists so Identity
+// (Phase 5) does not need to import the Notifications package directly,
+// keeping the modules dependency-decoupled and the test surface narrow.
+type notificationsIdentityHook struct {
+	svc *notifications.Service
+}
+
+func (h *notificationsIdentityHook) SendPasswordReset(ctx context.Context, tenantID, userID, resetURL string, ttlMinutes int) error {
+	_, err := h.svc.SendPasswordReset(ctx, tenantID, userID, resetURL, ttlMinutes)
+	return err
+}
+
+func (h *notificationsIdentityHook) SendEmailVerify(ctx context.Context, tenantID, userID, verifyURL string, ttlMinutes int) error {
+	_, err := h.svc.SendEmailVerify(ctx, tenantID, userID, verifyURL, ttlMinutes)
+	return err
 }
 
 // envDuration reads an env var as a duration ("250ms", "5s", "15m"). On parse

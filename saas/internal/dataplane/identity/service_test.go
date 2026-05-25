@@ -518,3 +518,116 @@ func TestService_Get_MissingContext_Unauthorized(t *testing.T) {
 		t.Errorf("expected ErrUnauthorized, got %v", err)
 	}
 }
+
+// --- notify-hook routing (Phase 6 integration) ------------------------------
+
+// fakeNotifyHook captures the last call to either TriggerPasswordReset or
+// TriggerEmailVerify so the §17.3 matrix can assert that the Notify hook
+// takes priority over the Keycloak SMTP fallback when set.
+type fakeNotifyHook struct {
+	calledReset  string
+	calledVerify string
+	err          error
+}
+
+func (f *fakeNotifyHook) SendPasswordReset(_ context.Context, _, userID, _ string, _ int) error {
+	f.calledReset = userID
+	return f.err
+}
+
+func (f *fakeNotifyHook) SendEmailVerify(_ context.Context, _, userID, _ string, _ int) error {
+	f.calledVerify = userID
+	return f.err
+}
+
+func newServiceWithNotify(t *testing.T, hook identity.NotificationsHook) (*identity.Service, *fakeProvider, *capturedEvents) {
+	t.Helper()
+	prov := newFakeProvider()
+	events := &capturedEvents{}
+	svc := identity.NewService(identity.Config{
+		Repo:         newFakeRepo(),
+		Provider:     prov,
+		Hasher:       identity.NewStaticEmailHasher(nil),
+		Events:       events,
+		Notify:       hook,
+		DeploymentID: "dep_test",
+		Realm:        "saas-data-test",
+		ClientID:     "saas-data-test",
+	})
+	return svc, prov, events
+}
+
+func TestService_TriggerPasswordReset_UsesNotifyHook(t *testing.T) {
+	hook := &fakeNotifyHook{}
+	svc, prov, events := newServiceWithNotify(t, hook)
+	ctx := withTenant(fixtureTenant)
+	u, err := svc.Create(ctx, fixtureTenant, "hook@example.com", "Hook", false, nil)
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if err := svc.TriggerPasswordReset(ctx, fixtureTenant, u.ID); err != nil {
+		t.Fatalf("TriggerPasswordReset: %v", err)
+	}
+	if hook.calledReset != u.ID {
+		t.Errorf("notify hook not called with user id: got %q", hook.calledReset)
+	}
+	// Keycloak SMTP fallback must NOT fire when the hook is wired.
+	if len(prov.passwordResets) != 0 {
+		t.Errorf("keycloak SMTP fallback fired despite notify hook: %v", prov.passwordResets)
+	}
+	if !events.has("user.password_reset_requested") {
+		t.Errorf("missing outbox event on notify path")
+	}
+}
+
+func TestService_TriggerPasswordReset_NotifyHook_Error_Wraps(t *testing.T) {
+	hook := &fakeNotifyHook{err: errors.New("novu down")}
+	svc, _, _ := newServiceWithNotify(t, hook)
+	ctx := withTenant(fixtureTenant)
+	u, err := svc.Create(ctx, fixtureTenant, "hook-err@example.com", "HookErr", false, nil)
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	gotErr := svc.TriggerPasswordReset(ctx, fixtureTenant, u.ID)
+	if !errors.Is(gotErr, identity.ErrProviderUnavailable) {
+		t.Errorf("expected ErrProviderUnavailable, got %v", gotErr)
+	}
+}
+
+func TestService_TriggerEmailVerify_UsesNotifyHook(t *testing.T) {
+	hook := &fakeNotifyHook{}
+	svc, prov, events := newServiceWithNotify(t, hook)
+	ctx := withTenant(fixtureTenant)
+	u, err := svc.Create(ctx, fixtureTenant, "verify-hook@example.com", "Ver", false, nil)
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	// Reset prov.emailVerifies; Create already triggered one VERIFY_EMAIL
+	// with sendVerificationEmail=false → expect length 0 before our call.
+	if err := svc.TriggerEmailVerify(ctx, fixtureTenant, u.ID); err != nil {
+		t.Fatalf("TriggerEmailVerify: %v", err)
+	}
+	if hook.calledVerify != u.ID {
+		t.Errorf("notify hook not called with user id: got %q", hook.calledVerify)
+	}
+	if len(prov.emailVerifies) != 0 {
+		t.Errorf("keycloak SMTP fallback fired despite notify hook: %v", prov.emailVerifies)
+	}
+	if !events.has("user.email_verify_requested") {
+		t.Errorf("missing outbox event on notify path")
+	}
+}
+
+func TestService_TriggerEmailVerify_NotifyHook_Error_Wraps(t *testing.T) {
+	hook := &fakeNotifyHook{err: errors.New("novu down")}
+	svc, _, _ := newServiceWithNotify(t, hook)
+	ctx := withTenant(fixtureTenant)
+	u, err := svc.Create(ctx, fixtureTenant, "ver-err@example.com", "VerErr", false, nil)
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	gotErr := svc.TriggerEmailVerify(ctx, fixtureTenant, u.ID)
+	if !errors.Is(gotErr, identity.ErrProviderUnavailable) {
+		t.Errorf("expected ErrProviderUnavailable, got %v", gotErr)
+	}
+}
