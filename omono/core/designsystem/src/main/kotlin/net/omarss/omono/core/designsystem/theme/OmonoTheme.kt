@@ -8,6 +8,7 @@ import androidx.compose.material3.Shapes
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 
@@ -33,11 +34,14 @@ fun OmonoTheme(
         darkTheme -> OmonoDarkColors
         else -> OmonoLightColors
     }
+    val semantic = if (darkTheme) OmonoSemanticDark else OmonoSemanticLight
 
-    MaterialTheme(
-        colorScheme = colors,
-        typography = OmonoTypography,
-        shapes = OmonoShapes,
-        content = content,
-    )
+    CompositionLocalProvider(LocalOmonoSemantic provides semantic) {
+        MaterialTheme(
+            colorScheme = colors,
+            typography = OmonoTypography,
+            shapes = OmonoShapes,
+            content = content,
+        )
+    }
 }

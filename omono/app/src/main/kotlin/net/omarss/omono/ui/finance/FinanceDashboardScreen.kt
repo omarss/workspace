@@ -61,6 +61,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import net.omarss.omono.core.designsystem.theme.OmonoTokens
 import net.omarss.omono.feature.spending.SpendingCategory
 import net.omarss.omono.feature.spending.Transaction
 import java.time.YearMonth
@@ -492,14 +493,14 @@ private fun SummaryCard(state: FinanceDashboardUiState) {
                 Text(
                     text = "+ SAR %,.0f refunded".format(state.monthRefundsSar),
                     style = MaterialTheme.typography.bodySmall,
-                    color = Color(0xFFA7F3D0), // emerald 200 — reads on indigo→violet gradient
+                    color = OmonoTokens.colors.incomeOnHero,
                 )
             }
 
             if (state.budgetSar > 0.0) {
                 Spacer(Modifier.height(6.dp))
                 val barColor = if (state.overBudget) {
-                    Color(0xFFF87171) // red 400 — reads on gradient
+                    OmonoTokens.colors.dangerOnHero
                 } else {
                     Color.White.copy(alpha = 0.9f)
                 }
@@ -533,7 +534,7 @@ private fun SummaryCard(state: FinanceDashboardUiState) {
 private fun OverBudgetPill(overBy: Double) {
     Row(
         modifier = Modifier
-            .background(Color(0xFFDC2626), RoundedCornerShape(50)) // red 600
+            .background(OmonoTokens.colors.danger, RoundedCornerShape(50))
             .padding(horizontal = 10.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -557,8 +558,8 @@ private fun TrendPill(
 ) {
     if (trend == SpendTrend.None || benchmark <= 0.0) return
     val bg = when (trend) {
-        SpendTrend.Below -> Color(0xFF10B981) // emerald 500
-        SpendTrend.Above -> Color(0xFFDC2626) // red 600
+        SpendTrend.Below -> OmonoTokens.colors.income
+        SpendTrend.Above -> OmonoTokens.colors.danger
         SpendTrend.None -> Color.Transparent
     }
     val arrow = if (trend == SpendTrend.Below) "▼" else "▲"
@@ -646,7 +647,7 @@ private fun CategoryBreakdownCard(
                             color = if (row.overBudget) {
                                 MaterialTheme.colorScheme.error
                             } else {
-                                Color(0xFF10B981) // emerald — distinct from the share bar
+                                OmonoTokens.colors.income
                             },
                             trackColor = MaterialTheme.colorScheme.surfaceVariant,
                         )
@@ -901,10 +902,9 @@ private fun directionGlyph(direction: TransferDirection): String = when (directi
 
 @Composable
 private fun directionTint(direction: TransferDirection): Color = when (direction) {
-    // Emerald for money in, matching the refund "+" tint elsewhere
-    // on the dashboard so "money came back" reads the same way
-    // across the screen.
-    TransferDirection.IN -> Color(0xFF10B981)
+    // Same income tint as refunds elsewhere on the dashboard so
+    // "money came back" reads identically across the screen.
+    TransferDirection.IN -> OmonoTokens.colors.income
     // Outgoing uses the card's onSecondaryContainer, so it blends
     // with the surrounding text and reads as the "default" case.
     TransferDirection.OUT -> MaterialTheme.colorScheme.onSecondaryContainer
@@ -995,7 +995,7 @@ private fun RecentTransactionsCard(
                         val amountColor = when (row.kind) {
                             Transaction.Kind.TRANSFER_OUT -> MaterialTheme.colorScheme.secondary
                             Transaction.Kind.REFUND,
-                            Transaction.Kind.TRANSFER_IN -> Color(0xFF10B981) // emerald — money in
+                            Transaction.Kind.TRANSFER_IN -> OmonoTokens.colors.income
                             else -> MaterialTheme.colorScheme.onSurface
                         }
                         val amountText = formatAmount(row.amountSar, row.originalAmount, row.originalCurrency)
@@ -1059,21 +1059,22 @@ private fun CategoryBadge(kind: Transaction.Kind, category: SpendingCategory?) {
     }
 }
 
+@Composable
 private fun iconFor(
     kind: Transaction.Kind,
     category: SpendingCategory?,
 ): Pair<androidx.compose.ui.graphics.vector.ImageVector, Color> {
     // Kind-specific overrides first — these read more meaningfully
-    // than the category for the cases they cover.
+    // than the category for the cases they cover. Tints pulled from
+    // the shared semantic palette so the "money in / out / cash /
+    // bill" colour story stays consistent across screens.
+    val semantic = OmonoTokens.colors
     when (kind) {
-        Transaction.Kind.TRANSFER_OUT -> return Icons.Filled.AccountBalance to Color(0xFF6366F1)
-        // Emerald matches the refund / incoming tint used elsewhere
-        // on the dashboard so "money came in" reads consistently
-        // whether it's a refund or an explicit credit transfer.
-        Transaction.Kind.TRANSFER_IN -> return Icons.AutoMirrored.Filled.ReceiptLong to Color(0xFF10B981)
-        Transaction.Kind.REFUND -> return Icons.AutoMirrored.Filled.ReceiptLong to Color(0xFF10B981)
-        Transaction.Kind.CASH_WITHDRAWAL -> return Icons.Filled.AccountBalance to Color(0xFF8B5CF6)
-        Transaction.Kind.GOVT_PAYMENT -> return Icons.Filled.Receipt to Color(0xFF64748B)
+        Transaction.Kind.TRANSFER_OUT -> return Icons.Filled.AccountBalance to semantic.transferOut
+        Transaction.Kind.TRANSFER_IN -> return Icons.AutoMirrored.Filled.ReceiptLong to semantic.income
+        Transaction.Kind.REFUND -> return Icons.AutoMirrored.Filled.ReceiptLong to semantic.income
+        Transaction.Kind.CASH_WITHDRAWAL -> return Icons.Filled.AccountBalance to semantic.cashWithdraw
+        Transaction.Kind.GOVT_PAYMENT -> return Icons.Filled.Receipt to semantic.billNeutral
         else -> Unit
     }
     return when (category) {
