@@ -37,30 +37,54 @@ from urllib.request import urlopen
 import websocket  # type: ignore
 
 
+def get_browser_version(devtools_url: str) -> dict:
+    return json.loads(urlopen(f"{devtools_url}/json/version", timeout=5).read())
+
+
 def find_or_open_x_page(devtools_url: str, timeout: float) -> dict:
-    """Return a Page target on x.com, creating one if none exists."""
+    """Return a page handle we can drive into x.com.
+
+    Strategy (in order):
+      1. /json/list → look for an existing x.com page; reuse it.
+      2. Otherwise pick any existing page (typically Chrome's initial
+         about:blank). The caller's first action is Page.navigate,
+         which is what actually pulls the cookies we want.
+      3. If there are no pages at all, open one via Target.createTarget
+         on the browser-wide CDP socket — modern Chrome retired the
+         HTTP-side /json/new endpoint that the previous version used.
+    """
     deadline = time.time() + timeout
+    page = None
     while time.time() < deadline:
         try:
-            targets = json.loads(urlopen(f"{devtools_url}/json/list", timeout=5).read())
-        except Exception as e:
-            time.sleep(0.5)
-            continue
-        for t in targets:
-            if t.get("type") == "page" and "x.com" in t.get("url", ""):
-                return t
-        # No x.com tab yet — ask DevTools to open one.
-        try:
-            new = json.loads(
-                urlopen(
-                    f"{devtools_url}/json/new?https://x.com/explore",
-                    timeout=5,
-                ).read()
+            targets = json.loads(
+                urlopen(f"{devtools_url}/json/list", timeout=5).read()
             )
-            return new
         except Exception:
             time.sleep(0.5)
-    raise SystemExit("no x.com page found in DevTools target list")
+            continue
+        pages = [t for t in targets if t.get("type") == "page"]
+        for t in pages:
+            if "x.com" in t.get("url", ""):
+                return t
+        if pages:
+            page = pages[0]
+            break
+        time.sleep(0.5)
+    if page is not None:
+        return page
+
+    # No pages at all: open one via the browser-wide CDP socket.
+    info = get_browser_version(devtools_url)
+    browser_ws = info["webSocketDebuggerUrl"]
+    bcdp = CDP(browser_ws)
+    result = bcdp.call("Target.createTarget", {"url": "about:blank"})
+    target_id = result.get("targetId", "")
+    targets = json.loads(urlopen(f"{devtools_url}/json/list", timeout=5).read())
+    for t in targets:
+        if t.get("id") == target_id:
+            return t
+    raise SystemExit("created new target but could not locate its page entry")
 
 
 class CDP:
