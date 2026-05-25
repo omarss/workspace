@@ -137,6 +137,52 @@ func TestScore_OffTopicPolitical(t *testing.T) {
 	}
 }
 
+func TestScore_AdultSoftPromo(t *testing.T) {
+	// Verbatim "Come to me" pattern observed in live feed.
+	got, _ := Score(Compute(
+		"مساج في مدينة جدة   مساج في مدينة الدمام   Come to me 24/24🦋 💃💃💃 https://t.co/x https://t.co/y",
+		time.Time{}, 0, 0, false,
+	))
+	if got < 0.7 {
+		t.Errorf("adult soft-promo expected >= 0.7, got %.3f", got)
+	}
+}
+
+func TestScore_OffRegionDubaiRental(t *testing.T) {
+	// Verbatim Dubai car-rental tagged-as-KSA pattern.
+	got, _ := Score(Compute(
+		"🚗 استأجر سيارة اقتصادية في دبي بأفضل الأسعار 💸 بدون وديعة ✅ بدون تأمين مخالفات ❌",
+		time.Time{}, 0, 0, false,
+	))
+	if got < 0.5 {
+		t.Errorf("off-region Dubai rental expected >= 0.5, got %.3f", got)
+	}
+}
+
+func TestScore_OffRegion_DubaiAloneNotSpam(t *testing.T) {
+	// "I'm thinking of visiting Dubai" should not trip the off-region
+	// blocklist — needs both a service AND a region phrase.
+	got, _ := Score(Compute(
+		"أفكر بزيارة دبي قريباً، هل لديكم توصيات؟",
+		time.Time{}, 0, 0, false,
+	))
+	if got >= 0.5 {
+		t.Errorf("mere Dubai mention must not fire off-region promo, got %.3f", got)
+	}
+}
+
+func TestScore_OffRegion_RentalInKsaNotSpam(t *testing.T) {
+	// Same service language but no off-region anchor — legitimate KSA
+	// rental query. Must not fire.
+	got, _ := Score(Compute(
+		"أبحث عن تأجير سيارة في الرياض لمدة أسبوع، أي توصيات؟",
+		time.Time{}, 0, 0, false,
+	))
+	if got >= 0.5 {
+		t.Errorf("KSA rental query must not fire off-region promo, got %.3f", got)
+	}
+}
+
 func TestScore_LegitimateContentNotFlagged(t *testing.T) {
 	// Spot-check: religious daily-life post should pass with a low score.
 	got, _ := Score(Compute(
