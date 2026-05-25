@@ -1,6 +1,7 @@
 package net.omarss.omono.ui.twitter
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -45,6 +46,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -259,8 +261,22 @@ private fun TweetList(
 
 @Composable
 private fun TweetCard(tweet: Tweet) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val xUrl = remember(tweet.handle, tweet.id) {
+        if (tweet.handle.isNotBlank() && tweet.id.isNotBlank()) {
+            "https://x.com/${tweet.handle}/status/${tweet.id}"
+        } else null
+    }
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            // Tapping anywhere on the card outside a link opens the
+            // post in the X app (or browser fallback). Lets the user
+            // jump to the original thread without hunting for a button.
+            .then(
+                if (xUrl != null) Modifier.clickable { openExternal(context, xUrl) }
+                else Modifier,
+            ),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
         ),
@@ -278,6 +294,7 @@ private fun TweetCard(tweet: Tweet) {
                         text = tweet.author.ifBlank { tweet.handle },
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.weight(1f, fill = false),
                     )
                     if (tweet.handle.isNotBlank()) {
                         Spacer(Modifier.width(6.dp))
@@ -287,22 +304,23 @@ private fun TweetCard(tweet: Tweet) {
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
+                    Spacer(Modifier.weight(1f))
+                    Text(
+                        text = formatRelativeTime(tweet.createdAtMillis),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
                 Spacer(Modifier.height(4.dp))
-                Text(
+                LinkifiedTweetText(
                     text = tweet.text,
-                    style = MaterialTheme.typography.bodyMedium,
+                    onClickLink = { url -> openExternal(context, url) },
                 )
                 Spacer(Modifier.height(6.dp))
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text(
-                        text = formatTime(tweet.createdAtMillis),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
                     val place = tweet.place?.takeIf { it.isNotBlank() }
                     if (place != null) {
                         Text(
@@ -312,18 +330,91 @@ private fun TweetCard(tweet: Tweet) {
                         )
                     }
                     EventBadges(tweet.eventCategories)
-                }
-                val stats = buildStatsLine(tweet)
-                if (stats.isNotEmpty()) {
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        text = stats,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                    Spacer(Modifier.weight(1f))
+                    val stats = buildStatsLine(tweet)
+                    if (stats.isNotEmpty()) {
+                        Text(
+                            text = stats,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
             }
         }
+    }
+}
+
+// LinkifiedTweetText renders the body text with embedded URLs styled
+// as tappable links. URLs map to ClickableText regions that fire the
+// onClickLink lambda — the caller launches an external intent. Falls
+// back to a plain Text when there are no URLs (no extra allocations).
+@Composable
+private fun LinkifiedTweetText(
+    text: String,
+    onClickLink: (String) -> Unit,
+) {
+    val matches = remember(text) { URL_REGEX.findAll(text).toList() }
+    if (matches.isEmpty()) {
+        Text(text = text, style = MaterialTheme.typography.bodyMedium)
+        return
+    }
+    val annotated = remember(text, matches) {
+        androidx.compose.ui.text.buildAnnotatedString {
+            var cursor = 0
+            for (m in matches) {
+                if (m.range.first > cursor) {
+                    append(text.substring(cursor, m.range.first))
+                }
+                pushStringAnnotation(tag = "URL", annotation = m.value)
+                withStyle(
+                    androidx.compose.ui.text.SpanStyle(
+                        color = androidx.compose.ui.graphics.Color(0xFF3B82F6),
+                        textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline,
+                    ),
+                ) {
+                    append(m.value)
+                }
+                pop()
+                cursor = m.range.last + 1
+            }
+            if (cursor < text.length) {
+                append(text.substring(cursor))
+            }
+        }
+    }
+    androidx.compose.foundation.text.ClickableText(
+        text = annotated,
+        style = MaterialTheme.typography.bodyMedium.copy(
+            color = MaterialTheme.colorScheme.onSurface,
+        ),
+        onClick = { offset ->
+            annotated
+                .getStringAnnotations(tag = "URL", start = offset, end = offset)
+                .firstOrNull()
+                ?.let { onClickLink(it.item) }
+        },
+    )
+}
+
+// Matches http/https URLs and bare t.co shortlinks (X sometimes
+// strips the protocol on its own shortlinks in the response we get).
+private val URL_REGEX = Regex("""https?://\S+|t\.co/\S+""")
+
+// openExternal launches a VIEW intent with FLAG_ACTIVITY_NEW_TASK so
+// the Chrome / X chooser handles its own task. Catches the silent
+// ActivityNotFoundException case (no browser at all) — extremely rare
+// on Android but worth not crashing on.
+private fun openExternal(context: android.content.Context, url: String) {
+    val cleaned = if (url.startsWith("http")) url else "https://$url"
+    val intent = android.content.Intent(
+        android.content.Intent.ACTION_VIEW,
+        android.net.Uri.parse(cleaned),
+    ).apply { addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK) }
+    try {
+        context.startActivity(intent)
+    } catch (_: android.content.ActivityNotFoundException) {
+        // No browser installed; silently swallow rather than crash.
     }
 }
 
@@ -529,5 +620,31 @@ private fun CenterMessage(title: String, body: String) {
     }
 }
 
-private val timeFormatter = SimpleDateFormat("EEE d MMM · HH:mm", Locale.getDefault())
-private fun formatTime(millis: Long): String = timeFormatter.format(Date(millis))
+// Relative time strings for the timeline. Anything older than ~6 days
+// falls through to an absolute date — by that point "1w ago" reads
+// less informatively than "26 May".
+private val absDateFormatter = SimpleDateFormat("d MMM", Locale.getDefault())
+private val absYearFormatter = SimpleDateFormat("d MMM yyyy", Locale.getDefault())
+
+internal fun formatRelativeTime(millis: Long, now: Long = System.currentTimeMillis()): String {
+    val delta = now - millis
+    val sec = delta / 1000
+    return when {
+        sec < 0 -> "just now"                        // clock skew safety net
+        sec < 45 -> "now"
+        sec < 60 * 60 -> "${(sec / 60).coerceAtLeast(1)}m ago"
+        sec < 24 * 60 * 60 -> "${sec / 3600}h ago"
+        sec < 2 * 24 * 60 * 60 -> "yesterday"
+        sec < 7 * 24 * 60 * 60 -> "${sec / 86400}d ago"
+        sameYear(millis, now) -> absDateFormatter.format(Date(millis))
+        else -> absYearFormatter.format(Date(millis))
+    }
+}
+
+private fun sameYear(a: Long, b: Long): Boolean {
+    val cal = java.util.Calendar.getInstance()
+    cal.timeInMillis = a
+    val ya = cal.get(java.util.Calendar.YEAR)
+    cal.timeInMillis = b
+    return ya == cal.get(java.util.Calendar.YEAR)
+}
