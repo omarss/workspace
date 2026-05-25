@@ -1,4 +1,4 @@
-.PHONY: k3s-config apply-k8s apply-obsidian apply-openclaw apply-network-policies apply-nginx apply-apps-host apply-tweets-host tweets-cookies-edit tweets-status tweets-restart apply-geofence geofence-status geofence-disable geofence-enable geofence-refresh apply-all
+.PHONY: k3s-config apply-k8s apply-obsidian apply-openclaw apply-network-policies apply-nginx apply-apps-host apply-tweets-host tweets-browser-login tweets-refresh tweets-cookies-edit tweets-status tweets-restart apply-geofence geofence-status geofence-disable geofence-enable geofence-refresh apply-all
 
 # Copy k3s server configs to /etc/rancher/k3s/
 k3s-config:
@@ -42,32 +42,55 @@ apply-nginx:
 apply-apps-host:
 	sudo bash scripts/setup-apps-host.sh
 
-# One-shot full setup for the tweets.omarss.net feed service:
-# builds tweetsd, installs binary + systemd unit, creates /srv/tweets
-# (700, holds X session cookies), installs the nginx vhost + snippet,
-# reloads nginx. Idempotent.
-#
-# Safe to re-run after pulling a new version of tweets/ — the build
-# step always rebuilds the binary and `systemctl restart` picks it up.
-#
-# After the first run: edit /srv/tweets/cookies.json with your X
-# auth_token + ct0, then `sudo systemctl restart tweets`.
-# Then re-run certbot: sudo certbot --nginx -d tweets.omarss.net
+# One-shot full setup for the tweets.omarss.net browser-hybrid scraper:
+# builds tweetsd, installs both systemd units (tweets + tweets-browser),
+# creates /srv/tweets (700, holds the X session cookies + browser profile),
+# sets up the python venv for the CDP refresher, installs the nginx vhost
+# + snippet, reloads nginx. Idempotent — safe to re-run after `git pull`.
 apply-tweets-host:
 	sudo bash scripts/setup-tweets-host.sh
 
-# Convenience wrappers for the tweets feed service.
+# ── tweets convenience wrappers ────────────────────────────────────────
+
+# ONE-TIME: open a HEADED Chrome with the systemd unit's profile so you
+# can log into x.com interactively. Closes the headless instance first,
+# launches headed, you log in, then we restart headless so it inherits
+# the saved session. Needs your graphical session env (Wayland/X).
+tweets-browser-login:
+	@echo "Stopping headless tweets-browser…"
+	@sudo systemctl stop tweets-browser.service
+	@rm -f /srv/tweets/browser-profile/SingletonLock \
+	       /srv/tweets/browser-profile/SingletonCookie \
+	       /srv/tweets/browser-profile/SingletonSocket 2>/dev/null || true
+	@echo "Launching headed Chrome — log into x.com, then close the window."
+	@google-chrome \
+	    --user-data-dir=/srv/tweets/browser-profile \
+	    --no-first-run --no-default-browser-check \
+	    --new-window https://x.com/login || true
+	@echo "Restarting headless tweets-browser…"
+	@sudo systemctl restart tweets-browser.service
+	@echo "Now run: make -C homelab tweets-refresh"
+
+# Trigger the CDP refresher to capture fresh cookies + search template.
+tweets-refresh:
+	sudo -u omar /srv/tweets/refresh-venv/bin/python /srv/tweets/refresh-template.py
+	sudo systemctl restart tweets.service
+
 tweets-cookies-edit:
 	sudo -e /srv/tweets/cookies.json
 
 tweets-status:
-	sudo systemctl status tweets.service --no-pager
+	@sudo systemctl --no-pager status tweets-browser.service | head -6 || true
+	@echo
+	@sudo systemctl --no-pager status tweets.service | head -6 || true
 	@echo
 	@curl -sS http://127.0.0.1:8088/healthz || echo "(local healthz unreachable)"
 
 tweets-restart:
+	sudo systemctl restart tweets-browser.service
+	sleep 2
 	sudo systemctl restart tweets.service
-	sudo systemctl status tweets.service --no-pager | head -8
+	@sudo systemctl --no-pager status tweets.service | head -6
 
 # Saudi Arabia geofence: blocks all incoming TCP from non-SA IPs except
 # tailscale, LAN, and tcp/80 (kept open for ACME). Pre-flights against

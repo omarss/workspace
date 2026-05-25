@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"sort"
 )
 
 // StoreReader is the subset of the SQLite store the HTTP handler needs.
@@ -47,7 +48,21 @@ func (c *CachedSource) Feed(ctx context.Context, country Country) ([]Tweet, erro
 		if errors.Is(fbErr, ErrUnknownCountry) {
 			return nil, ErrUnknownCountry
 		}
-		return fallback, nil
+		return sortFeed(fallback), nil
 	}
-	return tweets, nil
+	return sortFeed(tweets), nil
+}
+
+// sortFeed orders the result so the Feed tab emphasises events. Ties
+// break on created_at (newer first) which mirrors the chronological
+// product the scrape requested. Stable sort means same-score same-time
+// tweets keep their store-defined order.
+func sortFeed(in []Tweet) []Tweet {
+	sort.SliceStable(in, func(i, j int) bool {
+		if in[i].EventScore != in[j].EventScore {
+			return in[i].EventScore > in[j].EventScore
+		}
+		return in[i].CreatedAt.After(in[j].CreatedAt)
+	})
+	return in
 }

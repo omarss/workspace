@@ -23,6 +23,14 @@ const (
 // Clients receive only tweets below the service's drop threshold, so a
 // non-zero value here just means "passed the filter but isn't squeaky
 // clean" — useful for de-emphasising borderline content in the UI.
+//
+// EventScore + EventCategories drive the "events and registration"
+// emphasis: the feed is sorted event-score descending so concerts,
+// festivals, workshops, ticket releases etc. float above generic
+// location-tagged chatter. EventCategories names the matched event
+// vocabulary buckets (ticket / concert / festival / workshop / talk /
+// sports / opening / venue / schedule) so the UI can render a small
+// badge per row.
 type Tweet struct {
 	ID         string    `json:"id"`
 	Author     string    `json:"author"`           // display name
@@ -36,6 +44,8 @@ type Tweet struct {
 	LikeCount  int       `json:"like_count"`
 	RetweetCount int     `json:"retweet_count"`
 	SpamScore  float64   `json:"spam_score"`
+	EventScore float64   `json:"event_score"`
+	EventCategories []string `json:"event_categories,omitempty"`
 }
 
 // FeedResponse is the envelope for GET /tweets. Keeping the list under a
