@@ -17,7 +17,7 @@ from __future__ import annotations
 import logging
 import random
 from dataclasses import dataclass
-from typing import Any, Final
+from typing import Any, Final, cast
 
 import httpx
 from tenacity import (
@@ -92,10 +92,14 @@ class HttpClient:
             # curl_cffi import is lazy because the binary wheel adds ~10 MB
             # to the image; only loaded when an actually-impersonating
             # crawler is instantiated.
-            from curl_cffi.requests import AsyncSession  # type: ignore[import-untyped]
+            from curl_cffi.requests import AsyncSession
 
+            # curl_cffi types `impersonate` as a closed Literal of browser
+            # profile names; our field is `str | None` because crawlers
+            # set it dynamically (env var / DB). Runtime validation lives
+            # inside curl_cffi — cast to silence the Literal check.
             self._cffi_session = AsyncSession(
-                impersonate=impersonate,
+                impersonate=cast(Any, impersonate),
                 timeout=rate.timeout_seconds,
                 max_clients=rate.max_concurrent * 2,
             )
@@ -311,7 +315,7 @@ class HttpClient:
         )
         if self._cffi_session is not None:
             try:
-                from curl_cffi.requests.errors import RequestsError  # type: ignore[import-untyped]
+                from curl_cffi.requests.errors import RequestsError
 
                 retry_types = (*retry_types, RequestsError)
             except ImportError:

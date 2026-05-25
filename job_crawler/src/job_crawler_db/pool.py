@@ -8,7 +8,7 @@ state (statement timeout, trigram thresholds, search path).
 from __future__ import annotations
 
 import logging
-from typing import Final
+from typing import Any, Final
 
 import psycopg
 from psycopg.rows import dict_row
@@ -19,7 +19,7 @@ from .settings import Settings
 _LOG: Final = logging.getLogger(__name__)
 
 
-async def _configure_session(conn: psycopg.AsyncConnection[dict[str, object]]) -> None:
+async def _configure_session(conn: psycopg.AsyncConnection[Any]) -> None:
     """Apply per-session state every connection inherits.
 
     Runs once when psycopg checks a connection out of the pool for the first
@@ -28,11 +28,11 @@ async def _configure_session(conn: psycopg.AsyncConnection[dict[str, object]]) -
     """
     # Make every row a dict by default. Repos that want typed rows override
     # via `cur.row_factory = class_row(SomeClass)` per-cursor — cheap.
-    conn.row_factory = dict_row  # type: ignore[assignment]
+    conn.row_factory = dict_row
 
 
 async def _on_checkout(
-    conn: psycopg.AsyncConnection[dict[str, object]],
+    conn: psycopg.AsyncConnection[Any],
     *,
     statement_timeout_ms: int,
     trgm_similarity: float,
@@ -72,7 +72,7 @@ def build_pool(settings: Settings) -> AsyncConnectionPool:
     sim = settings.trgm_similarity_threshold
     wsim = settings.trgm_word_similarity_threshold
 
-    async def _check(conn: psycopg.AsyncConnection[dict[str, object]]) -> None:
+    async def _check(conn: psycopg.AsyncConnection[Any]) -> None:
         await _on_checkout(
             conn,
             statement_timeout_ms=sti,

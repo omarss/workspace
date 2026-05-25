@@ -166,6 +166,12 @@ _UNIT_MAP: Final[dict[str, SalaryPeriod]] = {
 
 
 def _parse(node: dict[str, Any]) -> JobPostingLD:
+    # Pre-compute the salary + location sub-dicts then explode them
+    # field-by-field. `**dict` unpacking confuses mypy when the source
+    # dict has a wider value type than the target dataclass fields —
+    # listing the assignments keeps strict mode happy.
+    salary = _salary(node.get("baseSalary"))
+    loc = _location(node.get("jobLocation"))
     return JobPostingLD(
         title=_str(node.get("title")),
         description=_html_to_text(_str(node.get("description"))),
@@ -173,10 +179,15 @@ def _parse(node: dict[str, Any]) -> JobPostingLD:
         valid_through=_iso(node.get("validThrough")),
         employment_type=_employment(node.get("employmentType")),
         min_experience_years=_experience_years(node.get("experienceRequirements")),
-        **_salary(node.get("baseSalary")),
+        salary_min=salary.get("salary_min"),
+        salary_max=salary.get("salary_max"),
+        salary_currency=salary.get("salary_currency"),
+        salary_period=salary.get("salary_period"),
         company_name=_company_name(node.get("hiringOrganization")),
         company_url=_company_url(node.get("hiringOrganization")),
-        **_location(node.get("jobLocation")),
+        city=loc.get("city"),
+        region=loc.get("region"),
+        country=loc.get("country"),
     )
 
 
@@ -271,7 +282,7 @@ def _company_url(value: Any) -> str | None:
 
 
 def _location(value: Any) -> dict[str, str | None]:
-    out = {"city": None, "region": None, "country": None}
+    out: dict[str, str | None] = {"city": None, "region": None, "country": None}
     if isinstance(value, list) and value:
         value = value[0]
     if not isinstance(value, dict):

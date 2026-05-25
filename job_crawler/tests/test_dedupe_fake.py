@@ -9,6 +9,7 @@ from job_crawler_db import (
     DuplicateReason,
     FakeSignalKind,
     JobCrawlerDB,
+    JobPosting,
     JobPostingUpsert,
     detect_ai_generation,
 )
@@ -18,7 +19,10 @@ pytestmark = pytest.mark.integration
 
 async def _upsert(
     db: JobCrawlerDB, source_slug: str, ext_id: str, *, title: str, description: str
-) -> JobPostingUpsert:
+) -> JobPosting:
+    # postings.upsert returns the persisted JobPosting (with an `id`),
+    # not the JobPostingUpsert payload. Annotated correctly so callers
+    # accessing `.id` typecheck.
     src = await db.sources.get(slug=source_slug)
     assert src is not None
     return await db.postings.upsert(

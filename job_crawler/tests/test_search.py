@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from decimal import Decimal
+from uuid import UUID
 
 import pytest
 
@@ -173,7 +174,7 @@ async def test_search_filters_by_required_skills(seeded_reference: JobCrawlerDB)
     db = seeded_reference
     ids = await _seed_jobs(db)
     python = await db.skills.create(slug="python", name_en="Python", kind=SkillKind.tool)
-    await db.jobs.link_skill(ids["python"], python.id)
+    await db.jobs.link_skill(UUID(ids["python"]), python.id)
 
     hits = await db.search.find_jobs(required_skill_ids=[python.id])
     assert hits and all(str(h.job.id) == ids["python"] for h in hits)

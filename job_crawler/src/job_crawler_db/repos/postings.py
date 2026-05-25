@@ -65,9 +65,13 @@ class PostingsRepo(Repo):
         # Run insert + snapshot inside one transaction so a snapshot is never
         # written without its parent's update committing. The pool sets the
         # connection-default row factory to `dict_row` (so SELECTs return
-        # mappings); cursors below use that.
+        # mappings); pass it explicitly to the cursor so mypy types
+        # `existing` / `row` as `dict[str, Any] | None` instead of the
+        # default `tuple` shape.
+        from psycopg.rows import dict_row
+
         async with self._pool.connection() as conn, conn.transaction():
-            async with conn.cursor() as cur:
+            async with conn.cursor(row_factory=dict_row) as cur:
                 # Try plain insert first; capture pre-existing row for diff.
                 await cur.execute(
                     """
@@ -241,8 +245,10 @@ class PostingsRepo(Repo):
                 )
 
     async def detach_from_cluster(self, posting_id: UUID) -> None:
+        from psycopg.rows import dict_row
+
         async with self._pool.connection() as conn, conn.transaction():
-            async with conn.cursor() as cur:
+            async with conn.cursor(row_factory=dict_row) as cur:
                 await cur.execute(
                     """
                         UPDATE job_postings SET cluster_job_id = NULL

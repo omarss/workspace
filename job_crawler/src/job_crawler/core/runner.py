@@ -327,7 +327,9 @@ class CrawlerRunner:
         return posting.id, was_new
 
 
-# Keep the imports alive for downstream code-completion.
-_ = SourceKind
-_ = datetime
-_ = timezone
+# Keep the imports alive for downstream code-completion. Each goes
+# under a distinct `_KEEP_*` name so mypy doesn't try to unify the
+# types under a single bare `_`.
+_KEEP_SOURCE_KIND = SourceKind
+_KEEP_DATETIME = datetime
+_KEEP_TIMEZONE = timezone

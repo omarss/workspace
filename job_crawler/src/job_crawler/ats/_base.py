@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import os
 from collections.abc import Iterable
+from typing import ClassVar
 
 from ..core.base import BaseCrawler
 from ..core.db_boards import db_boards_for, merge_board_lists
@@ -41,13 +42,16 @@ class ATSBoardCrawler(BaseCrawler):
     back on if needed.
     """
 
-    respect_robots = False
+    # All four are intentionally class-level — `ClassVar` keeps mypy
+    # from treating subclass `ClassVar` redeclarations as overrides
+    # of instance variables (Finding 2).
+    respect_robots: ClassVar[bool] = False
     # ATS boards return jobs for *all* their tenants' locations. We only
     # care about GCC roles, so the runner drops the rest.
-    requires_gcc_location = True
+    requires_gcc_location: ClassVar[bool] = True
     # Subclasses set `boards_env_var` to the env var name they read.
-    boards_env_var: str = ""
-    default_boards: tuple[str, ...] = ()
+    boards_env_var: ClassVar[str] = ""
+    default_boards: ClassVar[tuple[str, ...]] = ()
 
     async def boards(self) -> tuple[str, ...]:
         """Return the merged board-slug list.

@@ -163,7 +163,9 @@ class ProxyPool:
             if not pool:
                 return None
             urls, weights = zip(*pool, strict=False)
-            chosen = random.choices(urls, weights=weights, k=1)[0]
+            # `random.choices` is typed as returning `Any` in stubs.
+            # `urls` is `tuple[str, ...]`, so the picked element is a str.
+            chosen: str = random.choices(urls, weights=weights, k=1)[0]
             self._proxies[chosen].last_used_at = time.time()
             return chosen
 

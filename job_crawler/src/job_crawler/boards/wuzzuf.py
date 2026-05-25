@@ -106,7 +106,10 @@ class WuzzufCrawler(BoardCrawler):
                 break
 
     def _search_url(self, *, page: int, query: str) -> str:
-        params = {
+        # `urlencode` accepts heterogeneous values (str | int) — declare
+        # the dict as such so the `params["start"] = int` below
+        # typechecks. Defaults to str-only otherwise.
+        params: dict[str, str | int] = {
             "filters[country][0]": "Saudi Arabia",
             "filters[date_post][0]": "last_30_days",
         }
