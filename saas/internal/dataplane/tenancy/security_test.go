@@ -153,6 +153,68 @@ func (s *strictSrv) GetNotification(ctx context.Context, r httpapi.GetNotificati
 	return s.notifications.GetNotification(ctx, r)
 }
 
+// Organizations delegation — Phase 7 stubs so the §17.3 tenancy matrix
+// continues to compile against the post-Phase-7 StrictServerInterface.
+// Each stub returns nil so the test, which only exercises tenancy
+// endpoints, never invokes them. A future tenancy-vs-orgs cross-matrix
+// will replace these with a real organizations.Handler wiring.
+
+func (s *strictSrv) ListOrganizations(_ context.Context, _ httpapi.ListOrganizationsRequestObject) (httpapi.ListOrganizationsResponseObject, error) {
+	return nil, nil //nolint:nilnil // unused in tenancy matrix
+}
+
+func (s *strictSrv) CreateOrganization(_ context.Context, _ httpapi.CreateOrganizationRequestObject) (httpapi.CreateOrganizationResponseObject, error) {
+	return nil, nil //nolint:nilnil
+}
+
+func (s *strictSrv) GetOrganization(_ context.Context, _ httpapi.GetOrganizationRequestObject) (httpapi.GetOrganizationResponseObject, error) {
+	return nil, nil //nolint:nilnil
+}
+
+func (s *strictSrv) UpdateOrganization(_ context.Context, _ httpapi.UpdateOrganizationRequestObject) (httpapi.UpdateOrganizationResponseObject, error) {
+	return nil, nil //nolint:nilnil
+}
+
+func (s *strictSrv) DeleteOrganization(_ context.Context, _ httpapi.DeleteOrganizationRequestObject) (httpapi.DeleteOrganizationResponseObject, error) {
+	return nil, nil //nolint:nilnil
+}
+
+func (s *strictSrv) ListMembers(_ context.Context, _ httpapi.ListMembersRequestObject) (httpapi.ListMembersResponseObject, error) {
+	return nil, nil //nolint:nilnil
+}
+
+func (s *strictSrv) GetMember(_ context.Context, _ httpapi.GetMemberRequestObject) (httpapi.GetMemberResponseObject, error) {
+	return nil, nil //nolint:nilnil
+}
+
+func (s *strictSrv) UpdateMember(_ context.Context, _ httpapi.UpdateMemberRequestObject) (httpapi.UpdateMemberResponseObject, error) {
+	return nil, nil //nolint:nilnil
+}
+
+func (s *strictSrv) RemoveMember(_ context.Context, _ httpapi.RemoveMemberRequestObject) (httpapi.RemoveMemberResponseObject, error) {
+	return nil, nil //nolint:nilnil
+}
+
+func (s *strictSrv) ListInvitations(_ context.Context, _ httpapi.ListInvitationsRequestObject) (httpapi.ListInvitationsResponseObject, error) {
+	return nil, nil //nolint:nilnil
+}
+
+func (s *strictSrv) CreateInvitation(_ context.Context, _ httpapi.CreateInvitationRequestObject) (httpapi.CreateInvitationResponseObject, error) {
+	return nil, nil //nolint:nilnil
+}
+
+func (s *strictSrv) GetInvitation(_ context.Context, _ httpapi.GetInvitationRequestObject) (httpapi.GetInvitationResponseObject, error) {
+	return nil, nil //nolint:nilnil
+}
+
+func (s *strictSrv) RevokeInvitation(_ context.Context, _ httpapi.RevokeInvitationRequestObject) (httpapi.RevokeInvitationResponseObject, error) {
+	return nil, nil //nolint:nilnil
+}
+
+func (s *strictSrv) AcceptInvitation(_ context.Context, _ httpapi.AcceptInvitationRequestObject) (httpapi.AcceptInvitationResponseObject, error) {
+	return nil, nil //nolint:nilnil
+}
+
 // noopIdentityProvider satisfies identity.IdentityProvider without doing any
 // work. Used to fulfil the strict interface in the tenancy security suite —
 // every method either returns "" / nil or an error that surfaces as a 5xx
