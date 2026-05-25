@@ -31,6 +31,9 @@ func main() {
 		deploymentCmd(),
 		domainCmd(),
 	)
+	// `saasctl debug ...` is only registered in non-prod builds. See
+	// debug_register.go vs debug_register_prod.go.
+	registerDebug(root)
 	if err := root.Execute(); err != nil {
 		os.Exit(1)
 	}
