@@ -149,17 +149,21 @@ class CompanyCareersCrawler(BoardCrawler):
         limit = int(os.environ.get("JC_COMPANY_CAREERS_LIMIT", "200"))
 
         companies = await self._companies_to_probe(limit)
-        _LOG.info("company_careers: probing %d companies", len(companies))
+        seeded = sum(1 for c in companies if c[3] == "seed")
+        _LOG.info(
+            "company_careers: %d companies (%d seeded, %d homepage-probe)",
+            len(companies), seeded, len(companies) - seeded,
+        )
 
-        for company_id, name_en, website in companies:
-            base_url = self._normalize_homepage(website)
-            if not base_url:
-                continue
+        for company_id, name_en, candidate_urls, kind in companies:
+            _LOG.debug(
+                "company_careers: %s [%s] %d candidate URL(s)",
+                name_en or company_id, kind, len(candidate_urls),
+            )
             yielded = 0
             landing_html = ""
             landing_url = ""
-            for path in _CANDIDATE_PATHS:
-                target = urljoin(base_url + "/", path.lstrip("/"))
+            for target in candidate_urls:
                 # Use `networkidle` because most enterprise careers pages
                 # are SPAs that XHR their listings after first paint. The
                 # 12s budget is the practical max — anything longer makes
@@ -184,7 +188,7 @@ class CompanyCareersCrawler(BoardCrawler):
                 if postings:
                     _LOG.info(
                         "company_careers: %s → %d JSON-LD postings via %s",
-                        name_en or company_id, len(postings), path,
+                        name_en or company_id, len(postings), target,
                     )
                     for ld in postings:
                         listing = self._listing_from_ld(
@@ -351,20 +355,47 @@ class CompanyCareersCrawler(BoardCrawler):
     # ------------------------------------------------------------------
     async def _companies_to_probe(
         self, limit: int,
-    ) -> list[tuple[str, str, str]]:
-        """Return (id, name_en, website) for companies whose careers page
-        we haven't successfully crawled before.
+    ) -> list[tuple[str, str, list[str], str]]:
+        """Return `(id, name, candidate_urls, kind)` for the crawl target set.
 
-        Selection rules:
-          * `website` populated.
-          * No row in `company_source_profiles` (we'd have an ATS path otherwise).
-          * Order by name for stability — easy to resume after a kill.
+        Two-tier selection (each tier capped by `limit` independently —
+        a seeded company never bumps a probe company out of the run):
+
+        * `kind="seed"` — companies with a `company_careers`
+          `company_source_profiles` row. The seed CSV's `careers_url`
+          column lands here via `discover/manual_seed.py::load`. We use
+          the seeded URLs verbatim (no `/careers` guessing) and the
+          Playwright fetcher hits them directly.
+        * `kind="probe"` — companies with `website` populated but no
+          source profile of any kind. Falls back to the
+          `/careers`-style probe of `_CANDIDATE_PATHS`.
+
+        Why the split? Pre-fix, the probe skipped any company with a
+        source_profile — which would have made the seed CSV's careers
+        URLs invisible. Now the seed wins.
         """
         if self.db is None:
             return []
         async with self.db.pool.connection() as conn, conn.cursor(
             row_factory=dict_row,
         ) as cur:
+            await cur.execute(
+                """
+                SELECT c.id::text AS id, c.name_en,
+                       array_agg(csp.profile_url ORDER BY csp.profile_url) AS urls
+                FROM   companies c
+                JOIN   company_source_profiles csp ON csp.company_id = c.id
+                JOIN   sources s ON s.id = csp.source_id
+                WHERE  s.slug = 'company_careers'
+                  AND  c.deleted_at IS NULL
+                GROUP  BY c.id, c.name_en
+                ORDER  BY c.name_en
+                LIMIT  %s
+                """,
+                (limit,),
+            )
+            seeded_rows = await cur.fetchall()
+
             await cur.execute(
                 """
                 SELECT c.id::text AS id, c.name_en, c.website
@@ -380,8 +411,20 @@ class CompanyCareersCrawler(BoardCrawler):
                 """,
                 (limit,),
             )
-            rows = await cur.fetchall()
-        return [(r["id"], r["name_en"] or "", r["website"]) for r in rows]
+            probe_rows = await cur.fetchall()
+
+        out: list[tuple[str, str, list[str], str]] = []
+        for r in seeded_rows:
+            urls = [u for u in (r["urls"] or []) if u]
+            if urls:
+                out.append((r["id"], r["name_en"] or "", urls, "seed"))
+        for r in probe_rows:
+            base_url = self._normalize_homepage(r["website"])
+            if not base_url:
+                continue
+            urls = [urljoin(base_url + "/", p.lstrip("/")) for p in _CANDIDATE_PATHS]
+            out.append((r["id"], r["name_en"] or "", urls, "probe"))
+        return out
 
     def _extract_job_links_dom(self, html: str, base_url: str) -> set[str]:
         """Walk anchor tags and keep those whose final URL looks like an
