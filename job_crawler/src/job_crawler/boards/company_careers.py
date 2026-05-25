@@ -46,6 +46,7 @@ from job_crawler_db import (
 
 from ..core.config import IDENTIFIABLE_UA, RateConfig
 from ..core.jsonld import JobPostingLD, extract_job_postings
+from ..core.normalise import coerce_country_code
 from ..core.types import (
     ApplicationChannelRaw,
     Listing,
@@ -342,7 +343,11 @@ class CompanyCareersCrawler(BoardCrawler):
             min_experience_years=ld.min_experience_years,
             raw_location=raw_location,
             city_name_hint=ld.city,
-            country_code=(ld.country or "").lower()[:2] or "sa",
+            # JSON-LD `addressCountry` is wildly inconsistent — "United
+            # States" naively truncated yields "un", which trips the FK
+            # on job_postings.country_code. coerce_country_code keeps
+            # only known-seeded codes and falls back to 'sa' otherwise.
+            country_code=coerce_country_code(ld.country, default="sa"),
             salary_min=ld.salary_min,
             salary_max=ld.salary_max,
             salary_currency=ld.salary_currency,
