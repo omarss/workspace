@@ -279,3 +279,39 @@ def test_to_upsert_keeps_seeded_country_from_location_resolution() -> None:
         location=LocationResolution(country_code="ae"),
     )
     assert upsert.country_code == "ae"
+
+
+# ---------------------------------------------------------------------------
+# Bayt._search_url: keyword must be ASCII-safe in BOTH the request URL
+# and the page-1 Referer header (HTTP/1.1 headers are latin-1).
+# Live regression: Arabic queries like "مهندس" (engineer) failed on
+# page > 1 because the legacy `f"keywords={query.replace(' ', '+')}"`
+# left raw UTF-8 in the URL, and httpx tried to latin-1-encode it
+# when setting the Referer.
+# ---------------------------------------------------------------------------
+def test_bayt_search_url_percent_encodes_arabic_query() -> None:
+    from job_crawler.boards.bayt import BaytCrawler
+
+    crawler = BaytCrawler.__new__(BaytCrawler)
+    crawler.http = None  # type: ignore[assignment]
+    crawler.db = None
+
+    url = crawler._search_url(page=2, query="مهندس")
+    # 1. URL must be latin-1 / ASCII encodable — header layer requires it.
+    url.encode("latin-1")  # raises UnicodeEncodeError on regression
+    # 2. Query is percent-encoded, not raw UTF-8.
+    assert "مهندس" not in url
+    assert "keywords=%" in url
+
+
+def test_bayt_search_url_preserves_space_as_plus_for_multi_word_query() -> None:
+    from job_crawler.boards.bayt import BaytCrawler
+
+    crawler = BaytCrawler.__new__(BaytCrawler)
+    crawler.http = None  # type: ignore[assignment]
+    crawler.db = None
+
+    url = crawler._search_url(page=1, query="موارد بشرية")
+    url.encode("latin-1")  # latin-1 safe
+    # The space-as-`+` convention Bayt uses must survive percent-encoding.
+    assert "+" in url.split("keywords=", 1)[1].split("&", 1)[0]
