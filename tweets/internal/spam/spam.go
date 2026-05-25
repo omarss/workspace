@@ -46,6 +46,19 @@ type Features struct {
 	// via combined "rent / car / Dubai" keywords; the cross-field
 	// place-vs-text check is left to the future.
 	BlocklistOffRegionPromo bool
+	// Commercial advertisements — product / service / course /
+	// educational promo. Distinct from BlocklistLocalBizAd (which
+	// targets repetitive Saudi-phone-anchored classifieds) in that
+	// it catches WhatsApp / product-page / price-statement /
+	// course-registration shapes. Triggered by any of several strong
+	// commercial signals; see matchCommercialAd() for the full set.
+	BlocklistCommercialAd bool
+	// Bare-URL bot posts: a single t.co / https link with essentially
+	// no body text (< 10 chars after stripping URLs). These are
+	// usually image / video cross-posts that carry no information
+	// once the link target is dead, plus a chunk of low-effort
+	// engagement-farming bot traffic.
+	BlocklistBareUrl bool
 }
 
 // Score returns a value in [0, 1]. Higher = more spam-like. The mapping
@@ -151,6 +164,19 @@ func Score(f Features) (float64, map[string]float64) {
 	if f.BlocklistOffRegionPromo {
 		add(contrib, "off_region_promo", 0.55)
 	}
+	// Strong enough to drop on its own — every match site is a
+	// deliberate ad signal (price statement, product URL, WhatsApp +
+	// CTA, course-with-payment, etc.).
+	if f.BlocklistCommercialAd {
+		add(contrib, "commercial_ad", 0.55)
+	}
+	// Bare-URL posts are mostly low-effort cross-posts; weight them
+	// just below threshold so a single other signal (link spam,
+	// emoji spam, etc.) pushes them over. Avoids dropping every
+	// short-comment-plus-link tweet outright.
+	if f.BlocklistBareUrl {
+		add(contrib, "bare_url", 0.4)
+	}
 
 	// Sum the components, clamp.
 	total := 0.0
@@ -193,6 +219,8 @@ func Compute(text string, createdAccount time.Time, followers, following int, du
 		BlocklistLocalBizAd:     matchLocalBizAd(text),
 		BlocklistOffTopicPol:    matchOffTopicPolitical(text),
 		BlocklistOffRegionPromo: matchOffRegionPromo(text),
+		BlocklistCommercialAd:   matchCommercialAd(text),
+		BlocklistBareUrl:        matchBareUrl(text),
 	}
 }
 
@@ -380,6 +408,150 @@ var offRegionPlaceKeywords = []string{
 	"in abu dhabi",
 }
 
+// ── Commercial ads ─────────────────────────────────────────────────
+//
+// Catches paid promotion regardless of subject — product ads, course
+// signups, "buy/order/register now" pitches, WhatsApp-anchored sales
+// flows. The signal is the *commercial intent* (price + call-to-action,
+// product-page URL, contact-funnel) rather than the subject; that's
+// why "educational" promos (paid courses, bootcamps, certifications)
+// land here too — same shape, same ad.
+//
+// A single match fires the blocklist. Each pattern is narrow enough
+// that the false-positive case (a non-promotional tweet using the
+// same exact phrasing) is rare. The pattern set:
+//
+//   1. Saudi phone number + WhatsApp link.
+//   2. Phone number + an explicit CTA verb.
+//   3. Explicit price-inclusive phrasing ("السعر شامل", etc.).
+//   4. Product-page URL shape (`/p\d{7,}` in the path — used by
+//      Salla, Zid, JollyChic, Shein, etc.).
+//   5. WhatsApp-business shortlink (wa.me / api.whatsapp.com/send).
+//   6. Course / certificate signup phrasing.
+//   7. "Now available" + a price digit.
+
+var saudiPhoneAdRe = regexp.MustCompile(`(?:\+?9665\d{8}|\b05\d{8}\b)`)
+var productUrlRe = regexp.MustCompile(`/p\d{7,}\b`)
+var pricePhraseRe = regexp.MustCompile(`\d+\s*(?:ريال|sar|ر\.س|aed|درهم|ج\.م|جنيه)`)
+
+func matchCommercialAd(text string) bool {
+	low := strings.ToLower(text)
+	hasPhone := saudiPhoneAdRe.MatchString(text)
+	// Accept the Arabic word "واتساب" / "الواتساب" too — beauty-clinic
+	// and similar ads write "تواصل عبر الواتساب" instead of dropping
+	// the wa.me URL. The phrase paired with a phone or CTA is the same
+	// commercial funnel shape regardless of whether the URL appears.
+	hasWhatsApp := strings.Contains(low, "wa.me") ||
+		strings.Contains(low, "whatsapp.com/send") ||
+		strings.Contains(low, "api.whatsapp.com") ||
+		strings.Contains(text, "واتساب")
+	hasProductUrl := productUrlRe.MatchString(text)
+	hasPrice := pricePhraseRe.MatchString(low)
+
+	if hasPhone && hasWhatsApp {
+		return true
+	}
+	if hasProductUrl {
+		return true
+	}
+	// WhatsApp is itself a commercial-funnel signal, so any CTA (even
+	// the soft "contact" verb) is enough alongside it.
+	if hasWhatsApp && (containsAny(low, commercialCtaKeywords) ||
+		containsAny(low, contactCtaKeywords)) {
+		return true
+	}
+	// Phone alone is NOT enough — many legit "call us at X for
+	// inquiries" messages mention تواصل. Require a strictly commercial
+	// CTA (buy / order / book / subscribe) so customer-service phone
+	// announcements don't trip the rule.
+	if hasPhone && containsAny(low, commercialCtaKeywords) {
+		return true
+	}
+	if containsAny(low, strongAdPhrases) {
+		return true
+	}
+	if containsAny(low, courseAdPhrases) {
+		return true
+	}
+	// Price phrase is commercial on its own when paired with any CTA
+	// (including the softer "contact" verb — a price + "contact us"
+	// is the textbook ad shape).
+	if hasPrice && (containsAny(low, commercialCtaKeywords) ||
+		containsAny(low, contactCtaKeywords)) {
+		return true
+	}
+	return false
+}
+
+func containsAny(text string, needles []string) bool {
+	for _, n := range needles {
+		if strings.Contains(text, n) {
+			return true
+		}
+	}
+	return false
+}
+
+// commercialCtaKeywords are unambiguously purchase-intent verbs:
+// buy / order / book / subscribe. Pairing any of these with a phone
+// number, a price, or a WhatsApp link is enough to call the post an ad.
+var commercialCtaKeywords = []string{
+	"اشتري", "اشتروا", "للشراء",
+	"اطلب", "اطلبوا",
+	"احجز", "احجزوا", "احجزي", "للحجز",
+	"اشترك", "اشتركوا",
+	"buy now", "order now", "shop now",
+	"book now", "subscribe", "sign up",
+}
+
+// contactCtaKeywords are the softer "contact us" verb family. تواصل
+// is heavily used in legitimate customer-service announcements
+// ("المتجر مغلق اليوم، يمكنكم التواصل على 055…"), so we DON'T treat
+// phone-plus-contact as an ad — only when paired with a stronger
+// commercial signal (WhatsApp link, explicit price phrase).
+var contactCtaKeywords = []string{
+	"تواصل", "تواصلوا", "للتواصل",
+}
+
+var strongAdPhrases = []string{
+	"متوفر الآن", "متوفر الان",
+	"السعر شامل", "السعر يشمل", "شامل الضريبة",
+	"للحجز عبر", "للطلب عبر", "للتواصل واتساب",
+	"للطلب واتساب", "للحجز واتساب",
+	"خصم خاص", "خصم لفترة محدودة",
+	"limited time offer",
+}
+
+var courseAdPhrases = []string{
+	"احصل على شهادة", "احصلي على شهادة",
+	"اشترك بدورة", "اشترك بالدورة", "اشتركوا بالدورة",
+	"دورة تدريبية معتمدة",
+	"بوت كامب",
+	"شهادة معتمدة",
+	"online course", "bootcamp",
+	"certified course",
+	"masterclass",
+	"enroll now",
+}
+
+// ── Bare-URL bots ──────────────────────────────────────────────────
+//
+// Identifies low-effort posts that consist of a URL plus essentially no
+// other content — typical bot media reposts, X-CDN'd image dumps,
+// engagement-farming. Threshold of 10 runes leaves room for a leading
+// emoji or two-word caption while catching the bare https://t.co/… case.
+
+var anyUrlRe = regexp.MustCompile(`https?://\S+|t\.co/\S+`)
+
+func matchBareUrl(text string) bool {
+	if !strings.Contains(text, "http") && !strings.Contains(text, "t.co/") {
+		return false
+	}
+	stripped := anyUrlRe.ReplaceAllString(text, "")
+	stripped = strings.TrimSpace(stripped)
+	return len([]rune(stripped)) < 10
+}
+
 func add(m map[string]float64, key string, v float64) {
 	m[key] += v
 }
@@ -398,8 +570,20 @@ func countLinks(text string) int {
 	// Cheap heuristic — covers http(s) and bare t.co shortlinks the
 	// scraper hasn't unwrapped. Misses email addresses (intentional).
 	count := strings.Count(text, "http://") + strings.Count(text, "https://")
-	// t.co bare links happen when the scrape returns a stripped body.
-	count += strings.Count(text, "t.co/")
+	// Bare t.co/ shortlinks (scraper returned a stripped body). Skip
+	// occurrences that are part of a full `https://t.co/...` URL we
+	// already counted — otherwise a single shortlink gets counted twice.
+	for i := 0; i < len(text); {
+		rel := strings.Index(text[i:], "t.co/")
+		if rel < 0 {
+			break
+		}
+		at := i + rel
+		if at < 3 || text[at-3:at] != "://" {
+			count++
+		}
+		i = at + len("t.co/")
+	}
 	return count
 }
 
