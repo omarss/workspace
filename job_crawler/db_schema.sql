@@ -347,35 +347,43 @@ CREATE TABLE countries (
 COMMENT ON TABLE countries IS
     'ISO-3166-1 countries. Lowercase alpha-2 PKs so they appear cleanly in URLs.';
 
--- Saudi Arabia's 13 administrative regions (mintaqah).
--- Modelled separately from a generic "regions" table to make the SA-first
--- query path trivial; other countries can be added later as their own tables
--- or merged into a generic regions table without affecting existing rows.
-CREATE TABLE sa_regions (
-    code        text        PRIMARY KEY,            -- e.g. 'riyadh', 'makkah'
-    name_en     text        NOT NULL,
-    name_ar     text        NOT NULL,
-    country_code char(2)    NOT NULL DEFAULT 'sa' REFERENCES countries(code),
-    CONSTRAINT sa_regions_country_chk CHECK (country_code = 'sa')
+-- Administrative regions / first-level subdivisions, keyed per country.
+-- Saudi Arabia's 13 mintaqah live here under country_code='sa'; UAE
+-- emirates under 'ae'; etc. Stable text codes (e.g. 'riyadh', 'dubai')
+-- appear in URLs + filters, so they are part of the composite PK along
+-- with the country.
+CREATE TABLE regions (
+    country_code char(2)    NOT NULL REFERENCES countries(code),
+    code         text       NOT NULL,
+    name_en      text       NOT NULL,
+    name_ar      text       NOT NULL,
+    PRIMARY KEY (country_code, code)
 );
-COMMENT ON TABLE sa_regions IS
-    'The 13 Saudi administrative regions. Used as the coarse location filter.';
+COMMENT ON TABLE regions IS
+    'First-level administrative subdivisions per country (mintaqah / emirate / governorate).';
 
-CREATE TABLE sa_cities (
+-- Cities live under (country_code, region_code). The composite FK keeps
+-- a Dubai city under the UAE Dubai emirate and a Riyadh city under the
+-- Saudi Riyadh region — there is no way to accidentally attach a UAE
+-- city to a Saudi region.
+CREATE TABLE cities (
     id           uuid       PRIMARY KEY DEFAULT uuidv7(),
-    region_code  text       NOT NULL REFERENCES sa_regions(code),
+    country_code char(2)    NOT NULL,
+    region_code  text       NOT NULL,
     name_en      text       NOT NULL,
     name_ar      text       NOT NULL,
     -- ISO 6709 lat/lon, optional, for distance queries
     latitude     numeric(9,6),
     longitude    numeric(9,6),
-    UNIQUE (region_code, name_en),
-    UNIQUE (region_code, name_ar)
+    FOREIGN KEY (country_code, region_code) REFERENCES regions(country_code, code),
+    UNIQUE (country_code, region_code, name_en),
+    UNIQUE (country_code, region_code, name_ar)
 );
-CREATE INDEX sa_cities_name_en_trgm ON sa_cities USING gin (normalize_en(name_en) gin_trgm_ops);
-CREATE INDEX sa_cities_name_ar_trgm ON sa_cities USING gin (normalize_ar(name_ar) gin_trgm_ops);
-COMMENT ON TABLE sa_cities IS
-    'Saudi cities. Trigram indexes enable fuzzy matching of crawled location strings.';
+CREATE INDEX cities_name_en_trgm   ON cities USING gin (normalize_en(name_en) gin_trgm_ops);
+CREATE INDEX cities_name_ar_trgm   ON cities USING gin (normalize_ar(name_ar) gin_trgm_ops);
+CREATE INDEX cities_country_region ON cities (country_code, region_code);
+COMMENT ON TABLE cities IS
+    'Cities scoped by (country_code, region_code). Trigram indexes enable fuzzy matching of crawled location strings.';
 
 
 -- ----------------------------------------------------------------------------
@@ -453,7 +461,7 @@ CREATE TABLE companies (
     linkedin_url        text          UNIQUE,
     logo_url            text,
     industry_code       text          REFERENCES industries(code),
-    headquarters_city_id uuid         REFERENCES sa_cities(id),
+    headquarters_city_id uuid         REFERENCES cities(id),
     country_code        char(2)       NOT NULL DEFAULT 'sa' REFERENCES countries(code),
     -- Approximate employee count; ranges from source pages are normalized to midpoint.
     employee_count      integer       CHECK (employee_count IS NULL OR employee_count >= 0),
@@ -693,9 +701,12 @@ CREATE TABLE jobs (
     -- For jobs that recruit into multiple offices, the primary city goes here
     -- and every office goes into `job_locations` (see below). This duplication
     -- is intentional: keeps the common "filter by city" query fast.
-    city_id             uuid              REFERENCES sa_cities(id),
-    region_code         text              REFERENCES sa_regions(code),
+    -- `country_code` + `region_code` form a composite FK to `regions`; either
+    -- both populated together or both NULL (MATCH SIMPLE).
+    city_id             uuid              REFERENCES cities(id),
+    region_code         text,
     country_code        char(2)           NOT NULL DEFAULT 'sa' REFERENCES countries(code),
+    FOREIGN KEY (country_code, region_code) REFERENCES regions(country_code, code),
     -- Street-level office address as printed on the source (canonical).
     office_address      text,
     -- Lat / lon of the canonical office, for map pinning.
@@ -843,7 +854,10 @@ CREATE TABLE job_postings (
     work_arrangement         work_arrangement,
     experience_level         experience_level,
     raw_location             text,                    -- "Riyadh, KSA · Hybrid" verbatim
-    city_id                  uuid          REFERENCES sa_cities(id),
+    city_id                  uuid          REFERENCES cities(id),
+    region_code              text,
+    country_code             char(2)       NOT NULL DEFAULT 'sa' REFERENCES countries(code),
+    FOREIGN KEY (country_code, region_code) REFERENCES regions(country_code, code),
     office_address           text,                    -- as printed, sometimes ATS-only data
     hybrid_days_per_week     smallint      CHECK (hybrid_days_per_week IS NULL
                                                   OR hybrid_days_per_week BETWEEN 0 AND 7),
@@ -965,9 +979,10 @@ COMMENT ON TABLE application_channels IS
 CREATE TABLE job_locations (
     id              uuid          PRIMARY KEY DEFAULT uuidv7(),
     job_id          uuid          NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
-    city_id         uuid          REFERENCES sa_cities(id),
-    region_code     text          REFERENCES sa_regions(code),
+    city_id         uuid          REFERENCES cities(id),
+    region_code     text,
     country_code    char(2)       NOT NULL DEFAULT 'sa' REFERENCES countries(code),
+    FOREIGN KEY (country_code, region_code) REFERENCES regions(country_code, code),
     office_address  text,
     latitude        numeric(9,6),
     longitude       numeric(9,6),

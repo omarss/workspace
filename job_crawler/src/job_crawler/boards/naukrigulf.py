@@ -172,7 +172,7 @@ class NaukrigulfCrawler(BoardCrawler):
         return to_upsert(
             parsed,
             source_id=__import__("uuid").UUID(int=0),
-            company_id=None, recruiter_id=None, city_id=None,
+            company_id=None, recruiter_id=None, location=None,
         )
 
 

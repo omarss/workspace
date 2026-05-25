@@ -30,13 +30,20 @@ async def _ensure_reference(db: JobCrawlerDB) -> None:
 
     Safe to call on every load — every method here is an UPSERT.
     """
-    await db.reference.upsert_country(
-        code="sa",
-        name_en="Saudi Arabia",
-        name_ar="المملكة العربية السعودية",
-        dial_code="+966",
-        currency="SAR",
-    )
+    # SA + GCC neighbours. GCC entries exist so a Bayt/LinkedIn posting from
+    # Dubai/Doha/Manama/etc. resolves into the right country instead of being
+    # mis-stored as country_code='sa'.
+    for cc, en, ar, dial, curr in (
+        ("sa", "Saudi Arabia",         "المملكة العربية السعودية", "+966", "SAR"),
+        ("ae", "United Arab Emirates", "الإمارات العربية المتحدة", "+971", "AED"),
+        ("bh", "Bahrain",              "البحرين",                  "+973", "BHD"),
+        ("kw", "Kuwait",               "الكويت",                   "+965", "KWD"),
+        ("om", "Oman",                 "عمان",                     "+968", "OMR"),
+        ("qa", "Qatar",                "قطر",                      "+974", "QAR"),
+    ):
+        await db.reference.upsert_country(
+            code=cc, name_en=en, name_ar=ar, dial_code=dial, currency=curr,
+        )
     # Industry list — must cover every code referenced by the seed CSV.
     for code, en, ar in (
         ("tech_software", "Software", "البرمجيات"),
@@ -74,96 +81,119 @@ async def _ensure_reference(db: JobCrawlerDB) -> None:
         ("petrochemicals","Petrochemicals", "البتروكيماويات"),
     ):
         await db.reference.upsert_industry(code=code, name_en=en, name_ar=ar)
-    for code, name_en, name_ar in (
-        ("riyadh", "Riyadh", "الرياض"),
-        ("makkah", "Makkah", "مكة المكرمة"),
-        ("eastern", "Eastern", "الشرقية"),
-        ("madinah", "Madinah", "المدينة المنورة"),
-        ("asir", "Asir", "عسير"),
-        ("qassim", "Qassim", "القصيم"),
-        ("hail", "Hail", "حائل"),
-        ("tabuk", "Tabuk", "تبوك"),
+    # Regions, grouped by country. Each country also gets a synthetic catch-all
+    # region (`<cc>_other`) used by cities we know belong to the country but
+    # have no specific admin region modelled yet.
+    _SA_REGIONS = (
+        ("riyadh",           "Riyadh",           "الرياض"),
+        ("makkah",           "Makkah",           "مكة المكرمة"),
+        ("eastern",          "Eastern",          "الشرقية"),
+        ("madinah",          "Madinah",          "المدينة المنورة"),
+        ("asir",             "Asir",             "عسير"),
+        ("qassim",           "Qassim",           "القصيم"),
+        ("hail",             "Hail",             "حائل"),
+        ("tabuk",            "Tabuk",            "تبوك"),
         ("northern_borders", "Northern Borders", "الحدود الشمالية"),
-        ("jazan", "Jazan", "جازان"),
-        ("najran", "Najran", "نجران"),
-        ("al_bahah", "Al Bahah", "الباحة"),
-        ("al_jouf", "Al Jouf", "الجوف"),
-    ):
-        await db.geo.upsert_region(code=code, name_en=name_en, name_ar=name_ar)
-    # Comprehensive SA + GCC city seed. Cities outside Saudi Arabia are
-    # tagged to the closest SA region as a placeholder — `region_code` FK
-    # demands SOMETHING and we'd rather have the city resolvable than
-    # leave it unknown. Country resolution still happens via raw_location.
-    for region_code, name_en, name_ar, lat, lon in (
-        # Saudi Arabia — Riyadh region
-        ("riyadh", "Riyadh", "الرياض", 24.7136, 46.6753),
-        ("riyadh", "Al Kharj", "الخرج", 24.1554, 47.3346),
-        ("riyadh", "Diriyah", "الدرعية", 24.7376, 46.5747),
-        ("riyadh", "Al Majma'ah", "المجمعة", 25.9006, 45.3603),
-        # Saudi Arabia — Makkah region
-        ("makkah", "Jeddah", "جدة", 21.4858, 39.1925),
-        ("makkah", "Makkah", "مكة", 21.3891, 39.8579),
-        ("makkah", "Taif", "الطائف", 21.2703, 40.4158),
-        ("makkah", "Rabigh", "رابغ", 22.7986, 39.0349),
-        ("makkah", "Al Jamoum", "الجموم", 21.6225, 39.7044),
-        # Saudi Arabia — Eastern Province
-        ("eastern", "Dammam", "الدمام", 26.4207, 50.0888),
-        ("eastern", "Khobar", "الخبر", 26.2172, 50.1971),
-        ("eastern", "Dhahran", "الظهران", 26.2361, 50.0393),
-        ("eastern", "Jubail", "الجبيل", 27.0046, 49.6586),
-        ("eastern", "Hofuf (Al Hasa)", "الهفوف", 25.3795, 49.5867),
-        ("eastern", "Qatif", "القطيف", 26.5650, 50.0123),
-        ("eastern", "Ras Tanura", "رأس تنورة", 26.7126, 50.1632),
-        ("eastern", "Abqaiq", "بقيق", 25.9347, 49.6711),
-        # Saudi Arabia — Madinah region
-        ("madinah", "Madinah", "المدينة", 24.5247, 39.5692),
-        ("madinah", "Yanbu", "ينبع", 24.0220, 38.0599),
-        # Saudi Arabia — Asir region
-        ("asir", "Abha", "أبها", 18.2164, 42.5053),
-        ("asir", "Khamis Mushait", "خميس مشيط", 18.3000, 42.7333),
-        ("asir", "Bisha", "بيشة", 20.0000, 42.6000),
-        # Saudi Arabia — Qassim region
-        ("qassim", "Buraydah", "بريدة", 26.3260, 43.9750),
-        ("qassim", "Unaizah", "عنيزة", 26.0840, 43.9942),
-        # Saudi Arabia — Hail region
-        ("hail", "Hail", "حائل", 27.5114, 41.6900),
-        # Saudi Arabia — Tabuk region
-        ("tabuk", "Tabuk", "تبوك", 28.3838, 36.5550),
-        ("tabuk", "NEOM", "نيوم", 28.0000, 35.0000),
-        ("tabuk", "AlUla", "العلا", 26.6087, 37.9229),
-        # Saudi Arabia — Northern Borders region
-        ("northern_borders", "Arar", "عرعر", 30.9758, 41.0381),
-        # Saudi Arabia — Jazan region
-        ("jazan", "Jazan", "جازان", 16.8892, 42.5611),
-        # Saudi Arabia — Najran region
-        ("najran", "Najran", "نجران", 17.4924, 44.1277),
-        # Saudi Arabia — Al Bahah region
-        ("al_bahah", "Al Bahah", "الباحة", 20.0129, 41.4677),
-        # Saudi Arabia — Al Jouf region
-        ("al_jouf", "Sakaka", "سكاكا", 29.9697, 40.2064),
-        # UAE — tagged to Eastern region as nearest neighbour
-        ("eastern", "Dubai", "دبي", 25.2048, 55.2708),
-        ("eastern", "Abu Dhabi", "أبوظبي", 24.4539, 54.3773),
-        ("eastern", "Sharjah", "الشارقة", 25.3463, 55.4209),
-        ("eastern", "Ajman", "عجمان", 25.4052, 55.5136),
-        ("eastern", "Ras Al Khaimah", "رأس الخيمة", 25.7895, 55.9432),
-        ("eastern", "Fujairah", "الفجيرة", 25.1288, 56.3265),
-        ("eastern", "Umm Al Quwain", "أم القيوين", 25.5567, 55.5567),
-        ("eastern", "Al Ain", "العين", 24.2074, 55.7447),
-        # Bahrain
-        ("eastern", "Manama", "المنامة", 26.2235, 50.5876),
-        ("eastern", "Riffa", "الرفاع", 26.1300, 50.5550),
-        # Kuwait
-        ("eastern", "Kuwait City", "مدينة الكويت", 29.3759, 47.9774),
-        # Qatar
-        ("eastern", "Doha", "الدوحة", 25.2854, 51.5310),
-        ("eastern", "Al Rayyan", "الريان", 25.2919, 51.4244),
-        # Oman
-        ("eastern", "Muscat", "مسقط", 23.5880, 58.3829),
-        ("eastern", "Salalah", "صلالة", 17.0151, 54.0924),
-        ("eastern", "Sohar", "صحار", 24.3473, 56.7468),
-    ):
+        ("jazan",            "Jazan",            "جازان"),
+        ("najran",           "Najran",           "نجران"),
+        ("al_bahah",         "Al Bahah",         "الباحة"),
+        ("al_jouf",          "Al Jouf",          "الجوف"),
+    )
+    # GCC admin regions kept coarse — one emirate / governorate per major city.
+    # Each is keyed by its real first-level admin code so the composite FK
+    # (country_code, region_code) on jobs/postings stays meaningful.
+    _GCC_REGIONS: tuple[tuple[str, str, str, str], ...] = (
+        ("ae", "abu_dhabi",      "Abu Dhabi",      "أبوظبي"),
+        ("ae", "dubai",          "Dubai",          "دبي"),
+        ("ae", "sharjah",        "Sharjah",        "الشارقة"),
+        ("ae", "ajman",          "Ajman",          "عجمان"),
+        ("ae", "ras_al_khaimah", "Ras Al Khaimah", "رأس الخيمة"),
+        ("ae", "fujairah",       "Fujairah",       "الفجيرة"),
+        ("ae", "umm_al_quwain",  "Umm Al Quwain",  "أم القيوين"),
+        ("bh", "capital",        "Capital",        "العاصمة"),
+        ("kw", "capital",        "Capital",        "العاصمة"),
+        ("om", "muscat",         "Muscat",         "مسقط"),
+        ("om", "dhofar",         "Dhofar",         "ظفار"),
+        ("om", "al_batinah_north", "Al Batinah North", "شمال الباطنة"),
+        ("qa", "doha",           "Doha",           "الدوحة"),
+        ("qa", "al_rayyan",      "Al Rayyan",      "الريان"),
+    )
+    for code, name_en, name_ar in _SA_REGIONS:
+        await db.geo.upsert_region(
+            code=code, name_en=name_en, name_ar=name_ar, country_code="sa",
+        )
+    for cc, code, name_en, name_ar in _GCC_REGIONS:
+        await db.geo.upsert_region(
+            code=code, name_en=name_en, name_ar=name_ar, country_code=cc,
+        )
+
+    # Cities — grouped by (country, region). The composite FK on `cities`
+    # makes it impossible to attach a UAE city under a SA region, so the
+    # historical "tag GCC under SA Eastern" workaround is gone.
+    _CITIES: tuple[tuple[str, str, str, str, float, float], ...] = (
+        # ----- Saudi Arabia ----------------------------------------------
+        ("sa", "riyadh",  "Riyadh",          "الرياض",     24.7136, 46.6753),
+        ("sa", "riyadh",  "Al Kharj",        "الخرج",      24.1554, 47.3346),
+        ("sa", "riyadh",  "Diriyah",         "الدرعية",    24.7376, 46.5747),
+        ("sa", "riyadh",  "Al Majma'ah",     "المجمعة",    25.9006, 45.3603),
+        ("sa", "makkah",  "Jeddah",          "جدة",        21.4858, 39.1925),
+        ("sa", "makkah",  "Makkah",          "مكة",        21.3891, 39.8579),
+        ("sa", "makkah",  "Taif",            "الطائف",     21.2703, 40.4158),
+        ("sa", "makkah",  "Rabigh",          "رابغ",       22.7986, 39.0349),
+        ("sa", "makkah",  "Al Jamoum",       "الجموم",     21.6225, 39.7044),
+        ("sa", "eastern", "Dammam",          "الدمام",     26.4207, 50.0888),
+        ("sa", "eastern", "Khobar",          "الخبر",      26.2172, 50.1971),
+        ("sa", "eastern", "Dhahran",         "الظهران",    26.2361, 50.0393),
+        ("sa", "eastern", "Jubail",          "الجبيل",     27.0046, 49.6586),
+        ("sa", "eastern", "Hofuf (Al Hasa)", "الهفوف",     25.3795, 49.5867),
+        ("sa", "eastern", "Qatif",           "القطيف",     26.5650, 50.0123),
+        ("sa", "eastern", "Ras Tanura",      "رأس تنورة",  26.7126, 50.1632),
+        ("sa", "eastern", "Abqaiq",          "بقيق",       25.9347, 49.6711),
+        # Real SA industrial city — previously fuzz-matched to UAE's
+        # "Ras Al Khaimah" because the SA row didn't exist.
+        ("sa", "eastern", "Ras Al Khair",    "رأس الخير",  27.5167, 49.2333),
+        ("sa", "eastern", "Khafji",          "الخفجي",     28.4317, 48.4904),
+        ("sa", "madinah", "Madinah",         "المدينة",    24.5247, 39.5692),
+        ("sa", "madinah", "Yanbu",           "ينبع",       24.0220, 38.0599),
+        ("sa", "asir",    "Abha",            "أبها",       18.2164, 42.5053),
+        ("sa", "asir",    "Khamis Mushait",  "خميس مشيط",  18.3000, 42.7333),
+        ("sa", "asir",    "Bisha",           "بيشة",       20.0000, 42.6000),
+        ("sa", "qassim",  "Buraydah",        "بريدة",      26.3260, 43.9750),
+        ("sa", "qassim",  "Unaizah",         "عنيزة",      26.0840, 43.9942),
+        ("sa", "hail",    "Hail",            "حائل",       27.5114, 41.6900),
+        ("sa", "tabuk",   "Tabuk",           "تبوك",       28.3838, 36.5550),
+        ("sa", "tabuk",   "NEOM",            "نيوم",       28.0000, 35.0000),
+        ("sa", "tabuk",   "AlUla",           "العلا",      26.6087, 37.9229),
+        ("sa", "northern_borders", "Arar",   "عرعر",       30.9758, 41.0381),
+        ("sa", "jazan",   "Jazan",           "جازان",      16.8892, 42.5611),
+        ("sa", "najran",  "Najran",          "نجران",      17.4924, 44.1277),
+        ("sa", "al_bahah","Al Bahah",        "الباحة",     20.0129, 41.4677),
+        ("sa", "al_jouf", "Sakaka",          "سكاكا",      29.9697, 40.2064),
+        # ----- UAE -------------------------------------------------------
+        ("ae", "dubai",          "Dubai",          "دبي",        25.2048, 55.2708),
+        ("ae", "abu_dhabi",      "Abu Dhabi",      "أبوظبي",     24.4539, 54.3773),
+        ("ae", "abu_dhabi",      "Al Ain",         "العين",      24.2074, 55.7447),
+        ("ae", "sharjah",        "Sharjah",        "الشارقة",    25.3463, 55.4209),
+        ("ae", "ajman",          "Ajman",          "عجمان",      25.4052, 55.5136),
+        ("ae", "ras_al_khaimah", "Ras Al Khaimah", "رأس الخيمة", 25.7895, 55.9432),
+        ("ae", "fujairah",       "Fujairah",       "الفجيرة",    25.1288, 56.3265),
+        ("ae", "umm_al_quwain",  "Umm Al Quwain",  "أم القيوين", 25.5567, 55.5567),
+        # ----- Bahrain ---------------------------------------------------
+        ("bh", "capital",        "Manama",         "المنامة",    26.2235, 50.5876),
+        ("bh", "capital",        "Riffa",          "الرفاع",     26.1300, 50.5550),
+        # ----- Kuwait ----------------------------------------------------
+        ("kw", "capital",        "Kuwait City",    "مدينة الكويت", 29.3759, 47.9774),
+        # ----- Qatar -----------------------------------------------------
+        ("qa", "doha",           "Doha",           "الدوحة",     25.2854, 51.5310),
+        ("qa", "al_rayyan",      "Al Rayyan",      "الريان",     25.2919, 51.4244),
+        # ----- Oman ------------------------------------------------------
+        ("om", "muscat",            "Muscat",      "مسقط",       23.5880, 58.3829),
+        ("om", "dhofar",            "Salalah",     "صلالة",      17.0151, 54.0924),
+        ("om", "al_batinah_north",  "Sohar",       "صحار",       24.3473, 56.7468),
+    )
+    for cc, region_code, name_en, name_ar, lat, lon in _CITIES:
         await db.geo.upsert_city(
+            country_code=cc,
             region_code=region_code,
             name_en=name_en,
             name_ar=name_ar,
