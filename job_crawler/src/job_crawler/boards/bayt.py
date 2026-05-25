@@ -94,23 +94,41 @@ class BaytCrawler(BoardCrawler):
     # keep the legacy single-query behaviour.
     _DEFAULT_QUERIES: ClassVar[tuple[str, ...]] = (
         "",                  # bare listing (most recent across SA)
-        "software engineer",
-        "data",
-        "sales",
-        "marketing",
-        "finance",
-        "accounting",
-        "human resources",
-        "operations",
-        "customer service",
-        "nurse",
-        "doctor",
-        "logistics",
-        "supply chain",
-        "project manager",
-        "مهندس",            # Arabic: "engineer"
-        "محاسب",             # Arabic: "accountant"
-        "مبيعات",             # Arabic: "sales"
+        # Tech / engineering
+        "software engineer", "data", "data scientist", "data engineer",
+        "devops", "cloud", "security", "machine learning",
+        "frontend", "backend", "mobile", "qa", "product manager",
+        "ux", "designer", "engineering manager",
+        # Business / ops
+        "sales", "business development", "marketing", "digital marketing",
+        "content", "social media", "finance", "accounting", "auditor",
+        "controller", "treasury", "investment", "banking",
+        "human resources", "talent acquisition", "operations",
+        "supply chain", "logistics", "procurement", "warehouse",
+        "customer service", "call center", "administrative", "executive assistant",
+        "project manager", "construction", "civil engineer", "mechanical engineer",
+        "electrical engineer", "architect", "interior designer",
+        # Healthcare
+        "nurse", "doctor", "pharmacist", "lab technician", "medical",
+        "dentist", "physiotherapist", "radiology",
+        # Hospitality / retail
+        "chef", "barista", "waiter", "hotel", "front office",
+        "store manager", "merchandiser",
+        # Legal / compliance / education
+        "lawyer", "legal", "compliance", "teacher", "professor", "trainer",
+        # Arabic variants — Bayt indexes them separately
+        "مهندس",            # engineer
+        "محاسب",             # accountant
+        "مبيعات",             # sales
+        "تسويق",              # marketing
+        "موارد بشرية",        # HR
+        "مدير مشروع",         # project manager
+        "ممرض",              # nurse
+        "طبيب",              # doctor
+        "خدمة العملاء",       # customer service
+        "سائق",              # driver
+        "حارس",              # security
+        "مصمم",              # designer
     )
 
     # ------------------------------------------------------------------

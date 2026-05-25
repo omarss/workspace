@@ -37,7 +37,10 @@ _LOG: Final = logging.getLogger("job_crawler.company_sites.ats_detector")
 # Per-source rate-limit cool-off (epoch seconds). When a probe hits 429,
 # the caller skips that source for `_COOLOFF_S` seconds within this run.
 _RATE_LIMITED_UNTIL: dict[str, float] = {}
-_COOLOFF_S: Final[float] = 600.0  # 10 minutes
+_COOLOFF_S: Final[float] = 3600.0  # 60 minutes — Workable's account-wide
+                                   # 429 lasts hours, not minutes; the
+                                   # earlier 10-min value just guaranteed
+                                   # we'd re-trip it on every wake-up.
 
 
 def _is_rate_limited(source_slug: str) -> bool:
