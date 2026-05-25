@@ -132,6 +132,12 @@ db-restore:  ## pg_restore from FILE=backups/...  (DROPS existing schema!)
 		PGPASSWORD=$$JC_DB_PASSWORD pg_restore -U job_crawler -h 127.0.0.1 -d job_crawler \
 			--clean --if-exists --no-owner --no-acl --exit-on-error "$(FILE)"
 
+db-clear:  ## Dry-run: print rows that would be wiped (postings/clusters/runs). Add CONFIRM=1 to execute.
+	@bash scripts/db_clear.sh crawl $(if $(CONFIRM),--confirm,)
+
+db-clear-all:  ## Dry-run: print rows for FULL wipe (also companies+recruiters). Add CONFIRM=1 to execute.
+	@bash scripts/db_clear.sh all $(if $(CONFIRM),--confirm,)
+
 db-allow-k3s:  ## Append a pg_hba entry letting the 10.42.0.0/16 pod CIDR connect (NEEDS SUDO)
 	@# `omar` is a superuser on the local socket via peer auth, so no sudo
 	@# needed to ask for the hba_file path.
