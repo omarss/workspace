@@ -348,16 +348,6 @@ class CompanyCareersCrawler(BoardCrawler):
             missing_fields=missing_fields,
             raw_payload={"source": "company_careers", "ld": ld_dict},
         )
-
-    def normalize(self, parsed: ParsedPosting):  # type: ignore[override]
-        from ..core.normalise import to_upsert
-
-        return to_upsert(
-            parsed,
-            source_id=__import__("uuid").UUID(int=0),
-            company_id=None, recruiter_id=None, location=None,
-        )
-
     # ------------------------------------------------------------------
     async def _companies_to_probe(
         self, limit: int,

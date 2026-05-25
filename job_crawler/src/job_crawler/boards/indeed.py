@@ -186,16 +186,6 @@ class IndeedCrawler(BoardCrawler):
             missing_fields=missing_fields,
             raw_payload={"source": "indeed"},
         )
-
-    def normalize(self, parsed: ParsedPosting):  # type: ignore[override]
-        from ..core.normalise import to_upsert
-
-        return to_upsert(
-            parsed,
-            source_id=__import__("uuid").UUID(int=0),
-            company_id=None, recruiter_id=None, location=None,
-        )
-
     # ------------------------------------------------------------------
     def _search_url(self, *, query: str, location: str, page: int) -> str:
         params: dict[str, str] = {"l": location, "fromage": "30"}

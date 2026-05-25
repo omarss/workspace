@@ -218,17 +218,6 @@ class WorkdayCrawler(ATSBoardCrawler):
             missing_fields=missing_fields,
             raw_payload={"source": "workday", "job": info},
         )
-
-    def normalize(self, parsed: ParsedPosting):  # type: ignore[override]
-        from ..core.normalise import to_upsert
-
-        return to_upsert(
-            parsed,
-            source_id=__import__("uuid").UUID(int=0),
-            company_id=None, recruiter_id=None, location=None,
-        )
-
-
 # ---- helpers --------------------------------------------------------------
 def _parse_tenants(raw: str) -> tuple[_Tenant, ...]:
     """Parse a CSV like 'accenture:Accenture_Careers:wd5,pepsico:PepsiCo:wd5'."""

@@ -165,17 +165,6 @@ class NaukrigulfCrawler(BoardCrawler):
             missing_fields=missing_fields,
             raw_payload={"source": "naukrigulf", "html_bytes": len(html)},
         )
-
-    def normalize(self, parsed: ParsedPosting):  # type: ignore[override]
-        from ..core.normalise import to_upsert
-
-        return to_upsert(
-            parsed,
-            source_id=__import__("uuid").UUID(int=0),
-            company_id=None, recruiter_id=None, location=None,
-        )
-
-
 # ---- helpers --------------------------------------------------------------
 _DAYS_AGO_RE = re.compile(r"(\d+)\s*(day|hour|minute|month)s?\s*ago", re.IGNORECASE)
 _ID_FROM_URL_RE = re.compile(r"-(\d+)$|/(\d+)$|/(\d+)\.")

@@ -11,7 +11,7 @@ import argparse
 import asyncio
 import logging
 import sys
-from typing import Final
+from typing import Final, Literal
 
 from job_crawler_db import JobCrawlerDB
 
@@ -22,18 +22,43 @@ from ..registry import get, resolve_slugs
 
 _LOG: Final = logging.getLogger("job_crawler.cli.canary")
 
+# A canary run has three terminal states, not two (Finding 17):
+#   * "ok"               — fetch + parse succeeded on every canary URL.
+#   * "fail"             — at least one canary URL didn't fetch or parse.
+#   * "skipped_no_canary"— the crawler is implemented but ships no
+#                          canary_urls. Counts as a non-ok health signal
+#                          so it's visible on the dashboard, but doesn't
+#                          send the failure alert (it's a code gap, not
+#                          a site outage).
+CanaryStatus = Literal["ok", "fail", "skipped_no_canary"]
 
-async def _check(db: JobCrawlerDB, slug: str) -> bool:
-    """Run the canary for one source. Returns True on success."""
+
+async def _check(db: JobCrawlerDB, slug: str) -> CanaryStatus:
+    """Run the canary for one source.
+
+    Returns the terminal state for the run. The CLI sums these into an
+    exit code (any "fail" → exit 1; any "skipped_no_canary" prints a
+    warning but doesn't fail the run).
+    """
     cls = get(slug)
     if not cls.canary_urls:
-        _LOG.info("[%s] no canary URLs configured — skipping", slug)
-        return True
+        # Previously returned True ("ok") here — that hid the fact that
+        # workday / successfactors / linkedin etc. were implemented but
+        # never actually proved they could fetch + parse anything. Now
+        # surface it both to the operator (log + stdout) and to the
+        # health table (record_canary with ok=False + a marker error).
+        _LOG.warning("[%s] no canary URLs configured — recording skipped state", slug)
+        source = await db.sources.get(slug=slug)
+        if source is not None:
+            await record_canary(
+                db, source.id, ok=False, error="skipped_no_canary",
+            )
+        return "skipped_no_canary"
 
     source = await db.sources.get(slug=slug)
     if source is None:
         _LOG.info("[%s] not yet registered in sources — skipping", slug)
-        return True
+        return "ok"
 
     # Canary deliberately skips the proxy pool — we want to know whether
     # the source itself is reachable from our own egress, not whether a
@@ -78,21 +103,32 @@ async def _check(db: JobCrawlerDB, slug: str) -> bool:
                 f"Two consecutive failures will auto-disable the source."
             ),
         )
-    return ok
+    return "ok" if ok else "fail"
 
 
 async def _main(slugs: tuple[str, ...]) -> int:
     logging.basicConfig(
         level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s :: %(message)s"
     )
-    bad = 0
+    failed = 0
+    skipped = 0
     async with JobCrawlerDB.from_env() as db:
         for slug in slugs:
-            ok = await _check(db, slug)
-            print(f"[{slug}] canary {'ok' if ok else 'FAIL'}")
-            if not ok:
-                bad += 1
-    return 1 if bad else 0
+            status = await _check(db, slug)
+            print(f"[{slug}] canary {status}")
+            if status == "fail":
+                failed += 1
+            elif status == "skipped_no_canary":
+                skipped += 1
+    if failed:
+        return 1
+    if skipped:
+        # Implemented crawlers WITHOUT canary URLs are a code gap, not a
+        # site outage. Exit nonzero so CI / cron status reflects the gap;
+        # operator can either add canary URLs or accept the WARN.
+        print(f"[canary] {skipped} source(s) had no canary URLs configured", file=sys.stderr)
+        return 2
+    return 0
 
 
 def main() -> None:

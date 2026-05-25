@@ -145,17 +145,6 @@ class LeverCrawler(ATSBoardCrawler):
             missing_fields=missing_fields,
             raw_payload={"source": "lever", "job": job},
         )
-
-    def normalize(self, parsed: ParsedPosting):  # type: ignore[override]
-        from ..core.normalise import to_upsert
-
-        return to_upsert(
-            parsed,
-            source_id=__import__("uuid").UUID(int=0),
-            company_id=None, recruiter_id=None, location=None,
-        )
-
-
 # ---- helpers --------------------------------------------------------------
 def _epoch_to_dt(ms: object) -> datetime | None:
     """Lever returns createdAt in ms-since-epoch (int)."""

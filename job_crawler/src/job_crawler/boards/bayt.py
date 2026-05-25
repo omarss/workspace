@@ -300,20 +300,6 @@ class BaytCrawler(BoardCrawler):
             missing_fields=missing_fields,
             raw_payload={"source": "bayt", "html_bytes": len(html)},
         )
-
-    # ------------------------------------------------------------------
-    def normalize(self, parsed: ParsedPosting):  # type: ignore[override]
-        from ..core.normalise import to_upsert
-
-        return to_upsert(
-            parsed,
-            source_id=__import__("uuid").UUID(int=0),  # runner overrides
-            company_id=None,
-            recruiter_id=None,
-            location=None,
-        )
-
-
 # ---------------------------------------------------------------------------
 # helpers
 # ---------------------------------------------------------------------------
