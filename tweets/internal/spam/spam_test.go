@@ -72,6 +72,82 @@ func TestCountPrefix_OnlyAtWordStart(t *testing.T) {
 	}
 }
 
+func TestScore_AdultBlocklist(t *testing.T) {
+	// Verbatim hashtag pattern observed in live KSA feed.
+	got, breakdown := Score(Compute(
+		"#Jeddah_VlPmassage #Jeddah_Fullbodymassage #ladyboy_saudi #Jeddah_massage_moroccan_bath  https://t.co/x",
+		time.Time{}, 0, 0, false,
+	))
+	if got < 0.7 {
+		t.Errorf("adult promo should clear 0.7, got %.3f breakdown=%v", got, breakdown)
+	}
+}
+
+func TestScore_CouponBracketBlocklist(t *testing.T) {
+	// Verbatim coupon-bracket pattern observed in live KSA feed.
+	got, breakdown := Score(Compute(
+		"⎐كُود⎐⎐ايهرب⎐ايهيرب اهرب ⊵IQH8946⊴",
+		time.Time{}, 0, 0, false,
+	))
+	if got < 0.6 {
+		t.Errorf("coupon-bracket should clear 0.6, got %.3f breakdown=%v", got, breakdown)
+	}
+}
+
+func TestScore_CouponKeywordBlocklist(t *testing.T) {
+	// AliExpress / Noon / Namshi coupon-code dropshipping text.
+	got, _ := Score(Compute(
+		"كوبون خصم لطلبك من aliexpress احصل عليه الآن!",
+		time.Time{}, 0, 0, false,
+	))
+	if got < 0.6 {
+		t.Errorf("coupon-keyword should clear 0.6, got %.3f", got)
+	}
+}
+
+func TestScore_LocalBizAdBlocklist(t *testing.T) {
+	// Saudi phone + butcher-service keyword — observed pattern.
+	got, _ := Score(Compute(
+		"قصاب ماهر بالرياض 0533286100 قصاب شمال الرياض",
+		time.Time{}, 0, 0, false,
+	))
+	if got < 0.55 {
+		t.Errorf("local-biz ad should clear 0.55, got %.3f", got)
+	}
+}
+
+func TestScore_LocalBizAd_PhoneAloneNotSpam(t *testing.T) {
+	// Same phone format but no service keyword — legitimate, must not fire.
+	got, _ := Score(Compute(
+		"المتجر مغلق اليوم، يمكنكم التواصل على 0533286100 للاستفسارات",
+		time.Time{}, 0, 0, false,
+	))
+	if got >= 0.5 {
+		t.Errorf("legit phone-bearing message must not fire local-biz blocklist, got %.3f", got)
+	}
+}
+
+func TestScore_OffTopicPolitical(t *testing.T) {
+	got, _ := Score(Compute(
+		"The Custodian of the Two Holy Mosques is great. Show respect and bow! #Saudi 🇸🇦",
+		time.Time{}, 0, 0, false,
+	))
+	if got < 0.4 {
+		t.Errorf("off-topic political glorification expected >= 0.4, got %.3f", got)
+	}
+}
+
+func TestScore_LegitimateContentNotFlagged(t *testing.T) {
+	// Spot-check: religious daily-life post should pass with a low score.
+	got, _ := Score(Compute(
+		"في يوم عرفة تتنزّل الرحمات وتطمئن القلوب بالدعاء والرجاء.",
+		time.Now().Add(-200*24*time.Hour), 2000, 800, false,
+	))
+	if got >= 0.5 {
+		t.Errorf("religious daily-life post must not fire any blocklist, got %.3f", got)
+	}
+}
+
 func TestLatinAllCapsRatio_IgnoresArabic(t *testing.T) {
 	// Arabic letters don't have case; they must not be counted as
 	// either upper or lower in the ratio.

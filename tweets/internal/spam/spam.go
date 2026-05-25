@@ -11,6 +11,7 @@ package spam
 
 import (
 	"math"
+	"regexp"
 	"strings"
 	"time"
 	"unicode"
@@ -20,15 +21,25 @@ import (
 // Exposed so the caller (and tests) can inspect *why* a score came out
 // the way it did rather than treating the number as opaque.
 type Features struct {
-	LinkCount        int
-	HashtagCount     int
-	MentionCount     int
-	EmojiCount       int
-	AllCapsRatio     float64 // proportion of letters that are uppercase
-	AccountAgeDays   int     // 0 when unknown
-	FollowerRatio    float64 // followers / max(1, following); 0 when unknown
-	DuplicateRecent  bool    // same text from same author within the recent window
-	TextLength       int
+	LinkCount       int
+	HashtagCount    int
+	MentionCount    int
+	EmojiCount      int
+	AllCapsRatio    float64 // proportion of letters that are uppercase
+	AccountAgeDays  int     // 0 when unknown
+	FollowerRatio   float64 // followers / max(1, following); 0 when unknown
+	DuplicateRecent bool    // same text from same author within the recent window
+	TextLength      int
+
+	// Hits on the curated blocklist categories below. The handful of
+	// patterns observed in live KSA scrapes that the original heuristic
+	// missed entirely — adult/sex-work promo hashtag stamps, dropshipping
+	// coupon spam with Unicode-decoration brackets, repetitive local-
+	// business ads built around a Saudi phone number.
+	BlocklistAdult       bool
+	BlocklistCoupon      bool
+	BlocklistLocalBizAd  bool
+	BlocklistOffTopicPol bool
 }
 
 // Score returns a value in [0, 1]. Higher = more spam-like. The mapping
@@ -99,6 +110,32 @@ func Score(f Features) (float64, map[string]float64) {
 		add(contrib, "duplicate", 0.35)
 	}
 
+	// Blocklist hits — each one is strong enough to push a tweet past
+	// the default 0.5 threshold on its own. These cover the spam
+	// categories the original feature set missed entirely on live
+	// KSA scrapes:
+	//   * adult / sex-work promo (#ladyboy_*, #vlpmassage_*) — ~70%
+	//     of these have <4 hashtags so the count-based gate misses them.
+	//   * coupon / dropshipping spam decorated with the Unicode bracket
+	//     glyphs ⎐ ⊵ ⊴ and bouncing through AliExpress / Noon / Namshi.
+	//   * repetitive Riyadh-area local business ads built around one
+	//     phone number (butcher, furniture haulers). Same phone +
+	//     same hashtags posted across many tweets.
+	//   * off-topic political glorification ("Custodian of the Two
+	//     Holy Mosques… Show respect and bow!") wrapped in flag emoji.
+	if f.BlocklistAdult {
+		add(contrib, "adult", 0.7)
+	}
+	if f.BlocklistCoupon {
+		add(contrib, "coupon", 0.6)
+	}
+	if f.BlocklistLocalBizAd {
+		add(contrib, "local_biz_ad", 0.55)
+	}
+	if f.BlocklistOffTopicPol {
+		add(contrib, "off_topic_political", 0.4)
+	}
+
 	// Sum the components, clamp.
 	total := 0.0
 	for _, v := range contrib {
@@ -126,16 +163,148 @@ func Compute(text string, createdAccount time.Time, followers, following int, du
 		ratio = math.Inf(1) // followed by many, follows nobody — non-spammy
 	}
 	return Features{
-		LinkCount:       countLinks(text),
-		HashtagCount:    countPrefix(text, '#'),
-		MentionCount:    countPrefix(text, '@'),
-		EmojiCount:      countEmoji(text),
-		AllCapsRatio:    latinAllCapsRatio(text),
-		AccountAgeDays:  ageDays,
-		FollowerRatio:   ratio,
-		DuplicateRecent: duplicateRecent,
-		TextLength:      len([]rune(text)),
+		LinkCount:            countLinks(text),
+		HashtagCount:         countPrefix(text, '#'),
+		MentionCount:         countPrefix(text, '@'),
+		EmojiCount:           countEmoji(text),
+		AllCapsRatio:         latinAllCapsRatio(text),
+		AccountAgeDays:       ageDays,
+		FollowerRatio:        ratio,
+		DuplicateRecent:      duplicateRecent,
+		TextLength:           len([]rune(text)),
+		BlocklistAdult:       matchAdult(text),
+		BlocklistCoupon:      matchCoupon(text),
+		BlocklistLocalBizAd:  matchLocalBizAd(text),
+		BlocklistOffTopicPol: matchOffTopicPolitical(text),
 	}
+}
+
+// ── Blocklists ─────────────────────────────────────────────────────
+//
+// Lower-cased substring matches; cheap. Update as new patterns are
+// observed in the live feed (spam adversaries adapt). Each list is
+// kept narrow so a single legitimate post is unlikely to trip it.
+
+func matchAdult(text string) bool {
+	low := strings.ToLower(text)
+	for _, k := range adultKeywords {
+		if strings.Contains(low, k) {
+			return true
+		}
+	}
+	return false
+}
+
+var adultKeywords = []string{
+	"ladyboy",
+	"shemale",
+	"vlpmassage",
+	"vipmassage",
+	"_massage_",
+	"_bottom_",
+	"_top_in_",
+	"escort",
+	"call_girl",
+	"hookup",
+	"sex_in_",
+	"sex_riyadh",
+	"sex_jeddah",
+}
+
+func matchCoupon(text string) bool {
+	// Unicode-bracket decoration commonly used in coupon spam, e.g.
+	// ⎐كُود⎐ ⊵IQH8946⊴. Three or more decorations in one tweet is the
+	// signature pattern.
+	var brackets int
+	for _, r := range text {
+		switch r {
+		case '⎐', '⊵', '⊴':
+			brackets++
+			if brackets >= 3 {
+				return true
+			}
+		}
+	}
+	// Coupon-code shorthand seen alongside the brackets.
+	low := strings.ToLower(text)
+	for _, k := range couponKeywords {
+		if strings.Contains(low, k) {
+			return true
+		}
+	}
+	return false
+}
+
+var couponKeywords = []string{
+	"aliexpress",
+	"كوبون خصم",
+	"كود خصم",
+	"كوبِون",
+	"كُود",
+	"خـِصم",
+	"trendyol",
+	"namshi code",
+	"كوبون نون",
+	"كوبون نمشي",
+}
+
+// Saudi phone numbers — local business ads almost always anchor on a
+// phone number. Pattern catches +966 5xx xxx xxxx and 05xx xxx xxxx
+// shapes (with or without separators).
+var saudiPhoneRe = regexp.MustCompile(`(?:\+?9665\d{8}|\b05\d{8}\b)`)
+
+func matchLocalBizAd(text string) bool {
+	if !saudiPhoneRe.MatchString(text) {
+		return false
+	}
+	low := strings.ToLower(text)
+	// A Saudi phone number alone is not spam — pair it with a
+	// "service language" keyword that signals classifieds-style ads.
+	for _, k := range localBizMarkers {
+		if strings.Contains(low, k) {
+			return true
+		}
+	}
+	return false
+}
+
+var localBizMarkers = []string{
+	"قصاب",        // butcher
+	"جزار",        // butcher
+	"ذبح",         // slaughter
+	"دينا",        // pickup-truck (furniture removal)
+	"طش الاثاث",   // dump old furniture
+	"نقل عفش",     // furniture moving
+	"تنظيف فلل",   // villa cleaning ads
+	"تنظيف خزانات", // tank cleaning ads
+	"رش مبيدات",   // pesticide spraying
+	"عزل أسطح",    // roof insulation
+	"كشف تسربات",  // leak detection
+	"شفط مجاري",   // sewage drainage
+}
+
+// Off-topic political glorification — flagged keywords combined with
+// hashtag/emoji counts. Lighter weight than the others because false
+// positives on legitimate political commentary are worse than missing
+// the occasional fluff post.
+func matchOffTopicPolitical(text string) bool {
+	low := strings.ToLower(text)
+	hits := 0
+	for _, k := range polKeywords {
+		if strings.Contains(low, k) {
+			hits++
+		}
+	}
+	return hits >= 2
+}
+
+var polKeywords = []string{
+	"custodian of the two holy",
+	"show respect and bow",
+	"princerahimagakhan",
+	"long live",
+	"long-live",
+	"glorified leader",
 }
 
 func add(m map[string]float64, key string, v float64) {

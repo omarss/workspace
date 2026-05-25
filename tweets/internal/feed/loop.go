@@ -143,7 +143,11 @@ func (l *Loop) refreshOne(ctx context.Context, country server.Country) {
 		// feed errs on the side of fewer noisy tweets.
 		ss, _ := spam.Score(spam.Compute(t.Text, time.Time{}, 0, 0, false))
 		t.SpamScore = ss
-		if ss > l.spamThreshold {
+		// >= so the borderline 0.50 cases (multi-hashtag adult promo
+		// before the blocklist matched) still drop. The blocklist
+		// already pushes those past 0.5, but the tight inequality
+		// keeps the safety margin on score collisions.
+		if ss >= l.spamThreshold {
 			spamDrops++
 			continue
 		}
