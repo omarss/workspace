@@ -46,10 +46,19 @@ spec:
               resources:
                 requests: { cpu: "50m", memory: "192Mi" }
                 limits:   { cpu: "500m", memory: "512Mi" }
+              # /tmp/job_crawler is the proxy-pool state path (see configmap
+              # JC_PROXY_STATE_FILE). emptyDir keeps it per-pod — fine for
+              # the in-memory pool's per-run blacklist; cross-pod
+              # persistence isn't needed today.
+              volumeMounts:
+                - { name: proxy-state, mountPath: /tmp/job_crawler }
               securityContext:
                 allowPrivilegeEscalation: false
                 readOnlyRootFilesystem: true
                 capabilities: { drop: ["ALL"] }
+          volumes:
+            - name: proxy-state
+              emptyDir: { sizeLimit: 10Mi }
 
 ---
 # Bayt — internal JSON endpoint, polite HTTP with per-host throttle.
@@ -87,10 +96,19 @@ spec:
               resources:
                 requests: { cpu: "50m", memory: "192Mi" }
                 limits:   { cpu: "500m", memory: "512Mi" }
+              # /tmp/job_crawler is the proxy-pool state path (see configmap
+              # JC_PROXY_STATE_FILE). emptyDir keeps it per-pod — fine for
+              # the in-memory pool's per-run blacklist; cross-pod
+              # persistence isn't needed today.
+              volumeMounts:
+                - { name: proxy-state, mountPath: /tmp/job_crawler }
               securityContext:
                 allowPrivilegeEscalation: false
                 readOnlyRootFilesystem: true
                 capabilities: { drop: ["ALL"] }
+          volumes:
+            - name: proxy-state
+              emptyDir: { sizeLimit: 10Mi }
 
 ---
 # Canary — runs every hour, one synthetic fetch per enabled source.
@@ -129,10 +147,17 @@ spec:
               resources:
                 requests: { cpu: "25m", memory: "96Mi" }
                 limits:   { cpu: "250m", memory: "256Mi" }
+              # Canary bypasses the proxy pool, but the mount is harmless
+              # and keeps every workload's spec uniform.
+              volumeMounts:
+                - { name: proxy-state, mountPath: /tmp/job_crawler }
               securityContext:
                 allowPrivilegeEscalation: false
                 readOnlyRootFilesystem: true
                 capabilities: { drop: ["ALL"] }
+          volumes:
+            - name: proxy-state
+              emptyDir: { sizeLimit: 10Mi }
 
 ---
 # Companies discovery — weekly Wikidata SPARQL pull + seed CSV reconciliation.
@@ -170,7 +195,16 @@ spec:
               resources:
                 requests: { cpu: "50m", memory: "192Mi" }
                 limits:   { cpu: "500m", memory: "512Mi" }
+              # /tmp/job_crawler is the proxy-pool state path (see configmap
+              # JC_PROXY_STATE_FILE). emptyDir keeps it per-pod — fine for
+              # the in-memory pool's per-run blacklist; cross-pod
+              # persistence isn't needed today.
+              volumeMounts:
+                - { name: proxy-state, mountPath: /tmp/job_crawler }
               securityContext:
                 allowPrivilegeEscalation: false
                 readOnlyRootFilesystem: true
                 capabilities: { drop: ["ALL"] }
+          volumes:
+            - name: proxy-state
+              emptyDir: { sizeLimit: 10Mi }

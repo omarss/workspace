@@ -28,16 +28,40 @@ from ..core.runner import CrawlerRunner
 from ..intelligence import pipeline as intelligence
 from ..registry import REGISTRY, get, resolve_slugs
 
-# Shared proxy state lives under .cache/ so survives runs but stays local.
-_PROXY_STATE_FILE = Path(__file__).resolve().parents[3] / ".cache" / "proxy_pool.json"
+# Shared proxy state location:
+#   * local dev (no env override): `<repo>/.cache/proxy_pool.json` so a
+#     fresh `make crawl` re-uses the previous run's blacklist + counters.
+#   * container (env override):    `JC_PROXY_STATE_FILE` set to a
+#     writable path on an emptyDir mount, since `readOnlyRootFilesystem`
+#     forbids creating `/app/.cache/`. Default for containers is
+#     `/tmp/job_crawler/proxy_pool.json` (mounted via emptyDir in
+#     `homelab/apps/job-crawler/cronjobs.yaml`).
+_PROXY_STATE_FILE = Path(
+    os.environ.get(
+        "JC_PROXY_STATE_FILE",
+        str(Path(__file__).resolve().parents[3] / ".cache" / "proxy_pool.json"),
+    )
+)
 _PROXY_POOL_SINGLETON: ProxyPool | None = None
 
 
 async def _get_proxy_pool() -> ProxyPool:
-    """Build (or reuse) the shared proxy pool for this CLI invocation."""
+    """Build (or reuse) the shared proxy pool for this CLI invocation.
+
+    A write-protected proxy-state path (e.g. mounting issue, RO root FS)
+    must not block proxy-backed crawls — the in-memory pool is still
+    usable, we just lose persistence. `save_state` failures elsewhere
+    in this file are already non-fatal; mirror that for the mkdir.
+    """
     global _PROXY_POOL_SINGLETON
     if _PROXY_POOL_SINGLETON is None:
-        _PROXY_STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            _PROXY_STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
+        except OSError as exc:
+            _LOG.warning(
+                "could not create proxy state dir %s (%s); running without persistence",
+                _PROXY_STATE_FILE.parent, exc,
+            )
         _PROXY_POOL_SINGLETON = await build_default_pool(state_file=_PROXY_STATE_FILE)
     return _PROXY_POOL_SINGLETON
 

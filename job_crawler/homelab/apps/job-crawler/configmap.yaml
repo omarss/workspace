@@ -15,3 +15,8 @@ data:
   JC_FETCH_TIMEOUT_S: "20"
   JC_FETCH_MAX_CONCURRENCY: "3"
   JC_LOOKBACK_DAYS: "30"
+  # Proxy pool state lives under /tmp/job_crawler/ on an emptyDir mount
+  # (see cronjobs.yaml). /app/.cache is read-only because every workload
+  # sets `readOnlyRootFilesystem: true`. Switch to a PVC if cross-job
+  # blacklist persistence ever matters.
+  JC_PROXY_STATE_FILE: "/tmp/job_crawler/proxy_pool.json"
