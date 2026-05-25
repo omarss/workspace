@@ -12,6 +12,12 @@ from dataclasses import dataclass
 from typing import Final
 
 import httpx
+from tenacity import (
+    retry,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential,
+)
 
 from job_crawler_db import JobCrawlerDB
 
@@ -38,6 +44,12 @@ LIMIT 5000
 _UA: Final = "jobs.omarss.net/0.1 (https://jobs.omarss.net; omar.s.shaaban@gmail.com)"
 
 
+class WikidataFetchError(RuntimeError):
+    """Raised when the Wikidata SPARQL endpoint can't be reached or returns
+    a malformed response. Lets the CLI exit nonzero so the CronJob status
+    reflects the failure instead of silently logging it (Finding 4)."""
+
+
 @dataclass(slots=True)
 class WikidataResult:
     fetched: int
@@ -45,25 +57,48 @@ class WikidataResult:
     skipped: int
 
 
+@retry(
+    # Wikidata is rate-limited and occasionally flaky; back off and retry
+    # transient network errors / 5xx. 4xx raises immediately.
+    reraise=True,
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=2, min=2, max=30),
+    retry=retry_if_exception_type((httpx.TransportError, httpx.HTTPStatusError)),
+)
+async def _fetch_sparql() -> dict:
+    """Single SPARQL fetch with retry + backoff. Returns the parsed JSON."""
+    async with httpx.AsyncClient(
+        timeout=60.0,
+        headers={"Accept": "application/sparql-results+json", "User-Agent": _UA},
+    ) as client:
+        resp = await client.get(_ENDPOINT, params={"query": _QUERY, "format": "json"})
+        # 5xx → HTTPStatusError → retry; 4xx → HTTPStatusError → retry too
+        # but capped at 3 attempts. Tenacity won't retry past stop_after_attempt.
+        resp.raise_for_status()
+        return resp.json()
+
+
 async def fetch_and_load(db: JobCrawlerDB, *, max_rows: int | None = None) -> WikidataResult:
     """Run the SPARQL query and upsert each row via db.companies.resolve.
 
     `max_rows` caps the number of rows we ingest in one call (default: all).
+
+    Raises:
+        WikidataFetchError: the SPARQL endpoint is unreachable, returns a
+            5xx after retries, or its response body isn't valid JSON. The
+            caller (the CLI) translates this to a nonzero exit code so a
+            silent weekly-cron failure can't sit unnoticed.
     """
     fetched = 0
     inserted = 0
     skipped = 0
     try:
-        async with httpx.AsyncClient(
-            timeout=60.0,
-            headers={"Accept": "application/sparql-results+json", "User-Agent": _UA},
-        ) as client:
-            resp = await client.get(_ENDPOINT, params={"query": _QUERY, "format": "json"})
-            resp.raise_for_status()
-            data = resp.json()
-    except Exception:
+        data = await _fetch_sparql()
+    except (httpx.HTTPError, ValueError) as exc:
         _LOG.exception("wikidata SPARQL fetch failed")
-        return WikidataResult(0, 0, 0)
+        raise WikidataFetchError(
+            f"could not fetch wikidata SPARQL endpoint: {type(exc).__name__}: {exc}"
+        ) from exc
 
     rows = (data.get("results") or {}).get("bindings", []) or []
     for row in rows:

@@ -19,8 +19,10 @@ from psycopg.rows import dict_row
 
 from job_crawler_db import Company, JobCrawlerDB
 
+from ..alerts.email import send_alert
 from ..company_sites import ats_detector
 from ..discover import manual_seed, wikidata
+from ..discover.wikidata import WikidataFetchError
 
 _LOG: Final = logging.getLogger("job_crawler.cli.discover")
 
@@ -30,13 +32,36 @@ async def _main(seed: bool, wd: bool, ats: bool, limit: int | None) -> int:
         level=logging.INFO,
         format="%(asctime)s %(levelname)s %(name)s :: %(message)s",
     )
+    exit_code = 0
     async with JobCrawlerDB.from_env() as db:
         if seed:
             r = await manual_seed.load(db)
             print(f"[seed] total={r.total} created={r.created} matched={r.matched_existing}")
         if wd:
-            r2 = await wikidata.fetch_and_load(db)
-            print(f"[wikidata] fetched={r2.fetched} inserted={r2.inserted} skipped={r2.skipped}")
+            # Wikidata used to swallow fetch failures and return a (0, 0, 0)
+            # result that the CronJob recorded as success (Finding 4). Now we
+            # let WikidataFetchError surface to the exit code and still run
+            # the remaining discovery steps so a transient SPARQL hiccup
+            # doesn't block --seed / --ats. An alert email goes out so the
+            # weekly-cron failure isn't silent even when k8s shows green.
+            try:
+                r2 = await wikidata.fetch_and_load(db)
+                print(
+                    f"[wikidata] fetched={r2.fetched} inserted={r2.inserted} "
+                    f"skipped={r2.skipped}"
+                )
+            except WikidataFetchError as exc:
+                _LOG.error("wikidata pull failed: %s", exc)
+                print(f"[wikidata] FAILED: {exc}", file=sys.stderr)
+                exit_code = 1
+                await send_alert(
+                    subject="[job_crawler] wikidata discovery failed",
+                    body=(
+                        f"Wikidata SPARQL pull failed:\n  {exc}\n\n"
+                        "The weekly company-discovery job has stale data. "
+                        "The crawler keeps running — only the Wikidata enrichment is missing."
+                    ),
+                )
         if ats:
             cap = limit or 1000
             async with db.pool.connection() as conn, conn.cursor(row_factory=dict_row) as cur:
@@ -49,7 +74,7 @@ async def _main(seed: bool, wd: bool, ats: bool, limit: int | None) -> int:
             res = await ats_detector.detect_for_companies(db, companies)
             print(f"[ats-detect] scanned={res.companies_scanned} hits={res.hits} "
                   f"by_source={res.by_source}")
-    return 0
+    return exit_code
 
 
 def main() -> None:
