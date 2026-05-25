@@ -65,6 +65,7 @@ class GlassdoorCrawler(BoardCrawler):
     # the JS so we see the same DOM a human would.
     use_playwright: ClassVar[bool] = True
     use_proxy_pool: ClassVar[bool] = False
+    requires_gcc_location: ClassVar[bool] = True
 
     _CARD_RE: ClassVar[re.Pattern[str]] = re.compile(
         r'data-job-id="([^"]+)"|/partner/jobListing\.htm\?jobListingId=(\d+)',

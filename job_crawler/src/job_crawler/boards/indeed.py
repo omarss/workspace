@@ -66,6 +66,7 @@ class IndeedCrawler(BoardCrawler):
     # wired in.
     use_playwright: ClassVar[bool] = True
     use_proxy_pool: ClassVar[bool] = False
+    requires_gcc_location: ClassVar[bool] = True
 
     _CARD_RE: ClassVar[re.Pattern[str]] = re.compile(r'data-jk="([^"]+)"')
 

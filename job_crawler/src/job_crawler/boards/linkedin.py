@@ -69,6 +69,10 @@ class LinkedInCrawler(BoardCrawler):
     # residential proxy pool to push the daily ceiling higher.
     use_playwright: ClassVar[bool] = True
     use_proxy_pool: ClassVar[bool] = False
+    # LinkedIn's guest search ignores `geoId` and `location` filters for
+    # anonymous traffic, so its results are MENA-wide. Drop anything that
+    # doesn't have a GCC location at the runner gate.
+    requires_gcc_location: ClassVar[bool] = True
     rate: ClassVar[RateConfig] = RateConfig(
         max_rps=1.0, burst=2, max_concurrent=1,
         timeout_seconds=30.0,
@@ -87,12 +91,15 @@ class LinkedInCrawler(BoardCrawler):
         "card_location": ".job-search-card__location",
         "card_posted":   "time",
         "card_urn_attr": "data-entity-urn",
-        "detail_title":  "h1.top-card-layout__title, h1.topcard__title",
+        # LinkedIn's public jobPosting fragment puts the title in an h2
+        # (not h1 — that's the old logged-in-view markup). Keep h1 in the
+        # alt list as a defensive fallback if they rebrand again.
+        "detail_title":  "h2.top-card-layout__title, h1.top-card-layout__title, .topcard__title, h1.topcard__title",
         "detail_company":"a.topcard__org-name-link, .topcard__org-name-link, .top-card-layout__entity-info a",
-        "detail_loc":    ".topcard__flavor--bullet, .top-card-layout__entity-info .bullet",
+        "detail_loc":    ".topcard__flavor--bullet, .top-card-layout__entity-info .bullet, .topcard__flavor",
         "detail_body":   "div.show-more-less-html__markup, div.description__text",
-        "detail_posted": "span.posted-time-ago__text, .topcard__flavor--metadata.posted-time-ago__text",
-        "apply_link":    "a.apply-button, a[data-tracking-control-name*='apply']",
+        "detail_posted": "span.posted-time-ago__text, .topcard__flavor--metadata.posted-time-ago__text, .posted-time-ago",
+        "apply_link":    "a.apply-button, a[data-tracking-control-name*='apply'], code#applyUrl",
     }
     # Pulls "3479412345" from urn:li:fsd_jobPosting:3479412345.
     _JOB_ID_RE: ClassVar[re.Pattern[str]] = re.compile(r"jobPosting:(\d+)")
