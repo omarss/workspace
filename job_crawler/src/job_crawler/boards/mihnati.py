@@ -122,6 +122,13 @@ class MihnatiCrawler(BoardCrawler):
         title = _txt(title_node)
         if not title:
             return None
+        # Mihnati interleaves promotional cards ("post your job free!") in
+        # the same listing layout as real jobs. Live row
+        # `019e5e2a-d4fa-7142-afc9-0d097723b4b6` was such a card. Reject by
+        # title pattern before we waste a posting row + cluster bootstrap.
+        if _is_promo_title(title):
+            _LOG.info("mihnati: skipping promo card: %s", title)
+            return None
         external_id = self._external_id(raw.canonical_url)
         if not external_id:
             return None
@@ -206,3 +213,20 @@ def _city_hint(raw_location: str | None) -> str | None:
         return None
     head = raw_location.split(",")[0].strip()
     return head or None
+
+
+# Promotional cards Mihnati interleaves with real jobs. Substrings, not
+# regex — both Arabic and English variants observed in live audit data.
+# Lowercased; the check folds the title before matching.
+_PROMO_TITLE_PHRASES: Final[tuple[str, ...]] = (
+    "أعلن عن وظيفتك",     # "Post your job" (Arabic)
+    "post your job",        # English self-service signup card
+    "اعلن وظيفتك",         # alternate Arabic spelling without alef-with-hamza
+    "أعلن وظيفتك",         # another variant
+)
+
+
+def _is_promo_title(title: str) -> bool:
+    """True when the title matches a known Mihnati promotional card."""
+    folded = title.casefold()
+    return any(phrase.casefold() in folded for phrase in _PROMO_TITLE_PHRASES)
