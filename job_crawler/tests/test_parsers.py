@@ -315,3 +315,100 @@ def test_bayt_search_url_preserves_space_as_plus_for_multi_word_query() -> None:
     url.encode("latin-1")  # latin-1 safe
     # The space-as-`+` convention Bayt uses must survive percent-encoding.
     assert "+" in url.split("keywords=", 1)[1].split("&", 1)[0]
+
+
+# ---------------------------------------------------------------------------
+# company_careers required-fields gate + company_name fallback.
+# Live regressions from the 100-row sample:
+#   - KKU detail pages stored title="   " + the SA-gov verification banner
+#     as a 14k-char "description". DOM extractors picked up page chrome.
+#   - DACO detail pages stored "Company Dashboard Search Jobs Post Your CV"
+#     (42 chars of navbar text) as the description.
+#   - Hala / Batterjee / DXC postings landed without company_id because
+#     ld.company_name was None and the parser didn't read the listing's
+#     extra["company_name"] hint.
+# ---------------------------------------------------------------------------
+def _company_careers(
+    *,
+    ld: dict[str, Any] | None = None,
+    html: str | None = None,
+    company_name: str | None = None,
+) -> ParsedPosting | None:
+    from job_crawler.boards.company_careers import CompanyCareersCrawler
+
+    crawler = CompanyCareersCrawler.__new__(CompanyCareersCrawler)
+    crawler.http = None  # type: ignore[assignment]
+    crawler.db = None
+    payload: dict[str, Any] = {}
+    if ld is not None:
+        payload["ld"] = ld
+    if html is not None:
+        payload["html"] = html
+    if company_name is not None:
+        payload["company_name"] = company_name
+    raw = RawPosting(
+        listing=Listing(
+            source_job_external_id="x",
+            detail_url="https://careers.example.invalid/jobs/1",
+        ),
+        canonical_url="https://careers.example.invalid/jobs/1",
+        payload=payload,
+        fetched_at=datetime.now(UTC),
+        duration_ms=0,
+        http_status=200,
+        bytes=0,
+    )
+    return crawler.parse(raw)
+
+
+def test_company_careers_rejects_whitespace_only_title() -> None:
+    """KKU regression — JSON-LD with title='   ' + long description must
+    return None instead of writing a row with whitespace title."""
+    parsed = _company_careers(
+        ld={"title": "   ", "description": "A" * 500},
+    )
+    assert parsed is None
+
+
+def test_company_careers_rejects_short_description() -> None:
+    """DACO regression — the parser was scraping the page navbar
+    ('Company Dashboard Search Jobs Post Your CV', 42 chars) and storing
+    it as the description. Anything under 100 chars is rejected."""
+    parsed = _company_careers(
+        ld={
+            "title": "Security System Specialist",
+            "description": "Company Dashboard Search Jobs Post Your CV",
+        },
+    )
+    assert parsed is None
+
+
+def test_company_careers_uses_company_name_hint_when_jsonld_missing() -> None:
+    """Hala / Batterjee regression — when ld.company_name is None, fall
+    back to the company_name carried in listing.extra so the runner can
+    resolve company_id instead of leaving it NULL."""
+    parsed = _company_careers(
+        ld={
+            "title": "Software Backend Engineer",
+            "description": "A" * 500,
+            "company_name": None,
+        },
+        company_name="Hala",
+    )
+    assert parsed is not None
+    assert parsed.raw_company_name == "Hala"
+
+
+def test_company_careers_jsonld_company_name_wins_over_hint() -> None:
+    """When JSON-LD does surface a company name, prefer it — it's
+    posting-specific (e.g. a contractor name), not the parent firm."""
+    parsed = _company_careers(
+        ld={
+            "title": "Engineer",
+            "description": "B" * 500,
+            "company_name": "Acme Subsidiary",
+        },
+        company_name="Acme Holding",
+    )
+    assert parsed is not None
+    assert parsed.raw_company_name == "Acme Subsidiary"
