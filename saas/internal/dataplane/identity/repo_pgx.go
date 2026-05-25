@@ -15,6 +15,12 @@ import (
 	"github.com/omarss/saas/internal/platform/crypto/envelope"
 )
 
+// resourceUser is the canonical resource_type label used in AAD binding
+// for every row in this module. See ADR 004 / 017 §AAD binding. Hard-coded
+// rather than derived so a refactor cannot silently change the binding and
+// invalidate every persisted envelope.
+const resourceUser = "user"
+
 // PgxRepository is the pgx-backed Repository implementation. It owns the
 // sqlc Queries plus the envelope encryptor/decryptor + the deployment id
 // used for kid binding (CONVENTIONS.md §10.1).
@@ -64,7 +70,11 @@ func (r *PgxRepository) Create(ctx context.Context, u User) (User, error) {
 	// Strict envelope walker: refuses to proceed if any pii-tagged field on
 	// User lacks an <Field>Envelope sibling. Adding a new PII column requires
 	// adding the sibling in domain.go or this call fails closed.
-	if err := crypto.EncryptPIIFieldsStrict(ctx, r.enc, r.deploymentID, &u); err != nil {
+	//
+	// AAD binds the ciphertext to (deployment_id, "user", u.ID, field_name)
+	// so a row stolen from a sibling user in the same deployment fails the
+	// AEAD verify on decrypt. See ADR 004 / 017 §AAD binding.
+	if err := crypto.EncryptPIIFieldsStrict(ctx, r.enc, r.deploymentID, resourceUser, u.ID, &u); err != nil {
 		return User{}, err
 	}
 	metaJSON, err := marshalUserMetadata(u.Metadata)
@@ -208,7 +218,9 @@ func (r *PgxRepository) Update(ctx context.Context, tenantID, userID string, exp
 	// Strict walker covers UpdatePatch — both Name and Phone declare envelope
 	// siblings. Empty *string fields are skipped by the walker because their
 	// underlying value is "" — the walker only encrypts non-empty plaintext.
-	if err := crypto.EncryptPIIFieldsStrict(ctx, r.enc, r.deploymentID, &patch); err != nil {
+	// AAD binds to userID so a patch payload cannot be replayed against a
+	// different user's row.
+	if err := crypto.EncryptPIIFieldsStrict(ctx, r.enc, r.deploymentID, resourceUser, userID, &patch); err != nil {
 		return User{}, err
 	}
 	params := db.UpdatePlatformUserParams{
@@ -452,7 +464,7 @@ func (r *PgxRepository) hydrate(ctx context.Context, row db.PlatformUser) (User,
 		KID:        row.EmailKid,
 		KeyVersion: int(row.EmailKeyVersion),
 	}
-	emailPlain, err := r.dec.DecryptField(ctx, emailEnv, r.deploymentID, []byte("Email"))
+	emailPlain, err := r.dec.DecryptField(ctx, emailEnv, r.deploymentID, crypto.FieldAAD(r.deploymentID, resourceUser, row.ID, "Email"))
 	if err != nil {
 		return User{}, err
 	}
@@ -473,7 +485,7 @@ func (r *PgxRepository) hydrate(ctx context.Context, row db.PlatformUser) (User,
 		if row.NameKeyVersion != nil {
 			nameEnv.KeyVersion = int(*row.NameKeyVersion)
 		}
-		namePlain, err := r.dec.DecryptField(ctx, nameEnv, r.deploymentID, []byte("Name"))
+		namePlain, err := r.dec.DecryptField(ctx, nameEnv, r.deploymentID, crypto.FieldAAD(r.deploymentID, resourceUser, row.ID, "Name"))
 		if err != nil {
 			return User{}, err
 		}
@@ -494,7 +506,7 @@ func (r *PgxRepository) hydrate(ctx context.Context, row db.PlatformUser) (User,
 		if row.PhoneKeyVersion != nil {
 			phoneEnv.KeyVersion = int(*row.PhoneKeyVersion)
 		}
-		phonePlain, err := r.dec.DecryptField(ctx, phoneEnv, r.deploymentID, []byte("Phone"))
+		phonePlain, err := r.dec.DecryptField(ctx, phoneEnv, r.deploymentID, crypto.FieldAAD(r.deploymentID, resourceUser, row.ID, "Phone"))
 		if err != nil {
 			return User{}, err
 		}
