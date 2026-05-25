@@ -11,6 +11,7 @@ import kotlinx.coroutines.launch
 import net.omarss.omono.feature.spending.MerchantCategorizer
 import net.omarss.omono.feature.spending.SpendingCategory
 import net.omarss.omono.feature.spending.cleanMerchantName
+import net.omarss.omono.feature.spending.recipientKey
 import net.omarss.omono.feature.spending.SpendingRepository
 import net.omarss.omono.feature.spending.SpendingSettingsRepository
 import net.omarss.omono.feature.spending.Subscription
@@ -297,31 +298,46 @@ class FinanceDashboardViewModel @Inject constructor(
         group: List<Transaction>,
         direction: TransferDirection,
         fmt: SimpleDateFormat,
-    ): List<TransferRow> = group
-        .groupBy {
-            (it.merchant ?: when (direction) {
-                TransferDirection.IN -> "Unknown sender"
-                TransferDirection.OUT -> "Unknown recipient"
-            }).trim()
+    ): List<TransferRow> {
+        val unknown = when (direction) {
+            TransferDirection.IN -> "Unknown sender"
+            TransferDirection.OUT -> "Unknown recipient"
         }
-        .map { (counterparty, items) ->
-            val total = items.sumOf { it.amountSar }
-            val lastTx = items.maxBy { it.timestampMillis }
-            TransferRow(
-                id = "transfer-${direction.name.lowercase()}-${counterparty.hashCode()}",
-                recipient = counterparty,
-                direction = direction,
-                lastDate = fmt.format(lastTx.timestampMillis),
-                count = items.size,
-                amountSar = total,
-                // When every transfer in the group was SAR, show
-                // only SAR. If any was foreign, we lose the per-
-                // transfer original amounts in aggregation — the
-                // user can still drill down via Recent activity.
-                originalCurrency = if (items.all { it.originalCurrency == "SAR" }) "SAR" else "—",
-            )
-        }
-        .sortedByDescending { it.amountSar }
+        // Group by the normalised recipientKey() (vowel-folded consonant
+        // skeleton) so spelling variants of the same person collapse to
+        // one row — e.g. MOHMMAD/MUHAMMAD OSEMI, SHABAAN/SHAABAAN/SHAABAN.
+        // The displayed name uses the most recent verbatim spelling so
+        // the user sees the bank's latest transliteration.
+        return group
+            .groupBy { tx ->
+                val raw = tx.merchant?.trim().orEmpty()
+                if (raw.isEmpty()) "" else recipientKey(raw)
+            }
+            .map { (key, items) ->
+                val displayName = items
+                    .filter { !it.merchant.isNullOrBlank() }
+                    .maxByOrNull { it.timestampMillis }
+                    ?.merchant
+                    ?.trim()
+                    ?: unknown
+                val total = items.sumOf { it.amountSar }
+                val lastTx = items.maxBy { it.timestampMillis }
+                TransferRow(
+                    id = "transfer-${direction.name.lowercase()}-${key.hashCode()}",
+                    recipient = displayName,
+                    direction = direction,
+                    lastDate = fmt.format(lastTx.timestampMillis),
+                    count = items.size,
+                    amountSar = total,
+                    // When every transfer in the group was SAR, show
+                    // only SAR. If any was foreign, we lose the per-
+                    // transfer original amounts in aggregation — the
+                    // user can still drill down via Recent activity.
+                    originalCurrency = if (items.all { it.originalCurrency == "SAR" }) "SAR" else "—",
+                )
+            }
+            .sortedByDescending { it.amountSar }
+    }
 
     private fun buildRecent(
         transactions: List<Transaction>,
