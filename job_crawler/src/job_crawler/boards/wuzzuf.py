@@ -137,6 +137,18 @@ class WuzzufCrawler(BoardCrawler):
         description_html = body_node.html if body_node else None
         description = body_node.text(separator="\n", strip=True) if body_node else None
 
+        # Finding 12: Wuzzuf detail-page selectors drift more than the
+        # listing layer — when neither the company nor the body matched, we
+        # were saving title-only rows that the search/dedupe pipeline can't
+        # use. Treat that case as a parse failure so the runner records it
+        # in crawl_fetches.outcome='error' and the cluster isn't created.
+        if not raw_company_name and not description:
+            _LOG.info(
+                "wuzzuf: dropping title-only card (no company + no body): %s",
+                raw.canonical_url,
+            )
+            return None
+
         channels: list[ApplicationChannelRaw] = []
         if apply_node is not None:
             href = apply_node.attributes.get("href") or ""

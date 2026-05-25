@@ -102,14 +102,21 @@ class GreenhouseCrawler(ATSBoardCrawler):
         except (KeyError, TypeError):
             return None
 
-        # Greenhouse returns description as escaped HTML; strip tags for
-        # plain text but keep the original on description_html.
+        # Greenhouse's `content` is HTML inside a JSON string and the API
+        # double-encodes it: `<p>` becomes `&lt;p&gt;`. Feeding the raw value
+        # to HTMLParser was a no-op strip — descriptions kept their literal
+        # tag entities (Finding 11). Unescape first, then strip tags; keep
+        # the (now real-HTML) form on description_html.
+        import html as _html
+
         from selectolax.parser import HTMLParser
 
-        html = job.get("content") or ""
-        if isinstance(html, str) and html:
-            text = HTMLParser(html).text(separator="\n", strip=True)
+        raw_content = job.get("content") or ""
+        if isinstance(raw_content, str) and raw_content:
+            decoded_html = _html.unescape(raw_content)
+            text = HTMLParser(decoded_html).text(separator="\n", strip=True)
         else:
+            decoded_html = ""
             text = None
 
         location_obj = job.get("location") or {}
@@ -166,7 +173,7 @@ class GreenhouseCrawler(ATSBoardCrawler):
             posted_at=first_pub or updated_at,
             source_updated_at=updated_at,
             description=text,
-            description_html=html if isinstance(html, str) else None,
+            description_html=decoded_html or None,
             raw_company_name=raw_company_name,
             company_external_id=str(board_slug) if board_slug else None,
             employment_type=EmploymentType.full_time,  # GH boards rarely flag this
