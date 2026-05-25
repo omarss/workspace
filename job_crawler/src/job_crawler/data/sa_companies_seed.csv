@@ -1,362 +1,475 @@
-name_en,name_ar,industry_code,website,linkedin_url,notes
+name_en,name_ar,industry_code,website,careers_url,careers_url_ar,linkedin_url,notes
 # ========================================================================
 # Saudi Arabia — major employers seed list (KSA-focused)
 # Hand-curated 2026. Each row: name_en, name_ar, industry_code, website,
-# linkedin_url, free-text notes. The loader (discover/manual_seed.py) is
+# careers_url, careers_url_ar, linkedin_url, free-text notes. The loader
+# (discover/manual_seed.py) is
 # resilient to missing fields. New rows can be added at the bottom.
 # ========================================================================
 # --- Energy / Oil & Gas / Petrochemicals / Mining --------------------------
-Saudi Aramco,أرامكو السعودية,oil_gas,https://www.aramco.com,https://www.linkedin.com/company/saudi-aramco/,National oil
-SABIC,سابك,petrochemicals,https://www.sabic.com,https://www.linkedin.com/company/sabic/,Chemicals
-Ma'aden,معادن,mining,https://www.maaden.com.sa,https://www.linkedin.com/company/maaden/,Mining
-ACWA Power,أكوا باور,energy,https://www.acwapower.com,https://www.linkedin.com/company/acwapower/,Power & desalination
-SIPCHEM,سبكيم,petrochemicals,https://www.sipchem.com,https://www.linkedin.com/company/sipchem/,TASI petrochem
-YANSAB,ينساب,petrochemicals,https://www.yansab.com.sa,https://www.linkedin.com/company/yansab/,SABIC subsidiary
-Saudi Kayan,كيان السعودية,petrochemicals,https://www.saudikayan.com,https://www.linkedin.com/company/saudi-kayan/,TASI petrochem
-Petro Rabigh,بترو رابغ,petrochemicals,https://www.petrorabigh.com,https://www.linkedin.com/company/petro-rabigh/,TASI petrochem
-Tasnee,التصنيع,petrochemicals,https://www.tasnee.com,https://www.linkedin.com/company/tasnee/,TASI petrochem
-National Industrialization (NIC),التصنيع الوطنية,petrochemicals,https://www.nic.com.sa,,TASI petrochem holding
-Sahara Petrochemical,الصحراء للبتروكيماويات,petrochemicals,https://www.saharapcc.com,https://www.linkedin.com/company/sahara-petrochemicals/,TASI petrochem
-Almarai Investment Co — Petromin,بترومين,oil_gas,https://www.petromin.com,https://www.linkedin.com/company/petromin/,Lubricants
-AMAK (Almasane Alkobra Mining),الفلزات الكبرى للتعدين,mining,https://www.amak.com.sa,,TASI mining
-ENGIE Saudi,إنجي السعودية,energy,https://www.engie.com,https://www.linkedin.com/company/engie/,Power IPP
-Air Products Qudra,إير برودكتس قدرة,energy,https://www.airproducts.com,https://www.linkedin.com/company/air-products/,Industrial gases
+Saudi Aramco,أرامكو السعودية,oil_gas,https://www.aramco.com,https://www.aramco.com/careers,,https://www.linkedin.com/company/saudi-aramco/,National oil
+SABIC,سابك,petrochemicals,https://www.sabic.com,https://jobs.sabic.com/search?searchby=location&createNewAlert=false&q=&locationsearch=&geolocation=&optionsFacetsDD_title=&optionsFacetsDD_dept=&optionsFacetsDD_department=,,https://www.linkedin.com/company/sabic/,Chemicals
+Ma'aden,معادن,mining,https://www.maaden.com.sa,,,https://www.linkedin.com/company/maaden/,Mining
+ACWA Power,أكوا باور,energy,https://www.acwapower.com,https://careers.acwapower.com/,,https://www.linkedin.com/company/acwapower/,Power & desalination
+SIPCHEM,سبكيم,petrochemicals,https://www.sipchem.com,,,https://www.linkedin.com/company/sipchem/,TASI petrochem
+YANSAB,ينساب,petrochemicals,https://www.yansab.com.sa,,,https://www.linkedin.com/company/yansab/,SABIC subsidiary
+Saudi Kayan,كيان السعودية,petrochemicals,https://www.saudikayan.com,,,https://www.linkedin.com/company/saudi-kayan/,TASI petrochem
+Petro Rabigh,بترو رابغ,petrochemicals,https://www.petrorabigh.com,https://careers.petrorabigh.com/,,https://www.linkedin.com/company/petro-rabigh/,TASI petrochem
+Tasnee,التصنيع,petrochemicals,https://www.tasnee.com,https://www.tasnee.com/en/contact-us/careers,,https://www.linkedin.com/company/tasnee/,TASI petrochem
+National Industrialization (NIC),التصنيع الوطنية,petrochemicals,https://www.nic.com.sa,,,,TASI petrochem holding
+Sahara Petrochemical,الصحراء للبتروكيماويات,petrochemicals,https://www.saharapcc.com,,,https://www.linkedin.com/company/sahara-petrochemicals/,TASI petrochem
+Almarai Investment Co — Petromin,بترومين,oil_gas,https://www.petromin.com,https://petromin.com/career,,https://www.linkedin.com/company/petromin/,Lubricants
+AMAK (Almasane Alkobra Mining),الفلزات الكبرى للتعدين,mining,https://www.amak.com.sa,https://amak.com.sa/?page_id=693,,,TASI mining
+ENGIE Saudi,إنجي السعودية,energy,https://www.engie.com,https://jobs.engie.com/,,https://www.linkedin.com/company/engie/,Power IPP
+Air Products Qudra,إير برودكتس قدرة,energy,https://www.airproducts.com,https://airproducts.wd5.myworkdayjobs.com/en-US/AP0001,,https://www.linkedin.com/company/air-products/,Industrial gases
 # --- Banking --------------------------------------------------------------
-Saudi National Bank,البنك الأهلي السعودي,banking,https://www.alahli.com,https://www.linkedin.com/company/snbsa/,SNB
-Al Rajhi Bank,مصرف الراجحي,banking,https://www.alrajhibank.com.sa,https://www.linkedin.com/company/al-rajhi-bank/,Bank
-Riyad Bank,بنك الرياض,banking,https://www.riyadbank.com,https://www.linkedin.com/company/riyad-bank/,Bank
-The Saudi Investment Bank,البنك السعودي للاستثمار,banking,https://www.saib.com.sa,https://www.linkedin.com/company/the-saudi-investment-bank/,Bank
-Arab National Bank,البنك العربي الوطني,banking,https://anb.com.sa,https://www.linkedin.com/company/arab-national-bank/,Bank
-Al Bilad Bank,بنك البلاد,banking,https://www.bankalbilad.com,https://www.linkedin.com/company/bank-albilad/,Bank
-Banque Saudi Fransi,البنك السعودي الفرنسي,banking,https://www.alfransi.com.sa,https://www.linkedin.com/company/banque-saudi-fransi/,Bank
-Alinma Bank,مصرف الإنماء,banking,https://www.alinma.com,https://www.linkedin.com/company/alinma-bank/,Bank
-Saudi Awwal Bank (SAB),البنك السعودي الأول,banking,https://www.sab.com,https://www.linkedin.com/company/saudibritishbank/,SAB
-Bank Aljazira,بنك الجزيرة,banking,https://www.baj.com.sa,https://www.linkedin.com/company/bank-aljazira/,Bank
-Gulf International Bank Saudi Arabia,بنك الخليج الدولي,banking,https://www.gib.com,https://www.linkedin.com/company/gulf-international-bank/,Bank
+Saudi National Bank,البنك الأهلي السعودي,banking,https://www.alahli.com,https://www.alahli.com/en/pages/about-us/careers,,https://www.linkedin.com/company/snbsa/,SNB
+Al Rajhi Bank,مصرف الراجحي,banking,https://www.alrajhibank.com.sa,,,https://www.linkedin.com/company/al-rajhi-bank/,Bank
+Riyad Bank,بنك الرياض,banking,https://www.riyadbank.com,https://www.riyadbank.com/careers,,https://www.linkedin.com/company/riyad-bank/,Bank
+The Saudi Investment Bank,البنك السعودي للاستثمار,banking,https://www.saib.com.sa,https://careers.saib.com.sa/,,https://www.linkedin.com/company/the-saudi-investment-bank/,Bank
+Arab National Bank,البنك العربي الوطني,banking,https://anb.com.sa,https://anb.com.sa/careers,,https://www.linkedin.com/company/arab-national-bank/,Bank
+Al Bilad Bank,بنك البلاد,banking,https://www.bankalbilad.com,https://www.bankalbilad.com.sa/ar/about/Pages/e-careers.aspx,,https://www.linkedin.com/company/bank-albilad/,Bank
+Banque Saudi Fransi,البنك السعودي الفرنسي,banking,https://www.alfransi.com.sa,,,https://www.linkedin.com/company/banque-saudi-fransi/,Bank
+Alinma Bank,مصرف الإنماء,banking,https://www.alinma.com,https://career.alinma.com/,,https://www.linkedin.com/company/alinma-bank/,Bank
+Saudi Awwal Bank (SAB),البنك السعودي الأول,banking,https://www.sab.com,https://www.sab.com/en/about-us/careers,,https://www.linkedin.com/company/saudibritishbank/,SAB
+Bank Aljazira,بنك الجزيرة,banking,https://www.baj.com.sa,https://career.aljazirabank.com.sa/,,https://www.linkedin.com/company/bank-aljazira/,Bank
+Gulf International Bank Saudi Arabia,بنك الخليج الدولي,banking,https://www.gib.com,https://www.gib.com/en/careers-home-page,,https://www.linkedin.com/company/gulf-international-bank/,Bank
 # --- Insurance / Takaful --------------------------------------------------
-Bupa Arabia,بوبا العربية,insurance,https://www.bupa.com.sa,https://www.linkedin.com/company/bupaarabia/,Health insurance
-Tawuniya,التعاونية,insurance,https://www.tawuniya.com,https://www.linkedin.com/company/tawuniya/,Insurance
-Walaa Cooperative Insurance,ولاء للتأمين التعاوني,insurance,https://www.walaa.com,https://www.linkedin.com/company/walaa-insurance/,Insurance
-Al Rajhi Takaful,تكافل الراجحي,insurance,https://www.alrajhitakaful.com,https://www.linkedin.com/company/al-rajhi-takaful/,Takaful
-Saudi Reinsurance Co (Saudi Re),الإعادة السعودية,insurance,https://www.saudire.com.sa,https://www.linkedin.com/company/saudi-reinsurance-company/,Reinsurance
-AICC,التعاونية للتأمين,insurance,https://www.aicc.com.sa,,Insurance
-Solidarity Saudi Takaful,سوليدارتي للتكافل,insurance,https://www.solidaritysaudi.com,,Takaful
+Bupa Arabia,بوبا العربية,insurance,https://www.bupa.com.sa,https://careers.bupa.com.sa/,,https://www.linkedin.com/company/bupaarabia/,Health insurance
+Tawuniya,التعاونية,insurance,https://www.tawuniya.com,,,https://www.linkedin.com/company/tawuniya/,Insurance
+Walaa Cooperative Insurance,ولاء للتأمين التعاوني,insurance,https://www.walaa.com,,,https://www.linkedin.com/company/walaa-insurance/,Insurance
+Al Rajhi Takaful,تكافل الراجحي,insurance,https://www.alrajhitakaful.com,https://www.alrajhitakaful.com/careers,,https://www.linkedin.com/company/al-rajhi-takaful/,Takaful
+Saudi Reinsurance Co (Saudi Re),الإعادة السعودية,insurance,https://www.saudire.com.sa,,,https://www.linkedin.com/company/saudi-reinsurance-company/,Reinsurance
+AICC,التعاونية للتأمين,insurance,https://www.aicc.com.sa,https://www.aicc.com.sa/careers,,,Insurance
+Solidarity Saudi Takaful,سوليدارتي للتكافل,insurance,https://www.solidaritysaudi.com,,,,Takaful
 # --- Telecom / Telecom Equipment ------------------------------------------
-Saudi Telecom Company (STC),شركة الاتصالات السعودية,telecom,https://www.stc.com.sa,https://www.linkedin.com/company/stc/,Telecom
-Mobily,موبايلي,telecom,https://www.mobily.com.sa,https://www.linkedin.com/company/mobily/,Telecom
-Zain KSA,زين السعودية,telecom,https://www.sa.zain.com,https://www.linkedin.com/company/zainksa/,Telecom
-Salam,سلام,telecom,https://www.salam.sa,https://www.linkedin.com/company/salam-sa/,Telecom
-Bayanat,بيانات,telecom,,https://www.linkedin.com/company/bayanat-sa/,Data centers
-solutions by stc,حلول إس تي سي,telecom,https://www.solutions.com.sa,https://www.linkedin.com/company/sbs-tech/,STC subsidiary
-Center3,سنتر3,telecom,https://www.center3.com,https://www.linkedin.com/company/center3/,STC data
-Nokia Saudi Arabia,نوكيا السعودية,telecom,https://www.nokia.com,https://www.linkedin.com/company/nokia/,Telecom equip
-Ericsson Saudi Arabia,إريكسون السعودية,telecom,https://www.ericsson.com,https://www.linkedin.com/company/ericsson/,Telecom equip
-Huawei Saudi Arabia,هواوي السعودية,telecom,https://www.huawei.com/sa,https://www.linkedin.com/company/huawei/,Telecom equip
+Saudi Telecom Company (STC),شركة الاتصالات السعودية,telecom,https://www.stc.com.sa,,,https://www.linkedin.com/company/stc/,Telecom
+Mobily,موبايلي,telecom,https://www.mobily.com.sa,https://www.mobily.com.sa/careers,,https://www.linkedin.com/company/mobily/,Telecom
+Zain KSA,زين السعودية,telecom,https://www.sa.zain.com,https://www.sa.zain.com/ar/careers/join-zain,,https://www.linkedin.com/company/zainksa/,Telecom
+Salam,سلام,telecom,https://www.salam.sa,,,https://www.linkedin.com/company/salam-sa/,Telecom
+Bayanat,بيانات,telecom,,,,https://www.linkedin.com/company/bayanat-sa/,Data centers
+solutions by stc,حلول إس تي سي,telecom,https://www.solutions.com.sa,https://www.solutions.com.sa/jobs,,https://www.linkedin.com/company/sbs-tech/,STC subsidiary
+Center3,سنتر3,telecom,https://www.center3.com,,,https://www.linkedin.com/company/center3/,STC data
+Nokia Saudi Arabia,نوكيا السعودية,telecom,https://www.nokia.com,,,https://www.linkedin.com/company/nokia/,Telecom equip
+Ericsson Saudi Arabia,إريكسون السعودية,telecom,https://www.ericsson.com,,,https://www.linkedin.com/company/ericsson/,Telecom equip
+Huawei Saudi Arabia,هواوي السعودية,telecom,https://www.huawei.com/sa,https://career.huawei.com/reccampportal/portal5/index.html,,https://www.linkedin.com/company/huawei/,Telecom equip
 # --- Airlines / Transport / Logistics -------------------------------------
-Saudia,الخطوط السعودية,airline,https://www.saudia.com,https://www.linkedin.com/company/saudia/,Airline
-flynas,طيران ناس,airline,https://www.flynas.com,https://www.linkedin.com/company/flynas/,Airline
-flyadeal,طيران أديل,airline,https://www.flyadeal.com,https://www.linkedin.com/company/flyadeal/,Airline
-Riyadh Air,طيران الرياض,airline,https://www.riyadhair.com,https://www.linkedin.com/company/riyadh-air/,New PIF airline
-Saudi Railway Company (SAR),الخطوط الحديدية السعودية,transport,https://www.sar.com.sa,https://www.linkedin.com/company/saudi-arabia-railways/,Rail
-Saudi Ports Authority (Mawani),الموانئ السعودية موانئ,logistics,https://mawani.gov.sa,https://www.linkedin.com/company/mawani-sa/,Ports authority
-Bahri,البحري,logistics,https://www.bahri.sa,https://www.linkedin.com/company/bahri/,Shipping
-SAL Saudi Logistics Services,سال للخدمات اللوجستية,logistics,https://sal.com.sa,https://www.linkedin.com/company/sal-saudi-logistics-services/,Logistics
-Saudi Post (SPL),البريد السعودي,logistics,https://splonline.com.sa,https://www.linkedin.com/company/spl-com-sa/,Postal
-Aramex,أرامكس,logistics,https://www.aramex.com,https://www.linkedin.com/company/aramex/,Regional logistics
-DHL Express Saudi Arabia,دي إتش إل السعودية,logistics,https://www.dhl.com/sa-en,https://www.linkedin.com/company/dhl-express/,Multinational logistics
-FedEx Saudi Arabia,فيدكس السعودية,logistics,https://www.fedex.com/en-sa,https://www.linkedin.com/company/fedex/,Multinational logistics
-Maersk Saudi Arabia,ميرسك السعودية,logistics,https://www.maersk.com,https://www.linkedin.com/company/maersk/,Shipping multinational
-Almajdouie Group,المجدوعي,logistics,https://www.almajdouie.com,https://www.linkedin.com/company/almajdouie/,Logistics + auto distribution
-Petromin Express,بترومين إكسبريس,transport,https://www.petromin.com,,Auto services
-Careem KSA,كريم السعودية,transport,https://www.careem.com,https://www.linkedin.com/company/careem/,Ride-hailing
-Uber KSA,أوبر السعودية,transport,https://www.uber.com,https://www.linkedin.com/company/uber-com/,Ride-hailing
+Saudia,الخطوط السعودية,airline,https://www.saudia.com,https://www.saudia.com/careers,,https://www.linkedin.com/company/saudia/,Airline
+flynas,طيران ناس,airline,https://www.flynas.com,,,https://www.linkedin.com/company/flynas/,Airline
+flyadeal,طيران أديل,airline,https://www.flyadeal.com,,,https://www.linkedin.com/company/flyadeal/,Airline
+Riyadh Air,طيران الرياض,airline,https://www.riyadhair.com,,,https://www.linkedin.com/company/riyadh-air/,New PIF airline
+Saudi Railway Company (SAR),الخطوط الحديدية السعودية,transport,https://www.sar.com.sa,,,https://www.linkedin.com/company/saudi-arabia-railways/,Rail
+Saudi Ports Authority (Mawani),الموانئ السعودية موانئ,logistics,https://mawani.gov.sa,https://mawani.gov.sa/careers,,https://www.linkedin.com/company/mawani-sa/,Ports authority
+Bahri,البحري,logistics,https://www.bahri.sa,https://www.bahri.sa/en/careers,,https://www.linkedin.com/company/bahri/,Shipping
+SAL Saudi Logistics Services,سال للخدمات اللوجستية,logistics,https://sal.com.sa,,,https://www.linkedin.com/company/sal-saudi-logistics-services/,Logistics
+Saudi Post (SPL),البريد السعودي,logistics,https://splonline.com.sa,https://splonline.com.sa/careers,,https://www.linkedin.com/company/spl-com-sa/,Postal
+Aramex,أرامكس,logistics,https://www.aramex.com,,,https://www.linkedin.com/company/aramex/,Regional logistics
+DHL Express Saudi Arabia,دي إتش إل السعودية,logistics,https://www.dhl.com/sa-en,,,https://www.linkedin.com/company/dhl-express/,Multinational logistics
+FedEx Saudi Arabia,فيدكس السعودية,logistics,https://www.fedex.com/en-sa,https://www.fedex.com/en-sa/careers,,https://www.linkedin.com/company/fedex/,Multinational logistics
+Maersk Saudi Arabia,ميرسك السعودية,logistics,https://www.maersk.com,https://www.maersk.com/careers,,https://www.linkedin.com/company/maersk/,Shipping multinational
+Almajdouie Group,المجدوعي,logistics,https://www.almajdouie.com,,,https://www.linkedin.com/company/almajdouie/,Logistics + auto distribution
+Petromin Express,بترومين إكسبريس,transport,https://www.petromin.com,https://petromin.com/career,,,Auto services
+Careem KSA,كريم السعودية,transport,https://www.careem.com,,,https://www.linkedin.com/company/careem/,Ride-hailing
+Uber KSA,أوبر السعودية,transport,https://www.uber.com,,,https://www.linkedin.com/company/uber-com/,Ride-hailing
 # --- Mega-projects (PIF) --------------------------------------------------
-NEOM,نيوم,real_estate,https://www.neom.com,https://www.linkedin.com/company/neom/,Megaproject
-ROSHN,روشن,real_estate,https://www.roshn.sa,https://www.linkedin.com/company/roshnksa/,Real estate
-Qiddiya,القدية,entertainment,https://www.qiddiya.com,https://www.linkedin.com/company/qiddiya-investment-company/,Megaproject
-Diriyah Gate Development Authority,هيئة تطوير بوابة الدرعية,real_estate,https://www.diriyah.sa,https://www.linkedin.com/company/diriyahcompany/,Megaproject
-Red Sea Global,البحر الأحمر العالمية,hospitality,https://www.redseaglobal.com,https://www.linkedin.com/company/redseaglobal/,Megaproject
-AMAALA,أمالا,hospitality,https://www.amaala.com,https://www.linkedin.com/company/amaala/,Megaproject
-King Abdullah Economic City (KAEC),مدينة الملك عبدالله الاقتصادية,real_estate,https://www.kaec.net,https://www.linkedin.com/company/kingabdullaheconomiccity/,Megaproject
-Public Investment Fund (PIF),صندوق الاستثمارات العامة,investment,https://www.pif.gov.sa,https://www.linkedin.com/company/public-investment-fund/,Sovereign wealth fund
-SOUDAH Development,تطوير السودة,hospitality,https://www.soudahdevelopment.com,https://www.linkedin.com/company/soudah-development/,PIF megaproject
-NHC (National Housing Co),الإسكان الوطنية,real_estate,https://www.nhc.sa,https://www.linkedin.com/company/national-housing-co/,Housing
-ROSHN — King Salman Park,حدائق الملك سلمان,real_estate,,https://www.linkedin.com/company/king-salman-park-foundation/,PIF megaproject
-THIQAH Business Services,ثقة لخدمات الأعمال,tech_software,https://www.thiqah.sa,https://www.linkedin.com/company/thiqah/,Gov-tech
-Elm,علم,tech_software,https://www.elm.sa,https://www.linkedin.com/company/elm-company/,Gov-tech
+NEOM,نيوم,real_estate,https://www.neom.com,https://careers.neom.com/careers,,https://www.linkedin.com/company/neom/,Megaproject
+ROSHN,روشن,real_estate,https://www.roshn.sa,https://www.roshn.sa/careers,,https://www.linkedin.com/company/roshnksa/,Real estate
+Qiddiya,القدية,entertainment,https://www.qiddiya.com,,,https://www.linkedin.com/company/qiddiya-investment-company/,Megaproject
+Diriyah Gate Development Authority,هيئة تطوير بوابة الدرعية,real_estate,https://www.diriyah.sa,,,https://www.linkedin.com/company/diriyahcompany/,Megaproject
+Red Sea Global,البحر الأحمر العالمية,hospitality,https://www.redseaglobal.com,,,https://www.linkedin.com/company/redseaglobal/,Megaproject
+AMAALA,أمالا,hospitality,https://www.amaala.com,,,https://www.linkedin.com/company/amaala/,Megaproject
+King Abdullah Economic City (KAEC),مدينة الملك عبدالله الاقتصادية,real_estate,https://www.kaec.net,,,https://www.linkedin.com/company/kingabdullaheconomiccity/,Megaproject
+Public Investment Fund (PIF),صندوق الاستثمارات العامة,investment,https://www.pif.gov.sa,,,https://www.linkedin.com/company/public-investment-fund/,Sovereign wealth fund
+SOUDAH Development,تطوير السودة,hospitality,https://www.soudahdevelopment.com,,,https://www.linkedin.com/company/soudah-development/,PIF megaproject
+NHC (National Housing Co),الإسكان الوطنية,real_estate,https://www.nhc.sa,https://www.nhc.sa/careers,,https://www.linkedin.com/company/national-housing-co/,Housing
+ROSHN — King Salman Park,حدائق الملك سلمان,real_estate,,,,https://www.linkedin.com/company/king-salman-park-foundation/,PIF megaproject
+THIQAH Business Services,ثقة لخدمات الأعمال,tech_software,https://www.thiqah.sa,https://careers.thiqah.sa/,,https://www.linkedin.com/company/thiqah/,Government digital services
+Elm,علم,tech_software,https://www.elm.sa,https://elm.sa/ar/recruitment/sectors/Pages/default.aspx,,https://www.linkedin.com/company/elm-company/,Gov-tech
 # --- Healthcare / Hospitals -----------------------------------------------
-King Faisal Specialist Hospital and Research Centre,مستشفى الملك فيصل التخصصي,healthcare,https://www.kfshrc.edu.sa,https://www.linkedin.com/company/kfshrc/,KFSH&RC
-Dr Sulaiman Al Habib Medical Group,مجموعة الدكتور سليمان الحبيب الطبية,healthcare,https://www.hmg.com,https://www.linkedin.com/company/drsulaiman-al-habib-medical-group/,Healthcare
-Mouwasat Medical Services,المواساة للخدمات الطبية,healthcare,https://www.mouwasat.com,https://www.linkedin.com/company/mouwasat-medical-services/,Healthcare
-Saudi German Hospital,المستشفى السعودي الألماني,healthcare,https://www.sghgroup.com.sa,https://www.linkedin.com/company/saudi-german-hospitals/,Hospital
-Kingdom Hospital,مستشفى المملكة,healthcare,https://www.kingdomhospital.com.sa,https://www.linkedin.com/company/kingdom-hospital/,Hospital
-Habib Medical Service,خدمة الحبيب الطبية,healthcare,https://www.hmg.com.sa,,Hospital
-Magrabi Hospitals,مستشفيات مغربي,healthcare,https://www.magrabihospitals.com,https://www.linkedin.com/company/magrabi-hospitals/,Hospital
-Andalusia Hospital,مستشفى الأندلسية,healthcare,https://www.andalusiagroup.net,https://www.linkedin.com/company/andalusia-group/,Hospital
-Specialized Medical Center,المركز الطبي التخصصي,healthcare,https://www.smc.sa,,Hospital
-Al Hammadi Hospital,مستشفى الحمادي,healthcare,https://www.alhammadihospital.com.sa,https://www.linkedin.com/company/al-hammadi-hospital/,Hospital
-King Fahad Medical City,مدينة الملك فهد الطبية,healthcare,https://www.kfmc.med.sa,https://www.linkedin.com/company/king-fahad-medical-city/,Gov hospital
-King Saud Medical City,مدينة الملك سعود الطبية,healthcare,https://ksmc.med.sa,,Gov hospital
-Prince Sultan Military Medical City,مدينة الأمير سلطان الطبية العسكرية,healthcare,https://psmmc.med.sa,https://www.linkedin.com/company/prince-sultan-military-medical-city/,Military medical
-King Khaled Eye Specialist Hospital,مستشفى الملك خالد التخصصي للعيون,healthcare,https://www.kkesh.med.sa,https://www.linkedin.com/company/king-khaled-eye-specialist-hospital/,Gov hospital
-Security Forces Hospital,مستشفى قوى الأمن,healthcare,https://sfh.med.sa,,Gov hospital
-Dallah Healthcare,دلة الصحية,healthcare,https://www.dallah-hospital.com,https://www.linkedin.com/company/dallah-healthcare/,TASI healthcare
-SEHA Virtual Hospital,مستشفى صحة الافتراضي,healthcare,https://seha.sa,https://www.linkedin.com/company/seha-virtual-hospital/,Gov virtual hospital
-National Unified Procurement Co (NUPCO),نوبكو,healthcare,https://www.nupco.com,https://www.linkedin.com/company/nupco/,Medical procurement
-SPIMACO,سبيماكو,pharma,https://www.spimaco.com.sa,https://www.linkedin.com/company/spimaco/,Pharma TASI
-Tabuk Pharmaceuticals,تبوك للصناعات الدوائية,pharma,https://www.tabukpharma.com,https://www.linkedin.com/company/tabuk-pharmaceuticals/,Pharma
-Jamjoom Pharma,جمجوم فارما,pharma,https://www.jamjoompharma.com,https://www.linkedin.com/company/jamjoom-pharma/,Pharma
-Sehat-i (SAMA Healthcare),صحتي,healthcare,,,
+King Faisal Specialist Hospital and Research Centre,مستشفى الملك فيصل التخصصي,healthcare,https://www.kfshrc.edu.sa,https://www.kfshrc.edu.sa/en/careers,,https://www.linkedin.com/company/kfshrc/,KFSH&RC
+Dr Sulaiman Al Habib Medical Group,مجموعة الدكتور سليمان الحبيب الطبية,healthcare,https://www.hmg.com,,,https://www.linkedin.com/company/drsulaiman-al-habib-medical-group/,Healthcare
+Mouwasat Medical Services,المواساة للخدمات الطبية,healthcare,https://www.mouwasat.com,https://www.mouwasat.com/en/careers,,https://www.linkedin.com/company/mouwasat-medical-services/,Healthcare
+Saudi German Hospital,المستشفى السعودي الألماني,healthcare,https://www.sghgroup.com.sa,,,https://www.linkedin.com/company/saudi-german-hospitals/,Hospital
+Kingdom Hospital,مستشفى المملكة,healthcare,https://www.kingdomhospital.com.sa,,,https://www.linkedin.com/company/kingdom-hospital/,Hospital
+Habib Medical Service,خدمة الحبيب الطبية,healthcare,https://www.hmg.com.sa,,,,Hospital
+Magrabi Hospitals,مستشفيات مغربي,healthcare,https://www.magrabihospitals.com,,,https://www.linkedin.com/company/magrabi-hospitals/,Hospital
+Andalusia Hospital,مستشفى الأندلسية,healthcare,https://www.andalusiagroup.net,https://www.andalusiagroup.net/careers,,https://www.linkedin.com/company/andalusia-group/,Hospital
+Specialized Medical Center,المركز الطبي التخصصي,healthcare,https://www.smc.sa,,,,Hospital
+Al Hammadi Hospital,مستشفى الحمادي,healthcare,https://www.alhammadihospital.com.sa,,,https://www.linkedin.com/company/al-hammadi-hospital/,Hospital
+King Fahad Medical City,مدينة الملك فهد الطبية,healthcare,https://www.kfmc.med.sa,https://vacancy.kfmc.med.sa/EN/Vacancies.aspx,,https://www.linkedin.com/company/king-fahad-medical-city/,Gov hospital
+King Saud Medical City,مدينة الملك سعود الطبية,healthcare,https://ksmc.med.sa,,,,Gov hospital
+Prince Sultan Military Medical City,مدينة الأمير سلطان الطبية العسكرية,healthcare,https://psmmc.med.sa,,,https://www.linkedin.com/company/prince-sultan-military-medical-city/,Military medical
+King Khaled Eye Specialist Hospital,مستشفى الملك خالد التخصصي للعيون,healthcare,https://www.kkesh.med.sa,https://kkesh.med.sa/careers,,https://www.linkedin.com/company/king-khaled-eye-specialist-hospital/,Gov hospital
+Security Forces Hospital,مستشفى قوى الأمن,healthcare,https://sfh.med.sa,,,,Gov hospital
+Dallah Healthcare,دلة الصحية,healthcare,https://www.dallah-hospital.com,,,https://www.linkedin.com/company/dallah-healthcare/,TASI healthcare
+SEHA Virtual Hospital,مستشفى صحة الافتراضي,healthcare,https://seha.sa,https://seha.sa/careers,,https://www.linkedin.com/company/seha-virtual-hospital/,Gov virtual hospital
+National Unified Procurement Co (NUPCO),نوبكو,healthcare,https://www.nupco.com,,,https://www.linkedin.com/company/nupco/,Medical procurement
+# --- Private hospitals / medical complexes (additional) --------------------
+Fakeeh Care Group,مجموعة فقيه الطبية,healthcare,https://en.fakeeh.care,https://careers.fakeeh.care/,,,Private hospital group
+International Medical Center (IMC),المركز الطبي الدولي,healthcare,https://www.imc.med.sa/en/,https://www.imc.med.sa/career,,,Private hospital
+Almoosa Health,الموسى الصحية,healthcare,https://almoosahealthgroup.org,,,,Private hospital group
+Almana Hospitals,مستشفيات المانع,healthcare,https://www.almanahospital.com.sa/,https://www.almanahospital.com.sa/en/careers,,,Private hospital group
+Abeer Medical Group,مجموعة أبر الطبية,healthcare,https://www.abeergroup.com/ksa/index.aspx,https://www.abeergroup.com/ksa/career.aspx,,,Medical group
+Hayat National Hospitals,مستشفيات الحياة الوطني,healthcare,https://hayathospitals.com/en/,,,,Private hospital group
+Care Medical,رعاية الطبية,healthcare,https://care.med.sa/en,,,,Private healthcare TASI
+Ram Clinics,عيادات رام,healthcare,https://ramclinics.net?lang=en,https://ramclinics.net/careers?lang=en,,,Medical clinics
+My Clinic,ماي كلينك,healthcare,https://www.myclinic.com.sa,https://www.myclinic.com.sa/careers,,,Medical clinics
+Remain Medical Group,مجموعة ريمين الطبية,healthcare,https://remain.com.sa,https://remain.com.sa/career/,,,Medical clinics
+Derma Clinic,عيادات ديرما,healthcare,https://derma-clinic.com,,,,Medical clinics
+SPIMACO,سبيماكو,pharma,https://www.spimaco.com.sa,https://www.spimaco.com.sa/jobs,,https://www.linkedin.com/company/spimaco/,Pharma TASI
+Tabuk Pharmaceuticals,تبوك للصناعات الدوائية,pharma,https://www.tabukpharma.com,,,https://www.linkedin.com/company/tabuk-pharmaceuticals/,Pharma
+Jamjoom Pharma,جمجوم فارما,pharma,https://www.jamjoompharma.com,https://www.jamjoompharma.com/careers,,https://www.linkedin.com/company/jamjoom-pharma/,Pharma
+Sehat-i (SAMA Healthcare),صحتي,healthcare,,,,,
 # --- Education ------------------------------------------------------------
-King Abdullah University of Science and Technology,جامعة الملك عبدالله للعلوم والتقنية,education,https://www.kaust.edu.sa,https://www.linkedin.com/company/kaust/,University
-King Saud University,جامعة الملك سعود,education,https://www.ksu.edu.sa,,University
-King Abdulaziz University,جامعة الملك عبدالعزيز,education,https://www.kau.edu.sa,,University
-King Fahd University of Petroleum and Minerals (KFUPM),جامعة الملك فهد للبترول والمعادن,education,https://www.kfupm.edu.sa,https://www.linkedin.com/company/kfupm/,University
-Misk Foundation,مؤسسة مسك,education,https://www.misk.org.sa,https://www.linkedin.com/company/misk-foundation/,Education / Misk Academy
-Prince Sultan University,جامعة الأمير سلطان,education,https://www.psu.edu.sa,https://www.linkedin.com/company/prince-sultan-university/,University
-Alfaisal University,جامعة الفيصل,education,https://www.alfaisal.edu,https://www.linkedin.com/company/alfaisal-university/,University
-Effat University,جامعة عفت,education,https://www.effatuniversity.edu.sa,https://www.linkedin.com/company/effat-university/,University
-Tatweer Education Holding Co,تطوير القابضة للتعليم,education,https://www.tatweer.edu.sa,https://www.linkedin.com/company/tatweerhc/,MOE-linked
-ATAA Educational Services,عطاء للخدمات التعليمية,education,https://www.ataaedu.com,https://www.linkedin.com/company/ataa-educational-services/,TASI education
+King Abdullah University of Science and Technology,جامعة الملك عبدالله للعلوم والتقنية,education,https://www.kaust.edu.sa,https://careers.kaust.edu.sa/,,https://www.linkedin.com/company/kaust/,University
+King Saud University,جامعة الملك سعود,education,https://www.ksu.edu.sa,https://dfpa.ksu.edu.sa/ar/jobs,,,University
+King Abdulaziz University,جامعة الملك عبدالعزيز,education,https://www.kau.edu.sa,https://www.kau.edu.sa/en/page/employment,,,University
+King Fahd University of Petroleum and Minerals (KFUPM),جامعة الملك فهد للبترول والمعادن,education,https://www.kfupm.edu.sa,https://www.kfupm.edu.sa/about-us/connect/careers,,https://www.linkedin.com/company/kfupm/,University
+Misk Foundation,مؤسسة مسك,education,https://www.misk.org.sa,https://misk.org.sa/careers,,https://www.linkedin.com/company/misk-foundation/,Education / Misk Academy
+Prince Sultan University,جامعة الأمير سلطان,education,https://www.psu.edu.sa,https://www.psu.edu.sa/en/career,,https://www.linkedin.com/company/prince-sultan-university/,University
+Alfaisal University,جامعة الفيصل,education,https://www.alfaisal.edu,https://jobs.alfaisal.edu/,,https://www.linkedin.com/company/alfaisal-university/,University
+Effat University,جامعة عفت,education,https://www.effatuniversity.edu.sa,,,https://www.linkedin.com/company/effat-university/,University
+Tatweer Education Holding Co,تطوير القابضة للتعليم,education,https://www.tatweer.edu.sa,,,https://www.linkedin.com/company/tatweerhc/,MOE-linked
+ATAA Educational Services,عطاء للخدمات التعليمية,education,https://www.ataaedu.com,,,https://www.linkedin.com/company/ataa-educational-services/,TASI education
+# --- Private universities / colleges / academies --------------------------
+Dar Al Uloom University,جامعة دار العلوم,education,https://dau.edu.sa/en/,,,,Private university
+University of Business and Technology (UBT),جامعة الأعمال والتكنولوجيا,education,https://www.ubt.edu.sa,,,,Private university
+Dar Al-Hekma University,جامعة دار الحكمة,education,https://www.dah.edu.sa/en/,,,,Private university
+Al Yamamah University,جامعة اليمامة,education,https://yu.edu.sa,,,,Private university
+Almaarefa University,جامعة المعرفة,education,https://www.um.edu.sa/en/,,,,Private university
+Prince Mohammad Bin Fahd University,جامعة الأمير محمد بن فهد,education,https://www.pmu.edu.sa,https://www.pmu.edu.sa/hr/,,,Private university
+Batterjee Medical College,كلية البترجي الطبية,education,https://www.bmc.edu.sa,https://careers.bmc.edu.sa/jobs/Careers,,,Private medical college
+Riyadh Elm University,جامعة رياض العلم,education,https://riyadh.edu.sa,,,,Private university
+Tuwaiq Academy,أكاديمية طويق,education,https://tuwaiq.edu.sa,,,,Technology academy
+Saudi Digital Academy,الأكاديمية السعودية الرقمية,education,https://sda.edu.sa,,,,Digital skills academy
+National Information Technology Academy (NITA),الأكاديمية الوطنية لتقنية المعلومات,education,https://nita.edu.sa,,,,Technology institute
+National Industrial Training Institute (NITI),المعهد الوطني للتدريب الصناعي,education,https://niti.edu.sa,,,,Industrial training institute
+Saudi Petroleum Services Polytechnic (SPSP),المعهد التقني السعودي لخدمات البترول,education,https://www.spsp.edu.sa,,,,Oil and gas training institute
+Tayaran National Aviation Academy,أكاديمية الطيران الوطنية,education,https://tayaran.edu.sa,https://tayaran.edu.sa/jobs,,,Aviation academy
+# --- Private schools / international schools ------------------------------
+Misk Schools,مدارس مسك,education,https://www.miskschools.edu.sa,https://www.miskschools.edu.sa/careers,,,Private school
+Kingdom Schools,مدارس المملكة,education,https://kingdomschools.edu.sa,,,,Private school
+Riyadh Schools Group,مجموعة مدارس الرياض,education,https://rsg.edu.sa/rsn/,,,,Private school group
+Advanced Learning Schools,مدارس التعلم المتقدم,education,https://alsschools.edu.sa,https://alsschools.edu.sa/career/,,,Private school
+British International School Riyadh,المدرسة البريطانية الدولية بالرياض,education,https://www.bisr.com.sa,https://www.bisr.com.sa/employment/vacancies,,,International school
+American International School Riyadh,المدرسة الأمريكية الدولية بالرياض,education,https://www.aisr.org,,,,International school
+Jeddah Knowledge International School,مدارس جدة نولدج العالمية,education,https://www.jks.edu.sa,https://www.jks.edu.sa/recruitment/,,,International school
+British International School of Jeddah,المدرسة البريطانية الدولية بجدة,education,https://www.continental-school.com,,,,International school
+Al Forsan International Schools,مدارس الفرسان العالمية,education,https://www.fis.sch.sa,,,,International school group
+King's College Riyadh,كلية الملك بالرياض,education,https://kingscollegeriyadh.com,https://kingscollegeriyadh.com/careers/,,,International school
+German International School Riyadh,المدرسة الألمانية الدولية بالرياض,education,https://disr.edu.sa,https://disr.edu.sa/en/careers/,,,International school
+SEK International School Riyadh,مدرسة إس إي كيه الدولية بالرياض,education,https://sek.sa,https://sek.sa/work-with-us/,,,International school
+Downe House Riyadh,داون هاوس الرياض,education,https://downehouseriyadh.com,https://downehouseriyadh.com/careers/,,,International school
+Beech Hall School Riyadh,مدرسة بيتش هول الرياض,education,https://beechhallschoolriyadh.com,https://beechhallschoolriyadh.com/community/careers/,,,International school
+KAF Academy International Schools,مدارس كاف العالمية,education,https://kaf.edu.sa,https://kaf.edu.sa/careers/,,,International school group
+DOME International Schools,مدارس دوم العالمية,education,https://dome.edu.sa,https://dome.edu.sa/about-us/careers/,,,International school
+The Learning Caravan International School,مدرسة ذا ليرنينغ كارافان العالمية,education,https://www.tlc-riyadh.com,https://www.tlc-riyadh.com/careers/,,,International school
+Tadrees Holding,تدريس القابضة,education,https://tadreesholding.com,,,,Private school operator
 # --- Food & Beverage / Hospitality / Retail -------------------------------
-Almarai,المراعي,food_beverage,https://www.almarai.com,https://www.linkedin.com/company/almarai/,Largest dairy
-Savola Group,صافولا,food_beverage,https://www.savola.com,https://www.linkedin.com/company/savola-group/,F&B holding
-Panda Retail Company,أسواق بنده,retail,https://www.panda.com.sa,https://www.linkedin.com/company/panda-retail-company/,Retail
-Herfy,هرفي,food_beverage,https://www.herfy.com,https://www.linkedin.com/company/herfy-food-services-co/,QSR
-Kudu,كودو,food_beverage,https://www.kudu.com.sa,https://www.linkedin.com/company/kudu/,QSR
-SADAFCO,سدافكو,food_beverage,https://www.sadafco.com,https://www.linkedin.com/company/sadafco/,Dairy TASI
-Halwani Bros,حلواني إخوان,food_beverage,https://www.halwanibros.com,https://www.linkedin.com/company/halwani-bros-co/,F&B
-BinDawood Holding,بن داود القابضة,retail,https://www.bindawoodholding.com,https://www.linkedin.com/company/bindawood-holding/,Grocery TASI
-Cenomi Centers,سينومي للمراكز,real_estate,https://www.cenomicenters.com,https://www.linkedin.com/company/cenomi-centers/,Mall operator
-Cenomi Retail,سينومي للتجزئة,retail,https://www.cenomiretail.com,https://www.linkedin.com/company/cenomi-retail/,Fashion retail
-eXtra (United Electronics),إكسترا,retail,https://www.extra.com,https://www.linkedin.com/company/united-electronics-company-extra/,Electronics retail
-Jarir Marketing Co,جرير,retail,https://www.jarir.com,https://www.linkedin.com/company/jarir-bookstore/,Bookstore + electronics
-Lulu Hypermarket Saudi Arabia,لولو السعودية,retail,https://www.luluhypermarket.com,https://www.linkedin.com/company/lulu-group-international/,Hypermarket
-Othaim Markets,أسواق العثيم,retail,https://www.othaimmarkets.com,https://www.linkedin.com/company/abdullah-al-othaim-markets-co/,Grocery TASI
-Tamimi Markets,أسواق التميمي,retail,https://www.tamimimarkets.com,https://www.linkedin.com/company/tamimi-markets/,Grocery
-Dur Hospitality,دور الضيافة,hospitality,https://www.dur.sa,https://www.linkedin.com/company/dur-hospitality/,Hotels TASI
-Al Hokair Group,مجموعة الحكير,hospitality,https://www.alhokair.com,https://www.linkedin.com/company/al-hokair-group/,Hospitality TASI
-Carrefour Saudi Arabia,كارفور السعودية,retail,https://www.carrefourksa.com,https://www.linkedin.com/company/majid-al-futtaim/,Multinational retail
-IKEA Saudi Arabia,إيكيا السعودية,retail,https://www.ikea.com/sa,https://www.linkedin.com/company/ikea/,Multinational retail
-McDonald's Saudi Arabia,ماكدونالدز السعودية,food_beverage,https://www.mcdonaldsarabia.com,https://www.linkedin.com/company/mcdonalds-corporation/,QSR multinational
-Americana Restaurants,أمريكانا للمطاعم,food_beverage,https://www.americana-restaurants.com,https://www.linkedin.com/company/americana-restaurants/,QSR (KFC, Pizza Hut, Hardee's KSA)
-Starbucks Saudi Arabia (Alshaya),ستاربكس السعودية,food_beverage,https://www.starbucks.com/sa,https://www.linkedin.com/company/starbucks/,Alshaya operated
-Costa Coffee Saudi Arabia,كوستا كوفي السعودية,food_beverage,https://www.costa.com.sa,,Alshaya operated
-Hilton Saudi Arabia,هيلتون السعودية,hospitality,https://www.hilton.com,https://www.linkedin.com/company/hilton/,Hotel chain
-Marriott Saudi Arabia,ماريوت السعودية,hospitality,https://www.marriott.com,https://www.linkedin.com/company/marriott-international/,Hotel chain
-Accor Saudi Arabia,أكور السعودية,hospitality,https://group.accor.com,https://www.linkedin.com/company/accor/,Hotel chain
-IHG Hotels Saudi Arabia,آي إتش جي السعودية,hospitality,https://www.ihg.com,https://www.linkedin.com/company/ihg/,Hotel chain
-Rotana,روتانا,hospitality,https://www.rotana.com,https://www.linkedin.com/company/rotana-hotel-management-corporation-ltd/,Hotel chain
-Four Seasons Saudi Arabia,فور سيزونز السعودية,hospitality,https://www.fourseasons.com,https://www.linkedin.com/company/four-seasons-hotels-and-resorts/,Hotel chain
+Almarai,المراعي,food_beverage,https://www.almarai.com,https://www.almarai.com/ar/careers,,https://www.linkedin.com/company/almarai/,Largest dairy
+Savola Group,صافولا,food_beverage,https://www.savola.com,https://fa-ewxl-saasfaprod1.fa.ocs.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_1001,,https://www.linkedin.com/company/savola-group/,F&B holding
+Panda Retail Company,أسواق بنده,retail,https://www.panda.com.sa,,,https://www.linkedin.com/company/panda-retail-company/,Retail
+Herfy,هرفي,food_beverage,https://www.herfy.com,https://herfy.com/careers,,https://www.linkedin.com/company/herfy-food-services-co/,QSR
+Kudu,كودو,food_beverage,https://www.kudu.com.sa,https://www.kudu.com.sa/careers,,https://www.linkedin.com/company/kudu/,QSR
+SADAFCO,سدافكو,food_beverage,https://www.sadafco.com,https://www.sadafco.com/careers/working-at-sadafco,,https://www.linkedin.com/company/sadafco/,Dairy TASI
+Halwani Bros,حلواني إخوان,food_beverage,https://www.halwanibros.com,,,https://www.linkedin.com/company/halwani-bros-co/,F&B
+BinDawood Holding,بن داود القابضة,retail,https://www.bindawoodholding.com,https://www.bindawoodholding.com/careers,,https://www.linkedin.com/company/bindawood-holding/,Grocery TASI
+Cenomi Centers,سينومي للمراكز,real_estate,https://www.cenomicenters.com,https://centers.cenomi.com/sa-en/careers,,https://www.linkedin.com/company/cenomi-centers/,Mall operator
+Cenomi Retail,سينومي للتجزئة,retail,https://www.cenomiretail.com,https://www.cenomiretail.com/careers,,https://www.linkedin.com/company/cenomi-retail/,Fashion retail
+eXtra (United Electronics),إكسترا,retail,https://www.extra.com,,,https://www.linkedin.com/company/united-electronics-company-extra/,Electronics retail
+Jarir Marketing Co,جرير,retail,https://www.jarir.com,,,https://www.linkedin.com/company/jarir-bookstore/,Bookstore + electronics
+Lulu Hypermarket Saudi Arabia,لولو السعودية,retail,https://www.luluhypermarket.com,,,https://www.linkedin.com/company/lulu-group-international/,Hypermarket
+Othaim Markets,أسواق العثيم,retail,https://www.othaimmarkets.com,https://www.othaimmarkets.com/ar/about-us/careers,,https://www.linkedin.com/company/abdullah-al-othaim-markets-co/,Grocery TASI
+Tamimi Markets,أسواق التميمي,retail,https://www.tamimimarkets.com,https://www.tamimimarkets.com/Careers,,https://www.linkedin.com/company/tamimi-markets/,Grocery
+Dur Hospitality,دور الضيافة,hospitality,https://www.dur.sa,,,https://www.linkedin.com/company/dur-hospitality/,Hotels TASI
+Al Hokair Group,مجموعة الحكير,hospitality,https://www.alhokair.com,,,https://www.linkedin.com/company/al-hokair-group/,Hospitality TASI
+Carrefour Saudi Arabia,كارفور السعودية,retail,https://www.carrefourksa.com,,,https://www.linkedin.com/company/majid-al-futtaim/,Multinational retail
+IKEA Saudi Arabia,إيكيا السعودية,retail,https://www.ikea.com/sa,https://www.ikea.com/sa/en/this-is-ikea/work-with-us/,,https://www.linkedin.com/company/ikea/,Multinational retail
+McDonald's Saudi Arabia,ماكدونالدز السعودية,food_beverage,https://www.mcdonaldsarabia.com,,,https://www.linkedin.com/company/mcdonalds-corporation/,QSR multinational
+Americana Restaurants,أمريكانا للمطاعم,food_beverage,https://www.americana-restaurants.com,https://www.americana-restaurants.com/careers,,https://www.linkedin.com/company/americana-restaurants/,"QSR (KFC, Pizza Hut, Hardee's KSA)"
+Starbucks Saudi Arabia (Alshaya),ستاربكس السعودية,food_beverage,https://www.starbucks.com/sa,,,https://www.linkedin.com/company/starbucks/,Alshaya operated
+Costa Coffee Saudi Arabia,كوستا كوفي السعودية,food_beverage,https://www.costa.com.sa,,,,Alshaya operated
+Hilton Saudi Arabia,هيلتون السعودية,hospitality,https://www.hilton.com,,,https://www.linkedin.com/company/hilton/,Hotel chain
+Marriott Saudi Arabia,ماريوت السعودية,hospitality,https://www.marriott.com,https://careers.marriott.com/,,https://www.linkedin.com/company/marriott-international/,Hotel chain
+Accor Saudi Arabia,أكور السعودية,hospitality,https://group.accor.com,https://careers.accor.com/global/en,,https://www.linkedin.com/company/accor/,Hotel chain
+IHG Hotels Saudi Arabia,آي إتش جي السعودية,hospitality,https://www.ihg.com,,,https://www.linkedin.com/company/ihg/,Hotel chain
+Rotana,روتانا,hospitality,https://www.rotana.com,,,https://www.linkedin.com/company/rotana-hotel-management-corporation-ltd/,Hotel chain
+Four Seasons Saudi Arabia,فور سيزونز السعودية,hospitality,https://www.fourseasons.com,,,https://www.linkedin.com/company/four-seasons-hotels-and-resorts/,Hotel chain
 # --- Construction / Engineering / Cement ----------------------------------
-Saudi Binladin Group,مجموعة بن لادن السعودية,construction,https://www.sbg.com.sa,https://www.linkedin.com/company/saudi-binladin-group/,Construction
-Nesma,نسما,construction,https://www.nesma.com,https://www.linkedin.com/company/nesma/,Construction
-Almabani General Contractors,المعبني للمقاولات العامة,construction,https://www.almabani.com,https://www.linkedin.com/company/almabani-general-contractors/,Construction
-Saudi Aramco Total Refining and Petrochemical Co (SATORP),ساتورب,oil_gas,https://www.satorp.com,https://www.linkedin.com/company/satorp/,Refining JV
-Petrofac KSA,بتروفاك السعودية,construction,https://www.petrofac.com,https://www.linkedin.com/company/petrofac/,Oil services + construction
-AECOM Saudi Arabia,إيكوم السعودية,construction,https://www.aecom.com,https://www.linkedin.com/company/aecom/,Engineering multinational
-Jacobs Saudi Arabia,جاكوبس السعودية,construction,https://www.jacobs.com,https://www.linkedin.com/company/jacobs/,Engineering multinational
-Bechtel Saudi Arabia,بكتل السعودية,construction,https://www.bechtel.com,https://www.linkedin.com/company/bechtel/,Engineering multinational
-Hill International KSA,هل إنترناشيونال,construction,https://www.hillintl.com,https://www.linkedin.com/company/hill-international-inc-/,PM consultancy
-Parsons KSA,بارسونز السعودية,construction,https://www.parsons.com,https://www.linkedin.com/company/parsons-corporation/,Engineering multinational
-WSP Saudi Arabia,دبليو إس بي,construction,https://www.wsp.com,https://www.linkedin.com/company/wsp/,Engineering multinational
-Worley Saudi Arabia,وورلي السعودية,construction,https://www.worley.com,https://www.linkedin.com/company/worley/,Oil & gas engineering
-Saudi Cement,أسمنت السعودية,cement,https://www.saudicement.com.sa,,Cement TASI
-Yamama Cement,أسمنت اليمامة,cement,https://www.yamamacement.com,,Cement TASI
-Yanbu Cement,أسمنت ينبع,cement,https://www.yanbucement.com.sa,,Cement TASI
-Eastern Province Cement,أسمنت المنطقة الشرقية,cement,https://www.eastcement.com,,Cement TASI
-Najran Cement,أسمنت نجران,cement,https://www.najrancement.com,,Cement TASI
-Qassim Cement,أسمنت القصيم,cement,https://www.qassimcement.com,,Cement TASI
+Saudi Binladin Group,مجموعة بن لادن السعودية,construction,https://www.sbg.com.sa,https://www.sbg.com.sa/careers,,https://www.linkedin.com/company/saudi-binladin-group/,Construction
+Nesma,نسما,construction,https://www.nesma.com,https://www.nesma.com/en/careers,,https://www.linkedin.com/company/nesma/,Construction
+Almabani General Contractors,المعبني للمقاولات العامة,construction,https://www.almabani.com,https://www.almabani.com/careers,,https://www.linkedin.com/company/almabani-general-contractors/,Construction
+Saudi Aramco Total Refining and Petrochemical Co (SATORP),ساتورب,oil_gas,https://www.satorp.com,,,https://www.linkedin.com/company/satorp/,Refining JV
+Petrofac KSA,بتروفاك السعودية,construction,https://www.petrofac.com,https://petrofac.referrals.selectminds.com/,,https://www.linkedin.com/company/petrofac/,Oil services + construction
+AECOM Saudi Arabia,إيكوم السعودية,construction,https://www.aecom.com,https://aecom.com/careers,,https://www.linkedin.com/company/aecom/,Engineering multinational
+Jacobs Saudi Arabia,جاكوبس السعودية,construction,https://www.jacobs.com,https://www.jacobs.com/careers-jacobs,,https://www.linkedin.com/company/jacobs/,Engineering multinational
+Bechtel Saudi Arabia,بكتل السعودية,construction,https://www.bechtel.com,https://www.bechtel.com/careers,,https://www.linkedin.com/company/bechtel/,Engineering multinational
+Hill International KSA,هل إنترناشيونال,construction,https://www.hillintl.com,https://hcib.fa.us2.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_1001,,https://www.linkedin.com/company/hill-international-inc-/,PM consultancy
+Parsons KSA,بارسونز السعودية,construction,https://www.parsons.com,https://www.parsons.com/careers/,,https://www.linkedin.com/company/parsons-corporation/,Engineering multinational
+WSP Saudi Arabia,دبليو إس بي,construction,https://www.wsp.com,,,https://www.linkedin.com/company/wsp/,Engineering multinational
+Worley Saudi Arabia,وورلي السعودية,construction,https://www.worley.com,https://www.worley.com/en/careers/your-global-career,,https://www.linkedin.com/company/worley/,Oil & gas engineering
+Saudi Cement,أسمنت السعودية,cement,https://www.saudicement.com.sa,,,,Cement TASI
+Yamama Cement,أسمنت اليمامة,cement,https://www.yamamacement.com,https://www.yamamacement.com/ar/Careers,,,Cement TASI
+Yanbu Cement,أسمنت ينبع,cement,https://www.yanbucement.com.sa,,,,Cement TASI
+Eastern Province Cement,أسمنت المنطقة الشرقية,cement,https://www.eastcement.com,https://www.eastcement.com/careers,,,Cement TASI
+Najran Cement,أسمنت نجران,cement,https://www.najrancement.com,https://najrancement.com/career,,,Cement TASI
+Qassim Cement,أسمنت القصيم,cement,https://www.qassimcement.com,,,,Cement TASI
 # --- Defense (international + Saudi Military Industries) -------------------
-Saudi Arabian Military Industries (SAMI),الصناعات العسكرية السعودية سامي,manufacturing,https://www.sami.com.sa,https://www.linkedin.com/company/sami-defense/,PIF defense
-Lockheed Martin Saudi Arabia,لوكهيد مارتن السعودية,manufacturing,https://www.lockheedmartin.com,https://www.linkedin.com/company/lockheed-martin/,Defense multinational
-BAE Systems Saudi Arabia,بي إيه إي السعودية,manufacturing,https://www.baesystems.com,https://www.linkedin.com/company/bae-systems/,Defense multinational
-Raytheon Saudi Arabia (RTX),رايثيون السعودية,manufacturing,https://www.rtx.com,https://www.linkedin.com/company/rtx/,Defense multinational
-Boeing Saudi Arabia,بوينج السعودية,manufacturing,https://www.boeing.com,https://www.linkedin.com/company/boeing/,Aerospace multinational
-Airbus Saudi Arabia,إيرباص السعودية,manufacturing,https://www.airbus.com,https://www.linkedin.com/company/airbus/,Aerospace multinational
+Saudi Arabian Military Industries (SAMI),الصناعات العسكرية السعودية سامي,manufacturing,https://www.sami.com.sa,,,https://www.linkedin.com/company/sami-defense/,PIF defense
+Lockheed Martin Saudi Arabia,لوكهيد مارتن السعودية,manufacturing,https://www.lockheedmartin.com,https://www.lockheedmartinjobs.com/,,https://www.linkedin.com/company/lockheed-martin/,Defense multinational
+BAE Systems Saudi Arabia,بي إيه إي السعودية,manufacturing,https://www.baesystems.com,https://www.baesystems.com/careers,,https://www.linkedin.com/company/bae-systems/,Defense multinational
+Raytheon Saudi Arabia (RTX),رايثيون السعودية,manufacturing,https://www.rtx.com,https://careers.rtx.com/global/en,,https://www.linkedin.com/company/rtx/,Defense multinational
+Boeing Saudi Arabia,بوينج السعودية,manufacturing,https://www.boeing.com,https://www.boeing.com/company/careers,,https://www.linkedin.com/company/boeing/,Aerospace multinational
+Airbus Saudi Arabia,إيرباص السعودية,manufacturing,https://www.airbus.com,https://www.airbus.com/en/careers,,https://www.linkedin.com/company/airbus/,Aerospace multinational
 # --- Auto + dealers -------------------------------------------------------
-Lucid Motors KSA,لوسيد موتورز السعودية,automotive,https://www.lucidmotors.com,https://www.linkedin.com/company/lucidmotors/,EV
-Ceer Motors,سير موتورز,automotive,https://www.ceer.com,https://www.linkedin.com/company/ceer-motors/,EV
-Abdul Latif Jameel (ALJ),عبد اللطيف جميل,automotive,https://www.alj.com,https://www.linkedin.com/company/abdul-latif-jameel/,Toyota distributor + conglomerate
-Mohamed Yousuf Naghi Motors,محمد يوسف ناغي للسيارات,automotive,https://www.naghimotors.com.sa,https://www.linkedin.com/company/mohamed-yousuf-naghi-motors/,BMW distributor
-Saudi Automotive Services (SASCO),السعودية للخدمات السيارات,automotive,https://www.sasco.com.sa,,TASI
-ALDREES Petroleum and Transport Services,الدريس للبترول,oil_gas,https://www.aldrees.com,,TASI
+Lucid Motors KSA,لوسيد موتورز السعودية,automotive,https://www.lucidmotors.com,https://lucidmotors.com/careers,,https://www.linkedin.com/company/lucidmotors/,EV
+Ceer Motors,سير موتورز,automotive,https://www.ceer.com,,,https://www.linkedin.com/company/ceer-motors/,EV
+Abdul Latif Jameel (ALJ),عبد اللطيف جميل,automotive,https://www.alj.com,https://careers.alj.com/en/?locale=en_US,,https://www.linkedin.com/company/abdul-latif-jameel/,Toyota distributor + conglomerate
+Mohamed Yousuf Naghi Motors,محمد يوسف ناغي للسيارات,automotive,https://www.naghimotors.com.sa,,,https://www.linkedin.com/company/mohamed-yousuf-naghi-motors/,BMW distributor
+Saudi Automotive Services (SASCO),السعودية للخدمات السيارات,automotive,https://www.sasco.com.sa,https://www.sasco.com.sa/careers,,,TASI
+ALDREES Petroleum and Transport Services,الدريس للبترول,oil_gas,https://www.aldrees.com,,,,TASI
 # --- Tech multinationals operating in KSA ---------------------------------
-Google Saudi Arabia,جوجل السعودية,tech_software,https://www.google.com,https://www.linkedin.com/company/google/,Tech multinational
-Microsoft Arabia,مايكروسوفت العربية,tech_software,https://www.microsoft.com/ar-sa,https://www.linkedin.com/company/microsoft/,Tech multinational
-Amazon Saudi Arabia,أمازون السعودية,ecommerce,https://www.amazon.sa,https://www.linkedin.com/company/amazon/,E-commerce + cloud
-AWS Middle East,أمازون ويب سيرفس,tech_software,https://aws.amazon.com,https://www.linkedin.com/company/amazon-web-services/,Cloud
-Meta Middle East,ميتا الشرق الأوسط,tech_software,https://about.meta.com,https://www.linkedin.com/company/meta/,Tech multinational
-Apple Saudi Arabia,آبل السعودية,tech_software,https://www.apple.com/sa,https://www.linkedin.com/company/apple/,Tech multinational
-Oracle Saudi Arabia,أوراكل السعودية,tech_software,https://www.oracle.com,https://www.linkedin.com/company/oracle/,Tech multinational
-SAP Saudi Arabia,ساب السعودية,tech_software,https://www.sap.com,https://www.linkedin.com/company/sap/,ERP / cloud
-Salesforce Saudi Arabia,سيلز فورس السعودية,tech_software,https://www.salesforce.com,https://www.linkedin.com/company/salesforce/,CRM
-IBM Saudi Arabia,آي بي إم السعودية,tech_software,https://www.ibm.com,https://www.linkedin.com/company/ibm/,Tech multinational
-Cisco Saudi Arabia,سيسكو السعودية,tech_software,https://www.cisco.com,https://www.linkedin.com/company/cisco/,Networking
-ServiceNow Saudi Arabia,سيرفس ناو السعودية,tech_software,https://www.servicenow.com,https://www.linkedin.com/company/servicenow/,IT ops
-Dell Technologies Saudi Arabia,ديل السعودية,tech_software,https://www.dell.com,https://www.linkedin.com/company/delltechnologies/,Hardware
-HP Saudi Arabia,إتش بي السعودية,tech_software,https://www.hp.com,https://www.linkedin.com/company/hp/,Hardware
-Intel Saudi Arabia,إنتل السعودية,tech_software,https://www.intel.com,https://www.linkedin.com/company/intel-corporation/,Chips
-NVIDIA Saudi Arabia,إنفيديا السعودية,tech_software,https://www.nvidia.com,https://www.linkedin.com/company/nvidia/,GPU / AI
-Adobe Saudi Arabia,أدوبي السعودية,tech_software,https://www.adobe.com,https://www.linkedin.com/company/adobe/,Software
-Accenture Saudi Arabia,أكسنتشر السعودية,tech_software,https://www.accenture.com,https://www.linkedin.com/company/accenture/,Tech consulting
-Capgemini Saudi Arabia,كاب جيميني السعودية,tech_software,https://www.capgemini.com,https://www.linkedin.com/company/capgemini/,Tech consulting
-Cognizant Saudi Arabia,كوغنيزانت السعودية,tech_software,https://www.cognizant.com,https://www.linkedin.com/company/cognizant/,Tech consulting
-TCS Saudi Arabia,تي سي إس السعودية,tech_software,https://www.tcs.com,https://www.linkedin.com/company/tata-consultancy-services/,Tech consulting
-Infosys Saudi Arabia,إنفوسيس السعودية,tech_software,https://www.infosys.com,https://www.linkedin.com/company/infosys/,Tech consulting
-Wipro Saudi Arabia,ويبرو السعودية,tech_software,https://www.wipro.com,https://www.linkedin.com/company/wipro/,Tech consulting
-HCL Saudi Arabia,إتش سي إل السعودية,tech_software,https://www.hcltech.com,https://www.linkedin.com/company/hcltech/,Tech consulting
-NTT Data Saudi Arabia,إن تي تي داتا السعودية,tech_software,https://www.nttdata.com,https://www.linkedin.com/company/ntt-data/,Tech consulting
-DXC Technology Saudi Arabia,دي إكس سي السعودية,tech_software,https://www.dxc.com,https://www.linkedin.com/company/dxctechnology/,Tech consulting
+Google Saudi Arabia,جوجل السعودية,tech_software,https://www.google.com,https://www.google.com/about/careers/applications,,https://www.linkedin.com/company/google/,Tech multinational
+Microsoft Arabia,مايكروسوفت العربية,tech_software,https://www.microsoft.com/ar-sa,https://careers.microsoft.com/v2/global/en/home.html,,https://www.linkedin.com/company/microsoft/,Tech multinational
+Amazon Saudi Arabia,أمازون السعودية,ecommerce,https://www.amazon.sa,,,https://www.linkedin.com/company/amazon/,E-commerce + cloud
+AWS Middle East,أمازون ويب سيرفس,tech_software,https://aws.amazon.com,https://aws.amazon.com/careers,,https://www.linkedin.com/company/amazon-web-services/,Cloud
+Meta Middle East,ميتا الشرق الأوسط,tech_software,https://about.meta.com,,,https://www.linkedin.com/company/meta/,Tech multinational
+Apple Saudi Arabia,آبل السعودية,tech_software,https://www.apple.com/sa,https://www.apple.com/careers/sa,,https://www.linkedin.com/company/apple/,Tech multinational
+Oracle Saudi Arabia,أوراكل السعودية,tech_software,https://www.oracle.com,,,https://www.linkedin.com/company/oracle/,Tech multinational
+SAP Saudi Arabia,ساب السعودية,tech_software,https://www.sap.com,,,https://www.linkedin.com/company/sap/,ERP / cloud
+Salesforce Saudi Arabia,سيلز فورس السعودية,tech_software,https://www.salesforce.com,https://www.salesforce.com/company/careers?bc=DB,,https://www.linkedin.com/company/salesforce/,CRM
+IBM Saudi Arabia,آي بي إم السعودية,tech_software,https://www.ibm.com,https://www.ibm.com/careers,,https://www.linkedin.com/company/ibm/,Tech multinational
+Cisco Saudi Arabia,سيسكو السعودية,tech_software,https://www.cisco.com,https://careers.cisco.com/global/en/home,,https://www.linkedin.com/company/cisco/,Networking
+ServiceNow Saudi Arabia,سيرفس ناو السعودية,tech_software,https://www.servicenow.com,,,https://www.linkedin.com/company/servicenow/,IT ops
+Dell Technologies Saudi Arabia,ديل السعودية,tech_software,https://www.dell.com,https://iawmqy.fa.ocs.oraclecloud.com/hcmUI/CandidateExperience/en/sites/careers,,https://www.linkedin.com/company/delltechnologies/,Hardware
+HP Saudi Arabia,إتش بي السعودية,tech_software,https://www.hp.com,,,https://www.linkedin.com/company/hp/,Hardware
+Intel Saudi Arabia,إنتل السعودية,tech_software,https://www.intel.com,https://jobs.intel.com/,,https://www.linkedin.com/company/intel-corporation/,Chips
+NVIDIA Saudi Arabia,إنفيديا السعودية,tech_software,https://www.nvidia.com,https://www.nvidia.com/en-us/about-nvidia/careers,,https://www.linkedin.com/company/nvidia/,GPU / AI
+Adobe Saudi Arabia,أدوبي السعودية,tech_software,https://www.adobe.com,https://www.adobe.com/careers.html,,https://www.linkedin.com/company/adobe/,Software
+Accenture Saudi Arabia,أكسنتشر السعودية,tech_software,https://www.accenture.com,https://www.accenture.com/sa-en/careers/jobsearch,,https://www.linkedin.com/company/accenture/,Tech consulting
+Capgemini Saudi Arabia,كاب جيميني السعودية,tech_software,https://www.capgemini.com,,,https://www.linkedin.com/company/capgemini/,Tech consulting
+Cognizant Saudi Arabia,كوغنيزانت السعودية,tech_software,https://www.cognizant.com,,,https://www.linkedin.com/company/cognizant/,Tech consulting
+TCS Saudi Arabia,تي سي إس السعودية,tech_software,https://www.tcs.com,,,https://www.linkedin.com/company/tata-consultancy-services/,Tech consulting
+Infosys Saudi Arabia,إنفوسيس السعودية,tech_software,https://www.infosys.com,,,https://www.linkedin.com/company/infosys/,Tech consulting
+Wipro Saudi Arabia,ويبرو السعودية,tech_software,https://www.wipro.com,https://careers.wipro.com/,,https://www.linkedin.com/company/wipro/,Tech consulting
+HCL Saudi Arabia,إتش سي إل السعودية,tech_software,https://www.hcltech.com,,,https://www.linkedin.com/company/hcltech/,Tech consulting
+NTT Data Saudi Arabia,إن تي تي داتا السعودية,tech_software,https://www.nttdata.com,,,https://www.linkedin.com/company/ntt-data/,Tech consulting
+DXC Technology Saudi Arabia,دي إكس سي السعودية,tech_software,https://www.dxc.com,https://careers.dxc.com/,,https://www.linkedin.com/company/dxctechnology/,Tech consulting
 # --- Consulting (Big 4 + strategy) ----------------------------------------
-PwC Middle East,بي دبليو سي,investment,https://www.pwc.com/m1,https://www.linkedin.com/company/pwc-middle-east/,Big 4
-EY Middle East (Ernst & Young),إرنست ويونغ الشرق الأوسط,investment,https://www.ey.com/en_em,https://www.linkedin.com/company/ernstandyoung/,Big 4
-Deloitte Middle East,ديلويت الشرق الأوسط,investment,https://www2.deloitte.com,https://www.linkedin.com/company/deloitte/,Big 4
-KPMG Middle East,كي بي إم جي,investment,https://kpmg.com/sa,https://www.linkedin.com/company/kpmg/,Big 4
-McKinsey & Company Saudi Arabia,ماكنزي السعودية,investment,https://www.mckinsey.com,https://www.linkedin.com/company/mckinsey/,Strategy consulting
-Boston Consulting Group (BCG) Saudi Arabia,بي سي جي السعودية,investment,https://www.bcg.com,https://www.linkedin.com/company/boston-consulting-group/,Strategy consulting
-Bain & Company Saudi Arabia,بين السعودية,investment,https://www.bain.com,https://www.linkedin.com/company/bain-and-company/,Strategy consulting
-Roland Berger Saudi Arabia,رولاند برغر,investment,https://www.rolandberger.com,https://www.linkedin.com/company/roland-berger/,Strategy consulting
-Strategy& (PwC),استراتيجي آند,investment,https://www.strategyand.pwc.com,https://www.linkedin.com/company/strategyand/,Strategy consulting
-Arthur D Little Saudi Arabia,آرثر دي ليتل,investment,https://www.adlittle.com,https://www.linkedin.com/company/arthur-d-little/,Strategy consulting
-Oliver Wyman Saudi Arabia,أوليفر وايمان السعودية,investment,https://www.oliverwyman.com,https://www.linkedin.com/company/oliver-wyman/,Strategy consulting
+PwC Middle East,بي دبليو سي,investment,https://www.pwc.com/m1,,,https://www.linkedin.com/company/pwc-middle-east/,Big 4
+EY Middle East (Ernst & Young),إرنست ويونغ الشرق الأوسط,investment,https://www.ey.com/en_em,,,https://www.linkedin.com/company/ernstandyoung/,Big 4
+Deloitte Middle East,ديلويت الشرق الأوسط,investment,https://www2.deloitte.com,https://www.deloitte.com/middle-east/en/careers.html?icid=bn_careers,,https://www.linkedin.com/company/deloitte/,Big 4
+KPMG Middle East,كي بي إم جي,investment,https://kpmg.com/sa,https://slccareers.kpmg.com/,,https://www.linkedin.com/company/kpmg/,Big 4
+McKinsey & Company Saudi Arabia,ماكنزي السعودية,investment,https://www.mckinsey.com,,,https://www.linkedin.com/company/mckinsey/,Strategy consulting
+Boston Consulting Group (BCG) Saudi Arabia,بي سي جي السعودية,investment,https://www.bcg.com,https://careers.bcg.com/global/en,,https://www.linkedin.com/company/boston-consulting-group/,Strategy consulting
+Bain & Company Saudi Arabia,بين السعودية,investment,https://www.bain.com,https://www.bain.com/careers/work-with-us,,https://www.linkedin.com/company/bain-and-company/,Strategy consulting
+Roland Berger Saudi Arabia,رولاند برغر,investment,https://www.rolandberger.com,https://www.rolandberger.com/en/Join/,,https://www.linkedin.com/company/roland-berger/,Strategy consulting
+Strategy& (PwC),استراتيجي آند,investment,https://www.strategyand.pwc.com,,,https://www.linkedin.com/company/strategyand/,Strategy consulting
+Arthur D Little Saudi Arabia,آرثر دي ليتل,investment,https://www.adlittle.com,https://www.adlittle.com/en/careers/working-us/your-career,,https://www.linkedin.com/company/arthur-d-little/,Strategy consulting
+Oliver Wyman Saudi Arabia,أوليفر وايمان السعودية,investment,https://www.oliverwyman.com,https://www.oliverwyman.com/careers.html,,https://www.linkedin.com/company/oliver-wyman/,Strategy consulting
 # --- Oil services multinationals operating in KSA -------------------------
-Schlumberger Saudi Arabia,شلمبرجير السعودية,oil_gas,https://www.slb.com,https://www.linkedin.com/company/slb/,Oil services
-Halliburton Saudi Arabia,هاليبرتون السعودية,oil_gas,https://www.halliburton.com,https://www.linkedin.com/company/halliburton/,Oil services
-Baker Hughes Saudi Arabia,بيكر هيوز السعودية,oil_gas,https://www.bakerhughes.com,https://www.linkedin.com/company/bakerhughes/,Oil services
-Weatherford Saudi Arabia,ويذرفورد السعودية,oil_gas,https://www.weatherford.com,https://www.linkedin.com/company/weatherford/,Oil services
-ChampionX Saudi Arabia,تشامبيون إكس السعودية,oil_gas,https://www.championx.com,https://www.linkedin.com/company/championx/,Oil chemistry
+Schlumberger Saudi Arabia,شلمبرجير السعودية,oil_gas,https://www.slb.com,https://careers.slb.com/,,https://www.linkedin.com/company/slb/,Oil services
+Halliburton Saudi Arabia,هاليبرتون السعودية,oil_gas,https://www.halliburton.com,https://careers.halliburton.com/,,https://www.linkedin.com/company/halliburton/,Oil services
+Baker Hughes Saudi Arabia,بيكر هيوز السعودية,oil_gas,https://www.bakerhughes.com,https://careers.bakerhughes.com/,,https://www.linkedin.com/company/bakerhughes/,Oil services
+Weatherford Saudi Arabia,ويذرفورد السعودية,oil_gas,https://www.weatherford.com,https://www.weatherford.com/careers,,https://www.linkedin.com/company/weatherford/,Oil services
+ChampionX Saudi Arabia,تشامبيون إكس السعودية,oil_gas,https://www.championx.com,https://www.championx.com/careers,,https://www.linkedin.com/company/championx/,Oil chemistry
 # --- Pharma multinationals ------------------------------------------------
-Pfizer Saudi Arabia,فايزر السعودية,pharma,https://www.pfizer.com,https://www.linkedin.com/company/pfizer/,Pharma multinational
-GSK Saudi Arabia,جي إس كيه السعودية,pharma,https://www.gsk.com,https://www.linkedin.com/company/gsk/,Pharma multinational
-Novartis Saudi Arabia,نوفارتس السعودية,pharma,https://www.novartis.com,https://www.linkedin.com/company/novartis/,Pharma multinational
-Roche Saudi Arabia,روش السعودية,pharma,https://www.roche.com,https://www.linkedin.com/company/roche/,Pharma multinational
-Sanofi Saudi Arabia,سانوفي السعودية,pharma,https://www.sanofi.com,https://www.linkedin.com/company/sanofi/,Pharma multinational
-AstraZeneca Saudi Arabia,أسترازينيكا السعودية,pharma,https://www.astrazeneca.com,https://www.linkedin.com/company/astrazeneca/,Pharma multinational
-Bayer Saudi Arabia,باير السعودية,pharma,https://www.bayer.com,https://www.linkedin.com/company/bayer/,Pharma multinational
-Merck Saudi Arabia,ميرك السعودية,pharma,https://www.merckgroup.com,https://www.linkedin.com/company/merckgroup/,Pharma multinational
+Pfizer Saudi Arabia,فايزر السعودية,pharma,https://www.pfizer.com,https://www.pfizer.com/about/careers,,https://www.linkedin.com/company/pfizer/,Pharma multinational
+GSK Saudi Arabia,جي إس كيه السعودية,pharma,https://www.gsk.com,https://www.gsk.com/en-gb/careers/search-jobs,,https://www.linkedin.com/company/gsk/,Pharma multinational
+Novartis Saudi Arabia,نوفارتس السعودية,pharma,https://www.novartis.com,https://www.novartis.com/careers,,https://www.linkedin.com/company/novartis/,Pharma multinational
+Roche Saudi Arabia,روش السعودية,pharma,https://www.roche.com,https://careers.roche.com/global/en,,https://www.linkedin.com/company/roche/,Pharma multinational
+Sanofi Saudi Arabia,سانوفي السعودية,pharma,https://www.sanofi.com,https://jobs.sanofi.com/en,,https://www.linkedin.com/company/sanofi/,Pharma multinational
+AstraZeneca Saudi Arabia,أسترازينيكا السعودية,pharma,https://www.astrazeneca.com,https://careers.astrazeneca.com/,,https://www.linkedin.com/company/astrazeneca/,Pharma multinational
+Bayer Saudi Arabia,باير السعودية,pharma,https://www.bayer.com,,,https://www.linkedin.com/company/bayer/,Pharma multinational
+Merck Saudi Arabia,ميرك السعودية,pharma,https://www.merckgroup.com,,,https://www.linkedin.com/company/merckgroup/,Pharma multinational
 # --- FMCG multinationals --------------------------------------------------
-Unilever Saudi Arabia,يونيليفر السعودية,manufacturing,https://www.unilever.com,https://www.linkedin.com/company/unilever/,FMCG
-Procter & Gamble Saudi Arabia,بي اند جي السعودية,manufacturing,https://www.pg.com,https://www.linkedin.com/company/procter-and-gamble/,FMCG
-Nestle Saudi Arabia,نسله السعودية,food_beverage,https://www.nestle.com,https://www.linkedin.com/company/nestle-s-a-/,FMCG
-Henkel Saudi Arabia,هنكل السعودية,manufacturing,https://www.henkel.com,https://www.linkedin.com/company/henkel/,FMCG
-L'Oréal Saudi Arabia,لوريال السعودية,manufacturing,https://www.loreal.com,https://www.linkedin.com/company/loreal/,Cosmetics
-Colgate-Palmolive Saudi Arabia,كولجيت السعودية,manufacturing,https://www.colgatepalmolive.com,https://www.linkedin.com/company/colgate-palmolive/,FMCG
+Unilever Saudi Arabia,يونيليفر السعودية,manufacturing,https://www.unilever.com,,,https://www.linkedin.com/company/unilever/,FMCG
+Procter & Gamble Saudi Arabia,بي اند جي السعودية,manufacturing,https://www.pg.com,,,https://www.linkedin.com/company/procter-and-gamble/,FMCG
+Nestle Saudi Arabia,نسله السعودية,food_beverage,https://www.nestle.com,,,https://www.linkedin.com/company/nestle-s-a-/,FMCG
+Henkel Saudi Arabia,هنكل السعودية,manufacturing,https://www.henkel.com,https://www.henkel.com/careers,,https://www.linkedin.com/company/henkel/,FMCG
+L'Oréal Saudi Arabia,لوريال السعودية,manufacturing,https://www.loreal.com,https://www.loreal.com/en/careers,,https://www.linkedin.com/company/loreal/,Cosmetics
+Colgate-Palmolive Saudi Arabia,كولجيت السعودية,manufacturing,https://www.colgatepalmolive.com,,,https://www.linkedin.com/company/colgate-palmolive/,FMCG
 # --- International banks / financial services -----------------------------
-HSBC Saudi Arabia,إتش إس بي سي السعودية,banking,https://www.hsbcsaudi.com,https://www.linkedin.com/company/hsbc-saudi-arabia/,Bank
-Standard Chartered Saudi Arabia,ستاندرد تشارترد السعودية,banking,https://www.sc.com,https://www.linkedin.com/company/standard-chartered-bank/,Bank
-JPMorgan Saudi Arabia,جي بي مورغان السعودية,banking,https://www.jpmorgan.com,https://www.linkedin.com/company/jpmorganchase/,Investment bank
-Goldman Sachs Saudi Arabia,جولدمان ساكس السعودية,banking,https://www.goldmansachs.com,https://www.linkedin.com/company/goldman-sachs/,Investment bank
-BNP Paribas Saudi Arabia,بي إن بي باريبا السعودية,banking,https://www.bnpparibas.com,https://www.linkedin.com/company/bnp-paribas/,Investment bank
-Citi Saudi Arabia,سيتي السعودية,banking,https://www.citigroup.com,https://www.linkedin.com/company/citi/,Investment bank
-Morgan Stanley Saudi Arabia,مورجان ستانلي السعودية,banking,https://www.morganstanley.com,https://www.linkedin.com/company/morgan-stanley/,Investment bank
+HSBC Saudi Arabia,إتش إس بي سي السعودية,banking,https://www.hsbcsaudi.com,https://www.hsbc.com.sa/en-gb/careers,,https://www.linkedin.com/company/hsbc-saudi-arabia/,Bank
+Standard Chartered Saudi Arabia,ستاندرد تشارترد السعودية,banking,https://www.sc.com,https://www.sc.com/en/global-careers,,https://www.linkedin.com/company/standard-chartered-bank/,Bank
+JPMorgan Saudi Arabia,جي بي مورغان السعودية,banking,https://www.jpmorgan.com,,,https://www.linkedin.com/company/jpmorganchase/,Investment bank
+Goldman Sachs Saudi Arabia,جولدمان ساكس السعودية,banking,https://www.goldmansachs.com,,,https://www.linkedin.com/company/goldman-sachs/,Investment bank
+BNP Paribas Saudi Arabia,بي إن بي باريبا السعودية,banking,https://www.bnpparibas.com,,,https://www.linkedin.com/company/bnp-paribas/,Investment bank
+Citi Saudi Arabia,سيتي السعودية,banking,https://www.citigroup.com,,,https://www.linkedin.com/company/citi/,Investment bank
+Morgan Stanley Saudi Arabia,مورجان ستانلي السعودية,banking,https://www.morganstanley.com,,,https://www.linkedin.com/company/morgan-stanley/,Investment bank
 # --- Saudi tech startups (additional) -------------------------------------
-Tabby,تابي,fintech,https://tabby.ai,https://www.linkedin.com/company/tabby/,BNPL
-Tamara,تمارا,fintech,https://tamara.co,https://www.linkedin.com/company/tamara/,BNPL
-Foodics,فودكس,tech_software,https://www.foodics.com,https://www.linkedin.com/company/foodics/,POS SaaS
-Unifonic,يونيفونيك,tech_software,https://www.unifonic.com,https://www.linkedin.com/company/unifonic/,CPaaS
-Salla,سلة,ecommerce,https://salla.sa,https://www.linkedin.com/company/sallaapp/,E-commerce SaaS
-Zid,زد,ecommerce,https://zid.sa,https://www.linkedin.com/company/zidsa/,E-commerce SaaS
-Jahez,جاهز,food_beverage,https://www.jahez.net,https://www.linkedin.com/company/jahez/,Food delivery
-HungerStation,هنقرستيشن,food_beverage,https://hungerstation.com,https://www.linkedin.com/company/hungerstation/,Food delivery
-Mrsool,مرسول,food_beverage,https://mrsool.co,https://www.linkedin.com/company/mrsool/,Quick commerce
-The Chefz,ذا شفز,food_beverage,https://thechefz.co,https://www.linkedin.com/company/the-chefz/,Food delivery
-Calo,كالو,food_beverage,https://calo.app,https://www.linkedin.com/company/getcalo/,Meal subscription
-Lean Technologies,لين تكنولوجيز,fintech,https://www.leantech.me,https://www.linkedin.com/company/leantech/,Open banking
-Geidea,قيدوم,fintech,https://geidea.net,https://www.linkedin.com/company/geidea/,Payments
-Hala,هلا,fintech,https://hala.com,https://www.linkedin.com/company/hala/,Digital bank for SMBs
-Hyperpay,هايبر باي,fintech,https://www.hyperpay.com,https://www.linkedin.com/company/hyperpay/,Payments
-Lendo,ليندو,fintech,https://lendo.sa,https://www.linkedin.com/company/lendosa/,P2P lending
-Manafa Capital,منافع,fintech,https://www.manafa.com,https://www.linkedin.com/company/manafa-capital/,Crowdfunding
-Skiply,سكيبلي,fintech,https://skiply.io,https://www.linkedin.com/company/skiply/,Fintech
-Halawa,حلاوة,fintech,https://halawapay.com,,Salary advance
-Sary,ساري,ecommerce,https://sary.com,https://www.linkedin.com/company/sary/,B2B marketplace
-TruKKer Saudi Arabia,تروكر السعودية,logistics,https://trukker.com,https://www.linkedin.com/company/trukker/,Freight tech
-Marn,مرن,tech_software,https://marn.com,https://www.linkedin.com/company/marnpos/,POS / restaurant SaaS
-Maharah HR Services,مهارة للموارد البشرية,tech_software,https://www.maharah.com,https://www.linkedin.com/company/maharah-human-resources/,HR services TASI
-Nice One,نايس ون,ecommerce,https://niceonesa.com,https://www.linkedin.com/company/nice-one/,Beauty e-commerce
-Almatar,المطار,hospitality,https://www.almatar.com,https://www.linkedin.com/company/almatar/,Travel
-Almosafer,المسافر,hospitality,https://www.almosafer.com,https://www.linkedin.com/company/almosafer/,Travel
-Wego Saudi Arabia,ويجو السعودية,hospitality,https://www.wego.com,https://www.linkedin.com/company/wego/,Travel
-STC Pay,إس تي سي باي,fintech,https://www.stcpay.com.sa,https://www.linkedin.com/company/stcpay/,Mobile wallet
-Mozn,مزن,tech_software,https://mozn.com,https://www.linkedin.com/company/mozn/,AI / risk
-Rewaa,رواء,tech_software,https://www.rewaatech.com,https://www.linkedin.com/company/rewaatech/,Inventory SaaS
-Resal,ريسال,fintech,https://www.resal.me,https://www.linkedin.com/company/resal/,Gift cards
-Floward Saudi Arabia,فلوارد السعودية,ecommerce,https://floward.com,https://www.linkedin.com/company/floward/,Flowers e-commerce
-Sahab,سحاب,tech_software,https://sahab.tech,https://www.linkedin.com/company/sahabtech/,Cloud
-Wakeb,واكب,tech_software,https://wakeb.com,https://www.linkedin.com/company/wakeb-data/,AI
-Tahaluf,تحالف,tech_software,https://tahaluf.ai,https://www.linkedin.com/company/tahalufai/,AI / data
-SiFi,صيفي,fintech,https://www.sifi.sa,https://www.linkedin.com/company/sifi-sa/,Corporate cards
-Funding Souq,فاندينج سوق,fintech,https://www.fundingsouq.com,https://www.linkedin.com/company/funding-souq/,P2P
-Penny Saudi Arabia,بيني السعودية,fintech,https://www.pennysoftware.com,https://www.linkedin.com/company/pennysoftware/,Expense mgmt
-Maramy,مرمي,logistics,https://www.maramy.com,,Quick commerce
-Sahara Net,صحارى نت,tech_software,https://www.saharanet.com,https://www.linkedin.com/company/sahara-net-co/,IT services
-Bondai,بوندي,tech_software,https://www.bondai.io,,Fintech
-Sukoun,سكون,real_estate,https://sukoun.com,,Real estate tech
-Postpay,بوستباي,fintech,https://www.postpay.io,https://www.linkedin.com/company/postpay/,BNPL
-Sirdaab,سرداب,logistics,https://sirdaab.sa,,Quick commerce
-Yamamah AI,اليمامة للذكاء,tech_software,https://yamamah.ai,,AI
-Spineer,سبينير,tech_software,https://spineer.com,,AI / logistics
-Salasa,سلاسة,logistics,https://salasa.io,https://www.linkedin.com/company/salasa/,Fulfillment
-Brilliantly,بريلينتلي,tech_software,https://brilliantly.com,,AI / SAV portfolio
-Wakeb Data,واكب داتا,tech_software,https://wakeb.com,,Data services
-Tasweeq,تسويق,tech_software,,,Marketing tech
-NEOM Tech & Digital,نيوم للتقنية والرقمنة,tech_software,https://www.neom.com,https://www.linkedin.com/showcase/neom-tech-and-digital-company/,NEOM tech unit
+Tabby,تابي,fintech,https://tabby.ai,https://tabby.ai/en-AE/careers,,https://www.linkedin.com/company/tabby/,BNPL
+Tamara,تمارا,fintech,https://tamara.co,https://tamara.co/en-sa/careers,,https://www.linkedin.com/company/tamara/,BNPL
+Foodics,فودكس,tech_software,https://www.foodics.com,https://www.foodics.com/careers,,https://www.linkedin.com/company/foodics/,POS SaaS
+Unifonic,يونيفونيك,tech_software,https://www.unifonic.com,https://www.unifonic.com/en/careers,,https://www.linkedin.com/company/unifonic/,CPaaS
+Salla,سلة,ecommerce,https://salla.sa,https://jobs.salla.com/,,https://www.linkedin.com/company/sallaapp/,E-commerce SaaS
+Zid,زد,ecommerce,https://zid.sa,https://zid.sa/ar/careers,,https://www.linkedin.com/company/zidsa/,E-commerce SaaS
+Jahez,جاهز,food_beverage,https://www.jahez.net,,,https://www.linkedin.com/company/jahez/,Food delivery
+HungerStation,هنقرستيشن,food_beverage,https://hungerstation.com,,,https://www.linkedin.com/company/hungerstation/,Food delivery
+Mrsool,مرسول,food_beverage,https://mrsool.co,https://apply.workable.com/mrsool-3,,https://www.linkedin.com/company/mrsool/,Quick commerce
+The Chefz,ذا شفز,food_beverage,https://thechefz.co,,,https://www.linkedin.com/company/the-chefz/,Food delivery
+Calo,كالو,food_beverage,https://calo.app,,,https://www.linkedin.com/company/getcalo/,Meal subscription
+Lean Technologies,لين تكنولوجيز,fintech,https://www.leantech.me,https://www.leantech.me/uae/en/careers,,https://www.linkedin.com/company/leantech/,Open banking
+Geidea,قيدوم,fintech,https://geidea.net,,,https://www.linkedin.com/company/geidea/,Payments
+Hala,هلا,fintech,https://hala.com,https://job-boards.greenhouse.io/hala,,https://www.linkedin.com/company/hala/,Digital bank for SMBs
+Hyperpay,هايبر باي,fintech,https://www.hyperpay.com,,,https://www.linkedin.com/company/hyperpay/,Payments
+Lendo,ليندو,fintech,https://lendo.sa,https://www.lendo.sa/careers,,https://www.linkedin.com/company/lendosa/,P2P lending
+Manafa Capital,منافع,fintech,https://www.manafa.com,,,https://www.linkedin.com/company/manafa-capital/,Crowdfunding
+Skiply,سكيبلي,fintech,https://skiply.io,,,https://www.linkedin.com/company/skiply/,Fintech
+Halawa,حلاوة,fintech,https://halawapay.com,,,,Salary advance
+Sary,ساري,ecommerce,https://sary.com,,,https://www.linkedin.com/company/sary/,B2B marketplace
+TruKKer Saudi Arabia,تروكر السعودية,logistics,https://trukker.com,https://trukker.com/careers,,https://www.linkedin.com/company/trukker/,Freight tech
+Marn,مرن,tech_software,https://marn.com,,,https://www.linkedin.com/company/marnpos/,POS / restaurant SaaS
+Nice One,نايس ون,ecommerce,https://niceonesa.com,,,https://www.linkedin.com/company/nice-one/,Beauty e-commerce
+Almatar,المطار,hospitality,https://www.almatar.com,https://almatar.com/ar/career,,https://www.linkedin.com/company/almatar/,Travel
+Almosafer,المسافر,hospitality,https://www.almosafer.com,https://www.almosafer.com/ar/careers,,https://www.linkedin.com/company/almosafer/,Travel
+Wego Saudi Arabia,ويجو السعودية,hospitality,https://www.wego.com,https://careers.wego.com/,,https://www.linkedin.com/company/wego/,Travel
+STC Pay,إس تي سي باي,fintech,https://www.stcpay.com.sa,https://stcbank.com.sa/web/guest/job-application,,https://www.linkedin.com/company/stcpay/,Mobile wallet
+Mozn,مزن,tech_software,https://mozn.com,,,https://www.linkedin.com/company/mozn/,AI / risk
+Rewaa,رواء,tech_software,https://www.rewaatech.com,https://rewaa.com/careers,,https://www.linkedin.com/company/rewaatech/,Inventory SaaS
+Resal,ريسال,fintech,https://www.resal.me,https://www.resal.me/careers,,https://www.linkedin.com/company/resal/,Gift cards
+Floward Saudi Arabia,فلوارد السعودية,ecommerce,https://floward.com,,,https://www.linkedin.com/company/floward/,Flowers e-commerce
+Sahab,سحاب,tech_software,https://sahab.tech,https://sahab.tech/careers,,https://www.linkedin.com/company/sahabtech/,Cloud
+Wakeb,واكب,tech_software,https://wakeb.com,https://wakeb.com/careers,,https://www.linkedin.com/company/wakeb-data/,AI
+Tahaluf,تحالف,tech_software,https://tahaluf.ai,,,https://www.linkedin.com/company/tahalufai/,AI / data
+SiFi,صيفي,fintech,https://www.sifi.sa,,,https://www.linkedin.com/company/sifi-sa/,Corporate cards
+Funding Souq,فاندينج سوق,fintech,https://www.fundingsouq.com,,,https://www.linkedin.com/company/funding-souq/,P2P
+Penny Saudi Arabia,بيني السعودية,fintech,https://www.pennysoftware.com,https://www.pennysoftware.com/careers,,https://www.linkedin.com/company/pennysoftware/,Expense mgmt
+Maramy,مرمي,logistics,https://www.maramy.com,,,,Quick commerce
+Sahara Net,صحارى نت,tech_software,https://www.saharanet.com,,,https://www.linkedin.com/company/sahara-net-co/,IT services
+Bondai,بوندي,tech_software,https://www.bondai.io,https://www.bondai.io/careers,,,Fintech
+Sukoun,سكون,real_estate,https://sukoun.com,,,,Real estate tech
+Postpay,بوستباي,fintech,https://www.postpay.io,,,https://www.linkedin.com/company/postpay/,BNPL
+Sirdaab,سرداب,logistics,https://sirdaab.sa,,,,Quick commerce
+Yamamah AI,اليمامة للذكاء,tech_software,https://yamamah.ai,,,,AI
+Spineer,سبينير,tech_software,https://spineer.com,,,,AI / logistics
+Salasa,سلاسة,logistics,https://salasa.io,,,https://www.linkedin.com/company/salasa/,Fulfillment
+Brilliantly,بريلينتلي,tech_software,https://brilliantly.com,,,,AI / SAV portfolio
+Wakeb Data,واكب داتا,tech_software,https://wakeb.com,https://wakeb.com/careers,,,Data services
+Tasweeq,تسويق,tech_software,,,,,Marketing tech
+NEOM Tech & Digital,نيوم للتقنية والرقمنة,tech_software,https://www.neom.com,https://careers.neom.com/careers,,https://www.linkedin.com/showcase/neom-tech-and-digital-company/,NEOM tech unit
+# --- HR services / workforce outsourcing ----------------------------------
+Maharah HR Services,مهارة للموارد البشرية,hr_services,https://www.maharah.com,,,https://www.linkedin.com/company/maharah-human-resources/,Manpower and HR services TASI
+Saudi Manpower Solutions Company (SMASCO),الشركة السعودية لحلول القوى البشرية,hr_services,https://www.smasco.com/en/,,,,Manpower and workforce outsourcing TASI
+Al Mawarid Manpower Company,شركة الموارد للقوى البشرية,hr_services,https://mawarid.com.sa/en/,https://mawarid.com.sa/en/careers/,,,Manpower and workforce outsourcing TASI
+FNRCO,الشركة الوطنية الأولى,hr_services,https://fnrco.com.sa,,,,Recruitment and workforce outsourcing
+ESAD Human Resources Solutions,إسناد لحلول الموارد البشرية,hr_services,https://esadtalents.com,https://esadtalents.com/en/Home/Jobs,,,HR solutions and workforce services
+Tamkeen Human Resources,تمكين للموارد البشرية,hr_services,https://tamkeenhr.sa,https://tamkeenhr.sa/en/careers/,,,Workforce management and outsourcing
+Mueen Human Resources,معين للموارد البشرية,hr_services,https://www.mueen.com.sa/en,,,,Managed workforce and RPO
+Jaddarah Workforce Services,جدارة لخدمات القوى العاملة,hr_services,https://jaddarahpro.com,,,,Workforce outsourcing
+TASC Outsourcing Saudi Arabia,تاسك السعودية,hr_services,https://tascoutsourcing.sa/en,https://tascoutsourcing.sa/en/contact/working-with-us,,,Contract staffing and HR outsourcing
+Upsource by solutions,أبسورس من سولوشنز,hr_services,https://upsource.com.sa,https://upsource.com.sa/careers/,,,BPO and customer experience outsourcing
+# --- Government digital delivery / outsourcing vendors ---------------------
+Ejada Systems,إجادة للنظم,tech_software,https://www.ejada.com,https://careers.ejada.com/en/,,,Government and enterprise IT services
+Sure Global Technology,شور العالمية للتقنية,tech_software,https://www.sure.com.sa/en/,,,,Government digital solutions
+Tamkeen Technologies,تمكين للتقنيات,tech_software,https://tamkeentech.sa,https://tamkeentech.sa/careers,,,Public sector technology services
+Takamol Holding,تكامل القابضة,tech_software,https://www.takamol.sa/en,https://careers.takamol.sa/,,,Labor market digital platforms
+Lean Business Services,لين لخدمات الأعمال,tech_software,https://lean.sa,https://lean.sa/career.html,,,PIF digital healthcare services
 # --- Government / Ministries / Regulators ---------------------------------
-Saudi Central Bank (SAMA),البنك المركزي السعودي,government,https://www.sama.gov.sa,https://www.linkedin.com/company/saudi-central-bank/,Central bank
-ZATCA (Zakat Tax & Customs Authority),هيئة الزكاة والضريبة والجمارك,government,https://zatca.gov.sa,https://www.linkedin.com/company/zatca/,Tax + customs
-SDAIA,الهيئة السعودية للبيانات والذكاء الاصطناعي,government,https://sdaia.gov.sa,https://www.linkedin.com/company/sdaia/,Data + AI authority
-NDMC,المركز الوطني لإدارة البيانات,government,https://ndmo.gov.sa,https://www.linkedin.com/company/ndmo/,Data mgmt
-CITC,هيئة الاتصالات والفضاء والتقنية,government,https://www.citc.gov.sa,https://www.linkedin.com/company/citc-saudi/,ICT regulator
-GACA,الهيئة العامة للطيران المدني,government,https://www.gaca.gov.sa,https://www.linkedin.com/company/gaca-ksa/,Civil aviation
-GAMI,الهيئة العامة للصناعات العسكرية,government,https://gami.gov.sa,https://www.linkedin.com/company/gami-sa/,Military industries
-Saudi Space Agency,وكالة الفضاء السعودية,government,https://www.ssa.gov.sa,https://www.linkedin.com/company/saudi-space-agency/,Space
-Royal Commission for Jubail and Yanbu,الهيئة الملكية للجبيل وينبع,government,https://www.rcjy.gov.sa,https://www.linkedin.com/company/royal-commission-for-jubail-and-yanbu/,Royal Commission
-Royal Commission for Riyadh City,الهيئة الملكية لمدينة الرياض,government,https://www.rcrc.gov.sa,https://www.linkedin.com/company/royal-commission-riyadh/,Royal Commission
-Royal Commission for AlUla,الهيئة الملكية للعلا,government,https://www.rcu.gov.sa,https://www.linkedin.com/company/the-royal-commission-for-alula/,Royal Commission
-Royal Commission for Makkah City and Holy Sites,الهيئة الملكية لمكة المكرمة,government,,,
-General Entertainment Authority (GEA),الهيئة العامة للترفيه,entertainment,https://gea.gov.sa,https://www.linkedin.com/company/general-entertainment-authority/,GEA
-Saudi Tourism Authority,الهيئة السعودية للسياحة,hospitality,https://sta.gov.sa,https://www.linkedin.com/company/saudi-tourism-authority/,STA
-Ministry of Tourism,وزارة السياحة,government,https://mt.gov.sa,https://www.linkedin.com/company/ministry-of-tourism-saudi-arabia/,Tourism ministry
-Ministry of Health,وزارة الصحة,government,https://www.moh.gov.sa,https://www.linkedin.com/company/saudi-ministry-of-health/,MOH
-Ministry of Education,وزارة التعليم,government,https://www.moe.gov.sa,https://www.linkedin.com/company/ministry-of-education-saudi-arabia/,MOE
-Ministry of Finance,وزارة المالية,government,https://www.mof.gov.sa,,MOF
-Ministry of Investment (MISA),وزارة الاستثمار,government,https://misa.gov.sa,https://www.linkedin.com/company/ministry-of-investment-saudi-arabia/,MISA
-Ministry of Commerce,وزارة التجارة,government,https://mc.gov.sa,,MOC
-Ministry of Communications & IT (MCIT),وزارة الاتصالات وتقنية المعلومات,government,https://www.mcit.gov.sa,https://www.linkedin.com/company/mcit-sa/,MCIT
-Ministry of Foreign Affairs,وزارة الخارجية,government,https://www.mofa.gov.sa,,MOFA
-Ministry of Interior,وزارة الداخلية,government,https://www.moi.gov.sa,,MOI
-Ministry of Human Resources & Social Development (HRSD),وزارة الموارد البشرية والتنمية الاجتماعية,government,https://hrsd.gov.sa,https://www.linkedin.com/company/hrsd-saudi/,HRSD
-HRDF (Hadaf),صندوق تنمية الموارد البشرية,government,https://www.hrdf.org.sa,https://www.linkedin.com/company/hrdf/,Workforce development
-Ministry of Industry & Mineral Resources,وزارة الصناعة والثروة المعدنية,government,https://www.mim.gov.sa,,
-Saudi Standards (SASO),الهيئة السعودية للمواصفات والمقاييس,government,https://www.saso.gov.sa,https://www.linkedin.com/company/saudi-standards-metrology-and-quality-organization/,SASO
-General Authority for Statistics (GASTAT),الهيئة العامة للإحصاء,government,https://www.stats.gov.sa,https://www.linkedin.com/company/general-authority-statistics/,Stats authority
-Saudi Industrial Development Fund (SIDF),صندوق التنمية الصناعية السعودي,government,https://www.sidf.gov.sa,https://www.linkedin.com/company/sidf/,SIDF
-Heritage Commission,هيئة التراث,government,https://heritage.moc.gov.sa,,Heritage
-Saudi Olympic & Paralympic Committee,اللجنة الأولمبية والبارالمبية السعودية,sports,https://saudinoc.com,https://www.linkedin.com/company/saudinoc/,Sports
-Ministry of Sports,وزارة الرياضة,sports,https://mos.gov.sa,,
-SAR — Saudi Authority for Data and Statistics,هيئة البيانات والإحصاء,government,,,
+Saudi Central Bank (SAMA),البنك المركزي السعودي,government,https://www.sama.gov.sa,https://www.sama.gov.sa/careers,,https://www.linkedin.com/company/saudi-central-bank/,Central bank
+ZATCA (Zakat Tax & Customs Authority),هيئة الزكاة والضريبة والجمارك,government,https://zatca.gov.sa,,,https://www.linkedin.com/company/zatca/,Tax + customs
+SDAIA,الهيئة السعودية للبيانات والذكاء الاصطناعي,government,https://sdaia.gov.sa,https://careers.sdaia.gov.sa/,https://careers.sdaia.gov.sa/?locale=ar_SA,https://www.linkedin.com/company/sdaia/,Data + AI authority
+National Cybersecurity Authority (NCA),الهيئة الوطنية للأمن السيبراني,cybersecurity,https://nca.gov.sa/en/,,,,National cybersecurity authority
+NDMC,المركز الوطني لإدارة البيانات,government,https://ndmo.gov.sa,,,https://www.linkedin.com/company/ndmo/,Data mgmt
+CST (Communications Space & Technology Commission),هيئة الاتصالات والفضاء والتقنية,government,https://www.cst.gov.sa,,,https://www.linkedin.com/company/cst-saudi/,ICT regulator formerly CITC
+GACA,الهيئة العامة للطيران المدني,government,https://www.gaca.gov.sa,https://careers.gaca.gov.sa/,,https://www.linkedin.com/company/gaca-ksa/,Civil aviation
+GAMI,الهيئة العامة للصناعات العسكرية,government,https://gami.gov.sa,,,https://www.linkedin.com/company/gami-sa/,Military industries
+Saudi Space Agency,وكالة الفضاء السعودية,government,https://www.ssa.gov.sa,https://ssa.gov.sa/ar/careersLandingPage?path=/careers/,,https://www.linkedin.com/company/saudi-space-agency/,Space
+Royal Commission for Jubail and Yanbu,الهيئة الملكية للجبيل وينبع,government,https://www.rcjy.gov.sa,https://careers.rcjy.gov.sa/?tab=section-0,,https://www.linkedin.com/company/royal-commission-for-jubail-and-yanbu/,Royal Commission
+Royal Commission for Riyadh City,الهيئة الملكية لمدينة الرياض,government,https://www.rcrc.gov.sa,https://www.rcrc.gov.sa/careers-ar,,https://www.linkedin.com/company/royal-commission-riyadh/,Royal Commission
+Royal Commission for AlUla,الهيئة الملكية للعلا,government,https://www.rcu.gov.sa,https://www.rcu.gov.sa/contact/careers,,https://www.linkedin.com/company/the-royal-commission-for-alula/,Royal Commission
+Royal Commission for Makkah City and Holy Sites,الهيئة الملكية لمكة المكرمة,government,,,,,
+General Entertainment Authority (GEA),الهيئة العامة للترفيه,entertainment,https://gea.gov.sa,,,https://www.linkedin.com/company/general-entertainment-authority/,GEA
+Saudi Tourism Authority,الهيئة السعودية للسياحة,hospitality,https://sta.gov.sa,https://sta.gov.sa/en/careers,,https://www.linkedin.com/company/saudi-tourism-authority/,STA
+Ministry of Tourism,وزارة السياحة,government,https://mt.gov.sa,,,https://www.linkedin.com/company/ministry-of-tourism-saudi-arabia/,Tourism ministry
+Ministry of Health,وزارة الصحة,government,https://www.moh.gov.sa,,,https://www.linkedin.com/company/saudi-ministry-of-health/,MOH
+Ministry of Education,وزارة التعليم,government,https://www.moe.gov.sa,https://www.moe.gov.sa/careers,,https://www.linkedin.com/company/ministry-of-education-saudi-arabia/,MOE
+Ministry of Finance,وزارة المالية,government,https://www.mof.gov.sa,,,,MOF
+Ministry of Investment (MISA),وزارة الاستثمار,government,https://misa.gov.sa,https://jobs.misa.gov.sa/,,https://www.linkedin.com/company/ministry-of-investment-saudi-arabia/,MISA
+Ministry of Commerce,وزارة التجارة,government,https://mc.gov.sa,https://talent.mc.gov.sa/,,,MOC
+Ministry of Communications & IT (MCIT),وزارة الاتصالات وتقنية المعلومات,government,https://www.mcit.gov.sa,https://mcit.gov.sa/ar/recruitment,,https://www.linkedin.com/company/mcit-sa/,MCIT
+Ministry of Foreign Affairs,وزارة الخارجية,government,https://www.mofa.gov.sa,https://jobs.mofa.gov.sa/,,,MOFA
+Ministry of Interior,وزارة الداخلية,government,https://www.moi.gov.sa,https://www.moi.gov.sa/careers,,,MOI
+Ministry of Human Resources & Social Development (HRSD),وزارة الموارد البشرية والتنمية الاجتماعية,government,https://hrsd.gov.sa,https://www.hrsd.gov.sa/ministry/about-ministry/jobs,,https://www.linkedin.com/company/hrsd-saudi/,HRSD
+HRDF (Hadaf),صندوق تنمية الموارد البشرية,government,https://www.hrdf.org.sa,https://www.hrdf.org.sa/about/joinus/jobs,,https://www.linkedin.com/company/hrdf/,Workforce development
+Ministry of Industry & Mineral Resources,وزارة الصناعة والثروة المعدنية,government,https://www.mim.gov.sa,https://www.mim.gov.sa/ar/recruitment,,,
+Saudi Standards (SASO),الهيئة السعودية للمواصفات والمقاييس,government,https://www.saso.gov.sa,https://www.saso.gov.sa/ar/mediacenter/Pages/JoinOurTeam.aspx,,https://www.linkedin.com/company/saudi-standards-metrology-and-quality-organization/,SASO
+General Authority for Statistics (GASTAT),الهيئة العامة للإحصاء,government,https://www.stats.gov.sa,https://careers.stats.gov.sa/,,https://www.linkedin.com/company/general-authority-statistics/,Stats authority
+Saudi Industrial Development Fund (SIDF),صندوق التنمية الصناعية السعودي,government,https://www.sidf.gov.sa,https://www.sidf.gov.sa/Careers,,https://www.linkedin.com/company/sidf/,SIDF
+Heritage Commission,هيئة التراث,government,https://heritage.moc.gov.sa,,,,Heritage
+Saudi Olympic & Paralympic Committee,اللجنة الأولمبية والبارالمبية السعودية,sports,https://saudinoc.com,,,https://www.linkedin.com/company/saudinoc/,Sports
+Ministry of Sports,وزارة الرياضة,sports,https://mos.gov.sa,https://www.mos.gov.sa/ar/careers,,,
+SAR — Saudi Authority for Data and Statistics,هيئة البيانات والإحصاء,government,,,,,
+# --- Cybersecurity / AI / national digital infrastructure ------------------
+Saudi Federation for Cybersecurity Programming and Drones,الاتحاد السعودي للأمن السيبراني والبرمجة والدرونز,cybersecurity,https://safcsp.sa/en/,,,,Cybersecurity and technology programs
+Saudi Information Technology Company (SITE),الشركة السعودية لتقنية المعلومات,cybersecurity,https://site.sa,https://cloud.site.sa/en/careers,,,Cybersecurity and secure digital services
+sirar by stc,سرار من إس تي سي,cybersecurity,https://www.sirar.com.sa,https://www.sirar.com.sa/about-us/careers/,,,Cybersecurity provider
+Cyberani,سايبراني,cybersecurity,https://cyberani.sa,https://careers.cyberani.sa/,,,Cybersecurity by Aramco Digital
+Saudi Company for Artificial Intelligence (SCAI),الشركة السعودية للذكاء الاصطناعي,tech_software,https://scai.sa/en,https://career.scai.sa/,,,PIF AI company
+HUMAIN,هيوماين,tech_software,https://www.humain.ai,,,,National AI company
+Aramco Digital,أرامكو الرقمية,tech_software,https://www.aramcodigital.com/index.html,,,,Digital and AI services
+CNTXT,كونتكتست,tech_software,https://cntxt.com,https://cntxt.com/careers/,,,Cloud data and digital transformation
 # --- Universities (additional) -------------------------------------------
-Imam Muhammad Ibn Saud University,جامعة الإمام محمد بن سعود,education,https://www.imamu.edu.sa,,University
-King Khalid University,جامعة الملك خالد,education,https://www.kku.edu.sa,,University
-Umm Al-Qura University,جامعة أم القرى,education,https://uqu.edu.sa,,University
-Qassim University,جامعة القصيم,education,https://www.qu.edu.sa,,University
-Princess Nourah University,جامعة الأميرة نورة,education,https://www.pnu.edu.sa,,University
+Imam Muhammad Ibn Saud University,جامعة الإمام محمد بن سعود,education,https://www.imamu.edu.sa,,,,University
+King Khalid University,جامعة الملك خالد,education,https://www.kku.edu.sa,https://www.kku.edu.sa/ar/jobs,,,University
+Umm Al-Qura University,جامعة أم القرى,education,https://uqu.edu.sa,,,,University
+Qassim University,جامعة القصيم,education,https://www.qu.edu.sa,https://www.qu.edu.sa/jobs,,,University
+Princess Nourah University,جامعة الأميرة نورة,education,https://www.pnu.edu.sa,https://pnu.edu.sa/en/jobs/Pages/default.aspx,,,University
 # --- NGOs / non-profit ----------------------------------------------------
-Saudi Red Crescent Authority,هيئة الهلال الأحمر السعودي,ngo,https://www.srca.org.sa,,Red Crescent
-King Khalid Foundation,مؤسسة الملك خالد,ngo,https://www.kkf.org.sa,https://www.linkedin.com/company/king-khalid-foundation/,Philanthropy
-Alwaleed Philanthropies,مؤسسة الوليد للأعمال الإنسانية,ngo,https://alwaleedphilanthropies.org,https://www.linkedin.com/company/alwaleedphilanthropies/,Philanthropy
-King Salman Humanitarian Aid and Relief Centre,مركز الملك سلمان للإغاثة,ngo,https://www.ksrelief.org,https://www.linkedin.com/company/ksrelief/,Humanitarian
+Saudi Red Crescent Authority,هيئة الهلال الأحمر السعودي,ngo,https://www.srca.org.sa,,,,Red Crescent
+King Khalid Foundation,مؤسسة الملك خالد,ngo,https://www.kkf.org.sa,https://www.kkf.org.sa/career,,https://www.linkedin.com/company/king-khalid-foundation/,Philanthropy
+Alwaleed Philanthropies,مؤسسة الوليد للأعمال الإنسانية,ngo,https://alwaleedphilanthropies.org,,,https://www.linkedin.com/company/alwaleedphilanthropies/,Philanthropy
+King Salman Humanitarian Aid and Relief Centre,مركز الملك سلمان للإغاثة,ngo,https://www.ksrelief.org,,,https://www.linkedin.com/company/ksrelief/,Humanitarian
 # --- Conglomerates --------------------------------------------------------
-Olayan Financing Company,شركة العليان المالية,conglomerate,https://www.olayan.com,https://www.linkedin.com/company/olayan-group/,Conglomerate
-Al-Faisaliah Group,مجموعة الفيصلية,conglomerate,https://www.alfaisaliah.com,https://www.linkedin.com/company/alfaisaliah-group/,Conglomerate
-Abdul Latif Jameel Holding,القابضة لعبداللطيف جميل,conglomerate,https://www.alj.com,https://www.linkedin.com/company/abdul-latif-jameel/,Conglomerate
-A.A. Turki Corporation (ATCO),مؤسسة عبدالعزيز تركي,conglomerate,https://www.atco.com.sa,,Conglomerate
-Astra Industrial,أسترا الصناعية,manufacturing,https://www.astra.com.sa,,TASI conglomerate
-Saudi Industrial Investment Group (SIIG),المجموعة السعودية للاستثمار الصناعي,investment,https://www.siig.com.sa,,TASI holding
-Saudi Industrial Services (SISCO),الخدمات الصناعية السعودية,investment,https://www.sisco.com.sa,,TASI
+Olayan Financing Company,شركة العليان المالية,conglomerate,https://www.olayan.com,,,https://www.linkedin.com/company/olayan-group/,Conglomerate
+Al-Faisaliah Group,مجموعة الفيصلية,conglomerate,https://www.alfaisaliah.com,,,https://www.linkedin.com/company/alfaisaliah-group/,Conglomerate
+Abdul Latif Jameel Holding,القابضة لعبداللطيف جميل,conglomerate,https://www.alj.com,https://careers.alj.com/en/?locale=en_US,,https://www.linkedin.com/company/abdul-latif-jameel/,Conglomerate
+A.A. Turki Corporation (ATCO),مؤسسة عبدالعزيز تركي,conglomerate,https://www.atco.com.sa,,,,Conglomerate
+Astra Industrial,أسترا الصناعية,manufacturing,https://www.astra.com.sa,https://careers.astra.com.sa/Astra/OnlineApp/Home/Index?ReturnPage=None,,,TASI conglomerate
+Saudi Industrial Investment Group (SIIG),المجموعة السعودية للاستثمار الصناعي,investment,https://www.siig.com.sa,,,,TASI holding
+Saudi Industrial Services (SISCO),الخدمات الصناعية السعودية,investment,https://www.sisco.com.sa,,,,TASI
 # --- Agriculture ---------------------------------------------------------
-NADEC,نادك,agriculture,https://www.nadec.com.sa,https://www.linkedin.com/company/nadec/,Agriculture TASI
-Tabuk Agriculture Development Co (TADCO),التنمية الزراعية بتبوك تادكو,agriculture,https://www.tadco.com.sa,,TASI agriculture
-Halib Al-Safi,حليب الصافي,agriculture,https://www.alsafi.com.sa,https://www.linkedin.com/company/safi-danone/,Dairy
-Pure Harvest Saudi Arabia,بيور هارفست السعودية,agriculture,https://pureharvest.com,https://www.linkedin.com/company/pure-harvest-smart-farms/,Indoor farming
+NADEC,نادك,agriculture,https://www.nadec.com.sa,,,https://www.linkedin.com/company/nadec/,Agriculture TASI
+Tabuk Agriculture Development Co (TADCO),التنمية الزراعية بتبوك تادكو,agriculture,https://www.tadco.com.sa,,,,TASI agriculture
+Halib Al-Safi,حليب الصافي,agriculture,https://www.alsafi.com.sa,,,https://www.linkedin.com/company/safi-danone/,Dairy
+Pure Harvest Saudi Arabia,بيور هارفست السعودية,agriculture,https://pureharvest.com,,,https://www.linkedin.com/company/pure-harvest-smart-farms/,Indoor farming
+# --- .sa domain coverage additions ----------------------------------------
+Saudi Energy (Saudi Electricity Company),السعودية للطاقة,utilities,https://www.se.com.sa,https://www.se.com.sa/en/careers/,https://www.se.com.sa/Careers/,,Electricity utility formerly SEC
+National Water Company (NWC),شركة المياه الوطنية,utilities,https://www.nwc.com.sa,https://www.nwc.com.sa/EN/OurCompany/Careers/pages/default.aspx,,,Water and wastewater utility
+Saudi Water Authority (SWA),الهيئة السعودية للمياه,government,https://www.swa.gov.sa,https://swaprd.atit.sa/en/jadarat,https://swaprd.atit.sa/ar/jadarat,,Water authority
+Saudi Electricity Regulatory Authority (SERA),الهيئة السعودية لتنظيم الكهرباء,government,https://www.sera.gov.sa,https://www.sera.gov.sa/en/jadarat,https://www.sera.gov.sa/ar/jadarat,,Electricity regulator
+Marafiq,مرافق,utilities,https://www.marafiq.com.sa,,,,Power and water utility for Jubail and Yanbu
+National Energy Services Company (Tarshid),الشركة الوطنية لخدمات كفاءة الطاقة,energy,https://www.tarshid.com.sa,https://www.tarshid.com.sa/en/jobs,https://www.tarshid.com.sa/ar/jobs,,PIF energy services
+Saudi Energy Efficiency Center (SEEC),المركز السعودي لكفاءة الطاقة,government,https://www.seec.gov.sa,https://www.seec.gov.sa/en/careers,https://www.seec.gov.sa/ar/careers,,Energy efficiency center
+MATARAT Holding,مطارات القابضة,transport,https://matarat.com.sa,https://careers.matarat.com.sa/,https://careers.matarat.com.sa/?locale=ar_SA,,Airport holding company
+Riyadh Airports Company,شركة مطارات الرياض,transport,https://www.riyadhairports.com,,,,Airport operator
+Jeddah Airports Company,شركة مطارات جدة,transport,,https://career.jeddahairports.sa/,https://career.jeddahairports.sa/ar/,,Airport operator
+Dammam Airports Company,شركة مطارات الدمام,transport,https://daco.sa,https://careers.daco.sa/,https://careers.daco.sa/ar/,,Airport operator
+Cluster2 Airports Company,شركة تجمع مطارات الثاني,transport,,https://careers.matarat.com.sa/Cluster2/,https://careers.matarat.com.sa/Cluster2/?locale=ar_SA,,Regional airport operator
+Saudi Air Navigation Services (SANS),شركة خدمات الملاحة الجوية السعودية,transport,https://www.sans.com.sa,,,,Air navigation services
+Saudi Tadawul Group,مجموعة تداول السعودية,investment,https://www.tadawulgroup.sa,https://careers.tadawulgroup.sa/jobs,,,Capital markets infrastructure
+Capital Market Authority (CMA),هيئة السوق المالية,government,https://cma.org.sa,https://careers.cma.gov.sa/en/,https://careers.cma.gov.sa/,,Capital markets regulator
+National Development Fund (NDF),صندوق التنمية الوطني,investment,https://ndf.gov.sa,,,,Development finance
+Tourism Development Fund,صندوق التنمية السياحي,investment,https://www.tdf.gov.sa,https://www.tdf.gov.sa/en/careers,,,Tourism finance
+Saudi EXIM Bank,بنك التصدير والاستيراد السعودي,banking,https://saudiexim.gov.sa,,,,Export credit bank
+Agricultural Development Fund,صندوق التنمية الزراعية,investment,https://adf.gov.sa,https://adf.gov.sa/en/EmploymentRequests/Pages/default.aspx,,,Development finance
+Cultural Development Fund,الصندوق الثقافي,investment,https://www.cdf.gov.sa/en,,,,Cultural finance
+Digital Government Authority (DGA),هيئة الحكومة الرقمية,government,https://dga.gov.sa,https://career.dga.gov.sa/,https://career.dga.gov.sa/ar/,,Digital government authority
+Monsha'at,منشآت,government,https://www.monshaat.gov.sa,https://careers.monshaat.gov.sa/en/,https://careers.monshaat.gov.sa/ar/,,SME authority
+MODON,مدن,government,https://modon.gov.sa,https://careers.modon.gov.sa/,,,Industrial cities authority
+EXPRO,هيئة كفاءة الإنفاق والمشروعات الحكومية,government,https://expro.gov.sa,https://careers.expro.gov.sa/?locale=en_US,https://careers.expro.gov.sa/?locale=ar_SA,,Government expenditure and project efficiency
+LCGPA,هيئة المحتوى المحلي والمشتريات الحكومية,government,https://lcgpa.gov.sa,,,,Local content and procurement authority
+NCGR,المركز الوطني لنظم الموارد الحكومية,government,https://www.ncgr.gov.sa,,,,Government resource systems
+National Center for Privatization (NCP),المركز الوطني للتخصيص,government,https://www.ncp.gov.sa,,,,Privatization center
+Education & Training Evaluation Commission (ETEC),هيئة تقويم التعليم والتدريب,government,https://etec.gov.sa,,,,Education evaluation authority
+Technical and Vocational Training Corporation (TVTC),المؤسسة العامة للتدريب التقني والمهني,education,https://tvtc.gov.sa,,,,Technical and vocational training
+General Organization for Social Insurance (GOSI),المؤسسة العامة للتأمينات الاجتماعية,government,https://www.gosi.gov.sa,,,,Social insurance
+TAWAL,توال,telecom,https://www.tawal.com.sa,https://www.tawal.com.sa/en/team,https://www.tawal.com.sa/ar/team,,Telecom towers
+Saudi Cloud Computing Company (sccc by stc),الشركة السعودية للحوسبة السحابية,tech_software,https://www.sccc.sa,,,,Sovereign cloud by stc
+SAFE National Security Services,الشركة الوطنية للخدمات الأمنية,security_services,https://www.safesecurity.sa,https://www.safesecurity.sa/en/career/Pages/about-careers.aspx,https://www.safesecurity.sa/ar/career/pages/about-careers.aspx,,PIF security services
+Nahdi Medical Company,شركة النهدي الطبية,healthcare,https://nahdi.sa,https://careers.nahdi.sa/,,,Pharmacy and healthcare TASI
+National Gas and Industrialization Company (GASCO),شركة الغاز والتصنيع الأهلية,energy,https://gasco.com.sa,,,,Gas distribution TASI
+El-Seif Engineering Contracting,السيف مهندسون مقاولون,construction,https://www.el-seif.com.sa,,,,Construction
+Retal Urban Development,رتال للتطوير العمراني,real_estate,https://www.retal.com.sa,,,,Real estate developer TASI
+Jabal Omar Development Company,شركة جبل عمر للتطوير,real_estate,https://jabalomar.com.sa,,,,Makkah real estate development
+Sela,صلة,entertainment,https://sela.sa,,,,Events and sports

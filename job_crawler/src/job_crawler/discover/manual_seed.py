@@ -8,12 +8,14 @@ from __future__ import annotations
 
 import csv
 import logging
+from collections.abc import Mapping
 from dataclasses import dataclass
+from decimal import Decimal
 from importlib import resources
 from pathlib import Path
 from typing import Final
 
-from job_crawler_db import JobCrawlerDB
+from job_crawler_db import JobCrawlerDB, Source, SourceKind
 
 _LOG: Final = logging.getLogger("job_crawler.discover.manual_seed")
 
@@ -23,6 +25,7 @@ class SeedResult:
     total: int
     created: int
     matched_existing: int
+    career_profiles: int = 0
 
 
 async def _ensure_reference(db: JobCrawlerDB) -> None:
@@ -79,6 +82,12 @@ async def _ensure_reference(db: JobCrawlerDB) -> None:
         ("manufacturing", "Manufacturing", "التصنيع"),
         ("conglomerate",  "Conglomerate", "مجموعة شركات"),
         ("petrochemicals","Petrochemicals", "البتروكيماويات"),
+        # New verticals introduced by the expanded careers_url seed CSV —
+        # FK on companies.industry_code rejects rows whose code isn't here.
+        ("cybersecurity",     "Cybersecurity",       "الأمن السيبراني"),
+        ("hr_services",       "HR Services",          "خدمات الموارد البشرية"),
+        ("security_services", "Security Services",    "الخدمات الأمنية"),
+        ("utilities",         "Utilities",            "المرافق"),
     ):
         await db.reference.upsert_industry(code=code, name_en=en, name_ar=ar)
     # Regions, grouped by country. Each country also gets a synthetic catch-all
@@ -285,12 +294,48 @@ def audit_seed_duplicates(csv_path: Path) -> dict[str, list[str]]:
     return duplicates
 
 
+async def _ensure_company_careers_source(db: JobCrawlerDB) -> Source:
+    """The synthetic source the `company_careers` Playwright crawler runs as.
+
+    Created here (not in the runner's lazy `ensure_source`) so seeded
+    `careers_url` rows have a valid `source_id` to point at via
+    `company_source_profiles`. `crawl_enabled=False` keeps `make crawl-all`
+    from accidentally running the Playwright pass — `make crawl SOURCE=
+    company_careers` invokes it explicitly when the operator wants to.
+    """
+    return await db.sources.upsert(
+        slug="company_careers",
+        display_name="Company Careers",
+        kind=SourceKind.company_site,
+        base_url="https://example.invalid",
+        trust_weight=Decimal("0.95"),
+        crawl_enabled=False,
+        config={"seed_columns": ["careers_url", "careers_url_ar"]},
+    )
+
+
+def _career_urls(row: Mapping[str, str | None]) -> list[str]:
+    """Pull both careers_url + careers_url_ar from a CSV row, deduped."""
+    urls: list[str] = []
+    for key in ("careers_url", "careers_url_ar"):
+        url = (row.get(key) or "").strip()
+        if url and url not in urls:
+            urls.append(url)
+    return urls
+
+
 async def load(db: JobCrawlerDB) -> SeedResult:
     """Upsert every row in the seed CSV via `db.companies.resolve`.
 
     Also ensures the SA country + the three biggest regions + cities exist,
     since companies.country_code has a FK to countries(code), and seeds the
     skill taxonomy so the intelligence layer has something to match against.
+
+    For rows with a `careers_url` (and/or `careers_url_ar`), attaches a
+    `company_source_profiles` row pointing to the `company_careers` source.
+    The Playwright crawler reads those profiles first (then falls back to
+    probing companies without any profile) so seeded URLs short-circuit
+    the homepage-guess heuristic.
     """
     await _ensure_reference(db)
     await _ensure_skills(db)
@@ -315,6 +360,8 @@ async def load(db: JobCrawlerDB) -> SeedResult:
     total = 0
     created = 0
     matched = 0
+    career_profiles = 0
+    careers_source: Source | None = None
     with path.open(newline="", encoding="utf-8") as fh:
         # Strip `# section-header` comment lines before handing to csv —
         # makes the seed file readable but DictReader doesn't natively skip them.
@@ -327,6 +374,7 @@ async def load(db: JobCrawlerDB) -> SeedResult:
             linkedin_url = (row.get("linkedin_url") or "").strip() or None
             website = (row.get("website") or "").strip() or None
             industry = (row.get("industry_code") or "").strip() or None
+            career_urls = _career_urls(row)
             if not name_en and not name_ar:
                 continue
 
@@ -340,10 +388,25 @@ async def load(db: JobCrawlerDB) -> SeedResult:
                 # re-runs. Without this, websites added to the CSV after a
                 # company row was first seeded never reach the DB.
                 company = already
+            elif linkedin_url:
+                # The CSV row has a LinkedIn URL we just confirmed has no
+                # match — treat it as a brand-new company. Bypass
+                # companies.resolve() to avoid its fuzzy trigram name
+                # fallback (min_similarity=0.6), which otherwise merges
+                # rows like "Accenture Saudi Arabia" into "Accor Saudi
+                # Arabia" because both share the "Acc... Saudi Arabia"
+                # shape and then attaches Accenture's careers_url to Accor.
+                company = await db.companies.create(
+                    name_en=name_en or name_ar,
+                    linkedin_url=linkedin_url,
+                )
+                created += 1
             else:
+                # No LinkedIn URL — fall back to the fuzzy resolve. Worth
+                # the merge risk here because we have no other identifier
+                # to disambiguate the row.
                 company = await db.companies.resolve(
                     raw_name=name_en or name_ar,
-                    linkedin_url=linkedin_url,
                 )
                 created += 1
             # Best-effort: fill in name_ar, website, industry if the resolved
@@ -358,13 +421,44 @@ async def load(db: JobCrawlerDB) -> SeedResult:
                 patch["industry_code"] = industry
             if patch:
                 try:
-                    await db.companies.update(company.id, **patch)
+                    company = await db.companies.update(company.id, **patch)
                 except Exception:
                     _LOG.exception("could not patch company %s", company.id)
+
+            # Attach each seeded careers URL as a company_source_profiles
+            # row pointing at `company_careers`. The Playwright crawler
+            # consumes these directly, skipping its /careers homepage
+            # guess for companies the seed already nailed down.
+            for careers_url in career_urls:
+                if careers_source is None:
+                    careers_source = await _ensure_company_careers_source(db)
+                try:
+                    profile = await db.companies.add_source_profile(
+                        company.id,
+                        careers_source.id,
+                        careers_url,
+                    )
+                    if profile.company_id == company.id:
+                        career_profiles += 1
+                    else:
+                        _LOG.warning(
+                            "careers URL already belongs to another company: %s",
+                            careers_url,
+                        )
+                except Exception:
+                    _LOG.exception(
+                        "could not add careers profile for %s", company.id,
+                    )
     _LOG.info(
-        "seed loaded: total=%d created=%d matched_existing=%d",
+        "seed loaded: total=%d created=%d matched_existing=%d career_profiles=%d",
         total,
         created,
         matched,
+        career_profiles,
     )
-    return SeedResult(total=total, created=created, matched_existing=matched)
+    return SeedResult(
+        total=total,
+        created=created,
+        matched_existing=matched,
+        career_profiles=career_profiles,
+    )
