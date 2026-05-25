@@ -36,7 +36,7 @@ class Repo:
     ) -> dict[str, Any] | None:
         """Execute and return one row as a plain dict, or None."""
         async with self._pool.connection() as conn, conn.cursor(row_factory=dict_row) as cur:
-            await cur.execute(sql, params)  # type: ignore[arg-type]
+            await cur.execute(sql, params)
             return await cur.fetchone()
 
     async def _fetchall(
@@ -46,7 +46,7 @@ class Repo:
     ) -> list[dict[str, Any]]:
         """Execute and return every row as a list of dicts."""
         async with self._pool.connection() as conn, conn.cursor(row_factory=dict_row) as cur:
-            await cur.execute(sql, params)  # type: ignore[arg-type]
+            await cur.execute(sql, params)
             return await cur.fetchall()
 
     async def _execute(
@@ -56,7 +56,7 @@ class Repo:
     ) -> int:
         """Execute a statement that returns no rows; return affected row count."""
         async with self._pool.connection() as conn, conn.cursor() as cur:
-            await cur.execute(sql, params)  # type: ignore[arg-type]
+            await cur.execute(sql, params)
             return cur.rowcount
 
     async def _stream(
@@ -73,7 +73,7 @@ class Repo:
         """
         async with self._pool.connection() as conn:
             async with conn.cursor(row_factory=dict_row, name="jcdb_stream") as cur:
-                await cur.execute(sql, params)  # type: ignore[arg-type]
+                await cur.execute(sql, params)
                 while batch := await cur.fetchmany(batch_size):
                     for row in batch:
                         yield row
@@ -85,7 +85,14 @@ class Repo:
         return model_cls.model_validate(row) if row is not None else None
 
     @staticmethod
-    def _to_models(model_cls: type[M], rows: list[Mapping[str, Any]]) -> list[M]:
+    def _to_models(
+        model_cls: type[M],
+        rows: Sequence[Mapping[str, Any]],
+    ) -> list[M]:
+        # `Sequence` is covariant; `list[Mapping[str, Any]]` would be
+        # invariant and reject the `list[dict[str, Any]]` shape that
+        # `_fetchall` returns. Covariant signature lets every caller
+        # pass the helper's output straight through.
         return [model_cls.model_validate(r) for r in rows]
 
     # -- transaction context --------------------------------------------

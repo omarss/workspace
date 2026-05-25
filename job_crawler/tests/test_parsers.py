@@ -15,6 +15,7 @@ Covers FINDINGS:
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from typing import Any
 from uuid import UUID
 
 from job_crawler.ats.greenhouse import GreenhouseCrawler
@@ -24,7 +25,7 @@ from job_crawler.core.normalise import to_upsert
 from job_crawler.core.types import Listing, ParsedPosting, RawPosting
 
 
-def _raw(payload: dict, *, url: str = "https://example.invalid/job/1") -> RawPosting:
+def _raw(payload: dict[str, Any], *, url: str = "https://example.invalid/job/1") -> RawPosting:
     """Build a RawPosting fixture without going through HttpClient."""
     return RawPosting(
         listing=Listing(source_job_external_id="1", detail_url=url),

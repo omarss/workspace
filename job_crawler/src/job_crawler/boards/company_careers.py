@@ -33,7 +33,7 @@ import os
 import re
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime
-from typing import ClassVar, Final
+from typing import ClassVar, Final, cast
 from urllib.parse import urljoin, urlparse
 
 from psycopg.rows import dict_row
@@ -563,7 +563,9 @@ def _ld_from_dict(snapshot: dict[str, object]) -> JobPostingLD:
             if isinstance(snapshot.get("employment_type"), str) else None
         ),
         min_experience_years=(
-            int(snapshot["min_experience_years"])  # type: ignore[arg-type]
+            # isinstance() narrows the value to int but mypy doesn't carry
+            # that narrowing through the dict re-lookup, so cast.
+            cast(int, snapshot["min_experience_years"])
             if isinstance(snapshot.get("min_experience_years"), int) else None
         ),
         salary_min=_dec(snapshot.get("salary_min")),

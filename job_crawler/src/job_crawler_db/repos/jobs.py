@@ -16,13 +16,8 @@ from uuid import UUID
 
 from ..enums import (
     ClusterVerdict,
-    EducationLevel,
-    EmploymentType,
-    ExperienceLevel,
-    SalaryPeriod,
     SkillProficiency,
     SkillRequirement,
-    WorkArrangement,
 )
 from ..models import Job, JobCreate, JobSkill, Skill
 from .base import Repo
@@ -516,8 +511,3 @@ def _params(p: JobCreate) -> dict[str, Any]:
 
 # silence "json imported but unused" — keep it for future debug serialization
 _ = json
-_ = EmploymentType
-_ = WorkArrangement
-_ = ExperienceLevel
-_ = SalaryPeriod
-_ = EducationLevel

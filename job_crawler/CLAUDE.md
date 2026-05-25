@@ -123,6 +123,28 @@ src/job_crawler_db/
   wrote 15/15 title-only rows with no usable body. Apply the same
   pattern to any future board crawler whose selectors are CSS-hashed
   or otherwise fragile.
+* **Mypy invariance trap**: `list[X]` is invariant — a function
+  declared `(rows: list[Mapping[str, Any]])` rejects the
+  `list[dict[str, Any]]` that `_fetchall` returns. Repo helpers use
+  `Sequence[Mapping[str, Any]]` (covariant) instead. Same trick for
+  `dict` parameters that need to accept a narrower value type. When
+  in doubt: `Sequence`/`Mapping` for inputs (covariant), `list`/`dict`
+  for outputs (the caller knows the concrete type).
+* **`cur.row_factory` + mypy**: the pool's `configure` callback sets
+  `conn.row_factory = dict_row` at runtime, but mypy doesn't see
+  through that to the cursor type. Pass `row_factory=dict_row`
+  explicitly when calling `conn.cursor(...)` if the cursor uses
+  `row["name"]` indexing — otherwise mypy types it as the default
+  tuple-row cursor and the indexing fails strict mode.
+* **Don't reassign bare `_`**: `_ = X` for one symbol then `_ = Y`
+  for another confuses mypy's type narrowing — it tries to unify the
+  types under a single binding. Either give each keepalive a distinct
+  name (`_KEEP_DATETIME = datetime`) or use `__all__`.
+* **`**kwargs` unpack into a dataclass loses field-name info**: mypy
+  matches each value-type against parameter types in order, so
+  `**dict[str, str|None]` unpacked into a dataclass mid-call gets
+  matched against the wrong fields and complains. List the fields
+  explicitly (see `core/jsonld.py::_parse` for a worked example).
 
 ## Adding a new repo
 
@@ -205,11 +227,15 @@ findings. Status:
 | 8  | Low  | DONE PR#21 | `report_counts.sql` uses `normalize_text` grouping       |
 | 18 | Low  | DONE PR#21 | Stale `(stub)` labels removed from Makefile header       |
 | 15 | High | DONE pre-audit | All stubs implemented before the audit doc landed   |
-| 2  | High | OPEN     | `mypy --strict src tests` still has 133 errors           |
-| 3  | Med  | OPEN     | Proxy state file at `/app/.cache` blocked by RO root FS  |
-| 6  | Low  | OPEN     | Uvicorn `--forwarded-allow-ips='*'` — restrict to nginx  |
-| 16 | Med  | OPEN     | `BaseCrawler.normalize()` is abstract but bypassed       |
-| 17 | Med  | OPEN     | Canary returns `True` for stubs / no-canary sources      |
+| 3  | Med  | DONE PR#23 | `JC_PROXY_STATE_FILE` env + emptyDir mount on CronJobs   |
+| 6  | Low  | DONE PR#23 | `UVICORN_FORWARDED_ALLOW_IPS` env; default 127.0.0.1     |
+| 16 | Med  | DONE PR#24 | `BaseCrawler.normalize()` + 18 placeholder bodies gone   |
+| 17 | Med  | DONE PR#24 | Canary returns `Literal["ok","fail","skipped_no_canary"]` |
+| 2  | High | DONE PR#26 | mypy strict reaches zero errors; `make check` enforces it |
+
+**All 18 findings closed.** Subsequent audit cycles should add new rows
+beneath this table; never remove rows once they're done — they double as
+a changelog of the project's quality-bar history.
 
 When picking up the remaining work, check this table first — it's
 faster than re-running the audit, and the PR numbers link to the design

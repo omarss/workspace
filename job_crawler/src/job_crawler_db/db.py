@@ -98,22 +98,24 @@ class JobCrawlerDB:
             self._pool = pool
             self._owns_pool = False
 
-        # Repos materialised lazily — see __getattr__ below.
-        self._sources = None
-        self._companies = None
-        self._recruiters = None
-        self._skills = None
-        self._synonyms = None
-        self._jobs = None
-        self._job_locations = None
-        self._postings = None
-        self._dedupe = None
-        self._fake_signals = None
-        self._crawl = None
-        self._crawler_health = None
-        self._geo = None
-        self._reference = None
-        self._search = None
+        # Repos materialised lazily — see the @property accessors below.
+        # Annotated as Optional so mypy understands the lazy-init pattern
+        # and the property accessors return a concrete repo, not None.
+        self._sources: SourcesRepo | None = None
+        self._companies: CompaniesRepo | None = None
+        self._recruiters: RecruitersRepo | None = None
+        self._skills: SkillsRepo | None = None
+        self._synonyms: SynonymsRepo | None = None
+        self._jobs: JobsRepo | None = None
+        self._job_locations: JobLocationsRepo | None = None
+        self._postings: PostingsRepo | None = None
+        self._dedupe: DedupeRepo | None = None
+        self._fake_signals: FakeSignalsRepo | None = None
+        self._crawl: CrawlRepo | None = None
+        self._crawler_health: CrawlerHealthRepo | None = None
+        self._geo: GeoRepo | None = None
+        self._reference: ReferenceRepo | None = None
+        self._search: SearchRepo | None = None
 
     # -- alternative constructor ----------------------------------------
 

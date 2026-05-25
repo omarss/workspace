@@ -27,7 +27,7 @@ async def test_upsert_preserves_existing_crawl_enabled(db: JobCrawlerDB) -> None
     assert source.crawl_enabled is True
 
     # Simulate crawler_health.mark_broken disabling the source.
-    await db.sources._execute(  # type: ignore[attr-defined]
+    await db.sources._execute(
         "UPDATE sources SET crawl_enabled = false WHERE id = %(s)s",
         {"s": source.id},
     )

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Final
+from typing import Any, Final, cast
 
 import httpx
 from tenacity import (
@@ -65,7 +65,7 @@ class WikidataResult:
     wait=wait_exponential(multiplier=2, min=2, max=30),
     retry=retry_if_exception_type((httpx.TransportError, httpx.HTTPStatusError)),
 )
-async def _fetch_sparql() -> dict:
+async def _fetch_sparql() -> dict[str, Any]:
     """Single SPARQL fetch with retry + backoff. Returns the parsed JSON."""
     async with httpx.AsyncClient(
         timeout=60.0,
@@ -75,7 +75,9 @@ async def _fetch_sparql() -> dict:
         # 5xx → HTTPStatusError → retry; 4xx → HTTPStatusError → retry too
         # but capped at 3 attempts. Tenacity won't retry past stop_after_attempt.
         resp.raise_for_status()
-        return resp.json()
+        # httpx's .json() returns Any (parsed JSON can be anything). We know
+        # the SPARQL endpoint returns an object, but cast keeps mypy happy.
+        return cast(dict[str, Any], resp.json())
 
 
 async def fetch_and_load(db: JobCrawlerDB, *, max_rows: int | None = None) -> WikidataResult:
