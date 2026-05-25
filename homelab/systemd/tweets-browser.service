@@ -24,6 +24,11 @@ WorkingDirectory=/srv/tweets
 # CDP listens on loopback only — the only consumer is tweetsd's
 # refresher, and exposing CDP publicly would let anyone control this
 # logged-in X session.
+#
+# No URL on the command line: --headless=new refuses to start with any
+# "target" argument ("Multiple targets are not supported in headless
+# mode"). The CDP refresher navigates the about:blank tab to x.com
+# itself via Page.navigate when it needs to capture a search.
 ExecStart=/usr/bin/google-chrome \
     --headless=new \
     --user-data-dir=/srv/tweets/browser-profile \
@@ -37,8 +42,7 @@ ExecStart=/usr/bin/google-chrome \
     --disable-features=Translate,MediaRouter \
     --disable-gpu \
     --no-pings \
-    --user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36 \
-    https://x.com/
+    --user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36
 
 Restart=on-failure
 RestartSec=10s
