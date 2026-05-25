@@ -1,38 +1,39 @@
-# TenantsApi
+# NotificationChannelsApi
 
 All URIs are relative to *https://dev.example.saas.omarss.net*
 
 |Method | HTTP request | Description|
 |------------- | ------------- | -------------|
-|[**createTenant**](#createtenant) | **POST** /v1/tenants | Create a tenant. Auto-creates a default Organization.|
-|[**deleteTenant**](#deletetenant) | **DELETE** /v1/tenants/{tenant_id} | Soft-delete a tenant. Retention applies before physical purge.|
-|[**getTenant**](#gettenant) | **GET** /v1/tenants/{tenant_id} | Fetch a tenant by id.|
-|[**listTenants**](#listtenants) | **GET** /v1/tenants | List tenants visible to the caller\&#39;s Deployment.|
-|[**updateTenant**](#updatetenant) | **PATCH** /v1/tenants/{tenant_id} | Update a tenant. Idempotent. ETag concurrency control required.|
+|[**createNotificationChannel**](#createnotificationchannel) | **POST** /v1/notification-channels | Create a BYOK notification channel.|
+|[**deleteNotificationChannel**](#deletenotificationchannel) | **DELETE** /v1/notification-channels/{channel_id} | Soft-delete a notification channel.|
+|[**getNotificationChannel**](#getnotificationchannel) | **GET** /v1/notification-channels/{channel_id} | Fetch a notification channel by id.|
+|[**listNotificationChannels**](#listnotificationchannels) | **GET** /v1/notification-channels | List BYOK notification channels in the caller\&#39;s tenant.|
+|[**rotateNotificationChannelCredentials**](#rotatenotificationchannelcredentials) | **POST** /v1/notification-channels/{channel_id}/rotate-credentials | Rotate a channel\&#39;s BYOK credentials.|
+|[**updateNotificationChannel**](#updatenotificationchannel) | **PATCH** /v1/notification-channels/{channel_id} | Update a notification channel (metadata only).|
 
-# **createTenant**
-> TenantResponse createTenant(createTenantRequest)
+# **createNotificationChannel**
+> NotificationChannelResponse createNotificationChannel(createNotificationChannelRequest)
 
-Idempotent. Replays with the same Idempotency-Key + body return the cached 201 response; with the same key + a different body return 422 idempotency-key-conflict (see AGENTS.md section 5.2). 
+Idempotent. Per ADR 017 credentials in the body are envelope-encrypted before the row is inserted and the persisted plaintext is zeroed immediately. The response NEVER echoes credentials — only a credentials_present flag and last_rotated_at timestamp. 
 
 ### Example
 
 ```typescript
 import {
-    TenantsApi,
+    NotificationChannelsApi,
     Configuration,
-    CreateTenantRequest
+    CreateNotificationChannelRequest
 } from '@omarss/saas-dataplane-sdk';
 
 const configuration = new Configuration();
-const apiInstance = new TenantsApi(configuration);
+const apiInstance = new NotificationChannelsApi(configuration);
 
 let idempotencyKey: string; //24-hour idempotency key (idem_<ulid>). (default to undefined)
-let createTenantRequest: CreateTenantRequest; //
+let createNotificationChannelRequest: CreateNotificationChannelRequest; //
 
-const { status, data } = await apiInstance.createTenant(
+const { status, data } = await apiInstance.createNotificationChannel(
     idempotencyKey,
-    createTenantRequest
+    createNotificationChannelRequest
 );
 ```
 
@@ -40,13 +41,13 @@ const { status, data } = await apiInstance.createTenant(
 
 |Name | Type | Description  | Notes|
 |------------- | ------------- | ------------- | -------------|
-| **createTenantRequest** | **CreateTenantRequest**|  | |
+| **createNotificationChannelRequest** | **CreateNotificationChannelRequest**|  | |
 | **idempotencyKey** | [**string**] | 24-hour idempotency key (idem_&lt;ulid&gt;). | defaults to undefined|
 
 
 ### Return type
 
-**TenantResponse**
+**NotificationChannelResponse**
 
 ### Authorization
 
@@ -68,28 +69,27 @@ const { status, data } = await apiInstance.createTenant(
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
-# **deleteTenant**
-> deleteTenant()
+# **deleteNotificationChannel**
+> deleteNotificationChannel()
 
-Soft-deletes the tenant; status flips to \"deleted\" and a retention window applies before any physical purge (purge endpoint lands in Phase 18). 
 
 ### Example
 
 ```typescript
 import {
-    TenantsApi,
+    NotificationChannelsApi,
     Configuration
 } from '@omarss/saas-dataplane-sdk';
 
 const configuration = new Configuration();
-const apiInstance = new TenantsApi(configuration);
+const apiInstance = new NotificationChannelsApi(configuration);
 
 let ifMatch: string; //Weak ETag from a prior GET; rejects on mismatch with 412. (default to undefined)
-let tenantId: string; // (default to undefined)
+let channelId: string; // (default to undefined)
 
-const { status, data } = await apiInstance.deleteTenant(
+const { status, data } = await apiInstance.deleteNotificationChannel(
     ifMatch,
-    tenantId
+    channelId
 );
 ```
 
@@ -98,7 +98,7 @@ const { status, data } = await apiInstance.deleteTenant(
 |Name | Type | Description  | Notes|
 |------------- | ------------- | ------------- | -------------|
 | **ifMatch** | [**string**] | Weak ETag from a prior GET; rejects on mismatch with 412. | defaults to undefined|
-| **tenantId** | [**string**] |  | defaults to undefined|
+| **channelId** | [**string**] |  | defaults to undefined|
 
 
 ### Return type
@@ -126,26 +126,25 @@ void (empty response body)
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
-# **getTenant**
-> TenantResponse getTenant()
+# **getNotificationChannel**
+> NotificationChannelResponse getNotificationChannel()
 
-Returns the tenant if the caller\'s tenant context matches the path id; 403 otherwise.
 
 ### Example
 
 ```typescript
 import {
-    TenantsApi,
+    NotificationChannelsApi,
     Configuration
 } from '@omarss/saas-dataplane-sdk';
 
 const configuration = new Configuration();
-const apiInstance = new TenantsApi(configuration);
+const apiInstance = new NotificationChannelsApi(configuration);
 
-let tenantId: string; // (default to undefined)
+let channelId: string; // (default to undefined)
 
-const { status, data } = await apiInstance.getTenant(
-    tenantId
+const { status, data } = await apiInstance.getNotificationChannel(
+    channelId
 );
 ```
 
@@ -153,12 +152,12 @@ const { status, data } = await apiInstance.getTenant(
 
 |Name | Type | Description  | Notes|
 |------------- | ------------- | ------------- | -------------|
-| **tenantId** | [**string**] |  | defaults to undefined|
+| **channelId** | [**string**] |  | defaults to undefined|
 
 
 ### Return type
 
-**TenantResponse**
+**NotificationChannelResponse**
 
 ### Authorization
 
@@ -180,30 +179,25 @@ const { status, data } = await apiInstance.getTenant(
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
-# **listTenants**
-> TenantListResponse listTenants()
+# **listNotificationChannels**
+> NotificationChannelListResponse listNotificationChannels()
 
-Returns the tenants the caller is authorised to see. In Phase 2 the Data Plane caller\'s token resolves to exactly one tenant, so the list contains one element. Operator impersonation across tenants lands in Phase 13. 
 
 ### Example
 
 ```typescript
 import {
-    TenantsApi,
+    NotificationChannelsApi,
     Configuration
 } from '@omarss/saas-dataplane-sdk';
 
 const configuration = new Configuration();
-const apiInstance = new TenantsApi(configuration);
+const apiInstance = new NotificationChannelsApi(configuration);
 
 let limit: number; //Max items to return (default 25, max 200). (optional) (default to 25)
-let cursor: string; //Opaque pagination cursor; obtained from a previous response. (optional) (default to undefined)
-let sort: string; //Sort token. Default \"-created_at\". (optional) (default to '-created_at')
 
-const { status, data } = await apiInstance.listTenants(
-    limit,
-    cursor,
-    sort
+const { status, data } = await apiInstance.listNotificationChannels(
+    limit
 );
 ```
 
@@ -212,13 +206,11 @@ const { status, data } = await apiInstance.listTenants(
 |Name | Type | Description  | Notes|
 |------------- | ------------- | ------------- | -------------|
 | **limit** | [**number**] | Max items to return (default 25, max 200). | (optional) defaults to 25|
-| **cursor** | [**string**] | Opaque pagination cursor; obtained from a previous response. | (optional) defaults to undefined|
-| **sort** | [**string**] | Sort token. Default \&quot;-created_at\&quot;. | (optional) defaults to '-created_at'|
 
 
 ### Return type
 
-**TenantListResponse**
+**NotificationChannelListResponse**
 
 ### Authorization
 
@@ -235,38 +227,34 @@ const { status, data } = await apiInstance.listTenants(
 |-------------|-------------|------------------|
 |**200** | OK |  -  |
 |**401** | Missing or invalid bearer token / API key. |  -  |
-|**410** | Cursor schema version is no longer supported. |  -  |
-|**429** | Rate limit exceeded. |  * RateLimit-Limit -  <br>  * RateLimit-Remaining -  <br>  * RateLimit-Reset -  <br>  * Retry-After -  <br>  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
-# **updateTenant**
-> TenantResponse updateTenant(updateTenantRequest)
+# **rotateNotificationChannelCredentials**
+> NotificationChannelResponse rotateNotificationChannelCredentials(rotateChannelCredentialsRequest)
 
-PATCH requires the current Weak ETag in If-Match; a stale ETag returns 412. Idempotency-Key replays the cached response when the body hash matches. 
+ADR 017: rotation is the only verb that accepts new credentials. Bumps row_seq and stamps last_rotated_at; emits the notification_channel.rotated audit event. 
 
 ### Example
 
 ```typescript
 import {
-    TenantsApi,
+    NotificationChannelsApi,
     Configuration,
-    UpdateTenantRequest
+    RotateChannelCredentialsRequest
 } from '@omarss/saas-dataplane-sdk';
 
 const configuration = new Configuration();
-const apiInstance = new TenantsApi(configuration);
+const apiInstance = new NotificationChannelsApi(configuration);
 
-let ifMatch: string; //Weak ETag from a prior GET; rejects on mismatch with 412. (default to undefined)
 let idempotencyKey: string; //24-hour idempotency key (idem_<ulid>). (default to undefined)
-let tenantId: string; // (default to undefined)
-let updateTenantRequest: UpdateTenantRequest; //
+let channelId: string; // (default to undefined)
+let rotateChannelCredentialsRequest: RotateChannelCredentialsRequest; //
 
-const { status, data } = await apiInstance.updateTenant(
-    ifMatch,
+const { status, data } = await apiInstance.rotateNotificationChannelCredentials(
     idempotencyKey,
-    tenantId,
-    updateTenantRequest
+    channelId,
+    rotateChannelCredentialsRequest
 );
 ```
 
@@ -274,15 +262,79 @@ const { status, data } = await apiInstance.updateTenant(
 
 |Name | Type | Description  | Notes|
 |------------- | ------------- | ------------- | -------------|
-| **updateTenantRequest** | **UpdateTenantRequest**|  | |
-| **ifMatch** | [**string**] | Weak ETag from a prior GET; rejects on mismatch with 412. | defaults to undefined|
+| **rotateChannelCredentialsRequest** | **RotateChannelCredentialsRequest**|  | |
 | **idempotencyKey** | [**string**] | 24-hour idempotency key (idem_&lt;ulid&gt;). | defaults to undefined|
-| **tenantId** | [**string**] |  | defaults to undefined|
+| **channelId** | [**string**] |  | defaults to undefined|
 
 
 ### Return type
 
-**TenantResponse**
+**NotificationChannelResponse**
+
+### Authorization
+
+[apiKeyAuth](../README.md#apiKeyAuth), [bearerAuth](../README.md#bearerAuth)
+
+### HTTP request headers
+
+ - **Content-Type**: application/json
+ - **Accept**: application/json, application/problem+json
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+|**200** | OK |  * ETag -  <br>  |
+|**401** | Missing or invalid bearer token / API key. |  -  |
+|**403** | Caller lacks permission for this resource. |  -  |
+|**404** | Resource not found. |  -  |
+|**422** | Idempotency-Key reused with a different body, OR validation failed. |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
+
+# **updateNotificationChannel**
+> NotificationChannelResponse updateNotificationChannel(updateNotificationChannelRequest)
+
+Per ADR 017 PATCH never accepts credentials. Use the dedicated rotate-credentials endpoint to change secrets. 
+
+### Example
+
+```typescript
+import {
+    NotificationChannelsApi,
+    Configuration,
+    UpdateNotificationChannelRequest
+} from '@omarss/saas-dataplane-sdk';
+
+const configuration = new Configuration();
+const apiInstance = new NotificationChannelsApi(configuration);
+
+let ifMatch: string; //Weak ETag from a prior GET; rejects on mismatch with 412. (default to undefined)
+let idempotencyKey: string; //24-hour idempotency key (idem_<ulid>). (default to undefined)
+let channelId: string; // (default to undefined)
+let updateNotificationChannelRequest: UpdateNotificationChannelRequest; //
+
+const { status, data } = await apiInstance.updateNotificationChannel(
+    ifMatch,
+    idempotencyKey,
+    channelId,
+    updateNotificationChannelRequest
+);
+```
+
+### Parameters
+
+|Name | Type | Description  | Notes|
+|------------- | ------------- | ------------- | -------------|
+| **updateNotificationChannelRequest** | **UpdateNotificationChannelRequest**|  | |
+| **ifMatch** | [**string**] | Weak ETag from a prior GET; rejects on mismatch with 412. | defaults to undefined|
+| **idempotencyKey** | [**string**] | 24-hour idempotency key (idem_&lt;ulid&gt;). | defaults to undefined|
+| **channelId** | [**string**] |  | defaults to undefined|
+
+
+### Return type
+
+**NotificationChannelResponse**
 
 ### Authorization
 

@@ -13,12 +13,11 @@
  */
 
 
+// May contain unused imports in some cases
+// @ts-ignore
+import type { Notification } from './notification';
 
-export * from './api/meta-api';
-export * from './api/notification-channels-api';
-export * from './api/notification-workflows-api';
-export * from './api/notifications-api';
-export * from './api/social-providers-api';
-export * from './api/tenants-api';
-export * from './api/users-api';
+export interface NotificationResponse {
+    'data': Notification;
+}
 

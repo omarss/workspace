@@ -52,6 +52,18 @@ All URIs are relative to *https://dev.example.saas.omarss.net*
 Class | Method | HTTP request | Description
 ------------ | ------------- | ------------- | -------------
 *MetaApi* | [**getHealthz**](docs/MetaApi.md#gethealthz) | **GET** /healthz | Liveness probe.
+*NotificationChannelsApi* | [**createNotificationChannel**](docs/NotificationChannelsApi.md#createnotificationchannel) | **POST** /v1/notification-channels | Create a BYOK notification channel.
+*NotificationChannelsApi* | [**deleteNotificationChannel**](docs/NotificationChannelsApi.md#deletenotificationchannel) | **DELETE** /v1/notification-channels/{channel_id} | Soft-delete a notification channel.
+*NotificationChannelsApi* | [**getNotificationChannel**](docs/NotificationChannelsApi.md#getnotificationchannel) | **GET** /v1/notification-channels/{channel_id} | Fetch a notification channel by id.
+*NotificationChannelsApi* | [**listNotificationChannels**](docs/NotificationChannelsApi.md#listnotificationchannels) | **GET** /v1/notification-channels | List BYOK notification channels in the caller\&#39;s tenant.
+*NotificationChannelsApi* | [**rotateNotificationChannelCredentials**](docs/NotificationChannelsApi.md#rotatenotificationchannelcredentials) | **POST** /v1/notification-channels/{channel_id}/rotate-credentials | Rotate a channel\&#39;s BYOK credentials.
+*NotificationChannelsApi* | [**updateNotificationChannel**](docs/NotificationChannelsApi.md#updatenotificationchannel) | **PATCH** /v1/notification-channels/{channel_id} | Update a notification channel (metadata only).
+*NotificationWorkflowsApi* | [**listNotificationWorkflows**](docs/NotificationWorkflowsApi.md#listnotificationworkflows) | **GET** /v1/notification-workflows | List registered notification workflows for the caller\&#39;s tenant.
+*NotificationWorkflowsApi* | [**registerNotificationWorkflow**](docs/NotificationWorkflowsApi.md#registernotificationworkflow) | **POST** /v1/notification-workflows | Register a (name → Novu workflow id) mapping.
+*NotificationWorkflowsApi* | [**updateNotificationWorkflow**](docs/NotificationWorkflowsApi.md#updatenotificationworkflow) | **PATCH** /v1/notification-workflows/{workflow_id} | Update the Novu workflow id and/or description for a registered workflow.
+*NotificationsApi* | [**getNotification**](docs/NotificationsApi.md#getnotification) | **GET** /v1/notifications/{notification_id} | Fetch a notification by id.
+*NotificationsApi* | [**listNotifications**](docs/NotificationsApi.md#listnotifications) | **GET** /v1/notifications | List notifications in the caller\&#39;s tenant.
+*NotificationsApi* | [**sendNotification**](docs/NotificationsApi.md#sendnotification) | **POST** /v1/notifications/send | Queue a notification for delivery via Novu.
 *SocialProvidersApi* | [**linkSocialProvider**](docs/SocialProvidersApi.md#linksocialprovider) | **POST** /v1/users/{user_id}/social-providers | Start a social-provider link flow. Returns the Keycloak link URL.
 *SocialProvidersApi* | [**listSocialProviders**](docs/SocialProvidersApi.md#listsocialproviders) | **GET** /v1/users/{user_id}/social-providers | List linked social providers for a user.
 *SocialProvidersApi* | [**unlinkSocialProvider**](docs/SocialProvidersApi.md#unlinksocialprovider) | **DELETE** /v1/users/{user_id}/social-providers/{provider} | Unlink a social provider. Emits user.social_unlinked.
@@ -73,19 +85,39 @@ Class | Method | HTTP request | Description
 
 ### Documentation For Models
 
+ - [CreateNotificationChannelRequest](docs/CreateNotificationChannelRequest.md)
  - [CreateTenantRequest](docs/CreateTenantRequest.md)
  - [CreateUserRequest](docs/CreateUserRequest.md)
+ - [CredentialsBundle](docs/CredentialsBundle.md)
  - [FieldError](docs/FieldError.md)
  - [Health](docs/Health.md)
  - [LinkSocialProviderRequest](docs/LinkSocialProviderRequest.md)
  - [LinkSocialProviderResponse](docs/LinkSocialProviderResponse.md)
+ - [Notification](docs/Notification.md)
+ - [NotificationChannel](docs/NotificationChannel.md)
+ - [NotificationChannelListResponse](docs/NotificationChannelListResponse.md)
+ - [NotificationChannelResponse](docs/NotificationChannelResponse.md)
+ - [NotificationListResponse](docs/NotificationListResponse.md)
+ - [NotificationResponse](docs/NotificationResponse.md)
+ - [NotificationWorkflow](docs/NotificationWorkflow.md)
+ - [NotificationWorkflowListResponse](docs/NotificationWorkflowListResponse.md)
+ - [NotificationWorkflowResponse](docs/NotificationWorkflowResponse.md)
  - [Pagination](docs/Pagination.md)
  - [Problem](docs/Problem.md)
+ - [RegisterNotificationWorkflowRequest](docs/RegisterNotificationWorkflowRequest.md)
+ - [RotateChannelCredentialsRequest](docs/RotateChannelCredentialsRequest.md)
+ - [SESCredentials](docs/SESCredentials.md)
+ - [SMTPCredentials](docs/SMTPCredentials.md)
+ - [SendGridCredentials](docs/SendGridCredentials.md)
+ - [SendNotificationRequest](docs/SendNotificationRequest.md)
+ - [SendNotificationRequestTo](docs/SendNotificationRequestTo.md)
  - [SocialProvider](docs/SocialProvider.md)
  - [SocialProviderListResponse](docs/SocialProviderListResponse.md)
  - [Tenant](docs/Tenant.md)
  - [TenantListResponse](docs/TenantListResponse.md)
  - [TenantResponse](docs/TenantResponse.md)
+ - [UpdateNotificationChannelRequest](docs/UpdateNotificationChannelRequest.md)
+ - [UpdateNotificationWorkflowRequest](docs/UpdateNotificationWorkflowRequest.md)
  - [UpdateTenantRequest](docs/UpdateTenantRequest.md)
  - [UpdateUserRequest](docs/UpdateUserRequest.md)
  - [User](docs/User.md)

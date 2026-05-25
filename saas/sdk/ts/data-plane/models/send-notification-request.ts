@@ -13,12 +13,13 @@
  */
 
 
+// May contain unused imports in some cases
+// @ts-ignore
+import type { SendNotificationRequestTo } from './send-notification-request-to';
 
-export * from './api/meta-api';
-export * from './api/notification-channels-api';
-export * from './api/notification-workflows-api';
-export * from './api/notifications-api';
-export * from './api/social-providers-api';
-export * from './api/tenants-api';
-export * from './api/users-api';
+export interface SendNotificationRequest {
+    'workflow_name': string;
+    'to': SendNotificationRequestTo;
+    'payload'?: { [key: string]: any; };
+}
 

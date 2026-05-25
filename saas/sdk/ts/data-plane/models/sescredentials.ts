@@ -14,11 +14,8 @@
 
 
 
-export * from './api/meta-api';
-export * from './api/notification-channels-api';
-export * from './api/notification-workflows-api';
-export * from './api/notifications-api';
-export * from './api/social-providers-api';
-export * from './api/tenants-api';
-export * from './api/users-api';
+export interface SESCredentials {
+    'access_key_id': string;
+    'secret_access_key': string;
+}
 

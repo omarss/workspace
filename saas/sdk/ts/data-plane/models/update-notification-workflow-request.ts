@@ -14,11 +14,11 @@
 
 
 
-export * from './api/meta-api';
-export * from './api/notification-channels-api';
-export * from './api/notification-workflows-api';
-export * from './api/notifications-api';
-export * from './api/social-providers-api';
-export * from './api/tenants-api';
-export * from './api/users-api';
+/**
+ * Partial-update payload. Both fields are optional; omit a field to leave it unchanged. At least one MUST be provided. 
+ */
+export interface UpdateNotificationWorkflowRequest {
+    'novu_workflow_id'?: string;
+    'description'?: string;
+}
 
