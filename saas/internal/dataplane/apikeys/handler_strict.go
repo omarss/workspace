@@ -211,7 +211,7 @@ func (h *Handler) enforceWriteCtx(ctx context.Context, tenantID string) error {
 func toAPIKey(k APIKey) httpapi.APIKey {
 	out := httpapi.APIKey{
 		Id:        k.ID,
-		Object:    httpapi.ApiKey,
+		Object:    httpapi.APIKeyObjectApiKey,
 		TenantId:  k.TenantID,
 		Name:      k.Name,
 		Prefix:    k.Prefix,

@@ -8,6 +8,15 @@ servers:
 tags:
   - name: meta
     description: Health and metadata.
+  - name: audit
+    description: |
+      Audit-integrity verify endpoint. Operator-only — walks the
+      data-plane hash chain and reports the first row whose stored
+      row_hash disagrees with sha256(prev_hash || JCS(canonical body)),
+      or sequence gaps in the per-tenant chain (AGENTS.md §8.6 + ADR
+      012). The chain-walk logic ships in Phase 10; this endpoint's
+      Go wiring lands in Phase 11 when the control-plane binary is
+      assembled.
 paths:
   /healthz:
     get:
@@ -22,6 +31,36 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Health"
+  /control/v1/deployments/{deployment_id}/audit-integrity:
+    parameters:
+      - in: path
+        name: deployment_id
+        required: true
+        schema:
+          type: string
+    get:
+      operationId: verifyDeploymentAuditIntegrity
+      tags: [audit]
+      summary: Walk the audit chain and report the first mismatch (if any).
+      description: |
+        Operator-only. The chain walk is in-order per tenant; the
+        result terminates at the first mismatch. Reasons: sequence-gap,
+        prev_hash, row_hash. For very large deployments this endpoint
+        is long-running; the v1 roadmap moves it onto a background
+        job. Phase 10 ships the synchronous shape.
+      parameters:
+        - in: query
+          name: tenant_id
+          description: Optional — verify a single tenant's chain instead of every tenant on the Deployment.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuditIntegrityResponse"
 components:
   schemas:
     Health:
@@ -35,3 +74,34 @@ components:
           type: string
         commit:
           type: string
+    AuditIntegrityResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: object
+          required: [verified, rows_checked, tenants_checked, verified_at]
+          properties:
+            verified:
+              type: boolean
+            rows_checked:
+              type: integer
+            tenants_checked:
+              type: integer
+            first_mismatch_id:
+              type: string
+              nullable: true
+            first_mismatch_tenant_id:
+              type: string
+              nullable: true
+            first_mismatch_sequence:
+              type: integer
+              format: int64
+              nullable: true
+            first_mismatch_reason:
+              type: string
+              nullable: true
+              enum: [sequence-gap, prev_hash, row_hash]
+            verified_at:
+              type: string
+              format: date-time

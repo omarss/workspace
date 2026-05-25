@@ -51,11 +51,14 @@ All URIs are relative to *https://control.saas.omarss.net*
 
 Class | Method | HTTP request | Description
 ------------ | ------------- | ------------- | -------------
+*AuditApi* | [**verifyDeploymentAuditIntegrity**](docs/AuditApi.md#verifydeploymentauditintegrity) | **GET** /control/v1/deployments/{deployment_id}/audit-integrity | Walk the audit chain and report the first mismatch (if any).
 *MetaApi* | [**getHealthz**](docs/MetaApi.md#gethealthz) | **GET** /healthz | Liveness probe.
 
 
 ### Documentation For Models
 
+ - [AuditIntegrityResponse](docs/AuditIntegrityResponse.md)
+ - [AuditIntegrityResponseData](docs/AuditIntegrityResponseData.md)
  - [Health](docs/Health.md)
 
 
