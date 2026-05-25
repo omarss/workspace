@@ -36,7 +36,10 @@ async def _main(seed: bool, wd: bool, ats: bool, limit: int | None) -> int:
     async with JobCrawlerDB.from_env() as db:
         if seed:
             r = await manual_seed.load(db)
-            print(f"[seed] total={r.total} created={r.created} matched={r.matched_existing}")
+            print(
+                f"[seed] total={r.total} created={r.created} "
+                f"matched={r.matched_existing} career_profiles={r.career_profiles}"
+            )
         if wd:
             # Wikidata used to swallow fetch failures and return a (0, 0, 0)
             # result that the CronJob recorded as success (Finding 4). Now we
