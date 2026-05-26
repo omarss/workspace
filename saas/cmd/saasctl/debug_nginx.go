@@ -43,6 +43,7 @@ sequence is wired up (Phase 12e).`,
 	c.AddCommand(debugNginxCmd())
 	c.AddCommand(debugK3sCmd())
 	c.AddCommand(debugPostgresCmd())
+	c.AddCommand(debugBaoCmd())
 	return c
 }
 
