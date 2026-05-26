@@ -1,0 +1,18 @@
+# NodePort lets the host nginx reach the data-plane pod over loopback.
+# Each Deployment's NodePort is unique; allocation lives in the controlplane DB
+# (phase 12b reserves the port at provision time).
+apiVersion: v1
+kind: Service
+metadata:
+  name: dataplane
+  labels:
+    app.kubernetes.io/name: dataplane
+spec:
+  type: NodePort
+  selector:
+    app.kubernetes.io/name: dataplane
+  ports:
+    - name: http
+      port: 80
+      targetPort: 9090
+      nodePort: 30000   # overlay replaces this

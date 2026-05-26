@@ -1,0 +1,11 @@
+# Per-Deployment Kubernetes namespace. Phase 12b kustomize overlay sets
+# the `name` and `saas.omarss.net/deployment-id` label via replacements.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: saas-deployment
+  labels:
+    saas.omarss.net/managed-by: controlplane
+    saas.omarss.net/deployment-id: ""
+    saas.omarss.net/project-slug: ""
+    saas.omarss.net/environment-slug: ""

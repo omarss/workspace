@@ -1,0 +1,21 @@
+# Allow ingress from the host nginx (running on the node host) to the
+# data-plane pod's port 9090. The host network sits outside the cluster
+# CNI, so a CIDR-based ipBlock is the only way to reach it. The block
+# matches the k3s host's own IP space (overlay replaces with the actual
+# node CIDR).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-from-host-nginx
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: dataplane
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - ipBlock:
+            cidr: 10.43.0.0/16   # overlay replaces with k3s node-host CIDR
+      ports:
+        - protocol: TCP
+          port: 9090

@@ -41,6 +41,7 @@ to let the operator inspect host state before the full provisioning
 sequence is wired up (Phase 12e).`,
 	}
 	c.AddCommand(debugNginxCmd())
+	c.AddCommand(debugK3sCmd())
 	return c
 }
 

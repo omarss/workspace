@@ -1,0 +1,75 @@
+# Per-Deployment kustomize overlay template — rendered in-memory by the
+# k3s adapter at provision time. The adapter text-substitutes the ${var}
+# placeholders BEFORE kustomize runs (placeholders are NOT kustomize
+# syntax — they're a Phase 12b convention per the plan §12b.2). After
+# substitution the file is a valid Kustomization and the kustomize Go
+# API renders it normally.
+#
+# Substitutions Phase 12b fills in:
+#   ${deployment_id}       dep_<ulid> (also used as project + env slug
+#                          source until the deployments service supplies
+#                          richer metadata in Phase 12e)
+#   ${project_slug}        e.g. acme
+#   ${environment_slug}    e.g. prod
+#   ${image_version}       e.g. v0.3.1
+#   ${nodeport}            allocated unique port (30000-32767)
+#   ${host_nginx_cidr}     allowed source CIDR for ingress (host nginx)
+#   ${host_postgres_cidr}  egress CIDR for Postgres (host network)
+#   ${host_openbao_cidr}   egress CIDR for OpenBao (host network)
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: saas-${deployment_id}
+
+resources:
+  - ../base
+
+images:
+  - name: ghcr.io/omarss/saas/dataplane
+    newTag: ${image_version}
+
+# Label every resource so RBAC + audit can scope by deployment.
+labels:
+  - includeSelectors: false
+    pairs:
+      saas.omarss.net/deployment-id: ${deployment_id}
+      saas.omarss.net/project-slug: ${project_slug}
+      saas.omarss.net/environment-slug: ${environment_slug}
+
+# Patches do the per-Deployment field rewrites that `namespace:` and
+# `images:` cannot reach:
+#   - The Namespace metadata.name (kustomize's `namespace:` field sets
+#     the namespace of OTHER resources, not of the Namespace resource
+#     itself).
+#   - The Service.spec.ports[0].nodePort (so each Deployment occupies a
+#     unique host port).
+#   - The Deployment's SAAS_DEPLOYMENT_ID env var.
+#   - The two NetworkPolicy ipBlock CIDRs (ingress source + Postgres
+#     egress target). Without these, default-deny + missing-allow would
+#     trap pods.
+patches:
+  - target: { kind: Namespace }
+    patch: |-
+      - op: replace
+        path: /metadata/name
+        value: saas-${deployment_id}
+  - target: { kind: Service, name: dataplane }
+    patch: |-
+      - op: replace
+        path: /spec/ports/0/nodePort
+        value: ${nodeport}
+  - target: { kind: Deployment, name: dataplane }
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/env/2/value
+        value: ${deployment_id}
+  - target: { kind: NetworkPolicy, name: allow-ingress-from-host-nginx }
+    patch: |-
+      - op: replace
+        path: /spec/ingress/0/from/0/ipBlock/cidr
+        value: ${host_nginx_cidr}
+  - target: { kind: NetworkPolicy, name: allow-egress-platform }
+    patch: |-
+      - op: replace
+        path: /spec/egress/1/to/0/ipBlock/cidr
+        value: ${host_postgres_cidr}
