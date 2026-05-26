@@ -159,6 +159,7 @@ async def _main(slugs: tuple[str, ...]) -> int:
                 f"restrictions={summary.restrictions_recovered} "
                 f"centroids={summary.centroids_filled} "
                 f"legit_scored={summary.legit_scored} "
+                f"industries={summary.industries_classified} "
                 f"titles={summary.titles_normalized} "
                 f"dedup_edges={summary.dedup_edges} "
                 f"merged={summary.dedup_clusters_merged}"

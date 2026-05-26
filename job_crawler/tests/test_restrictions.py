@@ -444,3 +444,104 @@ def test_category_code_specificity_wins() -> None:
     assert detect_category_code("Senior Mechanical Engineer") == "engineering_mechanical"
     # 'Sales Engineer' is a sales role, not engineering (per taxonomy intent).
     assert detect_category_code("Sales Engineer - SaaS") == "sales_business_dev"
+
+
+# ---------------------------------------------------------------------------
+# detect_industry_code (companies)
+# ---------------------------------------------------------------------------
+
+
+from job_crawler.core.restrictions import detect_industry_code  # noqa: E402
+
+
+@pytest.mark.parametrize(
+    ("name", "expected"),
+    [
+        # Tech / digital
+        ("Cognizant Technology Solutions", "tech_software"),
+        ("Intertec Systems LLC", "tech_software"),
+        ("Saudi Cyber Security Co", "cybersecurity"),
+        ("STC Pay", "fintech"),
+        ("Tamara Fintech", "fintech"),
+        ("Souq Online Marketplace", "ecommerce"),
+        ("Saudi Telecom Company", "telecom"),
+        # Energy / heavy industry
+        ("Saudi Aramco", "oil_gas"),
+        ("SABIC", "petrochemicals"),
+        ("Maaden Mining", "mining"),
+        ("ACWA Power Renewables", "energy"),
+        ("Riyadh Water Utilities", "utilities"),
+        ("Al Yamamah Chemicals Co", "chemicals"),
+        # Financial
+        ("Al Rajhi Bank", "banking"),
+        ("Tawuniya Insurance", "insurance"),
+        ("Kingdom Investments Co", "investment"),
+        ("WATHEEQ INVESTMENTS CO", "investment"),
+        # Real estate / construction / cement
+        ("نارين العقارية", "real_estate"),
+        ("ROSHN Real Estate Developer", "real_estate"),
+        ("Tenvidh contracting company", "construction"),
+        ("Al Saif Building Co", "construction"),
+        ("Yamama Cement", "cement"),
+        # Healthcare / pharma
+        ("King Faisal Specialist Hospital", "healthcare"),
+        ("Batterjee Medical College", "healthcare"),
+        ("Al Nahdi Pharmacy", "pharma"),
+        ("Saudi Pharmaceuticals", "pharma"),
+        # Food / agri / retail / hospitality
+        ("Saudi Lebanese Factories For Chocolate", "food_beverage"),
+        ("Al Marai Dairy Co", "food_beverage"),
+        ("Saudi Agricultural Co", "agriculture"),
+        ("Panda Retail Stores", "retail"),
+        ("Oriental Horizon Trading Co.", "retail"),
+        ("Hilton Hotels Riyadh", "hospitality"),
+        ("Starbucks Coffee Cafe", "hospitality"),
+        # Education / NGO / gov
+        ("King Saud University", "education"),
+        ("Riyadh Schools Group", "education"),
+        ("Saudi Red Crescent NGO", "ngo"),
+        ("Ministry of Health", "government"),
+        # Transport / logistics / airline
+        ("Saudia Airlines", "airline"),
+        ("Aramex Logistics Services", "logistics"),
+        ("Emdad United Transportation", "transport"),
+        # Manufacturing / automotive
+        ("Saudi Lebanese Factories For Chocolate & Confectionery", "food_beverage"),  # food wins over manufacturing
+        ("شركة مصنع دار فصوص للصناعة", "manufacturing"),
+        ("Al-Futtaim Automotive", "automotive"),
+        # Media / entertainment / sports
+        ("Saudi Broadcasting Media", "media"),
+        ("Intro Events", "entertainment"),
+        ("Riyadh Sports Club", "sports"),
+        # Services
+        ("Falcon Security Services", "security_services"),
+        ("Talent Acquisition Recruitment Services", "hr_services"),
+        # Conglomerate
+        ("Al-Futtaim Holding Co", "conglomerate"),
+    ],
+)
+def test_industry_code_classification(name: str, expected: str) -> None:
+    assert detect_industry_code(name) == expected
+
+
+def test_industry_code_silent_returns_none() -> None:
+    """Generic names with no industry signal stay None."""
+    assert detect_industry_code("AK gorop") is None
+    assert detect_industry_code("Al Safsaf") is None
+    assert detect_industry_code("سنام") is None
+    assert detect_industry_code(None) is None
+    assert detect_industry_code("") is None
+
+
+def test_industry_code_arabic_name() -> None:
+    """Arabic name path."""
+    assert detect_industry_code(None, "شركة مجموعة مودة العالمية للفنادق") == "hospitality"
+    assert detect_industry_code(None, "ثوب سار للخياطة الرجالية", description=None) is None  # tailoring not in taxonomy
+
+
+def test_industry_code_description_fallback() -> None:
+    """When the name is generic, the description (about-blurb) is scanned."""
+    assert detect_industry_code(
+        "Mada Co",
+        description="We are a leading software company building SaaS for banks.",
+    ) == "tech_software"
