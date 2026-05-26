@@ -172,6 +172,18 @@ func (c *Client) Logical() *bao.Logical {
 	return c.bao.Logical()
 }
 
+// RawClient returns the underlying authenticated *bao.Client. Phase 12e
+// uses it to construct the provision/openbao adapter, which needs the
+// full client surface (Logical + Auth + Sys). Production callers
+// outside the host-provisioner wiring should NOT reach for this — use
+// Logical(), KVPut, Encrypt, etc.
+//
+// The returned client is the same one the lifetime watcher keeps
+// authenticated; do not call any method that revokes its token.
+func (c *Client) RawClient() *bao.Client {
+	return c.bao
+}
+
 // NewForTest builds a Client pre-loaded with a static token, skipping the
 // auth-method flow. Test-only — integration tests reach for this when the
 // compose stack already exposes a working token (root token in local dev).
