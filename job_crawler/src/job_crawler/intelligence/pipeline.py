@@ -41,6 +41,7 @@ class IntelligenceSummary:
     restrictions_recovered: int = 0
     centroids_filled: int = 0
     legit_scored: int = 0
+    titles_depolluted: int = 0
 
 
 async def enrich_unstructured_fields(
@@ -371,6 +372,65 @@ async def cleanup_html_entities_in_titles(db: JobCrawlerDB) -> int:
         return max(0, cur.rowcount or 0)
 
 
+async def cleanup_title_pollution(
+    db: JobCrawlerDB,
+    *,
+    batch_size: int = 500,
+    limit: int | None = None,
+) -> int:
+    """Apply `_clean_title` to every cluster title that looks polluted.
+
+    Targets titles still carrying:
+      * pipe-separator brand trails ("Manager | Acme | Riyadh")
+      * Hiring Now / Career Opportunities click-bait prefixes
+      * req-id paren suffixes ("(88068)", "(Tamheer NNNN)")
+
+    Idempotent: a cluster whose cleaned title equals the current one is
+    skipped (the WHERE clause filters those out before the Python loop).
+    Returns the count of clusters whose `title_en` / `title_ar` changed.
+    """
+    from ..core.normalise import _clean_title
+
+    sql = (
+        "SELECT id, title_en, title_ar FROM jobs "
+        "WHERE  deleted_at IS NULL "
+        "  AND  (title_en LIKE '%|%' OR title_ar LIKE '%|%' "
+        "    OR  title_en ~* '^(hiring now|now hiring|urgent|career opportunities|we are hiring|join (our|us))[ |:!]' "
+        "    OR  title_ar ~* '^(hiring now|now hiring|urgent|career opportunities|we are hiring|join (our|us))[ |:!]' "
+        "    OR  title_en ~ '\\([0-9]{3,}\\)$' "
+        "    OR  title_en ~* '\\(tamheer[ ]+[0-9]+\\)$' "
+        "    OR  title_en ~* '\\(req\\.?[ ]*[0-9]+\\)$' "
+        "    OR  title_en ~* '\\(urgent.*\\)$' "
+        "      )"
+    )
+    if limit:
+        sql += f" LIMIT {int(limit)}"
+
+    touched = 0
+    async with db.pool.connection() as conn, conn.cursor(
+        row_factory=dict_row, name="title_pollution_scan",
+    ) as cur:
+        await cur.execute(sql)
+        while batch := await cur.fetchmany(batch_size):
+            for row in batch:
+                patches: dict[str, object] = {}
+                if row["title_en"]:
+                    new_en = _clean_title(row["title_en"])
+                    if new_en and new_en != row["title_en"]:
+                        patches["title_en"] = new_en
+                if row["title_ar"]:
+                    new_ar = _clean_title(row["title_ar"])
+                    if new_ar and new_ar != row["title_ar"]:
+                        patches["title_ar"] = new_ar
+                if patches:
+                    try:
+                        await db.jobs.update(row["id"], **patches)
+                        touched += 1
+                    except Exception:
+                        _LOG.exception("title cleanup update failed for %s", row["id"])
+    return touched
+
+
 # ---------------------------------------------------------------------------
 # Orchestrator
 # ---------------------------------------------------------------------------
@@ -397,6 +457,10 @@ async def run_all(
         # Title cleanup runs FIRST so any subsequent re-derivation (titles
         # normalized in enrich_unstructured_fields) sees the decoded text.
         summary.titles_decoded = await cleanup_html_entities_in_titles(db)
+        # Strip brand-trail pipes / req-id paren suffixes from existing
+        # cluster titles. Must run BEFORE category-code backfill so the
+        # classifier sees the cleaned title.
+        summary.titles_depolluted = await cleanup_title_pollution(db)
         summary.cities_resolved = await backfill_unresolved_cities(db)
         s, e, ed, t = await enrich_unstructured_fields(db)
         summary.salary_recovered = s
