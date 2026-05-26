@@ -73,6 +73,7 @@ GOLANGCI_LINT := $(DOCKER) run --rm \
         openapi-lint openapi-overlay openapi-gen-go openapi-gen-ts openapi-diff-check \
         compose-up compose-down migrate migrate-down sqlc-gen sdk-ts sdk-go \
         openbao-init openbao-status openbao-rotate openbao-policies openbao-approle-creds \
+        operators-realm-import operators-realm-validate \
         fmt vet tidy clean help
 
 help:
@@ -228,6 +229,33 @@ openbao-approle-creds:
 		bao read -field=role_id auth/approle/role/controlplane/role-id; \
 		echo "----"; \
 		bao write -field=secret_id -f auth/approle/role/controlplane/secret-id'
+
+# ── Keycloak operators realm (Phase 13) ────────────────────────────────────
+# operators-realm-validate runs the JSON schema check + a Python json
+# parse so the realm file is provably importable before we ship it to
+# Keycloak. Cheaper than spinning the full container in CI.
+operators-realm-validate:
+	@python3 -c "import json,sys; json.load(open('deploy/keycloak/realms/operators-realm.json')); print('operators-realm: JSON OK')"
+
+# operators-realm-import boots a one-shot Keycloak container with the
+# operators-realm.json mounted at /opt/keycloak/data/import, runs
+# `kc.sh start-dev --import-realm`, waits for the discovery doc to be
+# reachable, then exits. Use for local smoke verification.
+operators-realm-import:
+	@echo "[operators-realm-import] booting Keycloak with --import-realm"
+	@$(DOCKER) run --rm -d --name saas-operators-realm \
+	    -v $(CURDIR)/deploy/keycloak/realms:/opt/keycloak/data/import:ro \
+	    -e KEYCLOAK_ADMIN=admin -e KEYCLOAK_ADMIN_PASSWORD=admin \
+	    -p 8081:8080 \
+	    quay.io/keycloak/keycloak:26.0 \
+	    start-dev --import-realm --hostname-strict=false >/dev/null
+	@for i in $$(seq 1 60); do \
+	    sleep 2; \
+	    curl -fsS http://localhost:8081/realms/operators/.well-known/openid-configuration >/dev/null 2>&1 && break; \
+	done
+	@curl -fsS http://localhost:8081/realms/operators/.well-known/openid-configuration \
+	    | python3 -c "import json,sys; d=json.load(sys.stdin); print('operators realm discovered:', d['issuer'])"
+	@$(DOCKER) kill saas-operators-realm >/dev/null
 
 # ── housekeeping ────────────────────────────────────────────────────────────
 clean:

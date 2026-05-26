@@ -30,6 +30,14 @@ func main() {
 		tenantCmd(),
 		deploymentCmd(),
 		domainCmd(),
+		// Phase 13 — operator inventory + impersonation lifecycle. The
+		// subtree calls the same control-plane API as everything else;
+		// the operator add / remove flows are deferred to a later phase
+		// because they require the gocloak admin client wiring, but
+		// `list` + `impersonate` are surfaced now so incident-response
+		// runbooks have a stable command set from Phase 13 onward.
+		operatorCmd(),
+		impersonationCmd(),
 	)
 	// Phase 12a-d shipped `saasctl debug <adapter>` helpers behind
 	// CHECKPOINT 5/6/7/8. Phase 12e composes the four adapters into

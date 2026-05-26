@@ -1,0 +1,241 @@
+{
+  "_comment_": "Operators realm — Phase 13. Imported via `kc.sh start --import-realm` (foundations §8 bootstrap-only; subsequent config drift goes through gocloak Admin API). The realm is intentionally locked down: no self-registration, no password reset, no broker IdPs, no public clients beyond saas-operator-cli (PKCE-only). MFA is enforced via two default required actions (TOTP + WebAuthn). The 5-min step-up window is enforced server-side in internal/platform/auth/operatorjwt/stepup.go — Keycloak emits `auth_time`, the platform decides freshness.",
+  "realm": "operators",
+  "enabled": true,
+  "displayName": "SaaS Operators",
+  "defaultSignatureAlgorithm": "RS256",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "verifyEmail": true,
+  "resetPasswordAllowed": false,
+  "editUsernameAllowed": false,
+  "sslRequired": "all",
+
+  "_comment_lifespans_": "accessTokenLifespan == 900s (15 min) — matches AGENTS.md §18.4 max impersonation TTL. ssoSessionIdleTimeout 1800s lets short breaks not log the operator out; ssoSessionMaxLifespan 28800s caps a full session at 8h, after which re-auth is required regardless of activity.",
+  "accessTokenLifespan": 900,
+  "accessTokenLifespanForImplicitFlow": 900,
+  "ssoSessionIdleTimeout": 1800,
+  "ssoSessionMaxLifespan": 28800,
+  "offlineSessionIdleTimeout": 2592000,
+  "actionTokenGeneratedByAdminLifespan": 300,
+  "actionTokenGeneratedByUserLifespan": 300,
+
+  "_comment_brute_force_": "Lock an account after 5 wrong passwords; quick-recover after 1 min on the first failure, max 15 min on repeats. Permanent lockout disabled so an attacker cannot lock out an operator indefinitely from the public auth page; the brute-force counter resets on a successful login.",
+  "bruteForceProtected": true,
+  "permanentLockout": false,
+  "failureFactor": 5,
+  "waitIncrementSeconds": 60,
+  "maxFailureWaitSeconds": 900,
+  "minimumQuickLoginWaitSeconds": 60,
+  "quickLoginCheckMilliSeconds": 1000,
+
+  "_comment_required_actions_": "Default required actions on every new operator: enroll TOTP AND register a WebAuthn key. Either satisfies the MFA AMR check at the platform side (otp / hwk / webauthn). Operators see both screens on first login.",
+  "requiredActions": [
+    { "alias": "CONFIGURE_TOTP",      "name": "Configure OTP",            "providerId": "CONFIGURE_TOTP",      "enabled": true, "defaultAction": true,  "priority": 10 },
+    { "alias": "webauthn-register",   "name": "Register Security Key",    "providerId": "webauthn-register",   "enabled": true, "defaultAction": true,  "priority": 20 },
+    { "alias": "VERIFY_EMAIL",        "name": "Verify Email",             "providerId": "VERIFY_EMAIL",        "enabled": true, "defaultAction": true,  "priority": 30 },
+    { "alias": "UPDATE_PASSWORD",     "name": "Update Password",          "providerId": "UPDATE_PASSWORD",     "enabled": true, "defaultAction": false, "priority": 40 }
+  ],
+
+  "_comment_password_policy_": "12-char min, mixed case + digit + special, last 12 hashes remembered, max 90-day rotation. argon2id (Keycloak's default since 22.0).",
+  "passwordPolicy": "length(12) and notUsername(undefined) and notEmail(undefined) and digits(1) and lowerCase(1) and upperCase(1) and specialChars(1) and passwordHistory(12) and forceExpiredPasswordChange(90) and hashAlgorithm(argon2)",
+
+  "_comment_otp_policy_": "TOTP, 6 digits, SHA1 (RFC 6238 default; the QR-renderer in authenticator apps is universally compatible), 30s period, 1-step look-behind window.",
+  "otpPolicyType": "totp",
+  "otpPolicyAlgorithm": "HmacSHA1",
+  "otpPolicyDigits": 6,
+  "otpPolicyInitialCounter": 0,
+  "otpPolicyLookAheadWindow": 1,
+  "otpPolicyPeriod": 30,
+  "otpSupportedApplications": ["FreeOTP", "Google Authenticator", "Microsoft Authenticator"],
+
+  "_comment_webauthn_policy_": "WebAuthn policy: any attestation, any authenticator (platform or roaming), require user verification = preferred (no biometric forcing for hardware keys). The relying party id is set at provisioning by the platform admin via gocloak — the placeholder is replaced before MVP.",
+  "webAuthnPolicyRpEntityName": "SaaS Operators",
+  "webAuthnPolicySignatureAlgorithms": ["ES256", "RS256"],
+  "webAuthnPolicyRpId": "",
+  "webAuthnPolicyAttestationConveyancePreference": "none",
+  "webAuthnPolicyAuthenticatorAttachment": "not specified",
+  "webAuthnPolicyRequireResidentKey": "not specified",
+  "webAuthnPolicyUserVerificationRequirement": "preferred",
+  "webAuthnPolicyCreateTimeout": 0,
+  "webAuthnPolicyAvoidSameAuthenticatorRegister": false,
+  "webAuthnPolicyAcceptableAaguids": [],
+
+  "_comment_acr_loa_map_": "Map ACR claims to loa (level of assurance). silver=1 (password only), gold=2 (password + MFA, fresh). Step-up middleware requires gold + auth_time within 5 min for destructive endpoints.",
+  "attributes": {
+    "acr.loa.map": "{\"silver\":\"1\",\"gold\":\"2\"}",
+    "frontendUrl": ""
+  },
+
+  "_comment_flows_": "browser-with-mfa: copy of the built-in browser flow with a REQUIRED MFA step right after the username+password screen. The exact step is conditional-otp (Keycloak's built-in OTP authenticator that also accepts a registered WebAuthn key when the user has one). Token's `amr` claim ends up containing `pwd` + (`otp` | `hwk`). The 5-min step-up freshness is NOT enforced at Keycloak — see CONVENTIONS / AGENTS.md §18.4 — it is the platform's responsibility because Keycloak does not natively expose 'force re-auth if older than X seconds'.",
+  "authenticationFlows": [
+    {
+      "alias": "browser-with-mfa",
+      "description": "Browser flow with required MFA after password (operators realm).",
+      "providerId": "basic-flow",
+      "topLevel": true,
+      "builtIn": false,
+      "authenticationExecutions": [
+        { "authenticator": "auth-cookie",                  "requirement": "ALTERNATIVE", "priority": 10, "userSetupAllowed": false, "autheticatorFlow": false },
+        { "authenticator": "auth-spnego",                  "requirement": "DISABLED",    "priority": 20, "userSetupAllowed": false, "autheticatorFlow": false },
+        { "authenticator": "identity-provider-redirector", "requirement": "DISABLED",    "priority": 25, "userSetupAllowed": false, "autheticatorFlow": false },
+        { "flowAlias": "browser-with-mfa-forms",           "requirement": "ALTERNATIVE", "priority": 30, "userSetupAllowed": false, "autheticatorFlow": true  }
+      ]
+    },
+    {
+      "alias": "browser-with-mfa-forms",
+      "description": "Username/password followed by required OTP/WebAuthn.",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        { "authenticator": "auth-username-password-form", "requirement": "REQUIRED", "priority": 10, "userSetupAllowed": false, "autheticatorFlow": false },
+        { "flowAlias": "browser-with-mfa-mfa",            "requirement": "REQUIRED", "priority": 20, "userSetupAllowed": false, "autheticatorFlow": true  }
+      ]
+    },
+    {
+      "alias": "browser-with-mfa-mfa",
+      "description": "Either OTP or WebAuthn; at least one must be configured.",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        { "authenticator": "auth-otp-form",          "requirement": "ALTERNATIVE", "priority": 10, "userSetupAllowed": false, "autheticatorFlow": false },
+        { "authenticator": "webauthn-authenticator", "requirement": "ALTERNATIVE", "priority": 20, "userSetupAllowed": false, "autheticatorFlow": false }
+      ]
+    }
+  ],
+  "browserFlow": "browser-with-mfa",
+
+  "clients": [
+    {
+      "_comment_": "Confidential service-account client used by the controlplane Go process to call Keycloak's admin REST (operator listing, role assignments, password resets). The audience-mapper forces aud=saas-control on every issued access token so operator JWTs are unambiguously bound to the control plane — a misrouted token to the data plane fails aud check.",
+      "clientId": "saas-controlplane",
+      "name": "SaaS Control Plane Service Account",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "secret": "REPLACE_AT_BOOTSTRAP",
+      "attributes": {
+        "use.refresh.tokens": "false",
+        "client.session.idle.timeout": "1800",
+        "client.session.max.lifespan": "28800"
+      },
+      "protocolMappers": [
+        {
+          "name": "audience-saas-control",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "saas-control",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "_comment_": "saasctl PKCE client. publicClient + PKCE S256 — no client secret in the binary. Callback is the operator's localhost:8765 loopback (RFC 8252). post.logout.redirect.uris=+ allows any of the configured redirectUris on logout.",
+      "clientId": "saas-operator-cli",
+      "name": "saasctl CLI (PKCE)",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "redirectUris": ["http://localhost:8765/callback", "http://127.0.0.1:8765/callback"],
+      "webOrigins": ["+"],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "+",
+        "access.token.lifespan": "900"
+      },
+      "protocolMappers": [
+        {
+          "name": "audience-saas-control",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "saas-control",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "_comment_": "operator_id is set as a user attribute by the platform at operator-create time; the mapper copies it into the access token as a top-level claim that the verifier reads alongside sub.",
+          "name": "operator-id-attribute",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "operator_id",
+            "claim.name": "operator_id",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        }
+      ]
+    }
+  ],
+
+  "_comment_roles_": "Realm roles map to OAuth scopes via the role-to-claim mapper. operator-admin is composite — assigning it grants the full destructive surface. The atomic roles let an org separate read-only auditors from incident-response operators.",
+  "roles": {
+    "realm": [
+      { "name": "deployments.read",    "description": "Read deployment metadata + state.",       "composite": false },
+      { "name": "deployments.write",   "description": "Create / update deployments.",            "composite": false },
+      { "name": "deployments.upgrade", "description": "Roll a deployment forward (destructive).","composite": false },
+      { "name": "deployments.rollback","description": "Roll a deployment back (destructive).",   "composite": false },
+      { "name": "deployments.restore", "description": "Restore a deployment from PITR.",         "composite": false },
+      { "name": "deployments.purge",   "description": "Physical delete of a deployment.",        "composite": false },
+      { "name": "deployments.freeze",  "description": "Freeze per-Deployment OpenBao transit keys.", "composite": false },
+      { "name": "operators.read",      "description": "List operators.",         "composite": false },
+      { "name": "operators.write",     "description": "Add / remove operators.", "composite": false },
+      { "name": "audit.read",          "description": "Read control-plane audit chain.", "composite": false },
+      { "name": "tenants.impersonate", "description": "Mint operator-impersonation tokens against a Deployment.", "composite": false },
+      {
+        "name": "operator",
+        "description": "Default role for every operator user — read-only across the control plane.",
+        "composite": true,
+        "composites": { "realm": ["deployments.read", "operators.read", "audit.read"] }
+      },
+      {
+        "name": "operator_admin",
+        "description": "Full control plane access; required for impersonation + operator management.",
+        "composite": true,
+        "composites": {
+          "realm": [
+            "deployments.read","deployments.write","deployments.upgrade",
+            "deployments.rollback","deployments.restore","deployments.purge",
+            "deployments.freeze","operators.read","operators.write",
+            "audit.read","tenants.impersonate"
+          ]
+        }
+      }
+    ]
+  },
+
+  "_comment_default_roles_": "Every freshly created operator picks up the `operator` (read-only) composite. Promotion to operator_admin is a manual step performed by an existing operator_admin via the saas-controlplane service account.",
+  "defaultRoles": ["operator"],
+
+  "_comment_users_": "Empty by default — the realm import installs no operators. The platform admin creates the first operator via the saas-controlplane service account, which then sends an email invite (verifyEmail flow). All subsequent operators are managed through saasctl operator add (post-MVP) or the gocloak admin path.",
+  "users": [],
+
+  "_comment_smtp_": "SMTP target for verify-email + password-reset (resetPasswordAllowed is false in this realm, but verify-email still uses SMTP). Local dev points at mailhog; production fills in the real SMTP credentials via gocloak post-import.",
+  "smtpServer": {
+    "host": "mailhog",
+    "port": "1025",
+    "from": "no-reply@operators.saas.omarss.net",
+    "fromDisplayName": "SaaS Operators",
+    "ssl": "false",
+    "starttls": "false",
+    "auth": "false"
+  }
+}
