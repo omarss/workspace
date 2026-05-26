@@ -84,20 +84,76 @@ func (v *Verifier) Verify(ctx context.Context, raw string) (auth.Principal, erro
 	if err != nil {
 		return auth.Principal{}, fmt.Errorf("operatorjwt: parse token: %w", err)
 	}
-	var operatorID, scope, ipClaim string
+	var operatorID, scope, ipClaim, acr string
 	_ = tok.Get("operator_id", &operatorID)
 	_ = tok.Get("scope", &scope)
 	_ = tok.Get("ip", &ipClaim)
+	_ = tok.Get("acr", &acr)
 	sub, _ := tok.Subject()
 	if operatorID == "" {
+		// Keycloak always emits `sub`; the operator-id mapper is best-effort.
 		operatorID = sub
 	}
+	// AMR is an array claim per RFC 8176. jwx v3 returns it as
+	// []interface{} unless a typed slice is requested.
+	amr := readStringSlice(tok, "amr")
+	authTime := readUnixTime(tok, "auth_time")
+	// keycloak_user_id mapped from the Keycloak `sub` so downstream
+	// repos can join against operator.keycloak_user_id without the
+	// platform issuing a separate claim.
 	return auth.Principal{
 		ActorType: auth.ActorOperator,
 		ActorID:   operatorID,
 		Scopes:    auth.ParseScopes(scope),
 		IPAddress: ipClaim,
+		AMR:       amr,
+		ACR:       acr,
+		AuthTime:  authTime,
 	}, nil
+}
+
+// readStringSlice extracts a JWT array claim as []string. jwx v3 stores
+// it as []interface{} when populated by Keycloak; coercing to []string
+// here keeps the principal type clean for callers.
+func readStringSlice(tok jwt.Token, claim string) []string {
+	var raw any
+	if err := tok.Get(claim, &raw); err != nil || raw == nil {
+		return nil
+	}
+	switch v := raw.(type) {
+	case []string:
+		return v
+	case []any:
+		out := make([]string, 0, len(v))
+		for _, e := range v {
+			if s, ok := e.(string); ok {
+				out = append(out, s)
+			}
+		}
+		return out
+	}
+	return nil
+}
+
+// readUnixTime extracts a numeric Unix-seconds claim as time.Time. Returns
+// zero time when the claim is missing or malformed — callers MUST treat
+// zero as "no auth_time" and reject step-up rather than calling it now.
+func readUnixTime(tok jwt.Token, claim string) time.Time {
+	var raw any
+	if err := tok.Get(claim, &raw); err != nil || raw == nil {
+		return time.Time{}
+	}
+	switch v := raw.(type) {
+	case float64:
+		return time.Unix(int64(v), 0).UTC()
+	case int64:
+		return time.Unix(v, 0).UTC()
+	case int:
+		return time.Unix(int64(v), 0).UTC()
+	case time.Time:
+		return v.UTC()
+	}
+	return time.Time{}
 }
 
 // Middleware wraps next in an operator-token verifying handler. On
