@@ -236,6 +236,8 @@ class BaytCrawler(BoardCrawler):
         title = (ld.title if ld else None) or (
             title_node.text(strip=True) if title_node else None
         )
+        if title:
+            title = _strip_bayt_title_nav_prefix(title)
         if not title:
             return None
         company_node = tree.css_first(self.PARSE_SELECTORS["detail_company"])
@@ -353,3 +355,34 @@ def _extract_posted_at(html: str) -> datetime | None:
         "day": timedelta(days=n),
     }.get(unit, timedelta())
     return datetime.now(UTC) - delta
+
+
+# Navigation phrases the `h3#job_title` selector occasionally swallows
+# when Bayt's template includes adjacent "View More Jobs" / "All Jobs" /
+# breadcrumb-style links inside the title block. One bad row in 613
+# (~0.16%) on the v6 corpus had "View More Jobs Talent Pool …" stored
+# verbatim. The list is short + match must be case-insensitive at the
+# start of the title only (mid-string occurrences are real text).
+_BAYT_NAV_PREFIXES: Final[tuple[str, ...]] = (
+    "view more jobs",
+    "more jobs",
+    "all jobs",
+    "view job",
+    "back to jobs",
+    "back to search",
+)
+
+
+def _strip_bayt_title_nav_prefix(title: str) -> str:
+    """Trim any known Bayt navbar phrase from the FRONT of a title."""
+    if not title:
+        return title
+    folded = title.casefold().lstrip()
+    for prefix in _BAYT_NAV_PREFIXES:
+        if folded.startswith(prefix):
+            # Strip the matched prefix (preserving original casing for
+            # the remainder) + any leading separator chars.
+            cut = len(title) - len(folded)
+            stripped = title[cut + len(prefix):].lstrip(" -–—:|")  # noqa: RUF001
+            return stripped or title  # never return empty
+    return title
