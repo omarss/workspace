@@ -287,3 +287,181 @@ def detect_visa_sponsorship(text: str | None) -> bool | None:
     if no_spans:
         return False
     return None
+
+
+# ---------------------------------------------------------------------------
+# Hybrid days-per-week detection
+# ---------------------------------------------------------------------------
+# Captures patterns like:
+#   "3 days in office", "4 days a week onsite", "2 days remote / 3 in office",
+#   "hybrid (3 days office)", "in-office 4 days per week"
+# Returns the in-office day count (1..6). Conservative: ignores ambiguous
+# phrases like "few days a week" or vague "couple of days".
+
+_NUMBER_WORDS: Final[dict[str, int]] = {
+    "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6,
+}
+
+# Numeric or word-form number followed by a "day(s)" + an in-office cue
+# within ~30 chars. The cue list intentionally excludes "remote" so we
+# don't mis-classify "2 days remote" as 2 in-office days.
+_HYBRID_DAYS_RES: Final[tuple[re.Pattern[str], ...]] = (
+    re.compile(
+        r"\b(\d|one|two|three|four|five|six)\s*(?:-|to)?\s*\d?\s*"
+        r"days?\b[^.!?]{0,30}\b(in[- ]?office|in[- ]?the[- ]?office|"
+        r"onsite|on[- ]?site|at\s+the\s+office|in[- ]?person)\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\b(in[- ]?office|onsite|on[- ]?site|in[- ]?person)\b[^.!?]{0,30}"
+        r"\b(\d|one|two|three|four|five|six)\s+days?\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\bhybrid\b[^.!?]{0,20}\(?\s*(\d|one|two|three|four|five|six)\s+days?",
+        re.IGNORECASE,
+    ),
+)
+
+
+def _coerce_day_count(token: str) -> int | None:
+    token = token.lower()
+    if token.isdigit():
+        n = int(token)
+        return n if 1 <= n <= 6 else None
+    return _NUMBER_WORDS.get(token)
+
+
+def detect_hybrid_days_per_week(text: str | None) -> int | None:
+    """Return the in-office day count for hybrid roles, or None.
+
+    Range clamped to 1..6 — five-day full-time onsite is rarely described
+    as "hybrid", and seven-day office is implausible. A NULL means the
+    text didn't explicitly state how many days are in-office.
+    """
+    if not text:
+        return None
+    for pattern in _HYBRID_DAYS_RES:
+        m = pattern.search(text)
+        if m is None:
+            continue
+        for group in m.groups():
+            if group is None:
+                continue
+            value = _coerce_day_count(group)
+            if value is not None:
+                return value
+    return None
+
+
+# ---------------------------------------------------------------------------
+# Remote country restriction detection
+# ---------------------------------------------------------------------------
+# Looks for explicit "must be based in / resident of X" phrasings and
+# returns the 2-letter country code (lowercase). Defaults to None when
+# the text is silent OR when multiple countries match (ambiguous).
+
+# Map country name → ISO 3166 alpha-2 (lowercase). Limited to GCC + a
+# handful of remote-hiring hubs we've seen in postings.
+_COUNTRY_NAME_TO_CODE: Final[dict[str, str]] = {
+    "saudi arabia": "sa", "ksa": "sa",
+    "united arab emirates": "ae", "uae": "ae",
+    "bahrain": "bh",
+    "kuwait": "kw",
+    "qatar": "qa",
+    "oman": "om",
+    "egypt": "eg",
+    "jordan": "jo",
+    "lebanon": "lb",
+    "india": "in",
+    "pakistan": "pk",
+    "philippines": "ph",
+    "turkey": "tr",
+    "united kingdom": "gb", "uk": "gb",
+    "united states": "us", "usa": "us",
+}
+
+_REMOTE_RESTRICTION_RE: Final = re.compile(
+    r"\b(?:must\s+(?:be\s+)?(?:resid(?:e|ent)|based|located)\s+(?:in\s+)?|"
+    r"(?:residing|based|located)\s+in\s+|"
+    r"open\s+to\s+(?:candidates\s+in\s+|residents\s+of\s+)|"
+    r"remote\s+(?:from|in|within)\s+)"
+    r"(?:the\s+)?"  # optional definite article — "based in *the* UAE"
+    r"(?P<country>"
+    r"saudi arabia|ksa|united arab emirates|uae|bahrain|kuwait|qatar|oman|"
+    r"egypt|jordan|lebanon|india|pakistan|philippines|turkey|"
+    r"united kingdom|uk|united states|usa)\b",
+    re.IGNORECASE,
+)
+
+
+def detect_remote_country_restriction(text: str | None) -> str | None:
+    """Return the 2-letter country code a remote role is restricted to.
+
+    Conservative: returns None when ambiguous (multiple distinct
+    countries matched) or when the text is silent on the restriction.
+    Case-insensitive matching; output is always lowercase.
+    """
+    if not text:
+        return None
+    codes = {
+        _COUNTRY_NAME_TO_CODE[m.group("country").lower()]
+        for m in _REMOTE_RESTRICTION_RE.finditer(text)
+    }
+    if len(codes) == 1:
+        return next(iter(codes))
+    return None
+
+
+# ---------------------------------------------------------------------------
+# Relocation-assistance detection
+# ---------------------------------------------------------------------------
+# Three-state: explicit yes (relocation assistance offered) → True;
+# explicit no (must be local / no relocation) → False; silent → None.
+
+_RELOCATION_YES_RES: Final[tuple[re.Pattern[str], ...]] = (
+    re.compile(r"\brelocation\s+(assistance|support|package|allowance|bonus|benefits?)\b", re.IGNORECASE),
+    # Allow filler words between "help/assist/provide/cover" and "relocate" —
+    # "We will help you relocate", "We can assist with your relocation", etc.
+    re.compile(r"\bwe\s+(?:will\s+|can\s+)?(?:help|assist|provide|cover)\b[^.!?]{0,20}\brelocat(?:e|ion|ing)\b", re.IGNORECASE),
+    re.compile(r"\boffer\s+relocation\b", re.IGNORECASE),
+    re.compile(r"\brelocation\s+(?:is\s+)?(?:offered|provided|available|included)\b", re.IGNORECASE),
+)
+
+# NO patterns are written to extend their span past the qualifying word
+# ("no relocation provided", "no relocation assistance") so the
+# span-overlap math drops the inner YES match cleanly. Without the
+# trailing `\w+` consumer, "no relocation" would stop at "relocation"
+# and the YES "relocation provided" pattern would extend past it,
+# producing a contradiction instead of a clear False.
+_RELOCATION_NO_RES: Final[tuple[re.Pattern[str], ...]] = (
+    re.compile(r"\bno\s+relocation(?:\s+\w+){0,3}\b", re.IGNORECASE),
+    re.compile(r"\brelocation\s+(?:is\s+)?not\s+(offered|provided|available)\b", re.IGNORECASE),
+    re.compile(r"\bdoes\s+not\s+(offer|provide|include)\s+relocation\b", re.IGNORECASE),
+    re.compile(r"\b(must\s+be|currently)\s+(local|locally\s+based)\b", re.IGNORECASE),
+)
+
+
+def detect_relocation_assistance(text: str | None) -> bool | None:
+    """Three-state relocation-assistance signal.
+
+    Returns True when the posting explicitly offers relocation help,
+    False when it requires the candidate to already be local, and None
+    when silent. Uses the same span-overlap logic as visa-sponsorship
+    so "no relocation" doesn't fire both YES and NO patterns.
+    """
+    if not text:
+        return None
+    yes_spans = [m.span() for p in _RELOCATION_YES_RES for m in p.finditer(text)]
+    no_spans = [m.span() for p in _RELOCATION_NO_RES for m in p.finditer(text)]
+    yes_real = [
+        y for y in yes_spans
+        if not any(n[0] <= y[0] and y[1] <= n[1] for n in no_spans)
+    ]
+    if yes_real and no_spans:
+        return None
+    if yes_real:
+        return True
+    if no_spans:
+        return False
+    return None

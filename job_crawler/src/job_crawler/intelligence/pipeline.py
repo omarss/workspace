@@ -200,6 +200,9 @@ async def enrich_cluster_restrictions(
     """
     from ..core.restrictions import (
         detect_experience_level,
+        detect_hybrid_days_per_week,
+        detect_relocation_assistance,
+        detect_remote_country_restriction,
         detect_requires_arabic,
         detect_visa_sponsorship,
     )
@@ -207,13 +210,18 @@ async def enrich_cluster_restrictions(
     touched = 0
     sql = (
         "SELECT j.id, j.title_en, j.title_ar, j.description_en, j.description_ar, "
-        "       j.experience_level, j.requires_arabic, j.visa_sponsorship "
+        "       j.experience_level, j.requires_arabic, j.visa_sponsorship, "
+        "       j.hybrid_days_per_week, j.remote_country_restriction, "
+        "       j.relocation_assistance "
         "FROM   jobs j "
         "WHERE  j.deleted_at IS NULL "
         "  AND  ("
-        "         j.experience_level   IS NULL "
-        "      OR j.requires_arabic    IS NULL "
-        "      OR j.visa_sponsorship   IS NULL"
+        "         j.experience_level         IS NULL "
+        "      OR j.requires_arabic          IS NULL "
+        "      OR j.visa_sponsorship         IS NULL "
+        "      OR j.hybrid_days_per_week     IS NULL "
+        "      OR j.remote_country_restriction IS NULL "
+        "      OR j.relocation_assistance    IS NULL"
         "      )"
     )
     if limit:
@@ -245,6 +253,21 @@ async def enrich_cluster_restrictions(
                     vs = detect_visa_sponsorship(body)
                     if vs is not None:
                         patches["visa_sponsorship"] = vs
+
+                if row["hybrid_days_per_week"] is None:
+                    hd = detect_hybrid_days_per_week(body)
+                    if hd is not None:
+                        patches["hybrid_days_per_week"] = hd
+
+                if row["remote_country_restriction"] is None:
+                    rc = detect_remote_country_restriction(body)
+                    if rc is not None:
+                        patches["remote_country_restriction"] = rc
+
+                if row["relocation_assistance"] is None:
+                    ra2 = detect_relocation_assistance(body)
+                    if ra2 is not None:
+                        patches["relocation_assistance"] = ra2
 
                 if patches:
                     try:
