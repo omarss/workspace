@@ -502,11 +502,12 @@ _CATEGORY_PATTERNS: Final[tuple[tuple[str, re.Pattern[str]], ...]] = (
         re.IGNORECASE),
     ),
     ("data_analytics", re.compile(
-        r"\b(data\s+(engineer|analyst|scientist|architect)|"
+        r"\b(data\s+(engineer|analyst|scientist|architect|specialist|officer)|"
         r"business\s+intelligence|bi\s+(developer|analyst)|"
         r"machine\s+learning\s+engineer|ml\s+engineer|"
         r"ai\s+engineer|ai\s+researcher|"
         r"analytics\s+engineer|business\s+analyst|"
+        r"credit\s+risk\s+data\s+specialist|"
         r"محلل\s+بيانات|عالم\s+بيانات)\b",
         re.IGNORECASE),
     ),
@@ -520,11 +521,14 @@ _CATEGORY_PATTERNS: Final[tuple[tuple[str, re.Pattern[str]], ...]] = (
     ),
     ("it_infrastructure", re.compile(
         r"\b(devops|sre|site\s+reliability|"
-        r"systems?\s+administrator|sys\s*admin|"
+        r"systems?\s+administrator|sys\s*admin|sysops|"
         r"network\s+engineer|network\s+administrator|"
         r"cloud\s+(engineer|architect)|aws\s+engineer|azure\s+engineer|"
         r"platform\s+engineer|kubernetes\s+engineer|"
-        r"it\s+(support|technician|helpdesk)|help\s*desk|"
+        r"it\s+(support|technician|helpdesk|administrator)|help\s*desk|"
+        r"noc\s+(engineer|operator|analyst)|"
+        r"wired\s*/?\s*wireless\s+technician|"
+        r"electronic\s+device\s+(maintenance\s+)?technician|"
         r"تقنية\s+المعلومات|دعم\s+فني)\b",
         re.IGNORECASE),
     ),
@@ -540,25 +544,35 @@ _CATEGORY_PATTERNS: Final[tuple[tuple[str, re.Pattern[str]], ...]] = (
         r"art\s+director|creative\s+director|"
         r"motion\s+designer|video\s+editor|photographer|"
         r"interior\s+designer|fashion\s+designer|"
+        r"(embroidery|textile|jewel(le)?ry|industrial|"
+        r"furniture|set|exhibition)\s+designer|"
+        r"content\s*/?\s*reel\s+creator|reel\s+creator|"
+        r"head\s+of\s+media|"
         r"مصمم\s+(جرافيك|واجهات|منتج))\b",
         re.IGNORECASE),
     ),
     ("engineering_civil", re.compile(
-        r"\b(civil\s+engineer|structural\s+engineer|"
+        r"\b(civil\s+engineer|structural\s+(engineer|coordinator)|"
         r"geotechnical\s+engineer|surveyor|site\s+engineer|"
         r"highway\s+engineer|transportation\s+engineer|"
+        r"bim\s+(engineer|modeler|coordinator|manager)|"
+        r"infrastructure\s*/?\s*utilities\s+engineer|"
+        r"(?:lead\s+)?infrastructure\s+engineer|"
+        r"utilities\s+engineer|"
         r"مهندس\s+مدني|مهندس\s+إنشائي)\b",
         re.IGNORECASE),
     ),
     ("engineering_mechanical", re.compile(
-        r"\b(mechanical\s+engineer|mechanical\s+designer|"
+        r"\b(mechanical\s+(engineer|designer|design\s+engineer)|"
         r"automotive\s+engineer|maintenance\s+engineer|"
         r"مهندس\s+ميكانيكي)\b",
         re.IGNORECASE),
     ),
     ("engineering_electrical", re.compile(
-        r"\b(electrical\s+engineer|electronics\s+engineer|"
+        r"\b(electrical\s+(engineer|technician)|"
+        r"electronics\s+engineer|"
         r"power\s+engineer|control\s+systems\s+engineer|"
+        r"elevator\s+electrical\s+technician|"
         r"مهندس\s+كهرباء)\b",
         re.IGNORECASE),
     ),
@@ -570,15 +584,19 @@ _CATEGORY_PATTERNS: Final[tuple[tuple[str, re.Pattern[str]], ...]] = (
         re.IGNORECASE),
     ),
     ("engineering_mep", re.compile(
-        r"\b(mep\s+engineer|mep\s+technician|hvac\s+(engineer|technician)|"
+        r"\b(mep\s+(engineer|technician|manager|coordinator)|"
+        r"hvac\s+(engineer|technician)|"
         r"refrigeration\s+(engineer|technician)|"
         r"plumbing\s+(engineer|technician)|fire\s+alarm\s+technician|"
         r"tendering\s+engineer\s*[-]\s*mep|"
+        r"(?:assistant\s+)?ac\s+technician|air[- ]?conditioning\s+technician|"
         r"مهندس\s+تكييف|فني\s+تبريد)\b",
         re.IGNORECASE),
     ),
     ("architecture", re.compile(
-        r"\b(architect|urban\s+planner|landscape\s+architect|"
+        r"\b(architect|architectural\s+(engineer|technical|"
+        r"technical\s+office\s+engineer)|"
+        r"urban\s+planner|landscape\s+architect|"
         r"interior\s+architect|"
         r"مهندس\s+معماري|معماري)\b",
         re.IGNORECASE),
@@ -586,21 +604,31 @@ _CATEGORY_PATTERNS: Final[tuple[tuple[str, re.Pattern[str]], ...]] = (
     # --- Commercial / support functions -------------------------------
     ("finance_accounting", re.compile(
         r"\b(accountant|chief\s+accountant|senior\s+accountant|"
-        r"treasury\s+accountant|treasury\s+manager|"
-        r"financial\s+(analyst|controller|manager|planner)|"
-        r"audit(or|ing)?\b|internal\s+audit|tax\s+(manager|specialist)|"
-        r"finance\s+(manager|director|lead)|controller|cfo|"
+        r"treasury\s+(accountant|manager|specialist|analyst)|"
+        r"financial\s+(analyst|controller|manager|planner|specialist|"
+        r"officer|coordinator)|"
+        r"corporate\s+financial\s+(specialist|analyst|manager|officer)|"
+        r"audit(or|ing)?\b|internal\s+audit|tax\s+(manager|specialist|"
+        r"accountant|consultant)|"
+        r"finance\s+(manager|director|lead|specialist|officer|analyst)|"
+        r"controller|cfo|"
         r"محاسب|مدير\s+مالي)\b",
         re.IGNORECASE),
     ),
     ("sales_business_dev", re.compile(
         r"\b(sales\s+(executive|representative|manager|engineer|associate|"
-        r"director|consultant|specialist|coordinator)|"
+        r"director|consultant|specialist|coordinator|partner|"
+        r"supervisor|advisor|professional)|"
         r"sales\s*man|sales\s+girl|sales\s+lady|"
-        r"account\s+(executive|manager|director)|"
+        r"account\s+(executive|manager|director|supervisor)|"
         r"business\s+development|business\s+developer|"
         r"key\s+account|territory\s+manager|"
         r"horeca\s+sales|b2b\s+sales|inside\s+sales|outside\s+sales|"
+        r"commercial\s+(director|manager|lead)|"
+        r"(?:regional\s+)?aftersales\s+(manager|coordinator|director|supervisor)|"
+        r"laminated\s+glass\s+sales|"
+        r"(?:part[- ]?time\s+)?(?:freelance\s+)?sales\s+partner|"
+        r"e[- ]?commerce\s+(manager|specialist|director)|"
         r"مبيعات|مندوب\s+مبيعات|تطوير\s+الأعمال)\b",
         re.IGNORECASE),
     ),
@@ -625,6 +653,10 @@ _CATEGORY_PATTERNS: Final[tuple[tuple[str, re.Pattern[str]], ...]] = (
         r"people\s+(operations|partner)|"
         r"learning\s+and\s+development|l&d\s+(manager|specialist)|"
         r"compensation\s+and\s+benefits|c&b\s+(manager|specialist)|"
+        r"organi[sz]ational\s+development|"
+        r"od\s+(specialist|manager|consultant)|"
+        r"training\s+(and|&)\s+od\s+specialist|"
+        r"sap\s+(?:human\s+capital|hcm|sf|successfactors)\s+(?:management\s+)?manager|"
         r"موارد\s+بشرية|توظيف)\b",
         re.IGNORECASE),
     ),
@@ -639,14 +671,23 @@ _CATEGORY_PATTERNS: Final[tuple[tuple[str, re.Pattern[str]], ...]] = (
     ),
     ("operations_supply_chain", re.compile(
         r"\b(operations\s+(manager|director|executive|specialist|coordinator|"
-        r"analyst)|"
+        r"analyst|officer|supervisor)|"
         r"supply\s+chain\s+(manager|analyst|specialist|engineer|coordinator)|"
+        r"manager\s+of\s+supply\s+chain|"
         r"logistics\s+(manager|coordinator|specialist|analyst|supervisor)|"
         r"warehouse\s+(manager|supervisor|associate|operator)|"
-        r"procurement\s+(manager|officer|specialist|director)|"
+        r"(?:store|stock)\s*keeper|stockroom\s+(clerk|assistant)|"
+        r"forklift\s+operator|"
+        r"inventory\s+(manager|coordinator|specialist|controller|analyst)|"
+        r"procurement\s+(manager|officer|specialist|director|"
+        r"intern|trainee|coordinator|associate|assistant|analyst)|"
         r"buyer|sourcing\s+(manager|specialist)|"
         r"planning\s+(manager|engineer)|"
-        r"عمليات|سلسلة\s+التوريد|مشتريات)\b",
+        r"project\s+(manager|engineer|coordinator|director|lead)|"
+        r"quality\s+(assurance|control|qc/qa|qa/qc)[^.]{0,30}\binspector|"
+        r"cost\s+estimator|collection\s+supervisor|"
+        r"عمليات|سلسلة\s+التوريد|مشتريات|"
+        r"مدير\s+مشروع|مهندس\s+مشروع)\b",
         re.IGNORECASE),
     ),
     ("customer_service", re.compile(
@@ -680,6 +721,8 @@ _CATEGORY_PATTERNS: Final[tuple[tuple[str, re.Pattern[str]], ...]] = (
         r"dean|provost|"
         r"faculty\s+member|"
         r"curriculum\s+(developer|designer|specialist)|"
+        r"(mathematics|maths|english|arabic|science|physics|chemistry|"
+        r"biology|computer|coding|arduino|programming|robotics)\s+trainer|"
         r"معلم|أستاذ|محاضر|عضو\s+هيئة\s+تدريس)\b",
         re.IGNORECASE),
     ),
@@ -687,11 +730,13 @@ _CATEGORY_PATTERNS: Final[tuple[tuple[str, re.Pattern[str]], ...]] = (
         r"\b(chef|sous\s+chef|head\s+chef|executive\s+chef|line\s+cook|cook|"
         r"barista|waiter|waitress|server|host(?:ess)?|"
         r"front\s+(desk|office)\s+(agent|supervisor|manager)|"
+        r"guest\s+(relations|services)\s+(officer|agent|manager|coordinator)|"
         r"hotel\s+(manager|director|supervisor)|"
         r"restaurant\s+(manager|supervisor)|"
         r"housekeeping\s+(supervisor|attendant)|"
         r"bartender|sommelier|food\s+and\s+beverage|"
         r"f&b\s+(manager|supervisor)|"
+        r"camp\s+(boss|manager)|"
         r"بارستا|طاهٍ|نادل)\b",
         re.IGNORECASE),
     ),
@@ -709,6 +754,7 @@ _CATEGORY_PATTERNS: Final[tuple[tuple[str, re.Pattern[str]], ...]] = (
         r"project\s+manager\s*(?:-)?\s*construction|"
         r"foreman|site\s+supervisor|site\s+(foreman|inspector)|"
         r"steel\s+fixer|carpenter|mason|"
+        r"rigger\b|scaffolder|"
         r"بناء|تشييد|رئيس\s+ورشة)\b",
         re.IGNORECASE),
     ),
@@ -726,14 +772,17 @@ _CATEGORY_PATTERNS: Final[tuple[tuple[str, re.Pattern[str]], ...]] = (
         r"manufacturing\s+(engineer|supervisor|technician|manager)|"
         r"assembly\s+(line\s+worker|operator|technician)|"
         r"machine\s+operator|cnc\s+(operator|machinist)|"
-        r"diesel\s+pump.*\bmaintenance|injection\s+technician)\b",
+        r"diesel\s+pump.*\bmaintenance|injection\s+technician|"
+        r"maintenance\s+technician|"
+        r"food\s+inspector|food\s+safety\s+inspector)\b",
         re.IGNORECASE),
     ),
     ("hse_safety", re.compile(
         r"\b(hse\s+(engineer|officer|coordinator|trainer|manager|specialist)|"
-        r"safety\s+(engineer|officer|supervisor|manager|coordinator)|"
+        r"safety\s+(engineer|officer|supervisor|manager|coordinator|guard)|"
         r"health\s+and\s+safety|"
         r"environmental\s+(specialist|engineer|consultant|coordinator)|"
+        r"\behss?(\s+|/)?\s*(manager|engineer|officer|coordinator|specialist)|"
         r"الصحة\s+والسلامة|مهندس\s+سلامة)\b",
         re.IGNORECASE),
     ),
@@ -743,7 +792,9 @@ _CATEGORY_PATTERNS: Final[tuple[tuple[str, re.Pattern[str]], ...]] = (
         r"office\s+(manager|administrator|coordinator)|"
         r"receptionist|secretary|personal\s+assistant|"
         r"data\s+entry\s+(operator|clerk)|"
-        r"سكرتير|مساعد\s+إداري)\b",
+        r"(?:language\s+)?translator|interpreter|"
+        r"government\s+relations[^.!?]{0,40}\b(officer|specialist|manager|coordinator)|"
+        r"سكرتير|مساعد\s+إداري|مترجم)\b",
         re.IGNORECASE),
     ),
     ("consulting", re.compile(
