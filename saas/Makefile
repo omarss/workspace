@@ -71,7 +71,7 @@ GOLANGCI_LINT := $(DOCKER) run --rm \
 # ── top-level ───────────────────────────────────────────────────────────────
 .PHONY: build test test-int contract-test lint openapi-check \
         openapi-lint openapi-overlay openapi-gen-go openapi-gen-ts openapi-diff-check \
-        compose-up compose-down migrate migrate-down sqlc-gen sdk-ts sdk-go \
+        compose-up compose-down migrate migrate-down sqlc-gen sdk-ts sdk-go sdk-go-test sdk-go-quickstart \
         openbao-init openbao-status openbao-rotate openbao-policies openbao-approle-creds \
         operators-realm-import operators-realm-validate \
         fmt vet tidy clean help
@@ -125,7 +125,7 @@ tidy:
 	$(GO) mod tidy
 
 # ── OpenAPI ─────────────────────────────────────────────────────────────────
-openapi-check: openapi-lint openapi-overlay openapi-gen-go openapi-gen-ts openapi-diff-check
+openapi-check: openapi-lint openapi-overlay openapi-gen-go openapi-gen-ts sdk-go openapi-diff-check
 
 openapi-lint:
 	$(SPECTRAL) lint openapi/control-plane.yaml openapi/data-plane.yaml -r .spectral.yaml
@@ -156,15 +156,38 @@ openapi-gen-ts:
 	$(DOCKER_RUN) node:22-alpine node -e "for (const d of ['sdk/ts/control-plane','sdk/ts/data-plane']) { const f=d+'/package.json'; const p=JSON.parse(require('fs').readFileSync(f,'utf8')); p.dependencies = Object.assign({}, p.dependencies, { ulidx: '^2.4.1' }); require('fs').writeFileSync(f, JSON.stringify(p, null, 2) + '\n'); }"
 
 openapi-diff-check:
-	@git diff --exit-code -- internal/controlplane/httpapi internal/dataplane/httpapi sdk/ts \
+	@git diff --exit-code -- internal/controlplane/httpapi internal/dataplane/httpapi sdk/ts sdk/go/controlplane sdk/go/dataplane \
 	    || { echo "ERROR: generated code drifted from spec — commit regeneration"; exit 1; }
 
 # ── SDKs ────────────────────────────────────────────────────────────────────
 sdk-ts: openapi-gen-ts
 
-sdk-go:
-	# Wired in Phase 13 (Go SDK).
-	@echo "not yet wired"
+sdk-go: openapi-overlay
+	$(OAPI_CODEGEN) -config .oapi-codegen-controlplane-client.yaml openapi/_generated/control-plane.yaml
+	$(OAPI_CODEGEN) -config .oapi-codegen-dataplane-client.yaml    openapi/_generated/data-plane.yaml
+	# The SDK is an independent Go module (sdk/go/go.mod). go mod tidy + build
+	# from inside that module so the platform's go.mod is never touched.
+	$(DOCKER_RUN_GO) -w /work/sdk/go $(GO_IMAGE) sh -c 'go mod tidy && go build ./...'
+
+sdk-go-test:
+	# Unit tests for SDK workflows. Runs in the same containerised toolchain
+	# as `make test`, but scoped to the SDK module.
+	$(DOCKER) run --rm \
+	    --user $(UID):$(GID) \
+	    -v $(CURDIR):/work -w /work/sdk/go \
+	    -v $(GOCACHE_HOST):/.cache/go-build \
+	    -v $(GOPKG_HOST):/go/pkg \
+	    -e HOME=/tmp \
+	    -e GOCACHE=/.cache/go-build \
+	    -e GOFLAGS=-buildvcs=false \
+	    -e GOTOOLCHAIN=auto \
+	    -e CGO_ENABLED=1 \
+	    $(GO_TEST_IMAGE) go test -race -count=1 ./...
+
+sdk-go-quickstart:
+	# Requires a live stack: `make compose-up && make migrate && saasctl operator login`
+	# and an exported SAAS_OPERATOR_TOKEN env var. NOT wired into `make test`.
+	cd sdk/go/examples/quickstart && go run .
 
 # ── DB ──────────────────────────────────────────────────────────────────────
 migrate: build
