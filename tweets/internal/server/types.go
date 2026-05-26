@@ -68,6 +68,12 @@ type FeedRequest struct {
 	// places within the selected countries pass". OR semantics — a
 	// tweet whose place contains any one substring matches.
 	Cities []string
+	// Query is a free-text keyword filter applied to the tweet body
+	// (case-insensitive substring match). Whitespace-separated terms
+	// are AND-ed — every term must appear somewhere in the body.
+	// Empty string disables the filter. Cleans incoming text in the
+	// handler so the store doesn't see SQL metachars from clients.
+	Query string
 	// Cursor is an RFC3339 timestamp; only tweets with `created_at`
 	// strictly less than this pass. Zero value means "first page" and
 	// triggers event-first sort for the response.
@@ -84,6 +90,7 @@ type FeedRequest struct {
 type FeedResponse struct {
 	Countries   []Country `json:"countries"`
 	Cities      []string  `json:"cities,omitempty"`
+	Query       string    `json:"query,omitempty"`
 	GeneratedAt time.Time `json:"generated_at"`
 	NextCursor  string    `json:"next_cursor,omitempty"`
 	Tweets      []Tweet   `json:"tweets"`

@@ -17,10 +17,14 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.FilterList
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.IosShare
@@ -33,6 +37,8 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -50,8 +56,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
@@ -93,6 +101,9 @@ fun TwitterRoute(
         onOpenFilter = { viewModel.setFilterSheetOpen(true) },
         onCloseFilter = { viewModel.setFilterSheetOpen(false) },
         onToggleLocation = viewModel::toggleLocation,
+        onQueryDraftChange = viewModel::setQueryDraft,
+        onApplyQuery = viewModel::applyQuery,
+        onClearQuery = viewModel::clearQuery,
         onRefresh = viewModel::refresh,
         onLoadMore = viewModel::loadMore,
     )
@@ -106,6 +117,9 @@ private fun TwitterScreen(
     onOpenFilter: () -> Unit,
     onCloseFilter: () -> Unit,
     onToggleLocation: (LocationOption) -> Unit,
+    onQueryDraftChange: (String) -> Unit,
+    onApplyQuery: () -> Unit,
+    onClearQuery: () -> Unit,
     onRefresh: () -> Unit,
     onLoadMore: () -> Unit,
 ) {
@@ -153,6 +167,13 @@ private fun TwitterScreen(
                 .padding(inner),
         ) {
             ActiveFilterRow(state.filter.selected, onOpenFilter)
+            SearchField(
+                draft = state.queryDraft,
+                committed = state.query,
+                onDraftChange = onQueryDraftChange,
+                onApply = onApplyQuery,
+                onClear = onClearQuery,
+            )
             PullToRefreshBox(
                 modifier = Modifier.fillMaxSize(),
                 isRefreshing = state.loading,
@@ -181,6 +202,70 @@ private fun TwitterScreen(
             onToggle = onToggleLocation,
         )
     }
+}
+
+// ── Search field ────────────────────────────────────────────────────
+// Outlined text field sized like the original Twitter search bar.
+// Draft text updates locally on every keystroke (cheap); the actual
+// network refresh fires only on the IME "search" action or when the
+// user taps the leading magnifier. Trailing × clears the field and
+// the committed query atomically so the feed pops back to default.
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SearchField(
+    draft: String,
+    committed: String,
+    onDraftChange: (String) -> Unit,
+    onApply: () -> Unit,
+    onClear: () -> Unit,
+) {
+    val keyboard = LocalSoftwareKeyboardController.current
+    OutlinedTextField(
+        value = draft,
+        onValueChange = onDraftChange,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 4.dp),
+        singleLine = true,
+        placeholder = { Text("Search tweets") },
+        leadingIcon = {
+            IconButton(
+                onClick = {
+                    onApply()
+                    keyboard?.hide()
+                },
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Search,
+                    contentDescription = "Search",
+                    tint = TwitterBlue,
+                )
+            }
+        },
+        trailingIcon = {
+            // Only show × when there's something to clear.
+            if (draft.isNotEmpty() || committed.isNotEmpty()) {
+                IconButton(onClick = onClear) {
+                    Icon(
+                        imageVector = Icons.Filled.Close,
+                        contentDescription = "Clear search",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        },
+        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+        keyboardActions = KeyboardActions(
+            onSearch = {
+                onApply()
+                keyboard?.hide()
+            },
+        ),
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedBorderColor = TwitterBlue,
+            cursorColor = TwitterBlue,
+        ),
+    )
 }
 
 // ── Active filter row ───────────────────────────────────────────────

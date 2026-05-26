@@ -57,6 +57,9 @@ class TweetsClient @Inject constructor(
         if (request.cities.isNotEmpty()) {
             builder.addQueryParameter("city", request.cities.joinToString(","))
         }
+        if (request.query.isNotBlank()) {
+            builder.addQueryParameter("q", request.query.trim())
+        }
         request.cursor?.takeIf { it.isNotBlank() }
             ?.let { builder.addQueryParameter("cursor", it) }
         if (request.limit > 0) {
