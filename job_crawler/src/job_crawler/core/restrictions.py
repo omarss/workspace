@@ -522,13 +522,15 @@ _CATEGORY_PATTERNS: Final[tuple[tuple[str, re.Pattern[str]], ...]] = (
     ("it_infrastructure", re.compile(
         r"\b(devops|sre|site\s+reliability|"
         r"systems?\s+administrator|sys\s*admin|sysops|"
-        r"network\s+engineer|network\s+administrator|"
+        r"network\s+(engineer|administrator|technician)|"
         r"cloud\s+(engineer|architect)|aws\s+engineer|azure\s+engineer|"
         r"platform\s+engineer|kubernetes\s+engineer|"
         r"it\s+(support|technician|helpdesk|administrator)|help\s*desk|"
         r"noc\s+(engineer|operator|analyst)|"
         r"wired\s*/?\s*wireless\s+technician|"
         r"electronic\s+device\s+(maintenance\s+)?technician|"
+        r"desktop\s+(and\s+laptop\s+)?(repairman|technician|support)|"
+        r"operational\s+technology\s+engineer|"
         r"تقنية\s+المعلومات|دعم\s+فني)\b",
         re.IGNORECASE),
     ),
@@ -552,8 +554,10 @@ _CATEGORY_PATTERNS: Final[tuple[tuple[str, re.Pattern[str]], ...]] = (
         re.IGNORECASE),
     ),
     ("engineering_civil", re.compile(
-        r"\b(civil\s+engineer|structural\s+(engineer|coordinator)|"
-        r"geotechnical\s+engineer|surveyor|site\s+engineer|"
+        r"\b(civil\s+(engineer|procurement\s+engineer)|"
+        r"structural\s+(engineer|coordinator)|"
+        r"geotechnical\s+engineer|surveyor|survey\s+(manager|engineer)|"
+        r"site\s+engineer|"
         r"highway\s+engineer|transportation\s+engineer|"
         r"bim\s+(engineer|modeler|coordinator|manager)|"
         r"infrastructure\s*/?\s*utilities\s+engineer|"
@@ -569,10 +573,14 @@ _CATEGORY_PATTERNS: Final[tuple[tuple[str, re.Pattern[str]], ...]] = (
         re.IGNORECASE),
     ),
     ("engineering_electrical", re.compile(
-        r"\b(electrical\s+(engineer|technician)|"
+        r"\b(electrical\s+(engineer|technician|design\s+engineer)|"
         r"electronics\s+engineer|"
         r"power\s+engineer|control\s+systems\s+engineer|"
         r"elevator\s+electrical\s+technician|"
+        r"solar\s+(pv|panel)\s+engineer|"
+        r"e\s*&\s*i\s+(commissioning\s+)?engineer|"
+        r"instrumentation\s+(technician|engineer)|"
+        r"industrial\s+electrician|electrician|"
         r"مهندس\s+كهرباء)\b",
         re.IGNORECASE),
     ),
@@ -580,6 +588,8 @@ _CATEGORY_PATTERNS: Final[tuple[tuple[str, re.Pattern[str]], ...]] = (
         r"\b(chemical\s+engineer|process\s+engineer|"
         r"petroleum\s+engineer|reservoir\s+engineer|drilling\s+engineer|"
         r"petrochemical\s+engineer|"
+        r"cathodic\s+protection\s+engineer|"
+        r"rig\s+(company\s+man|superintendent|manager)|"
         r"مهندس\s+كيميائي|مهندس\s+بترول)\b",
         re.IGNORECASE),
     ),
@@ -596,6 +606,7 @@ _CATEGORY_PATTERNS: Final[tuple[tuple[str, re.Pattern[str]], ...]] = (
     ("architecture", re.compile(
         r"\b(architect|architectural\s+(engineer|technical|"
         r"technical\s+office\s+engineer)|"
+        r"(?:enterprise|solution|technical|cloud|data)?\s*architecture\s+lead|"
         r"urban\s+planner|landscape\s+architect|"
         r"interior\s+architect|"
         r"مهندس\s+معماري|معماري)\b",
@@ -604,6 +615,7 @@ _CATEGORY_PATTERNS: Final[tuple[tuple[str, re.Pattern[str]], ...]] = (
     # --- Commercial / support functions -------------------------------
     ("finance_accounting", re.compile(
         r"\b(accountant|chief\s+accountant|senior\s+accountant|"
+        r"manager\s+of\s+accounts|accounts\s+manager|"
         r"treasury\s+(accountant|manager|specialist|analyst)|"
         r"financial\s+(analyst|controller|manager|planner|specialist|"
         r"officer|coordinator)|"
@@ -611,12 +623,15 @@ _CATEGORY_PATTERNS: Final[tuple[tuple[str, re.Pattern[str]], ...]] = (
         r"audit(or|ing)?\b|internal\s+audit|tax\s+(manager|specialist|"
         r"accountant|consultant)|"
         r"finance\s+(manager|director|lead|specialist|officer|analyst)|"
+        r"cost\s+engineer|"
+        r"debt\s+collector|collections\s+(officer|specialist)|"
         r"controller|cfo|"
         r"محاسب|مدير\s+مالي)\b",
         re.IGNORECASE),
     ),
     ("sales_business_dev", re.compile(
         r"\b(sales\s+(executive|representative|manager|engineer|associate|"
+        r"assistant|"
         r"director|consultant|specialist|coordinator|partner|"
         r"supervisor|advisor|professional)|"
         r"sales\s*man|sales\s+girl|sales\s+lady|"
@@ -629,18 +644,29 @@ _CATEGORY_PATTERNS: Final[tuple[tuple[str, re.Pattern[str]], ...]] = (
         r"laminated\s+glass\s+sales|"
         r"(?:part[- ]?time\s+)?(?:freelance\s+)?sales\s+partner|"
         r"e[- ]?commerce\s+(manager|specialist|director)|"
+        r"sales\s*/\s*commercial|trainee\s*[-]\s*sales|"
+        r"presales\s+engineer|pre[- ]?sales\s+engineer|"
+        r"sme\s+relationship\s+(officer|manager)|"
+        r"relationship\s+(officer|manager)\b|"
+        r"senior\s+project\s+sales|"
         r"مبيعات|مندوب\s+مبيعات|تطوير\s+الأعمال)\b",
         re.IGNORECASE),
     ),
     ("marketing", re.compile(
         r"\b(marketing\s+(manager|director|executive|specialist|coordinator|"
-        r"analyst|consultant|lead)|"
+        r"analyst|consultant|lead|communications)|"
+        r"marketing\s+communications|"
         r"brand\s+(manager|director|specialist)|"
         r"digital\s+marketing|content\s+(manager|writer|strategist|creator)|"
-        r"social\s+media\s+(manager|specialist|executive)|"
+        r"social\s+media\s+(manager|specialist|executive|designer)|"
         r"seo\s+specialist|sem\s+specialist|"
+        r"performance\s+(media\s+buying|marketing)\s+(team\s+leader|manager|"
+        r"specialist|lead)|"
+        r"media\s+buying\s+(team\s+leader|manager|specialist)|"
         r"growth\s+(marketer|hacker|manager)|"
         r"public\s+relations|pr\s+(manager|specialist)|"
+        r"event\s+(executive|manager|coordinator|specialist)|"
+        r"corporate\s+(affairs|communications)\s+(manager|director|specialist)|"
         r"تسويق|مدير\s+تسويق)\b",
         re.IGNORECASE),
     ),
@@ -671,7 +697,7 @@ _CATEGORY_PATTERNS: Final[tuple[tuple[str, re.Pattern[str]], ...]] = (
     ),
     ("operations_supply_chain", re.compile(
         r"\b(operations\s+(manager|director|executive|specialist|coordinator|"
-        r"analyst|officer|supervisor)|"
+        r"analyst|officer|supervisor|assistant)|"
         r"supply\s+chain\s+(manager|analyst|specialist|engineer|coordinator)|"
         r"manager\s+of\s+supply\s+chain|"
         r"logistics\s+(manager|coordinator|specialist|analyst|supervisor)|"
@@ -683,9 +709,14 @@ _CATEGORY_PATTERNS: Final[tuple[tuple[str, re.Pattern[str]], ...]] = (
         r"intern|trainee|coordinator|associate|assistant|analyst)|"
         r"buyer|sourcing\s+(manager|specialist)|"
         r"planning\s+(manager|engineer)|"
-        r"project\s+(manager|engineer|coordinator|director|lead)|"
-        r"quality\s+(assurance|control|qc/qa|qa/qc)[^.]{0,30}\binspector|"
+        r"project\s+(manager|engineer|coordinator|director|lead|"
+        r"scheduler|controls?\s+engineer|controls?\s+specialist)|"
+        r"qc\s+(officer|inspector|engineer|manager|supervisor)|"
+        r"qa\s+(officer|inspector|manager|supervisor)|"
+        r"quality\s+(assurance|control|qc/qa|qa/qc)[^.!?]{0,30}\b"
+        r"(officer|inspector|manager|supervisor|engineer)|"
         r"cost\s+estimator|collection\s+supervisor|"
+        r"sheet\s+metal\s+supervisor|"
         r"عمليات|سلسلة\s+التوريد|مشتريات|"
         r"مدير\s+مشروع|مهندس\s+مشروع)\b",
         re.IGNORECASE),
@@ -704,6 +735,8 @@ _CATEGORY_PATTERNS: Final[tuple[tuple[str, re.Pattern[str]], ...]] = (
         r"\b(doctor|physician|nurse|pharmacist|dentist|"
         r"general\s+practitioner|specialist\s+doctor|consultant\s+doctor|"
         r"radiologist|cardiologist|anesthesiologist|surgeon|"
+        r"ent\s+(specialist|consultant|doctor)|"
+        r"oncologist|neurologist|dermatologist|orthopedic|pediatrician|"
         r"medical\s+(director|officer|representative|technician)|"
         r"clinical\s+(specialist|coordinator|pharmacist)|"
         r"laboratory\s+technician|lab\s+technician|"
@@ -729,23 +762,30 @@ _CATEGORY_PATTERNS: Final[tuple[tuple[str, re.Pattern[str]], ...]] = (
     ("hospitality", re.compile(
         r"\b(chef|sous\s+chef|head\s+chef|executive\s+chef|line\s+cook|cook|"
         r"barista|waiter|waitress|server|host(?:ess)?|"
-        r"front\s+(desk|office)\s+(agent|supervisor|manager)|"
+        r"front\s+(desk|office)\s+(agent|supervisor|manager|employee)|"
         r"guest\s+(relations|services)\s+(officer|agent|manager|coordinator)|"
         r"hotel\s+(manager|director|supervisor)|"
         r"restaurant\s+(manager|supervisor)|"
         r"housekeeping\s+(supervisor|attendant)|"
+        r"hospitality\s+(revenues?|operations?)\s+(manager|director|"
+        r"supervisor|coordinator)|"
+        r"lifeguard|personal\s+butler|butler\b|"
         r"bartender|sommelier|food\s+and\s+beverage|"
         r"f&b\s+(manager|supervisor)|"
         r"camp\s+(boss|manager)|"
+        r"hair\s+stylist|makeup\s+artist|make[- ]?up\s+artist|"
         r"بارستا|طاهٍ|نادل)\b",
         re.IGNORECASE),
     ),
     ("retail", re.compile(
-        r"\b(retail\s+(manager|supervisor|associate|sales\s+associate)|"
+        r"\b(retail\s+(manager|supervisor|associate|sales\s+associate|"
+        r"merchandising\s+manager|merchandiser)|"
+        r"national\s+(grocery\s+)?retail\s+merchandising\s+manager|"
         r"store\s+(manager|supervisor|associate)|"
         r"shop\s+(manager|assistant)|"
         r"cashier|merchandiser|visual\s+merchandiser|"
         r"stock\s+(controller|keeper)|"
+        r"mystery\s+shopper|"
         r"مدير\s+معرض|بائع|محاسب\s+صندوق)\b",
         re.IGNORECASE),
     ),
@@ -768,13 +808,15 @@ _CATEGORY_PATTERNS: Final[tuple[tuple[str, re.Pattern[str]], ...]] = (
         re.IGNORECASE),
     ),
     ("manufacturing_production", re.compile(
-        r"\b(production\s+(manager|supervisor|engineer|operator|planner)|"
+        r"\b(production\s+(manager|supervisor|engineer|operator|planner|"
+        r"technician)|"
         r"manufacturing\s+(engineer|supervisor|technician|manager)|"
         r"assembly\s+(line\s+worker|operator|technician)|"
         r"machine\s+operator|cnc\s+(operator|machinist)|"
         r"diesel\s+pump.*\bmaintenance|injection\s+technician|"
-        r"maintenance\s+technician|"
-        r"food\s+inspector|food\s+safety\s+inspector)\b",
+        r"maintenance\s+(technician|manager)|"
+        r"food\s+inspector|food\s+safety\s+inspector|"
+        r"sheet\s+metal\s+(supervisor|worker|fabricator))\b",
         re.IGNORECASE),
     ),
     ("hse_safety", re.compile(
