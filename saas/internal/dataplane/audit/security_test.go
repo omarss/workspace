@@ -235,8 +235,8 @@ type contextWithBoth struct {
 }
 
 func (c contextWithBoth) Deadline() (time.Time, bool) { return c.base.Deadline() }
-func (c contextWithBoth) Done() <-chan struct{}        { return c.base.Done() }
-func (c contextWithBoth) Err() error                   { return c.base.Err() }
+func (c contextWithBoth) Done() <-chan struct{}       { return c.base.Done() }
+func (c contextWithBoth) Err() error                  { return c.base.Err() }
 func (c contextWithBoth) Value(k any) any {
 	if v := c.extra.Value(k); v != nil {
 		return v

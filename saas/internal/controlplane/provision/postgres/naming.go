@@ -52,7 +52,7 @@ func validateSlug(field, slug string) error {
 	// start with a digit unless quoted with E-style which we do not
 	// want to rely on for the embedded DDL.
 	first := rune(slug[0])
-	if !(first >= 'a' && first <= 'z') {
+	if first < 'a' || first > 'z' {
 		return fmt.Errorf("%w: %s %q must start with [a-z]", ErrInvalidInput, field, slug)
 	}
 	for i, r := range slug {

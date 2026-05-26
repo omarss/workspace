@@ -118,7 +118,7 @@ func (r *PgxRepository) Append(ctx context.Context, in NewEventInput) (Event, er
 		ActorID:       in.ActorID,
 		Action:        in.Action,
 		ResourceType:  in.ResourceType,
-		ResourceID:   in.ResourceID,
+		ResourceID:    in.ResourceID,
 		OccurredAt:    occurredAt.UTC(),
 		IPAddress:     in.IPAddress,
 		UserAgent:     in.UserAgent,
@@ -215,7 +215,6 @@ func (r *PgxRepository) List(ctx context.Context, filter ListFilter) ([]Event, b
 	if !filter.OccurredTo.IsZero() {
 		args = append(args, filter.OccurredTo)
 		fmt.Fprintf(&where, ` AND occurred_at <= $%d`, idx)
-		idx++
 	}
 	stmt := `SELECT ` + auditCols + ` FROM audit_event` + where.String() +
 		` ORDER BY occurred_at DESC, chain_sequence DESC LIMIT $2`

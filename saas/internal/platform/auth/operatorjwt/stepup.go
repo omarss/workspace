@@ -44,7 +44,7 @@ const StepUpACR = "gold"
 //
 //   - missing principal               → unauthorized (401)
 //   - non-operator principal          → forbidden (403) — only operators
-//                                       hit destructive control-plane paths
+//     hit destructive control-plane paths
 //   - principal has no strong AMR     → step-up-required (403)
 //   - principal acr != gold           → step-up-required (403)
 //   - principal auth_time > window    → step-up-required (403)

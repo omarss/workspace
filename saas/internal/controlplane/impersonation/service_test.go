@@ -17,8 +17,8 @@ import (
 
 	"github.com/jackc/pgx/v5/pgtype"
 
-	"github.com/omarss/saas/internal/controlplane/impersonation"
 	db "github.com/omarss/saas/internal/controlplane/db/sqlc"
+	"github.com/omarss/saas/internal/controlplane/impersonation"
 )
 
 type memRepo struct {
@@ -174,11 +174,11 @@ func TestServiceEndSessionRevokesAndAudits(t *testing.T) {
 	pub := &memPub{}
 	svc := newSvc(t, repo, pub)
 	res, err := svc.StartSession(context.Background(), impersonation.StartSessionInput{
-		DeploymentID:   "dep_01HXTEST",
-		OperatorID:     "op_01HXTEST",
-		OperatorEmail:  "ops@example.com",
-		TargetTenantID: "tenant_01HXTEST",
-		Reason:         "incident #2",
+		DeploymentID:    "dep_01HXTEST",
+		OperatorID:      "op_01HXTEST",
+		OperatorEmail:   "ops@example.com",
+		TargetTenantID:  "tenant_01HXTEST",
+		Reason:          "incident #2",
 		DurationSeconds: 300,
 	})
 	if err != nil {

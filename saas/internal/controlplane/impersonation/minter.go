@@ -71,15 +71,15 @@ const MinDuration = time.Minute
 // occasionally impersonate at tenant level when no specific member
 // applies — incident-response scenario).
 type MintInput struct {
-	DeploymentID     string        // dep_<ulid>
-	OperatorID       string        // op_<ulid>
-	OperatorEmail    string        // surfaced in audit
-	TenantID         string        // tenant_<ulid> the operator is acting as
-	TargetMemberID   string        // member_<ulid>; optional
-	Reason           string        // free text; redactor-safe
-	Duration         time.Duration // clamped to [MinDuration, MaxDuration]
-	SessionID        string        // impses_<ulid>; pre-computed by caller for atomic insert
-	Now              time.Time     // injected for tests; zero -> time.Now()
+	DeploymentID   string        // dep_<ulid>
+	OperatorID     string        // op_<ulid>
+	OperatorEmail  string        // surfaced in audit
+	TenantID       string        // tenant_<ulid> the operator is acting as
+	TargetMemberID string        // member_<ulid>; optional
+	Reason         string        // free text; redactor-safe
+	Duration       time.Duration // clamped to [MinDuration, MaxDuration]
+	SessionID      string        // impses_<ulid>; pre-computed by caller for atomic insert
+	Now            time.Time     // injected for tests; zero -> time.Now()
 }
 
 // Result holds the signed JWT + the metadata the handler needs to
@@ -125,18 +125,18 @@ func (m *Minter) Mint(in MintInput) (Result, error) {
 	dur := clamp(in.Duration, MinDuration, MaxDuration)
 	exp := now.Add(dur)
 	claims := map[string]any{
-		"iss":                     Issuer,
-		"aud":                     AudiencePrefix + in.DeploymentID,
-		"sub":                     in.OperatorID,
-		"actor_type":              string(auth.ActorOperatorImpersonation),
-		"actor_id":                in.OperatorID,
-		"actor_email":             in.OperatorEmail,
-		"tenant_id":               in.TenantID,
+		"iss":                      Issuer,
+		"aud":                      AudiencePrefix + in.DeploymentID,
+		"sub":                      in.OperatorID,
+		"actor_type":               string(auth.ActorOperatorImpersonation),
+		"actor_id":                 in.OperatorID,
+		"actor_email":              in.OperatorEmail,
+		"tenant_id":                in.TenantID,
 		"impersonation_session_id": in.SessionID,
-		"reason":                  in.Reason,
-		"iat":                     now.Unix(),
-		"exp":                     exp.Unix(),
-		"nbf":                     now.Unix() - 1, // tolerate 1s clock skew
+		"reason":                   in.Reason,
+		"iat":                      now.Unix(),
+		"exp":                      exp.Unix(),
+		"nbf":                      now.Unix() - 1, // tolerate 1s clock skew
 	}
 	if in.TargetMemberID != "" {
 		claims["target_member_id"] = in.TargetMemberID
@@ -242,13 +242,13 @@ func NewVerifier(secret []byte, deploymentID string) (*Verifier, error) {
 // uses this to construct an auth.Principal with
 // ActorType=ActorOperatorImpersonation.
 type VerifyResult struct {
-	OperatorID              string
-	OperatorEmail           string
-	TenantID                string
-	TargetMemberID          string
-	ImpersonationSessionID  string
-	Reason                  string
-	ExpiresAt               time.Time
+	OperatorID             string
+	OperatorEmail          string
+	TenantID               string
+	TargetMemberID         string
+	ImpersonationSessionID string
+	Reason                 string
+	ExpiresAt              time.Time
 }
 
 // Verify parses raw, checks signature + iss + aud + exp + nbf, and

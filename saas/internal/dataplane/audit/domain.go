@@ -26,22 +26,22 @@ const (
 // rows without a second round-trip. Service-level consumers should treat
 // PrevHash + RowHash as opaque — they are bytes, not text.
 type Event struct {
-	ID             string
-	TenantID       string
-	ActorType      ActorType
-	ActorID        string
-	Action         string
-	ResourceType   string
-	ResourceID     string
-	OccurredAt     time.Time
-	IPAddress      string
-	UserAgent      string
-	RequestID      string
-	Metadata       map[string]any
-	SourceEventID  string
-	PrevHash       []byte
-	RowHash        []byte
-	ChainSequence  int64
+	ID            string
+	TenantID      string
+	ActorType     ActorType
+	ActorID       string
+	Action        string
+	ResourceType  string
+	ResourceID    string
+	OccurredAt    time.Time
+	IPAddress     string
+	UserAgent     string
+	RequestID     string
+	Metadata      map[string]any
+	SourceEventID string
+	PrevHash      []byte
+	RowHash       []byte
+	ChainSequence int64
 }
 
 // NewEventInput carries the subscriber-supplied fields needed to mint a

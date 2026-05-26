@@ -115,13 +115,13 @@ func (s *Service) StartSession(ctx context.Context, in StartSessionInput) (Start
 		memberID = &v
 	}
 	insErr := s.repo.InsertImpersonationSession(ctx, db.InsertImpersonationSessionParams{
-		ID:              sessionID,
-		DeploymentID:    in.DeploymentID,
-		OperatorID:      in.OperatorID,
-		OperatorEmail:   in.OperatorEmail,
-		TargetMemberID:  memberID,
-		TargetTenantID:  in.TargetTenantID,
-		Reason:          in.Reason,
+		ID:             sessionID,
+		DeploymentID:   in.DeploymentID,
+		OperatorID:     in.OperatorID,
+		OperatorEmail:  in.OperatorEmail,
+		TargetMemberID: memberID,
+		TargetTenantID: in.TargetTenantID,
+		Reason:         in.Reason,
 		// Safe int32 cast: clampSeconds bounds the value to
 		// [MinDuration, MaxDuration] == [60s, 900s], well within int32.
 		DurationSeconds: int32(duration / time.Second), //nolint:gosec // bounded by clampSeconds()
@@ -159,20 +159,20 @@ func (s *Service) StartSession(ctx context.Context, in StartSessionInput) (Start
 	// Audit BEFORE returning. A dropped HTTP response must still
 	// leave an audit trail.
 	payload := map[string]any{
-		"actor_type":              string(auth.ActorOperator),
-		"actor_id":                in.OperatorID,
-		"actor_email":             in.OperatorEmail,
-		"deployment_id":           in.DeploymentID,
+		"actor_type":               string(auth.ActorOperator),
+		"actor_id":                 in.OperatorID,
+		"actor_email":              in.OperatorEmail,
+		"deployment_id":            in.DeploymentID,
 		"impersonation_session_id": sessionID,
-		"target_tenant_id":        in.TargetTenantID,
-		"target_member_id":        in.TargetMemberID,
-		"reason":                  in.Reason,
-		"duration_seconds":        int(duration / time.Second),
-		"expires_at":              expires.Format(time.RFC3339),
-		"request_id":              in.RequestID,
-		"ip_address":              in.IPAddress,
-		"resource_type":           "deployment",
-		"resource_id":             in.DeploymentID,
+		"target_tenant_id":         in.TargetTenantID,
+		"target_member_id":         in.TargetMemberID,
+		"reason":                   in.Reason,
+		"duration_seconds":         int(duration / time.Second),
+		"expires_at":               expires.Format(time.RFC3339),
+		"request_id":               in.RequestID,
+		"ip_address":               in.IPAddress,
+		"resource_type":            "deployment",
+		"resource_id":              in.DeploymentID,
 	}
 	if err := s.publisher.Publish(ctx, "operator.impersonation_started", in.TargetTenantID, payload); err != nil {
 		// Outbox publish failure is loud but not fatal — the session
@@ -223,15 +223,15 @@ func (s *Service) EndSession(ctx context.Context, sessionID, endedReason string,
 		return fmt.Errorf("impersonation: end session: %w", err)
 	}
 	payload := map[string]any{
-		"actor_type":              string(auth.ActorOperator),
-		"actor_id":                row.OperatorID,
-		"actor_email":             row.OperatorEmail,
-		"deployment_id":           row.DeploymentID,
+		"actor_type":               string(auth.ActorOperator),
+		"actor_id":                 row.OperatorID,
+		"actor_email":              row.OperatorEmail,
+		"deployment_id":            row.DeploymentID,
 		"impersonation_session_id": sessionID,
-		"target_tenant_id":        row.TargetTenantID,
-		"ended_reason":            reason,
-		"resource_type":           "deployment",
-		"resource_id":             row.DeploymentID,
+		"target_tenant_id":         row.TargetTenantID,
+		"ended_reason":             reason,
+		"resource_type":            "deployment",
+		"resource_id":              row.DeploymentID,
 	}
 	if err := s.publisher.Publish(ctx, "operator.impersonation_ended", row.TargetTenantID, payload); err != nil {
 		return fmt.Errorf("impersonation: publish end audit: %w", err)

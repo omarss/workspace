@@ -120,13 +120,13 @@ type DeploymentDomain struct {
 // Revision is a single image_version rollout entry. Used by /revisions
 // and rollback.
 type Revision struct {
-	ID            string
-	DeploymentID  string
-	ImageVersion  string
-	AppliedAt     time.Time
-	IsRolledBack  bool
-	AppliedBy     string
-	Metadata      map[string]string
+	ID           string
+	DeploymentID string
+	ImageVersion string
+	AppliedAt    time.Time
+	IsRolledBack bool
+	AppliedBy    string
+	Metadata     map[string]string
 }
 
 // BootstrapResult is what the LocalProvisioner returns to the handler so

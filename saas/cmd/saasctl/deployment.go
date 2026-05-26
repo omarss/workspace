@@ -28,9 +28,9 @@ const controlPlaneURL = "http://localhost:8080"
 // deploymentCmd is the parent of all `saasctl deployment ...` operations.
 func deploymentCmd() *cobra.Command {
 	var (
-		baseURL    string
-		operator   string
-		scopes     string
+		baseURL  string
+		operator string
+		scopes   string
 	)
 	c := &cobra.Command{
 		Use:   "deployment",

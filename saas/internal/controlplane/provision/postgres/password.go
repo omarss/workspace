@@ -7,13 +7,6 @@ import (
 	"strings"
 )
 
-// passwordRandomBytes is the entropy budget per password. 32 bytes /
-// 256 bits is overkill for a password (NIST SP 800-63B 5.1.1.2 calls
-// 112 bits "high"); we pick 256 bits so that even after the base64
-// alphabet shrink the worst-case effective entropy still clears 192
-// bits.
-const passwordRandomBytes = 32
-
 // generateRolePassword returns a fresh URL-safe random password suitable
 // for embedding in a Postgres CREATE ROLE PASSWORD literal.
 //
