@@ -8,7 +8,7 @@ A/B-ing them is a single edit.
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Final
 from uuid import UUID
 
@@ -24,11 +24,17 @@ CANARY_FAILURES_BREAK: Final = 2  # consecutive failures to declare broken
 
 @dataclass(slots=True)
 class RunStats:
-    """What the runner accumulated during one execution."""
+    """What the runner accumulated during one execution.
+
+    `quality_rejects` is keyed by `QualityReject.reason` so each gate's
+    impact is visible at a glance in the per-run health snapshot. The
+    sum of values is also the headline "noise dropped this run" number.
+    """
 
     fetched: int = 0
     parsed: int = 0
     field_coverage_sum: float = 0.0  # sum of per-posting field_coverage()
+    quality_rejects: dict[str, int] = field(default_factory=dict)
 
     @property
     def parse_rate(self) -> float | None:
@@ -37,6 +43,10 @@ class RunStats:
     @property
     def field_fill_rate(self) -> float | None:
         return self.field_coverage_sum / self.parsed if self.parsed else None
+
+    def record_quality_reject(self, reason: str) -> None:
+        """Bump the counter for `reason` (init to 0 if first sighting)."""
+        self.quality_rejects[reason] = self.quality_rejects.get(reason, 0) + 1
 
 
 async def record_run_outcome(

@@ -36,6 +36,7 @@ from .date_window import cutoff, is_within_window
 from .geo_filter import is_gcc_location
 from .health import RunStats, record_run_outcome
 from .normalise import field_coverage, persist_side_data, resolve_city, to_upsert
+from .quality import check_intra_run_dup, check_listing, check_parsed
 from .types import Listing, ParsedPosting
 
 _LOG: Final = logging.getLogger("job_crawler.runner")
@@ -100,9 +101,25 @@ class CrawlerRunner:
         updated_count = 0
         errors = 0
         since = cutoff()
+        # Intra-run dedup set, scoped to this single run. Catches
+        # paginators that surface the same listing on multiple pages.
+        seen_content_hashes: set[bytes] = set()
 
         try:
             async for listing in self._safe_iter(self.crawler.discover_listings(since=since)):
+                # Listing-stage gate: skip nav / search URLs before paying
+                # for a fetch. We don't bump `fetched` (no HTTP happened)
+                # and don't record_fetch (no URL was fetched).
+                listing_reject = check_listing(listing)
+                if listing_reject is not None:
+                    stats.record_quality_reject(listing_reject.reason)
+                    _LOG.debug(
+                        "listing rejected (%s): %s — %s",
+                        listing_reject.reason,
+                        listing.detail_url,
+                        listing_reject.detail,
+                    )
+                    continue
                 stats.fetched += 1
                 try:
                     raw = await self.crawler.fetch_detail(listing)
@@ -169,6 +186,54 @@ class CrawlerRunner:
                         http_status=raw.http_status,
                         duration_ms=raw.duration_ms,
                         bytes=raw.bytes,
+                    )
+                    continue
+
+                # Universal post-parse quality gate.
+                # First-failed-check wins so the scorecard reason tag is
+                # deterministic. New rejection categories (low-diversity
+                # description, garbage company name, future posted_at,
+                # etc.) all funnel through this single chokepoint.
+                parsed_reject = check_parsed(parsed)
+                if parsed_reject is not None:
+                    stats.record_quality_reject(parsed_reject.reason)
+                    await self.db.crawl.record_fetch(
+                        run.id,
+                        source_id,
+                        raw.canonical_url,
+                        outcome="rejected",
+                        http_status=raw.http_status,
+                        duration_ms=raw.duration_ms,
+                        bytes=raw.bytes,
+                        error_message=(
+                            f"quality:{parsed_reject.reason} "
+                            f"— {parsed_reject.detail}"
+                        ),
+                    )
+                    continue
+
+                # Intra-run dedup: same description seen twice in this run
+                # (paginator overlap, listing surfaced on two query
+                # variants, etc.). Cross-run + cross-source dedup is
+                # handled later by `intelligence/dedup.py`.
+                dup_reject = check_intra_run_dup(
+                    parsed,
+                    seen_content_hashes=seen_content_hashes,
+                )
+                if dup_reject is not None:
+                    stats.record_quality_reject(dup_reject.reason)
+                    await self.db.crawl.record_fetch(
+                        run.id,
+                        source_id,
+                        raw.canonical_url,
+                        outcome="rejected",
+                        http_status=raw.http_status,
+                        duration_ms=raw.duration_ms,
+                        bytes=raw.bytes,
+                        error_message=(
+                            f"quality:{dup_reject.reason} "
+                            f"— {dup_reject.detail}"
+                        ),
                     )
                     continue
 
