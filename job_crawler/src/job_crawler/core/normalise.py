@@ -290,6 +290,9 @@ def to_upsert(
     from .restrictions import (
         detect_experience_level,
         detect_gender_preference,
+        detect_hybrid_days_per_week,
+        detect_relocation_assistance,
+        detect_remote_country_restriction,
         detect_saudi_only,
     )
 
@@ -306,6 +309,20 @@ def to_upsert(
     experience_level = parsed.experience_level or detect_experience_level(
         parsed.title, parsed.description,
     )
+    # Three more parser-grade extractions. All three columns exist on
+    # job_postings AND on jobs, so to_upsert fills the posting and
+    # `create_from_posting` / `recompute_canonical` mirror up. Parser
+    # values still win when explicitly set by the per-source parser.
+    hybrid_days = (
+        parsed.hybrid_days_per_week
+        if parsed.hybrid_days_per_week is not None
+        else detect_hybrid_days_per_week(parsed.description)
+    )
+    remote_country = (
+        parsed.remote_country_restriction
+        or detect_remote_country_restriction(parsed.description)
+    )
+    relocation_assistance = detect_relocation_assistance(parsed.description)
 
     # Centralised text sanitisation — runs on every source so the
     # downstream consumer (search vectors, dedupe content_hash,
@@ -339,8 +356,9 @@ def to_upsert(
         region_code=loc.region_code,
         country_code=country_code,
         office_address=office_address,
-        hybrid_days_per_week=parsed.hybrid_days_per_week,
-        remote_country_restriction=parsed.remote_country_restriction,
+        hybrid_days_per_week=hybrid_days,
+        remote_country_restriction=remote_country,
+        relocation_assistance=relocation_assistance,
         hiring_manager_name=hiring_manager_name,
         hiring_manager_linkedin_url=parsed.hiring_manager_linkedin_url,
         saudi_nationals_only=saudi_only,

@@ -12,6 +12,9 @@ import pytest
 from job_crawler.core.restrictions import (
     detect_experience_level,
     detect_gender_preference,
+    detect_hybrid_days_per_week,
+    detect_relocation_assistance,
+    detect_remote_country_restriction,
     detect_requires_arabic,
     detect_saudi_only,
     detect_visa_sponsorship,
@@ -194,3 +197,113 @@ def test_visa_sponsorship_contradictory_returns_none() -> None:
     phrases (e.g. mixed eligibility paragraphs), stay silent."""
     text = "Visa sponsorship for engineers. No visa sponsorship for contractors."
     assert detect_visa_sponsorship(text) is None
+
+
+# ---------------------------------------------------------------------------
+# detect_hybrid_days_per_week
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("This is a hybrid role with 3 days in office.", 3),
+        ("4 days a week onsite, 1 day remote.", 4),
+        ("Hybrid (2 days office).", 2),
+        ("Onsite 5 days per week required.", 5),
+        ("You will be in-person three days a week.", 3),
+        ("Hybrid model: two days in-office.", 2),
+    ],
+)
+def test_hybrid_days_positive(text: str, expected: int) -> None:
+    assert detect_hybrid_days_per_week(text) == expected
+
+
+def test_hybrid_days_silent_returns_none() -> None:
+    assert detect_hybrid_days_per_week("Fully remote position.") is None
+    assert detect_hybrid_days_per_week("We're hiring an engineer.") is None
+    assert detect_hybrid_days_per_week(None) is None
+    assert detect_hybrid_days_per_week("") is None
+
+
+def test_hybrid_days_ignores_remote_day_count() -> None:
+    """A '2 days remote' phrase doesn't make us return 2 — that's
+    the wrong direction. Only in-office cues count."""
+    assert detect_hybrid_days_per_week("Work 2 days remote from home.") is None
+
+
+# ---------------------------------------------------------------------------
+# detect_remote_country_restriction
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("Must be resident in Saudi Arabia.", "sa"),
+        ("Must be based in the UAE.", "ae"),
+        ("Candidates residing in Egypt.", "eg"),
+        ("Open to candidates in India.", "in"),
+        ("Remote from Saudi Arabia only.", "sa"),
+        ("Must reside in Bahrain.", "bh"),
+        ("Open to residents of Qatar.", "qa"),
+    ],
+)
+def test_remote_country_positive(text: str, expected: str) -> None:
+    assert detect_remote_country_restriction(text) == expected
+
+
+def test_remote_country_silent_returns_none() -> None:
+    assert detect_remote_country_restriction("Fully remote position.") is None
+    assert detect_remote_country_restriction("We're hiring.") is None
+    assert detect_remote_country_restriction(None) is None
+
+
+def test_remote_country_ambiguous_returns_none() -> None:
+    """Two distinct countries mentioned as restrictions → ambiguous."""
+    text = "Candidates residing in Saudi Arabia or based in UAE."
+    assert detect_remote_country_restriction(text) is None
+
+
+# ---------------------------------------------------------------------------
+# detect_relocation_assistance
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Relocation assistance available.",
+        "We offer relocation support to qualified candidates.",
+        "Relocation package included.",
+        "We will help you relocate.",
+        "Relocation is provided.",
+    ],
+)
+def test_relocation_positive(text: str) -> None:
+    assert detect_relocation_assistance(text) is True
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "No relocation provided.",
+        "Relocation is not offered.",
+        "Does not offer relocation.",
+        "Candidates must be currently local.",
+        "Must be locally based.",
+    ],
+)
+def test_relocation_negative(text: str) -> None:
+    assert detect_relocation_assistance(text) is False
+
+
+def test_relocation_silent_returns_none() -> None:
+    assert detect_relocation_assistance("We're hiring a backend engineer.") is None
+    assert detect_relocation_assistance(None) is None
+    assert detect_relocation_assistance("") is None
+
+
+def test_relocation_contradictory_returns_none() -> None:
+    text = "Relocation assistance for engineers. No relocation for contractors."
+    assert detect_relocation_assistance(text) is None
