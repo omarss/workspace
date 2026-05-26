@@ -744,3 +744,87 @@ def test_jsonld_extract_strips_cisco_style_double_encoded_description() -> None:
     assert "<p>" not in postings[0].description
     assert "&lt;" not in postings[0].description
     assert "senior engineer" in postings[0].description
+
+
+# ---------------------------------------------------------------------------
+# _clean_title — title-specific stripping of click-bait / brand trails / IDs
+# ---------------------------------------------------------------------------
+
+
+def test_clean_title_strips_hiring_now_prefix() -> None:
+    from job_crawler.core.normalise import _clean_title
+    # Use chr() so ruff doesn't flag a literal en-dash in the source.
+    en_dash = chr(0x2013)
+    assert (
+        _clean_title(f"Hiring Now | Tendering Engineer {en_dash} MEP")
+        == f"Tendering Engineer {en_dash} MEP"
+    )
+
+
+def test_clean_title_strips_career_opportunities_prefix() -> None:
+    from job_crawler.core.normalise import _clean_title
+    assert (
+        _clean_title("Career Opportunities: Divisional Trade Marketing Manager")
+        == "Divisional Trade Marketing Manager"
+    )
+
+
+def test_clean_title_takes_longest_segment_for_brand_trail() -> None:
+    from job_crawler.core.normalise import _clean_title
+    # Brand-trail pipes: the longest segment is the real title.
+    assert (
+        _clean_title("Technical & Warranty Manager | Al-Futtaim Automotive - BYD | Riyadh")
+        == "Technical & Warranty Manager"
+    )
+    assert (
+        _clean_title("Regional Aftersales Manager | Al-Futtaim Automotive - BYD | Riyadh")
+        == "Regional Aftersales Manager"
+    )
+
+
+def test_clean_title_strips_pure_numeric_req_id() -> None:
+    from job_crawler.core.normalise import _clean_title
+    assert (
+        _clean_title("Divisional Trade Marketing Manager (88068)")
+        == "Divisional Trade Marketing Manager"
+    )
+
+
+def test_clean_title_strips_tamheer_req_id() -> None:
+    from job_crawler.core.normalise import _clean_title
+    assert _clean_title("Procurement Intern (Tamheer 24767260)") == "Procurement Intern"
+
+
+def test_clean_title_keeps_signal_paren_suffixes() -> None:
+    """Parens that carry signal — Saudi-only, remote, level — stay."""
+    from job_crawler.core.normalise import _clean_title
+    assert _clean_title("Receptionist (Female Saudi National)") == "Receptionist (Female Saudi National)"
+    assert _clean_title("AI Engineer (All Levels)") == "AI Engineer (All Levels)"
+    assert _clean_title("Material Planner (Saudi Nationals Preferred)") == (
+        "Material Planner (Saudi Nationals Preferred)"
+    )
+    assert _clean_title("Senior Architectural Technical Office Engineer (BIM)") == (
+        "Senior Architectural Technical Office Engineer (BIM)"
+    )
+
+
+def test_clean_title_handles_urgent_hiring_paren_suffix() -> None:
+    from job_crawler.core.normalise import _clean_title
+    assert _clean_title("Cost Estimator (Urgent!) - Saudi Nationals") == (
+        "Cost Estimator - Saudi Nationals"
+    )
+
+
+def test_clean_title_empty_after_cleaning_returns_none() -> None:
+    from job_crawler.core.normalise import _clean_title
+    assert _clean_title("") is None
+    assert _clean_title("   ") is None
+    assert _clean_title(None) is None
+
+
+def test_clean_title_idempotent() -> None:
+    from job_crawler.core.normalise import _clean_title
+    once = _clean_title("Hiring Now | Mechanical Engineer (88068)")
+    twice = _clean_title(once)
+    assert once == "Mechanical Engineer"
+    assert twice == once

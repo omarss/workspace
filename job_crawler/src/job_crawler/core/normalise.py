@@ -129,6 +129,95 @@ def _clean_company_name(value: str | None) -> str | None:
     return cleaned
 
 
+# ---------------------------------------------------------------------------
+# Title cleanup
+# ---------------------------------------------------------------------------
+# Real-world titles leak two classes of noise that survive HTML parsing
+# and the generic `_clean_text` chokepoint:
+#
+#   1. Brand / location trails after pipe separators.
+#      "Regional Aftersales Manager | Al-Futtaim Automotive | BYD | Riyadh"
+#      "Civil Construction Manager - Residential Projects | Saudi Arabia"
+#      The first segment is the real title; everything past the first
+#      `|` is brand-tagging that pollutes the search vector and inflates
+#      character length.
+#
+#   2. Click-bait / call-to-action prefixes before a pipe.
+#      "Hiring Now | Tendering Engineer - MEP"
+#      Here the real title is AFTER the pipe — the prefix is filler.
+#
+#   3. ATS / boilerplate prefixes that are not "real" title content.
+#      "Career Opportunities: Divisional Trade Marketing Manager"
+#      "URGENT HIRING: Construction Supervisor"
+#
+#   4. Req-id paren suffixes that aren't part of the role name.
+#      "Procurement Intern (Tamheer 24767260)"
+#      "Career Opportunities: Marketing Manager (88068)"
+#      The paren contents are pure numeric / ATS identifiers — strip
+#      them. Distinguish from signal-bearing parens like
+#      "(Saudi National Preferred)" or "(BIM)".
+
+# Pure-noise prefixes that should be stripped when followed by ` | ` or `:`.
+_TITLE_NOISE_PREFIX_RES: Final[tuple[re.Pattern[str], ...]] = (
+    re.compile(r"^\s*hiring\s+now\s*[|:]\s*", re.IGNORECASE),
+    re.compile(r"^\s*now\s+hiring\s*[|:]\s*", re.IGNORECASE),
+    re.compile(r"^\s*urgent(?:\s+hiring)?\s*[!|:]?\s*[|:]\s*", re.IGNORECASE),
+    re.compile(r"^\s*career\s+opportunities\s*:\s*", re.IGNORECASE),
+    re.compile(r"^\s*we\s+are\s+hiring\s*[|:]\s*", re.IGNORECASE),
+    re.compile(r"^\s*join\s+(?:our|us)\s*[|:]\s*", re.IGNORECASE),
+)
+
+# Paren contents that are pure noise (req-ids, internal codes, Tamheer
+# reference numbers, urgency stickers). End-of-string anchored except
+# "(Urgent!)" which ATSes also embed mid-title; we strip it anywhere.
+# Conservative: only strip when the paren content matches one of these
+# patterns exactly — signal-bearing parens like "(Saudi National)" or
+# "(BIM)" or "(All Levels)" are left intact.
+_TITLE_NOISE_PAREN_RES: Final[tuple[re.Pattern[str], ...]] = (
+    re.compile(r"\s*\(\s*\d{3,}\s*\)\s*$"),  # "(88068)", "(24767260)"
+    re.compile(r"\s*\(\s*tamheer\s+\d+\s*\)\s*$", re.IGNORECASE),
+    re.compile(r"\s*\(\s*req\.?\s*\d+\s*\)\s*$", re.IGNORECASE),
+    re.compile(r"\s*\(\s*job\s*(?:id|#)?\s*\d+\s*\)\s*$", re.IGNORECASE),
+    # Urgency stickers can appear mid-title — strip anywhere.
+    re.compile(r"\s*\(\s*urgent\s*(?:hiring)?!?\s*\)", re.IGNORECASE),
+)
+
+
+def _clean_title(value: str | None) -> str | None:
+    """Sanitise a job title — runs after `_clean_text` to strip extras.
+
+    Returns None when the title is empty after cleaning. Order matters:
+      1. Strip click-bait prefixes (`Hiring Now |`, `Career Opportunities:`).
+      2. If a pipe separator remains, take the LONGEST segment that looks
+         like a role title (preferred over heuristics about
+         pre-vs-post-pipe ordering — the longest segment is almost
+         always the actual job title; brand trails are short bursts).
+      3. Strip pure-noise paren suffixes (req-ids).
+      4. Collapse whitespace + strip.
+    """
+    cleaned = _clean_text(value)
+    if cleaned is None:
+        return None
+    for pattern in _TITLE_NOISE_PREFIX_RES:
+        cleaned = pattern.sub("", cleaned, count=1)
+    if "|" in cleaned:
+        # Pick the longest segment by character length — the real title
+        # is almost always longer than brand trails like "| BYD" or
+        # "| Riyadh". Tie → keep the first non-empty segment.
+        segments = [s.strip() for s in cleaned.split("|")]
+        segments = [s for s in segments if s]
+        if segments:
+            cleaned = max(segments, key=len)
+    for pattern in _TITLE_NOISE_PAREN_RES:
+        cleaned = pattern.sub("", cleaned)
+    # Strip trailing punctuation: ASCII space/hyphen/pipe/colon plus
+    # Unicode en-dash (U+2013) and em-dash (U+2014). chr() avoids ruff's
+    # ambiguous-character warning while keeping the strip working.
+    trail_chars = " -|:" + chr(0x2013) + chr(0x2014)
+    cleaned = re.sub(r"\s{2,}", " ", cleaned).strip(trail_chars)
+    return cleaned or None
+
+
 # Free-text aliases + sub-city neighborhoods → canonical cities.name_en.
 # Bayt and a few other sources frequently emit raw_location values that are
 # neighborhoods (e.g. "An Narjis", "Al Olaya"), district names, or alternate
@@ -330,7 +419,10 @@ def to_upsert(
     # through HTML parsing. See `_clean_text` for the full set:
     # html.unescape, strip BOM/ZWS/RTL marks, drop control chars,
     # collapse whitespace, strip leading/trailing space.
-    title = _clean_text(parsed.title)
+    # `_clean_title` builds on `_clean_text` plus title-specific stripping
+    # of click-bait prefixes ("Hiring Now |", "Career Opportunities:"),
+    # brand-trail pipe segments, and req-id paren suffixes.
+    title = _clean_title(parsed.title)
     description = _clean_text(parsed.description)
     raw_company_name = _clean_company_name(parsed.raw_company_name)
     raw_location = _clean_text(parsed.raw_location)
