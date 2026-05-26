@@ -474,6 +474,97 @@ def test_company_careers_extracts_itemprop_dateposted() -> None:
     assert ld.posted_at.month == 4 and ld.posted_at.day == 15
 
 
+def test_company_careers_extracts_data_attribute_dateposted() -> None:
+    """Greenhouse-hosted boards stash `data-posted-at` / `data-created-at`
+    on job tiles — neither itemprop nor <time> works on them."""
+    from job_crawler.boards.company_careers import _ld_from_detail_html
+
+    html = '''<html><body>
+        <div data-posted-at="2026-05-18T10:00:00Z">Job tile</div>
+    </body></html>'''
+    ld = _ld_from_detail_html(html)
+    assert ld.posted_at is not None
+    assert ld.posted_at.day == 18
+
+
+def test_company_careers_extracts_from_css_class_text() -> None:
+    """KKU-style templates put the date in a `.posted-date` span with a
+    short ISO text inside, with no semantic markup."""
+    from job_crawler.boards.company_careers import _ld_from_detail_html
+
+    html = '''<html><body>
+        <div class="posted-date">2026-05-12</div>
+    </body></html>'''
+    ld = _ld_from_detail_html(html)
+    assert ld.posted_at is not None
+    assert ld.posted_at.day == 12
+
+
+def test_company_careers_extracts_from_iso_regex_in_body() -> None:
+    """Last-resort scan: pick the most recent ISO date in the body when
+    no markup is available. Cap at last 90d so footer copyrights don't
+    leak through."""
+    from job_crawler.boards.company_careers import _ld_from_detail_html
+
+    today = datetime.now(UTC).date()
+    recent = today.replace(day=max(1, today.day - 3))
+    html = f'''<html><body>
+        <p>Footer: © 2014-2026</p>
+        <p>Posted recently. See {recent.isoformat()} for details.</p>
+    </body></html>'''
+    ld = _ld_from_detail_html(html)
+    assert ld.posted_at is not None
+    assert ld.posted_at.date() == recent
+
+
+def test_company_careers_skips_old_footer_dates() -> None:
+    """Plain '2014' in a footer copyright must NOT become the post date."""
+    from job_crawler.boards.company_careers import _ld_from_detail_html
+
+    html = '''<html><body>
+        <footer>© 2014 Company. All rights reserved.</footer>
+    </body></html>'''
+    ld = _ld_from_detail_html(html)
+    # 2014-anything is > 90 days old → rejected; no JSON-LD, no time tag.
+    assert ld.posted_at is None
+
+
+def test_company_careers_parses_relative_n_days_ago_english() -> None:
+    from job_crawler.boards.company_careers import _ld_from_detail_html
+
+    html = '''<html><body>
+        <span>Posted 5 days ago by the HR team</span>
+    </body></html>'''
+    ld = _ld_from_detail_html(html)
+    assert ld.posted_at is not None
+    delta = datetime.now(UTC) - ld.posted_at
+    # ~5 days ± a few hours
+    assert 4 < delta.days <= 5
+
+
+def test_company_careers_parses_relative_arabic() -> None:
+    from job_crawler.boards.company_careers import _ld_from_detail_html
+
+    html = '''<html><body>
+        <span>نشر منذ 3 أيام في الرياض</span>
+    </body></html>'''
+    ld = _ld_from_detail_html(html)
+    assert ld.posted_at is not None
+    delta = datetime.now(UTC) - ld.posted_at
+    assert 2 < delta.days <= 3
+
+
+def test_company_careers_parses_absolute_posted_on() -> None:
+    from job_crawler.boards.company_careers import _ld_from_detail_html
+
+    html = '''<html><body>
+        <p>Posted on May 12, 2026 in Riyadh</p>
+    </body></html>'''
+    ld = _ld_from_detail_html(html)
+    assert ld.posted_at is not None
+    assert ld.posted_at.year == 2026 and ld.posted_at.month == 5 and ld.posted_at.day == 12
+
+
 def test_company_careers_jsonld_dateposted_wins_over_dom() -> None:
     """When JSON-LD has datePosted, prefer it — the DOM fallback only
     kicks in when JSON-LD is silent."""
