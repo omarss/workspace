@@ -98,8 +98,24 @@ def is_gcc_location(
         return bool(_EN_REGEX.search(raw_location)) or any(
             marker in raw_location for marker in _GCC_MARKERS_AR
         )
-    # raw_location is empty: fall back to country_code.
-    return bool(country_code and country_code.lower() in _GCC_COUNTRY_CODES)
+    # raw_location is empty. The historic fallback "trust country_code"
+    # was too permissive: `ParsedPosting.country_code` defaults to "sa"
+    # in the dataclass, so parsers that fail to extract a location AND
+    # don't override the default would always pass the GCC gate. Live
+    # leak: SABIC's career site landed Bangalore / Bergen-Op-Zoom /
+    # Pontirolo roles in the SA-focused corpus because their parser
+    # left raw_location null. We now only trust `country_code` when
+    # it's explicitly NOT the default "sa" — that means a Cisco-style
+    # JSON-LD parser that sets country_code='ae' (or 'us', 'in', ...)
+    # still gets evaluated, but the silent default-sa path is shut.
+    if country_code is None:
+        return False
+    code = country_code.lower()
+    if code == "sa":
+        # Could be default OR explicit "sa". Without a raw_location to
+        # confirm, treat as untrustworthy and drop.
+        return False
+    return code in _GCC_COUNTRY_CODES
 
 
 # ---------------------------------------------------------------------------
