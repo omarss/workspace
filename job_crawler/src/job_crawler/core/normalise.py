@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import html
 import logging
+import re
 from dataclasses import dataclass
 from typing import Final
 from uuid import UUID
@@ -59,6 +60,45 @@ def coerce_country_code(value: str | None, default: str = "sa") -> str:
         return default
     code = value.strip().lower()[:2]
     return code if code in _KNOWN_COUNTRY_CODES else default
+
+
+# Characters that leak through HTML parsing but are invisible in the UI:
+# BOM (U+FEFF), zero-width space / joiner / non-joiner (U+200B-U+200D),
+# bidi marks (U+200E-U+200F), bidi overrides (U+202A-U+202E), word joiner
+# (U+2060). They corrupt search-vector tokenisation and content_hash
+# dedupe (visually-identical descriptions hash to different values).
+_INVISIBLE_RE: Final = re.compile(r"[﻿​-‏‪-‮⁠]")
+
+# ASCII control chars except TAB / LF / CR — these get stripped too.
+# (tab/newline/cr are legitimate inside descriptions; everything else is
+# garbage from broken-binary leaks or copy-paste from PDFs.)
+_CONTROL_RE: Final = re.compile(r"[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]")
+
+# Three-or-more consecutive spaces / inner whitespace runs collapse to
+# single space. Newlines preserved as-is (description structure matters).
+_INNER_WS_RUN_RE: Final = re.compile(r"[ \t]{2,}")
+
+
+def _clean_text(value: str | None) -> str | None:
+    """Sanitise a free-text field for storage.
+
+    Order of operations matters:
+      1. `html.unescape` — turn `&amp;`, `&lt;`, etc. into real chars.
+         Run first so any encoded invisible char gets caught by step 2.
+      2. Strip BOM / zero-width / RTL bidi marks.
+      3. Strip ASCII control chars (keep TAB/LF/CR).
+      4. Collapse runs of 2+ spaces / tabs to one.
+      5. Strip leading + trailing whitespace.
+      6. Return None if empty (so the column stays NULL instead of '').
+    """
+    if value is None:
+        return None
+    s = html.unescape(value)
+    s = _INVISIBLE_RE.sub("", s)
+    s = _CONTROL_RE.sub("", s)
+    s = _INNER_WS_RUN_RE.sub(" ", s)
+    s = s.strip()
+    return s or None
 
 
 # Free-text aliases + sub-city neighborhoods → canonical cities.name_en.
@@ -227,18 +267,18 @@ def to_upsert(
     if gender is GenderPreference.any:
         gender = detect_gender_preference(body)
 
-    # Source HTML often arrives with entities like `&amp;` not decoded
-    # (especially when read out of JSON-LD blocks). Decode once here so
-    # every downstream consumer (search, dedupe, dashboard) sees clean text.
-    title = html.unescape(parsed.title) if parsed.title else parsed.title
-    description = (
-        html.unescape(parsed.description) if parsed.description else parsed.description
-    )
-    raw_company_name = (
-        html.unescape(parsed.raw_company_name)
-        if parsed.raw_company_name
-        else parsed.raw_company_name
-    )
+    # Centralised text sanitisation — runs on every source so the
+    # downstream consumer (search vectors, dedupe content_hash,
+    # dashboard) never has to deal with invisible junk that leaks
+    # through HTML parsing. See `_clean_text` for the full set:
+    # html.unescape, strip BOM/ZWS/RTL marks, drop control chars,
+    # collapse whitespace, strip leading/trailing space.
+    title = _clean_text(parsed.title)
+    description = _clean_text(parsed.description)
+    raw_company_name = _clean_text(parsed.raw_company_name)
+    raw_location = _clean_text(parsed.raw_location)
+    hiring_manager_name = _clean_text(parsed.hiring_manager_name)
+    office_address = _clean_text(parsed.office_address)
 
     return JobPostingUpsert(
         source_id=source_id,
@@ -254,14 +294,14 @@ def to_upsert(
         employment_type=parsed.employment_type,
         work_arrangement=parsed.work_arrangement,
         experience_level=parsed.experience_level,
-        raw_location=parsed.raw_location,
+        raw_location=raw_location,
         city_id=loc.city_id,
         region_code=loc.region_code,
         country_code=country_code,
-        office_address=parsed.office_address,
+        office_address=office_address,
         hybrid_days_per_week=parsed.hybrid_days_per_week,
         remote_country_restriction=parsed.remote_country_restriction,
-        hiring_manager_name=parsed.hiring_manager_name,
+        hiring_manager_name=hiring_manager_name,
         hiring_manager_linkedin_url=parsed.hiring_manager_linkedin_url,
         saudi_nationals_only=saudi_only,
         gender_preference=gender,
