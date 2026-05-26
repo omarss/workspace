@@ -32,7 +32,7 @@ import logging
 import os
 import re
 from collections.abc import AsyncIterator
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import ClassVar, Final, cast
 from urllib.parse import urljoin, urlparse
 
@@ -584,7 +584,7 @@ def _ld_from_detail_html(html: str) -> JobPostingLD:
     if not ld.city:
         fields["city"] = _txt(tree.css_first(_DETAIL_LOCATION_CSS))
     if not ld.posted_at:
-        dom_posted = _dom_posted_at(tree)
+        dom_posted = _dom_posted_at(tree, html)
         if dom_posted is not None:
             fields["posted_at"] = dom_posted
     if fields:
@@ -592,45 +592,191 @@ def _ld_from_detail_html(html: str) -> JobPostingLD:
     return ld
 
 
-def _dom_posted_at(tree: HTMLParser) -> datetime | None:
-    """Best-effort publish-date extraction from a detail-page DOM.
+def _dom_posted_at(tree: HTMLParser, html: str) -> datetime | None:
+    """Best-effort publish-date extraction from a detail-page DOM + HTML.
 
-    Tries (in order):
-      1. `[itemprop="datePosted"]` — schema.org microdata.
-      2. `<time datetime="...">` — canonical HTML5 form.
-      3. `<meta property="article:published_time" content="...">` — OG.
-    All three are widely used by enterprise ATS templates (Cisco,
-    Halliburton, Petrofac) even when their JSON-LD blocks omit dates.
+    Five-stage cascade — first hit wins. Designed to cover the wide
+    variety of templates SA enterprises use:
+
+      1. Semantic markup attributes — schema.org microdata, HTML5
+         <time datetime>, Open Graph, common meta tags.
+      2. data-* attributes that carry ISO dates (Greenhouse-hosted
+         boards stash `data-posted-at`/`data-created-at` on job tiles).
+      3. CSS-class heuristics — `.posted-date`, `[class*="posted"]`,
+         `[class*="published"]`, `[class*="date"]` etc. — short text
+         nodes that often hold a human-readable date.
+      4. ISO-date regex (`YYYY-MM-DD`) scan over the rendered body
+         text; picks the most recent date that's ≤ today.
+      5. Relative-date phrases ("posted 5 days ago" / Arabic "منذ 5
+         أيام" / "Posted on May 20, 2026") — translated to absolute
+         datetimes via simple offset math.
+
+    Returns a tz-aware datetime in UTC, or None when every stage
+    misses. Out-of-window dates (> today or > 90 days old) are
+    rejected before returning — they're almost always a footer
+    "© 2024" copyright or a placeholder.
     """
-    candidates: list[str] = []
+    # --- Stage 1: semantic markup ----------------------------------------
     for css, attr in (
         ('[itemprop="datePosted"]', "content"),
         ('[itemprop="datePosted"]', "datetime"),
         ("time[datetime]", "datetime"),
         ('meta[property="article:published_time"]', "content"),
         ('meta[name="datePosted"]', "content"),
+        ('meta[itemprop="datePosted"]', "content"),
     ):
-        node = tree.css_first(css)
-        if node is None:
-            continue
-        value = node.attributes.get(attr) if node.attributes else None
-        if value:
-            candidates.append(value.strip())
-    for raw in candidates:
-        if not raw:
-            continue
-        # ISO 8601 with optional trailing Z — datetime.fromisoformat handles
-        # most browsers' output. Python 3.11+ accepts the "Z" suffix; below
-        # that requires a swap. We're on 3.13 in this repo, so direct call
-        # is fine.
+        for node in tree.css(css):
+            value = node.attributes.get(attr) if node.attributes else None
+            dt = _parse_dt_loose(value)
+            if dt is not None:
+                return dt
+
+    # --- Stage 2: data-* attributes carrying ISO dates -------------------
+    for css, attr in (
+        ('[data-posted-at]', "data-posted-at"),
+        ('[data-created-at]', "data-created-at"),
+        ('[data-publish-date]', "data-publish-date"),
+        ('[data-published]', "data-published"),
+        ('[data-job-posted]', "data-job-posted"),
+    ):
+        for node in tree.css(css):
+            value = node.attributes.get(attr) if node.attributes else None
+            dt = _parse_dt_loose(value)
+            if dt is not None:
+                return dt
+
+    # --- Stage 3: CSS-class heuristics -----------------------------------
+    for css in (
+        ".posted-date",
+        ".publish-date",
+        ".published-date",
+        ".job-date",
+        ".date-posted",
+        "[class*='postedDate']",
+        "[class*='publishDate']",
+        "[class*='posted']",
+        "[class*='published']",
+    ):
+        for node in tree.css(css):
+            text = node.text(separator=" ", strip=True) if hasattr(node, "text") else ""
+            # short text nodes only — long blocks are body content, not a date
+            if not text or len(text) > 80:
+                continue
+            dt = _parse_date_from_text(text)
+            if dt is not None:
+                return dt
+
+    # --- Stage 4: ISO-date regex over body text --------------------------
+    # Most recent valid date ≤ today wins. Cap window at 90d so a
+    # footer "© 2014" doesn't leak through.
+    iso_dates: set[str] = set(_ISO_DATE_RE.findall(html))
+    today = datetime.now(UTC).date()
+    best: datetime | None = None
+    for raw in iso_dates:
         try:
-            dt = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+            dt = datetime.fromisoformat(raw).replace(tzinfo=UTC)
         except ValueError:
             continue
-        if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=UTC)
-        return dt
+        d = dt.date()
+        if d > today:
+            continue
+        if (today - d).days > 90:
+            continue
+        if best is None or dt > best:
+            best = dt
+    if best is not None:
+        return best
+
+    # --- Stage 5: relative date phrases ----------------------------------
+    body_text = tree.body.text(separator=" ", strip=True) if tree.body else ""
+    rel = _parse_relative_date(body_text)
+    if rel is not None:
+        return rel
     return None
+
+
+_ISO_DATE_RE: Final[re.Pattern[str]] = re.compile(r"\b(20\d{2}-[01]\d-[0-3]\d)\b")
+
+# English "posted 5 days ago" + Arabic equivalents. Hours/minutes count as
+# "today" (good enough for daily-resolution sources).
+_REL_DAYS_EN: Final[re.Pattern[str]] = re.compile(
+    r"\b(?:posted|published|listed|created)\s+(\d{1,3})\+?\s+days?\s+ago\b",
+    re.IGNORECASE,
+)
+_REL_HOURS_EN: Final[re.Pattern[str]] = re.compile(
+    r"\b(?:posted|published|listed|created)\s+(\d{1,3})\+?\s+hours?\s+ago\b",
+    re.IGNORECASE,
+)
+_REL_DAYS_AR: Final[re.Pattern[str]] = re.compile(
+    r"(?:نشر|منذ|قبل)\s*(\d{1,3})\s*(?:يوم|أيام|يوماً)",
+)
+# "Posted on May 20, 2026" / "Posted on 20 May 2026"
+_REL_ABS_EN: Final[re.Pattern[str]] = re.compile(
+    r"\b(?:posted|published)\s+on\s+([A-Za-z]+\s+\d{1,2},?\s+20\d{2}|\d{1,2}\s+[A-Za-z]+\s+20\d{2})\b",
+    re.IGNORECASE,
+)
+
+
+def _parse_relative_date(text: str) -> datetime | None:
+    """Translate "posted N days ago" / Arabic equivalent to a datetime."""
+    if not text:
+        return None
+    now = datetime.now(UTC)
+    m = _REL_DAYS_EN.search(text) or _REL_DAYS_AR.search(text)
+    if m:
+        try:
+            days = int(m.group(1))
+        except ValueError:
+            days = 0
+        return now - timedelta(days=days)
+    m = _REL_HOURS_EN.search(text)
+    if m:
+        try:
+            hours = int(m.group(1))
+        except ValueError:
+            hours = 0
+        return now - timedelta(hours=hours)
+    m = _REL_ABS_EN.search(text)
+    if m:
+        for fmt in ("%B %d, %Y", "%B %d %Y", "%d %B %Y"):
+            try:
+                return datetime.strptime(m.group(1), fmt).replace(tzinfo=UTC)
+            except ValueError:
+                continue
+    return None
+
+
+def _parse_date_from_text(text: str) -> datetime | None:
+    """Tiny text-to-date parser — tries ISO first, then a few common
+    human-readable formats. Returns tz-aware UTC or None."""
+    text = text.strip()
+    iso_match = _ISO_DATE_RE.search(text)
+    if iso_match:
+        try:
+            return datetime.fromisoformat(iso_match.group(1)).replace(tzinfo=UTC)
+        except ValueError:
+            pass
+    for fmt in ("%B %d, %Y", "%d %B %Y", "%b %d, %Y", "%d-%m-%Y", "%m/%d/%Y", "%d/%m/%Y"):
+        try:
+            return datetime.strptime(text, fmt).replace(tzinfo=UTC)
+        except ValueError:
+            continue
+    return None
+
+
+def _parse_dt_loose(value: str | None) -> datetime | None:
+    """Parse a datetime string from an HTML attribute. Accepts ISO 8601
+    with or without trailing `Z`. Returns tz-aware UTC."""
+    if not value:
+        return None
+    raw = value.strip().replace("Z", "+00:00")
+    try:
+        dt = datetime.fromisoformat(raw)
+    except ValueError:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=UTC)
+    return dt
 
 
 def _join_location(ld: JobPostingLD) -> str | None:
