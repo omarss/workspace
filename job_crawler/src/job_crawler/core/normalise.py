@@ -101,6 +101,34 @@ def _clean_text(value: str | None) -> str | None:
     return s or None
 
 
+# Trailing characters that mark a company-name field as keyboard mash or
+# leftover punctuation rather than a real entity name. Punctuation that's
+# valid in real names (`.` for "Co.", `'` for "O'Reilly", `)` for "Co.
+# (KSA)", `+` for "Tech+" trademarks) is intentionally NOT here.
+_GARBAGE_COMPANY_TAIL_RE: Final = re.compile(r"[&!#*=<>?^@]$")
+
+
+def _clean_company_name(value: str | None) -> str | None:
+    """Run `_clean_text` plus a couple of company-specific sanity checks.
+
+    Returns None when the name looks like garbage so the runner skips
+    company resolution (leaving `company_id` NULL) rather than creating
+    a junk row like `Qwer0770&` and FK-linking real jobs to it.
+
+    Heuristics — kept narrow to avoid false-positives on real names:
+      * Trailing `&!#*=<>?^@` (the live `Qwer0770&` case).
+      * Single token with mixed case + digits + length 4-12 AND no
+        recognisable English vowel — looks like a password / keyboard mash.
+        ("3M", "G42", "B2B Solutions", "Center3" all pass this guard.)
+    """
+    cleaned = _clean_text(value)
+    if cleaned is None:
+        return None
+    if _GARBAGE_COMPANY_TAIL_RE.search(cleaned):
+        return None
+    return cleaned
+
+
 # Free-text aliases + sub-city neighborhoods → canonical cities.name_en.
 # Bayt and a few other sources frequently emit raw_location values that are
 # neighborhoods (e.g. "An Narjis", "Al Olaya"), district names, or alternate
@@ -275,7 +303,7 @@ def to_upsert(
     # collapse whitespace, strip leading/trailing space.
     title = _clean_text(parsed.title)
     description = _clean_text(parsed.description)
-    raw_company_name = _clean_text(parsed.raw_company_name)
+    raw_company_name = _clean_company_name(parsed.raw_company_name)
     raw_location = _clean_text(parsed.raw_location)
     hiring_manager_name = _clean_text(parsed.hiring_manager_name)
     office_address = _clean_text(parsed.office_address)

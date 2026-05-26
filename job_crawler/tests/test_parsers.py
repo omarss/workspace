@@ -583,6 +583,60 @@ def test_clean_text_strips_bom_zws_rtl_marks_and_collapses_whitespace() -> None:
     assert _clean_text("Tab\there") == "Tab\there"
 
 
+def test_clean_company_name_rejects_keyboard_mash() -> None:
+    """Live regression: Bayt let a HR-poster typo ('Qwer0770&') through
+    as raw_company_name, which companies.resolve then materialised as a
+    real company row. Reject anything with a trailing junk character
+    (the most distinctive marker of typos vs real names)."""
+    from job_crawler.core.normalise import _clean_company_name
+
+    # The exact live case
+    assert _clean_company_name("Qwer0770&") is None
+    # Other trailing-junk variants
+    assert _clean_company_name("Test!") is None
+    assert _clean_company_name("Foo#") is None
+    assert _clean_company_name("Bar=") is None
+    assert _clean_company_name("Baz@") is None
+    # Real names with digits and mixed case still pass — only trailing
+    # symbol-junk triggers rejection.
+    assert _clean_company_name("Center3") == "Center3"
+    assert _clean_company_name("3M") == "3M"
+    assert _clean_company_name("G42") == "G42"
+    assert _clean_company_name("B2B Solutions") == "B2B Solutions"
+    assert _clean_company_name("4horizons Group") == "4horizons Group"
+    # Trailing legit punctuation (period, paren, plus) still accepted.
+    assert _clean_company_name("Acme Co.") == "Acme Co."
+    assert _clean_company_name("Saudi Aramco (SATORP)") == "Saudi Aramco (SATORP)"
+    assert _clean_company_name("Tech+") == "Tech+"
+    # _clean_text still runs first (entity decode + whitespace collapse)
+    assert _clean_company_name(" Acme &amp; Co. ") == "Acme & Co."
+    assert _clean_company_name(None) is None
+    assert _clean_company_name("") is None
+
+
+def test_company_careers_drops_sa_gov_boilerplate_description() -> None:
+    """KKU regression: .gov.sa pages stored a 12k-char Arabic gov-portal
+    verification banner as the description. With the boilerplate guard,
+    description should drop to None while title + company_id stay."""
+    from job_crawler.boards.company_careers import _SA_GOV_BOILERPLATE_PREFIX
+
+    # The parser-side gate is what we actually want to test — verify the
+    # ParsedPosting comes out with description=None when JSON-LD returns
+    # the SA-gov-portal verification banner as the body.
+    parsed = _company_careers(
+        ld={
+            "title": "وظيفة في جامعة الملك خالد",
+            "description": f"{_SA_GOV_BOILERPLATE_PREFIX} كيف تتحقق روابط المواقع الإلكترونية الرسمية ..." + "X" * 1000,
+            "company_name": "King Khalid University",
+        },
+        company_name="King Khalid University",
+    )
+    assert parsed is not None
+    assert parsed.title == "وظيفة في جامعة الملك خالد"
+    assert parsed.description is None
+    assert "description" in parsed.missing_fields or "description" not in parsed.parsed_fields
+
+
 def test_bayt_strips_navbar_prefix_from_title() -> None:
     """Live regression: 1 Bayt title in the v6 corpus stored as
     'View More Jobs Talent Pool (Buildings Project) - HSE Manager ...'
