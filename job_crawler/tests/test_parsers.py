@@ -442,6 +442,58 @@ def test_jsonld_html_to_text_handles_raw_html_too() -> None:
     assert decoded == "Plain raw HTML."
 
 
+def test_company_careers_extracts_dom_posted_at_when_jsonld_omits() -> None:
+    """Cisco / Halliburton / Petrofac detail pages have time[datetime] in
+    the DOM but no datePosted in their JSON-LD. Without DOM fallback,
+    88% of company_careers postings landed without a publish date."""
+    from job_crawler.boards.company_careers import _ld_from_detail_html
+
+    html = '''<html><head>
+        <script type="application/ld+json">{
+            "@type":"JobPosting",
+            "title":"Senior Software Engineer",
+            "description":"A"
+        }</script>
+    </head><body>
+        <time datetime="2026-05-20T09:30:00Z">May 20</time>
+    </body></html>'''
+    ld = _ld_from_detail_html(html)
+    assert ld.posted_at is not None
+    assert ld.posted_at.year == 2026 and ld.posted_at.month == 5 and ld.posted_at.day == 20
+
+
+def test_company_careers_extracts_itemprop_dateposted() -> None:
+    """schema.org microdata variant — itemprop='datePosted'."""
+    from job_crawler.boards.company_careers import _ld_from_detail_html
+
+    html = '''<html><body>
+        <span itemprop="datePosted" content="2026-04-15T12:00:00Z">Apr 15</span>
+    </body></html>'''
+    ld = _ld_from_detail_html(html)
+    assert ld.posted_at is not None
+    assert ld.posted_at.month == 4 and ld.posted_at.day == 15
+
+
+def test_company_careers_jsonld_dateposted_wins_over_dom() -> None:
+    """When JSON-LD has datePosted, prefer it — the DOM fallback only
+    kicks in when JSON-LD is silent."""
+    from job_crawler.boards.company_careers import _ld_from_detail_html
+
+    html = '''<html><head>
+        <script type="application/ld+json">{
+            "@type":"JobPosting",
+            "title":"Engineer",
+            "description":"X",
+            "datePosted":"2026-05-25T00:00:00Z"
+        }</script>
+    </head><body>
+        <time datetime="2025-01-01T00:00:00Z">old</time>
+    </body></html>'''
+    ld = _ld_from_detail_html(html)
+    assert ld.posted_at is not None
+    assert ld.posted_at.year == 2026
+
+
 def test_jsonld_extract_strips_cisco_style_double_encoded_description() -> None:
     """End-to-end: a Cisco-shaped JSON-LD block in HTML yields a
     JobPostingLD with a plain-text description (the live regression

@@ -154,11 +154,24 @@ async def backfill_unresolved_cities(db: JobCrawlerDB) -> int:
         )
         while batch := await cur.fetchmany(500):
             for row in batch:
-                cid = await resolve_city(db, None, raw_location=row["raw_location"])
-                if cid is None:
+                # PR #18 changed resolve_city to return a LocationResolution
+                # tuple instead of a bare city UUID; this caller wasn't
+                # updated, and the dataclass was being handed straight to
+                # `jobs.update(city_id=...)` where psycopg can't adapt it.
+                # Pull city_id + propagate region/country so the cluster
+                # gets the full geo backfill, not just the city pin.
+                loc = await resolve_city(
+                    db, None, raw_location=row["raw_location"],
+                )
+                if loc.city_id is None:
                     continue
+                patch: dict[str, object] = {"city_id": loc.city_id}
+                if loc.region_code:
+                    patch["region_code"] = loc.region_code
+                if loc.country_code:
+                    patch["country_code"] = loc.country_code
                 try:
-                    await db.jobs.update(row["id"], city_id=cid)
+                    await db.jobs.update(row["id"], **patch)
                     n += 1
                 except Exception:
                     _LOG.exception("city backfill update failed for %s", row["id"])
