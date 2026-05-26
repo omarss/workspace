@@ -31,9 +31,11 @@ func main() {
 		deploymentCmd(),
 		domainCmd(),
 	)
-	// `saasctl debug ...` is only registered in non-prod builds. See
-	// debug_register.go vs debug_register_prod.go.
-	registerDebug(root)
+	// Phase 12a-d shipped `saasctl debug <adapter>` helpers behind
+	// CHECKPOINT 5/6/7/8. Phase 12e composes the four adapters into
+	// the full §6.2 provisioning sequence, so the debug subtree is
+	// removed — every adapter is now exercised by the production
+	// `saasctl deployment create` flow via HostProvisioner.
 	if err := root.Execute(); err != nil {
 		os.Exit(1)
 	}

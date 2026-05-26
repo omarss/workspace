@@ -399,6 +399,97 @@ verb "destroy" rather than "drop" / "remove" to telegraph this.
 
 ---
 
+## 16. Deployment provisioning lifecycle
+
+Phase 12e composes the four host adapters
+(`provision/{nginx,k3s,postgres,openbao}`) into the AGENTS.md §6.2
+13-step provisioning sequence + the §6.3 / §6.6 / §18.6 / §18.7
+lifecycle flows. The contract:
+
+### Status state machine
+
+```text
+       provisioning ──► active ──► upgrading ──► active
+            │             │            │            │
+            ▼             │            ▼            │
+          failed ─────────┘         failed ─────────┘
+            │
+            ▼
+        destroyed ────► purged
+            ▲             ▲
+            │             │
+        destroying      purging
+                       (bypass retention)
+```
+
+`suspended` is the FreezeKeys (§18.7) target state — the deployment
+is still provisioned, but its OpenBao keys are locked. Reversible by
+an operator with step-up MFA (Phase 13).
+
+### Retry semantics
+
+Every step is idempotent. The orchestrator records each step's status
+in the ledger; on retry, already-completed steps are SKIPPED and the
+orchestrator resumes from the first non-completed step. Adapters MUST
+NOT introduce state that breaks this — e.g. a `CREATE DATABASE` is
+preceded by an existence check rather than relying on `IF NOT EXISTS`.
+
+### Partial-failure handling
+
+On a step failure during Provision:
+
+1. Step row is marked `failed` in the ledger with the error message.
+2. Deployment row is flipped to `status='failed'`.
+3. The orchestrator does NOT inline-rollback. The destroy reconciler
+   picks up the row on its next tick (default 30 s) and walks the
+   ledger's completed rows in REVERSE ORDER, calling each step's
+   `Rollback` callback.
+4. Successful rollback → `status='destroyed'`. The operator can then
+   retry by re-issuing `saasctl deployment create`; the unique
+   constraint on `(project_slug, environment_slug)` is the natural
+   collision guard.
+5. Rollback failure leaves the row in `status='failed'`; the next
+   tick retries.
+
+### Destroy reconciler — selector matrix
+
+| Source `status` | Action                           | Target `status` |
+|-----------------|----------------------------------|-----------------|
+| `failed`        | walk ledger reverse + rollback   | `destroyed`     |
+| `destroying`    | full teardown (all 4 adapters)   | `destroyed`     |
+| `purging`       | full teardown, bypass retention  | `purged`        |
+| `destroyed` AND `retain_until < now()` | full teardown | `purged` |
+
+### Lifecycle flow refs
+
+| Flow         | Endpoint                                   | What runs |
+|--------------|--------------------------------------------|-----------|
+| Provision    | `POST /control/v1/deployments`             | 13-step sequence + ledger |
+| Upgrade      | `POST /deployments/{id}/upgrade`           | migrations + k3s SSA + healthz |
+| Rollback     | `POST /deployments/{id}/rollback`          | k3s SSA only (DB untouched) |
+| Restart      | `POST /deployments/{id}/restart`           | k3s SSA same image + WaitReady |
+| Restore      | `POST /deployments/{id}/restore`           | new dep_id + pg_restore (MVP stub returns ErrRestoreNotImplemented) |
+| Soft-delete  | `DELETE /deployments/{id}`                 | status='destroying'; reconciler tears down |
+| Purge        | `POST /deployments/{id}/purge`             | audit row → full teardown → status='purged' |
+| FreezeKeys   | `POST /deployments/{id}/freeze-keys`       | OpenBao min_*_version + status='suspended' |
+
+### Provisioner selection at boot
+
+`cmd/controlplane/main.go` reads `SAAS_HOST_PROVISIONER`:
+
+```bash
+SAAS_HOST_PROVISIONER=true    # composite path; needs all 4 adapters + env
+                              # (SAAS_PG_ADMIN_DSN, SAAS_NGINX_OPS_EMAIL,
+                              #  SAAS_K3S_HOST_NGINX_CIDR, SAAS_K3S_HOST_POSTGRES_CIDR,
+                              #  SAAS_K3S_HOST_OPENBAO_CIDR, BAO_ADDR + AppRole)
+unset / "false"                # LocalProvisioner (Postgres-only)
+```
+
+Default off matches the §15 Destructive operations convention — the
+operator must affirmatively opt in to the host-writing path.
+
+---
+
 ## Appendix A — Platform package map
 
 Every cross-cutting helper lives under `internal/platform/`. Reach for
@@ -422,6 +513,7 @@ these instead of re-implementing.
 | `crypto/` | Encryptor interface + reflection walker for `pii:"true"` (Phase 3) + EnvelopeAdapter that wraps the OpenBao client (Phase 4) |
 | `crypto/envelope/` | OpenBao envelope client (Encrypt / Decrypt with kid binding, EnsureKey, RotateKey, Rewrap, KV v2 helper); k8s + AppRole auth flows (Phase 4) |
 | `controlplane/provision/openbao/` | Per-Deployment OpenBao provisioner: transit key + per-Deployment HCL policy (embedded template) + kubernetes auth role + KV namespace marker (Phase 12d) |
+| `controlplane/provision/sequence/` | Composite orchestrator: 13-step §6.2 sequence + ledger + destroy reconciler + upgrade/rollback/restart/restore/purge/freeze-keys flows (Phase 12e) |
 
 ## Appendix B — Naming collisions
 

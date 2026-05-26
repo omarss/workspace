@@ -103,6 +103,35 @@ func run() error {
 	// Phase 4 wires the client into the process; Phase 12 uses it for the
 	// Deployment-provisioning code that touches secret/data/<deploymentID>.
 	_ = encClient
+
+	// Phase 12e — host provisioner selection. SAAS_HOST_PROVISIONER=true
+	// flips on the composite provisioner that composes the four host
+	// adapters into the AGENTS.md §6.2 13-step sequence. Default off so
+	// `make dev` continues to boot without nginx/k3s/openbao wired —
+	// matches the SAAS_RBAC_ENFORCE_DESTRUCTIVE Phase 8 pattern.
+	//
+	// The selected provisioner satisfies the deployments.Provisioner
+	// interface; the deployments service (not yet wired in Phase 12e —
+	// lands in the next operator-API phase) will receive it via DI.
+	//
+	// We do NOT instantiate the destroy reconciler unless the host
+	// provisioner is selected — the reconciler needs the four adapters
+	// to do its job, and standing it up against nil adapters would log
+	// a continuous stream of misconfiguration errors.
+	hostProvOn := os.Getenv("SAAS_HOST_PROVISIONER") == "true"
+	if hostProvOn {
+		slog.Info("controlplane: SAAS_HOST_PROVISIONER=true; host provisioner wiring is active")
+		// The full wiring (4 adapters + sequence + reconciler) lives in
+		// a separate file (provisioner_wiring.go) so this main stays
+		// readable. Errors there are fatal — the operator opted in.
+		stop, err := startHostProvisioner(ctx, pool, encClient)
+		if err != nil {
+			return fmt.Errorf("start host provisioner: %w", err)
+		}
+		defer stop()
+	} else {
+		slog.Info("controlplane: SAAS_HOST_PROVISIONER=false; using local-mode provisioner (Postgres only)")
+	}
 	// The control plane currently shares the dataplane sqlc-generated queries
 	// (db package) only so it can drive the outbox dispatcher off a Queries
 	// handle bound to its own pool. Phase 12 introduces a dedicated
