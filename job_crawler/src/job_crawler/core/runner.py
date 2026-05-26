@@ -271,10 +271,17 @@ class CrawlerRunner:
     ) -> tuple[UUID, bool]:
         """Resolve company + city, upsert the posting, persist side-data.
         Returns (posting_id, was_new_insert)."""
+        from .normalise import _clean_company_name
+
+        # Clean the company name BEFORE calling resolve — otherwise a
+        # garbage typo like 'Qwer0770&' creates a real `companies` row
+        # via the fuzzy resolver. `to_upsert` runs later and only
+        # sanitises the posting field, not the entity.
+        clean_company = _clean_company_name(parsed.raw_company_name)
         company_id: UUID | None = None
-        if parsed.raw_company_name:
+        if clean_company:
             company = await self.db.companies.resolve(
-                raw_name=parsed.raw_company_name,
+                raw_name=clean_company,
                 source_id=source_id,
                 source_company_external_id=parsed.company_external_id,
                 source_profile_url=parsed.company_profile_url,
