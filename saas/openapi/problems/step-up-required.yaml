@@ -1,0 +1,39 @@
+# Problem fragment: step-up-required
+# Type URI: https://saas.omarss.net/problems/step-up-required
+#
+# Emitted by operator-facing destructive endpoints when the bearer token
+# fails one of:
+#   - HasStrongAMR (no MFA method in the `amr` claim)
+#   - acr != gold
+#   - now - auth_time > 5min
+#
+# AGENTS.md §18.4. The `detail` field carries a kc_acr=gold max_age=0 hint
+# so the saasctl client can re-run the OIDC flow with the right
+# parameters and retry the request.
+
+type: object
+required: [type, title, status]
+properties:
+  type:
+    type: string
+    const: "https://saas.omarss.net/problems/step-up-required"
+  title:
+    type: string
+    example: "Forbidden"
+  status:
+    type: integer
+    const: 403
+  detail:
+    type: string
+    example: "auth_time exceeds 5-minute step-up window (hint: kc_acr=gold max_age=0)"
+  instance:
+    type: string
+    example: "/control/v1/deployments/dep_01HXYZ/purge"
+  request_id:
+    type: string
+example:
+  type: "https://saas.omarss.net/problems/step-up-required"
+  title: "Forbidden"
+  status: 403
+  detail: "auth_time exceeds 5-minute step-up window (hint: kc_acr=gold max_age=0)"
+  instance: "/control/v1/deployments/dep_01HXYZ/purge"

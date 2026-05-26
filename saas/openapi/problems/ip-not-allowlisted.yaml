@@ -1,0 +1,39 @@
+# Problem fragment: ip-not-allowlisted
+# Type URI: https://saas.omarss.net/problems/ip-not-allowlisted
+#
+# Emitted by:
+#   - API-key middleware when the bound key has an IP allowlist that does
+#     not include the request's source IP (Phase 5, ADR 008).
+#   - Operator IP-allowlist middleware (Phase 13) when the operator's
+#     ip_allowlist column is non-empty and the request source falls
+#     outside every CIDR.
+#
+# AGENTS.md §18.4. The status code is 403, not 401, because the caller
+# IS authenticated — the rejection is on a separate policy axis.
+
+type: object
+required: [type, title, status]
+properties:
+  type:
+    type: string
+    const: "https://saas.omarss.net/problems/ip-not-allowlisted"
+  title:
+    type: string
+    example: "Forbidden"
+  status:
+    type: integer
+    const: 403
+  detail:
+    type: string
+    example: "source IP outside operator allowlist"
+  instance:
+    type: string
+    example: "/control/v1/deployments"
+  request_id:
+    type: string
+example:
+  type: "https://saas.omarss.net/problems/ip-not-allowlisted"
+  title: "Forbidden"
+  status: 403
+  detail: "source IP outside operator allowlist"
+  instance: "/control/v1/deployments"
