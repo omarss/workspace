@@ -77,6 +77,11 @@ class JobsRepo(Repo):
                           (company_id, title_en, title_ar, description_en, description_ar,
                            employment_type, work_arrangement, experience_level,
                            city_id, region_code, country_code,
+                           office_address,
+                           hybrid_days_per_week, remote_country_restriction,
+                           relocation_assistance,
+                           hiring_manager_name, hiring_manager_linkedin_url,
+                           saudi_nationals_only, gender_preference,
                            salary_min, salary_max, salary_currency, salary_period,
                            canonical_posting_id, posting_count,
                            first_seen_at, last_seen_at)
@@ -84,6 +89,11 @@ class JobsRepo(Repo):
                           (%(c)s, %(t_en)s, %(t_ar)s, %(d_en)s, %(d_ar)s,
                            %(emp)s, %(work)s, %(exp)s,
                            %(city)s, %(region)s, %(country)s,
+                           %(office)s,
+                           %(hdays)s, %(remote)s,
+                           %(reloc)s,
+                           %(hmname)s, %(hmli)s,
+                           %(saudi_only)s, %(gender_pref)s::gender_preference,
                            %(smin)s, %(smax)s, %(scur)s, %(sper)s,
                            %(pid)s, 1,
                            %(first)s, %(last)s)
@@ -103,6 +113,14 @@ class JobsRepo(Repo):
                         # country_code on a posting is NOT NULL with a default of
                         # 'sa', so a missing column would be a bug. Mirror it.
                         "country": posting["country_code"],
+                        "office": posting["office_address"],
+                        "hdays": posting["hybrid_days_per_week"],
+                        "remote": posting["remote_country_restriction"],
+                        "reloc": posting["relocation_assistance"],
+                        "hmname": posting["hiring_manager_name"],
+                        "hmli": posting["hiring_manager_linkedin_url"],
+                        "saudi_only": posting["saudi_nationals_only"],
+                        "gender_pref": posting["gender_preference"],
                         "smin": posting["salary_min"],
                         "smax": posting["salary_max"],
                         "scur": posting["salary_currency"],
@@ -270,12 +288,27 @@ class JobsRepo(Repo):
                             raise KeyError(f"Job {job_id} no longer exists")
                         return Job.model_validate(row)
 
+                    # Bilingual title / description routing — mirror the
+                    # same logic `create_from_posting` uses so a merge that
+                    # picks an Arabic-dominant posting doesn't wipe the
+                    # cluster's English text (or vice versa). Prior code
+                    # hardcoded `title_en = chosen.title` which clobbered
+                    # `title_ar` on every merge.
+                    from ..text_utils import is_arabic_dominant
+
+                    chosen_title_ar = chosen["title"] if is_arabic_dominant(chosen["title"]) else None
+                    chosen_title_en = None if chosen_title_ar else chosen["title"]
+                    chosen_desc_ar = chosen["description"] if is_arabic_dominant(chosen["description"]) else None
+                    chosen_desc_en = None if chosen_desc_ar else chosen["description"]
+
                     await cur.execute(
                         """
                         UPDATE jobs SET
                             canonical_posting_id = %(p)s,
-                            title_en        = %(title)s,
-                            description_en  = COALESCE(%(desc)s, description_en),
+                            title_en        = COALESCE(%(t_en)s, title_en),
+                            title_ar        = COALESCE(%(t_ar)s, title_ar),
+                            description_en  = COALESCE(%(d_en)s, description_en),
+                            description_ar  = COALESCE(%(d_ar)s, description_ar),
                             employment_type = COALESCE(%(emp)s, employment_type),
                             work_arrangement= COALESCE(%(work)s, work_arrangement),
                             experience_level= COALESCE(%(exp)s, experience_level),
@@ -301,8 +334,10 @@ class JobsRepo(Repo):
                         {
                             "j": job_id,
                             "p": chosen["id"],
-                            "title": chosen["title"],
-                            "desc": chosen["description"],
+                            "t_en": chosen_title_en,
+                            "t_ar": chosen_title_ar,
+                            "d_en": chosen_desc_en,
+                            "d_ar": chosen_desc_ar,
                             "emp": chosen["employment_type"],
                             "work": chosen["work_arrangement"],
                             "exp": chosen["experience_level"],
