@@ -50,10 +50,14 @@ type Loop struct {
 // Config tunables for the loop. Zero values fall back to sensible
 // defaults — keeps the main.go wire-up readable.
 //
-// SpamThreshold default 0.5 is more aggressive than the original 0.7
-// after the user's feedback that the unfiltered feed was full of
-// "stupid spammers". Tweets with score > 0.5 (link spam, hashtag stuff,
-// new-account all-caps) drop out before they hit the store.
+// SpamThreshold default 0.45 (was 0.5, was 0.7 originally). Each
+// tightening followed a user audit that found a fresh batch of
+// patterns slipping through. At 0.45 the suspicious-handle penalty
+// (0.15) stacks with the bare-URL penalty (0.4) at exactly the
+// threshold — i.e. an auto-gen handle posting a bare t.co link drops
+// without needing any further signal. That was the live-audit miss.
+// Side effect: legit posts now need to clear 0.45 with no blocklist
+// hits and no auto-gen handle, which the live mix easily does.
 type Config struct {
 	Interval        time.Duration
 	MaxPerCountry   int
@@ -71,7 +75,7 @@ func NewLoop(s scrape.Scraper, db *store.DB, log *slog.Logger, cfg Config) *Loop
 		cfg.MaxPerCountry = 40
 	}
 	if cfg.SpamThreshold <= 0 {
-		cfg.SpamThreshold = 0.5
+		cfg.SpamThreshold = 0.45
 	}
 	if cfg.Retention <= 0 {
 		cfg.Retention = 24 * time.Hour
@@ -160,7 +164,11 @@ func (l *Loop) refreshOne(ctx context.Context, country server.Country) {
 			}
 		}
 
-		ss, _ := spam.Score(spam.Compute(t.Text, time.Time{}, 0, 0, dup))
+		ss, _ := spam.Score(spam.Compute(spam.Input{
+			Text:            t.Text,
+			Handle:          t.Handle,
+			DuplicateRecent: dup,
+		}))
 		t.SpamScore = ss
 		// >= so borderline 0.50 cases drop (was > before; the
 		// blocklist comfortably puts real spam past 0.5, the strict

@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"os"
 	"sort"
-	"time"
 
 	_ "modernc.org/sqlite"
 
@@ -32,7 +31,7 @@ import (
 // Mirrors the default threshold in internal/feed.Loop's NewLoop().
 // Kept here as a constant so this tool doesn't import the loop just
 // for one number.
-const threshold = 0.5
+const threshold = 0.45
 
 type row struct {
 	id       string
@@ -72,7 +71,10 @@ func main() {
 		if err := json.Unmarshal([]byte(body), &tw); err != nil {
 			continue
 		}
-		ns, contrib := spam.Score(spam.Compute(tw.Text, time.Time{}, 0, 0, false))
+		ns, contrib := spam.Score(spam.Compute(spam.Input{
+			Text:   tw.Text,
+			Handle: tw.Handle,
+		}))
 		all = append(all, row{
 			id:       tw.ID,
 			handle:   tw.Handle,

@@ -16,8 +16,10 @@ type StoreReader interface {
 	// countries with created_at < cursor (cursor zero = no upper
 	// bound). Newest first. Cities is an optional list of
 	// case-insensitive substrings matched against tweet.place; empty
-	// means "no city filter".
-	Latest(ctx context.Context, countries []Country, cities []string, cursor time.Time, limit int) ([]Tweet, error)
+	// means "no city filter". Query is an optional whitespace-tokenised
+	// AND keyword filter applied to the tweet body; empty means "no
+	// keyword filter".
+	Latest(ctx context.Context, countries []Country, cities []string, query string, cursor time.Time, limit int) ([]Tweet, error)
 }
 
 // CachedSource reads from a StoreReader and falls back to a secondary
@@ -57,7 +59,7 @@ func (c *CachedSource) Feed(ctx context.Context, req FeedRequest) (FeedResult, e
 	if limit <= 0 {
 		limit = c.limit
 	}
-	tweets, err := c.store.Latest(ctx, req.Countries, req.Cities, req.Cursor, limit)
+	tweets, err := c.store.Latest(ctx, req.Countries, req.Cities, req.Query, req.Cursor, limit)
 	if err != nil {
 		c.log.Warn("store read failed; falling back to fixture", "err", err)
 		fb, fbErr := c.fallback.Feed(ctx, req)

@@ -97,15 +97,20 @@ func (d *DB) SaveBatch(ctx context.Context, tweets []server.Tweet) error {
 //     "no city filter".
 //   * cursor — only tweets with created_at < cursor are returned.
 //     Zero value means "no upper bound" (first page).
+//   * query — free-text keyword filter, whitespace-tokenised. Every
+//     token must appear (AND) in the body, case-insensitively. Empty
+//     string disables the filter.
 //
-// All filtering runs in SQL except the city substring match — SQLite's
-// LIKE is collation-dependent and SUBSTR with arbitrary Arabic input
-// gets messy. Pulling a slightly larger window into memory and
-// filtering in Go keeps the query simple and the behaviour explicit.
+// All filtering runs in SQL except the city + body keyword matches —
+// SQLite's LIKE is collation-dependent and SUBSTR with arbitrary
+// Arabic input gets messy. Pulling a slightly larger window into
+// memory and filtering in Go keeps the query simple and behaviour
+// explicit.
 func (d *DB) Latest(
 	ctx context.Context,
 	countries []server.Country,
 	cities []string,
+	query string,
 	cursor time.Time,
 	limit int,
 ) ([]server.Tweet, error) {
@@ -115,6 +120,8 @@ func (d *DB) Latest(
 	if len(countries) == 0 {
 		countries = []server.Country{server.CountryKSA}
 	}
+
+	queryTerms := tokenizeQuery(query)
 
 	// Build placeholders for the IN clause.
 	args := make([]any, 0, len(countries)+2)
@@ -129,9 +136,10 @@ func (d *DB) Latest(
 		args = append(args, cursor.UTC())
 	}
 	q += " ORDER BY created_at DESC LIMIT ?"
-	// Over-fetch when a city filter is set; we'll trim in memory.
+	// Over-fetch when filters that may reject rows are set; we trim
+	// in memory after the substring matches run.
 	fetchLimit := limit
-	if len(cities) > 0 {
+	if len(cities) > 0 || len(queryTerms) > 0 {
 		fetchLimit = limit * 3
 		if fetchLimit > 600 {
 			fetchLimit = 600
@@ -161,12 +169,43 @@ func (d *DB) Latest(
 		if len(cities) > 0 && !matchesAnyCity(tw.Place, cities) {
 			continue
 		}
+		if len(queryTerms) > 0 && !matchesAllTerms(tw.Text, queryTerms) {
+			continue
+		}
 		out = append(out, tw)
 		if len(out) >= limit {
 			break
 		}
 	}
 	return out, rows.Err()
+}
+
+// tokenizeQuery splits the free-text search on whitespace, lowercases,
+// and drops empties. Returns nil for an empty query so callers can use
+// `len(...) > 0` as the "filter active" check.
+func tokenizeQuery(q string) []string {
+	q = strings.TrimSpace(q)
+	if q == "" {
+		return nil
+	}
+	parts := strings.Fields(strings.ToLower(q))
+	if len(parts) == 0 {
+		return nil
+	}
+	return parts
+}
+
+// matchesAllTerms returns true iff every term appears as a substring
+// in text (case-insensitive). Terms are assumed pre-lowercased by
+// tokenizeQuery.
+func matchesAllTerms(text string, terms []string) bool {
+	low := strings.ToLower(text)
+	for _, t := range terms {
+		if !strings.Contains(low, t) {
+			return false
+		}
+	}
+	return true
 }
 
 // matchesAnyCity mirrors server.matchesAnyCity but kept local to the

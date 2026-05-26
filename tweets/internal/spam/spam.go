@@ -17,6 +17,18 @@ import (
 	"unicode"
 )
 
+// Input is everything Compute needs to score a single tweet. Grouped
+// into a struct so adding context fields (handle, recent-post counts,
+// etc.) stays a one-line API change for callers.
+type Input struct {
+	Text            string
+	Handle          string    // @handle, no leading @. "" when unknown.
+	CreatedAccount  time.Time // account creation; zero when unknown
+	Followers       int
+	Following       int
+	DuplicateRecent bool // same text from same author in the recent window
+}
+
 // Features is the raw, pre-scoring view of a tweet's spam signals.
 // Exposed so the caller (and tests) can inspect *why* a score came out
 // the way it did rather than treating the number as opaque.
@@ -54,11 +66,35 @@ type Features struct {
 	// commercial signals; see matchCommercialAd() for the full set.
 	BlocklistCommercialAd bool
 	// Bare-URL bot posts: a single t.co / https link with essentially
-	// no body text (< 10 chars after stripping URLs). These are
-	// usually image / video cross-posts that carry no information
-	// once the link target is dead, plus a chunk of low-effort
-	// engagement-farming bot traffic.
+	// no body text (< 15 chars after stripping URLs, emoji and
+	// whitespace). Tighter than the original 10-char gate so
+	// "❤️ https://t.co/X" and "Sweet dreams 🥰🥰🥰 https://…" both fire.
 	BlocklistBareUrl bool
+	// Medical-fraud blocklist — paid sick-note / fake doctor's-cert
+	// classifieds. Observed pattern: "#سكليف", "أعذار طبية", "تقرير
+	// طبي" repeatedly posted from disposable handles, always paired
+	// with a contact number. Single keyword match fires; the
+	// vocabulary is narrow enough that legit medical conversation
+	// doesn't trip it.
+	BlocklistMedicalFraud bool
+	// Furniture-removal / used-furniture-purchase classifieds. Same
+	// "phone + service keyword" shape as the original local-biz
+	// blocklist; broken out so the keyword set (نقل عفش / شراء
+	// الأثاث المستعمل / دينا / ونيت / etc.) stays self-contained.
+	BlocklistFurnitureService bool
+	// Short-caption media bots — typical OnlyFans / escort funnel
+	// pattern: a 1-3 word English caption ("Sweet dreams 🥰",
+	// "Noto night ❣️") + a t.co media URL, often tagged inside KSA
+	// places. The English caption inside a KSA-tagged post is the
+	// classic give-away.
+	BlocklistEscortCaption bool
+	// Suspicious-handle signal — auto-generated X handles like
+	// `bwbdlzy28748081`, `lswdlswd7228114`, or trailing-digit
+	// patterns. Fires as a soft penalty (0.15) on its own, but
+	// combined with a URL/short-text becomes the canonical bot
+	// shape. Tracked separately from blocklists so legitimate
+	// auto-handle accounts aren't dropped wholesale.
+	SuspiciousHandle bool
 }
 
 // Score returns a value in [0, 1]. Higher = more spam-like. The mapping
@@ -177,6 +213,34 @@ func Score(f Features) (float64, map[string]float64) {
 	if f.BlocklistBareUrl {
 		add(contrib, "bare_url", 0.4)
 	}
+	// Medical-fraud classifieds — single hit drops on its own. Live
+	// audit found these are always disposable-handle posts with a
+	// contact number; the keyword set is narrow and high-precision.
+	if f.BlocklistMedicalFraud {
+		add(contrib, "medical_fraud", 0.7)
+	}
+	// Furniture-removal / used-furniture-purchase ads. Same shape as
+	// the original local-biz ad but with a different vocabulary —
+	// pulled into its own bucket so the keyword list stays focused.
+	if f.BlocklistFurnitureService {
+		add(contrib, "furniture_service", 0.55)
+	}
+	// Short-caption media bots: drop on their own. The pattern is
+	// narrow (1-3 word English caption + t.co media URL inside a
+	// KSA-tagged post) so false positives on legit short captions
+	// from non-Saudi accounts don't apply — these posts only reach
+	// the loop after the country filter already passed.
+	if f.BlocklistEscortCaption {
+		add(contrib, "escort_caption", 0.6)
+	}
+	// Suspicious handle on its own is a soft (0.15) penalty —
+	// legitimate users sometimes pick auto-generated names. But
+	// when combined with a bare URL or short content the post is
+	// almost certainly a bot — those two penalties stack and the
+	// post drops past the threshold without any further signal.
+	if f.SuspiciousHandle {
+		add(contrib, "suspicious_handle", 0.15)
+	}
 
 	// Sum the components, clamp.
 	total := 0.0
@@ -186,41 +250,46 @@ func Score(f Features) (float64, map[string]float64) {
 	return clamp01(total), contrib
 }
 
-// Compute extracts Features from raw fields. Pass in author + follower
-// metadata when available; zero values disable those individual signals
-// without affecting the others.
-func Compute(text string, createdAccount time.Time, followers, following int, duplicateRecent bool) Features {
+// Compute extracts Features from an Input. Zero-valued fields disable
+// their individual signals without affecting the others, so callers
+// without author / follower metadata still get useful scores from the
+// text-level heuristics alone.
+func Compute(in Input) Features {
 	now := time.Now().UTC()
 	ageDays := 0
-	if !createdAccount.IsZero() {
-		ageDays = int(now.Sub(createdAccount).Hours() / 24)
+	if !in.CreatedAccount.IsZero() {
+		ageDays = int(now.Sub(in.CreatedAccount).Hours() / 24)
 		if ageDays < 0 {
 			ageDays = 0
 		}
 	}
 	ratio := 0.0
-	if following > 0 {
-		ratio = float64(followers) / float64(following)
-	} else if followers > 0 {
+	if in.Following > 0 {
+		ratio = float64(in.Followers) / float64(in.Following)
+	} else if in.Followers > 0 {
 		ratio = math.Inf(1) // followed by many, follows nobody — non-spammy
 	}
 	return Features{
-		LinkCount:            countLinks(text),
-		HashtagCount:         countPrefix(text, '#'),
-		MentionCount:         countPrefix(text, '@'),
-		EmojiCount:           countEmoji(text),
-		AllCapsRatio:         latinAllCapsRatio(text),
-		AccountAgeDays:       ageDays,
-		FollowerRatio:        ratio,
-		DuplicateRecent:      duplicateRecent,
-		TextLength:           len([]rune(text)),
-		BlocklistAdult:          matchAdult(text),
-		BlocklistCoupon:         matchCoupon(text),
-		BlocklistLocalBizAd:     matchLocalBizAd(text),
-		BlocklistOffTopicPol:    matchOffTopicPolitical(text),
-		BlocklistOffRegionPromo: matchOffRegionPromo(text),
-		BlocklistCommercialAd:   matchCommercialAd(text),
-		BlocklistBareUrl:        matchBareUrl(text),
+		LinkCount:                 countLinks(in.Text),
+		HashtagCount:              countPrefix(in.Text, '#'),
+		MentionCount:              countPrefix(in.Text, '@'),
+		EmojiCount:                countEmoji(in.Text),
+		AllCapsRatio:              latinAllCapsRatio(in.Text),
+		AccountAgeDays:            ageDays,
+		FollowerRatio:             ratio,
+		DuplicateRecent:           in.DuplicateRecent,
+		TextLength:                len([]rune(in.Text)),
+		BlocklistAdult:            matchAdult(in.Text),
+		BlocklistCoupon:           matchCoupon(in.Text),
+		BlocklistLocalBizAd:       matchLocalBizAd(in.Text),
+		BlocklistOffTopicPol:      matchOffTopicPolitical(in.Text),
+		BlocklistOffRegionPromo:   matchOffRegionPromo(in.Text),
+		BlocklistCommercialAd:     matchCommercialAd(in.Text),
+		BlocklistBareUrl:          matchBareUrl(in.Text),
+		BlocklistMedicalFraud:     matchMedicalFraud(in.Text),
+		BlocklistFurnitureService: matchFurnitureService(in.Text),
+		BlocklistEscortCaption:    matchEscortCaption(in.Text),
+		SuspiciousHandle:          matchSuspiciousHandle(in.Handle),
 	}
 }
 
@@ -538,8 +607,10 @@ var courseAdPhrases = []string{
 //
 // Identifies low-effort posts that consist of a URL plus essentially no
 // other content — typical bot media reposts, X-CDN'd image dumps,
-// engagement-farming. Threshold of 10 runes leaves room for a leading
-// emoji or two-word caption while catching the bare https://t.co/… case.
+// engagement-farming. Strips URLs, emoji, and whitespace before
+// counting; threshold of 15 runes catches "❤️ https://t.co/X" and
+// "Sweet dreams 🥰🥰🥰 https://…" but leaves a one-sentence caption
+// (~20+ chars) alone.
 
 var anyUrlRe = regexp.MustCompile(`https?://\S+|t\.co/\S+`)
 
@@ -547,10 +618,215 @@ func matchBareUrl(text string) bool {
 	if !strings.Contains(text, "http") && !strings.Contains(text, "t.co/") {
 		return false
 	}
-	stripped := anyUrlRe.ReplaceAllString(text, "")
-	stripped = strings.TrimSpace(stripped)
-	return len([]rune(stripped)) < 10
+	stripped := stripUrlsEmojiWhitespace(text)
+	return len([]rune(stripped)) < 15
 }
+
+// Drops URLs, emoji, and whitespace from text. Used by bare-URL
+// detection and by the escort-caption / short-content checks below
+// so they share the same "effective text" definition.
+func stripUrlsEmojiWhitespace(text string) string {
+	noUrls := anyUrlRe.ReplaceAllString(text, "")
+	var b strings.Builder
+	b.Grow(len(noUrls))
+	for _, r := range noUrls {
+		if unicode.IsSpace(r) {
+			continue
+		}
+		// Same emoji ranges as countEmoji — keep them aligned so
+		// the bare-URL and emoji-count signals see the same string.
+		if r >= 0x1F300 && r <= 0x1FAFF {
+			continue
+		}
+		if r >= 0x2600 && r <= 0x27BF {
+			continue
+		}
+		// Variation selectors / ZWJ / regional indicators that
+		// accompany emoji glyphs but don't carry meaning on their
+		// own.
+		if r == 0x200D || r == 0xFE0F || (r >= 0x1F1E6 && r <= 0x1F1FF) {
+			continue
+		}
+		b.WriteRune(r)
+	}
+	return b.String()
+}
+
+// ── Medical-fraud classifieds ──────────────────────────────────────
+//
+// Paid sick-note / fake doctor's-certificate spam. Observed pattern:
+// "#سكليف", "أعذار طبية", "تقرير طبي معتمد" repeatedly posted from
+// disposable handles, always with a contact funnel. Single keyword
+// match fires — the vocabulary is narrow and high-precision; a real
+// medical conversation about being sick wouldn't use these exact
+// phrasings.
+
+func matchMedicalFraud(text string) bool {
+	low := strings.ToLower(text)
+	for _, k := range medicalFraudKeywords {
+		if strings.Contains(low, k) {
+			return true
+		}
+	}
+	return false
+}
+
+var medicalFraudKeywords = []string{
+	"سكليف",          // colloquial: "sick-leave" Anglicism for fake sick note
+	"اعذار طبية",     // "medical excuses" (the classifieds phrasing)
+	"أعذار طبية",
+	"اعذار_طبية",
+	"تقرير طبي",      // "medical report" — classifieds-style; legit posts say "نتائج تحاليلي"
+	"تقارير طبية",
+	"اجازة مرضية",    // "sick leave certificate"
+	"إجازة مرضية",
+	"اجازات مرضية",
+	"إجازات مرضية",
+	"اجازات_مرضية",
+}
+
+// ── Furniture-removal / used-furniture ads ─────────────────────────
+//
+// Same anchor shape as the original local-biz blocklist — a phone
+// number combined with a service keyword — but kept separate so the
+// vocabulary (نقل عفش / شراء الأثاث المستعمل / دينا / etc.) stays
+// self-contained and easy to extend without polluting the existing
+// list.
+
+func matchFurnitureService(text string) bool {
+	if !saudiPhoneRe.MatchString(text) && !egyptPhoneRe.MatchString(text) {
+		// Also catch phone-less variants when the keyword density is
+		// high (≥ 2 distinct keywords). Lets us drop the AbuAlhamde85903
+		// pattern that posts the keyword stack with handle-only contact.
+		return countFurnitureKeywords(text) >= 2
+	}
+	return countFurnitureKeywords(text) >= 1
+}
+
+func countFurnitureKeywords(text string) int {
+	low := strings.ToLower(text)
+	hits := 0
+	for _, k := range furnitureServiceKeywords {
+		if strings.Contains(low, k) {
+			hits++
+		}
+	}
+	return hits
+}
+
+var furnitureServiceKeywords = []string{
+	"نقل عفش",
+	"نقل اثاث",
+	"نقل أثاث",
+	"شركة نقل عفش",
+	"شركة نقل أثاث",
+	"شراء الأثاث المستعمل",
+	"شراء الاثاث المستعمل",
+	"شراء أثاث مستعمل",
+	"شراء اثاث مستعمل",
+	"دينا نقل",
+	"ونيت نقل",
+	"شراء المكيفات المستعملة",
+	"شراء غرف النوم المستعملة",
+	"تركيب اثاث ايكيا",
+	"تركيب أثاث ايكيا",
+}
+
+// Egyptian mobile numbers — same shape detection as saudiPhoneRe so
+// EG-tagged ads with local phones still get caught by the broader
+// classifieds rules. +20 1xxxxxxxxx and 01xxxxxxxxx.
+var egyptPhoneRe = regexp.MustCompile(`(?:\+?201[0125]\d{8}|\b01[0125]\d{8}\b)`)
+
+// ── Escort / OnlyFans short-caption bots ───────────────────────────
+//
+// Pattern: 1-3 word English caption + t.co media URL, posted from a
+// KSA / EG place. The English-on-Arabic-region mismatch is the signal.
+// We only fire on a curated word list — random short English ("Hello"
+// or "Thank you" from a tourist) shouldn't trip it.
+
+func matchEscortCaption(text string) bool {
+	if !strings.Contains(text, "http") && !strings.Contains(text, "t.co/") {
+		return false
+	}
+	stripped := stripUrlsEmojiWhitespace(text)
+	runeCount := len([]rune(stripped))
+	// Caption-shaped: < 40 chars of non-URL non-emoji content. Longer
+	// posts are real prose; their commercial intent would already be
+	// caught by other blocklists.
+	if runeCount == 0 || runeCount > 40 {
+		return false
+	}
+	low := strings.ToLower(text)
+	for _, k := range escortCaptionKeywords {
+		if strings.Contains(low, k) {
+			return true
+		}
+	}
+	return false
+}
+
+var escortCaptionKeywords = []string{
+	"sweet dreams",
+	"noto night",
+	"good morning honey",
+	"good night honey",
+	"love you all",
+	"miss you all",
+	"my new video",
+	"new video",
+	"check my profile",
+	"check my bio",
+	"check bio",
+	"link in bio",
+	"my page",
+	"my onlyfans",
+	"onlyfans",
+	"only fans",
+}
+
+// ── Suspicious handle ──────────────────────────────────────────────
+//
+// Auto-generated X handles: `bwbdlzy28748081`, `lswdlswd7228114`,
+// `Chubby091824811`, `mumtaza94959855`. Trailing 5+ digits is the
+// usual giveaway; digit-heavy or all-consonant-no-vowel patterns
+// catch the rest. Soft signal — fires as a 0.15 penalty alone, but
+// combined with a URL / short text it stacks past threshold.
+
+func matchSuspiciousHandle(handle string) bool {
+	if handle == "" {
+		return false
+	}
+	// Five or more trailing digits — Twitter's auto-suggest pattern.
+	if trailingDigitRe.MatchString(handle) {
+		return true
+	}
+	// Mostly digits (≥ 60% of chars).
+	digitCount := 0
+	for _, r := range handle {
+		if r >= '0' && r <= '9' {
+			digitCount++
+		}
+	}
+	if len(handle) > 0 && float64(digitCount)/float64(len(handle)) >= 0.6 {
+		return true
+	}
+	// Long handle with no vowels — keyboard-mash auto-gen.
+	if len([]rune(handle)) >= 12 {
+		hasVowel := false
+		for _, r := range strings.ToLower(handle) {
+			switch r {
+			case 'a', 'e', 'i', 'o', 'u':
+				hasVowel = true
+			}
+		}
+		if !hasVowel {
+			return true
+		}
+	}
+	return false
+}
+
+var trailingDigitRe = regexp.MustCompile(`\d{5,}$`)
 
 func add(m map[string]float64, key string, v float64) {
 	m[key] += v

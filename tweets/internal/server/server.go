@@ -60,6 +60,10 @@ func (s *Server) health(w http.ResponseWriter, _ *http.Request) {
 //             be a known Country; unknown → 400.
 //   city      comma-separated case-insensitive substrings to match
 //             against tweet.place. Empty → no city filter.
+//   q         free-text keyword search, AND-ed whitespace tokens,
+//             case-insensitive substring match against tweet body.
+//             Empty → no keyword filter. Capped to 200 chars and
+//             stripped of % and _ so the store's LIKE query stays safe.
 //   cursor    RFC3339 timestamp. Tweets older than this returned.
 //             Empty → first page (event-first sort).
 //   limit     int, default 60, capped at 200.
@@ -86,6 +90,7 @@ func (s *Server) tweets(w http.ResponseWriter, r *http.Request) {
 	resp := FeedResponse{
 		Countries:   req.Countries,
 		Cities:      req.Cities,
+		Query:       req.Query,
 		GeneratedAt: time.Now().UTC(),
 		Tweets:      result.Tweets,
 	}
@@ -133,6 +138,18 @@ func parseFeedRequest(q map[string][]string) (FeedRequest, error) {
 				req.Cities = append(req.Cities, c)
 			}
 		}
+	}
+
+	if v := get("q"); v != "" {
+		// Strip the LIKE wildcards so a caller can't smuggle them into
+		// the store layer's substring match. Also cap length to keep
+		// the SQL query bounded.
+		v = strings.ReplaceAll(v, "%", " ")
+		v = strings.ReplaceAll(v, "_", " ")
+		if len(v) > 200 {
+			v = v[:200]
+		}
+		req.Query = strings.TrimSpace(v)
 	}
 
 	if v := get("cursor"); v != "" {
