@@ -127,6 +127,59 @@ func TestTweets_KeywordQuery_AndAcrossTokens(t *testing.T) {
 	}
 }
 
+func TestTweets_KeywordQuery_BooleanOr(t *testing.T) {
+	// `أبشر OR NEOM` matches both ksa-1 (أبشر) and ksa-2 (NEOM).
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/tweets?q=أبشر+OR+NEOM", nil)
+	newTestServer().ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rr.Code)
+	}
+	var body FeedResponse
+	if err := json.Unmarshal(rr.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(body.Tweets) != 2 {
+		t.Fatalf("expected both KSA tweets (أبشر OR NEOM), got %d", len(body.Tweets))
+	}
+}
+
+func TestTweets_KeywordQuery_InvalidExpression(t *testing.T) {
+	// Unterminated quote → 400.
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, `/tweets?q=%22unterminated`, nil)
+	newTestServer().ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for unterminated quote, got %d", rr.Code)
+	}
+}
+
+func TestTweets_MagicQuery_MatchesNothingInFixturesOK(t *testing.T) {
+	// The fixtures don't include event-shaped content, so magic
+	// returns zero tweets but the response itself is 200 with
+	// magic=true echoed back. Confirms the magic flag round-trips
+	// without breaking the response shape.
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/tweets?magic=1&country=ksa,eg", nil)
+	newTestServer().ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rr.Code)
+	}
+	var body FeedResponse
+	if err := json.Unmarshal(rr.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if !body.Magic {
+		t.Errorf("expected magic=true in response, got false")
+	}
+	if body.Query == "" {
+		t.Error("expected echoed magic query string, got empty")
+	}
+}
+
 func TestTweets_KeywordQuery_StripsWildcards(t *testing.T) {
 	// %% and __ must not reach the store — the handler scrubs them.
 	rr := httptest.NewRecorder()

@@ -13,12 +13,14 @@ interface TweetsSource {
 
 // FeedRequest mirrors the server's URL query params 1:1 so the layers
 // stay easy to read. Empty `cities` means "no city filter"; blank
-// `query` means "no keyword filter"; zero `limit` means "use the
-// server default".
+// `query` means "no keyword filter"; `magic = true` asks the server to
+// swap in its curated "interesting to me" preset (overrides query when
+// set). Zero `limit` means "use the server default".
 data class FeedRequest(
     val countries: List<Country>,
     val cities: List<String> = emptyList(),
     val query: String = "",
+    val magic: Boolean = false,
     val cursor: String? = null,
     val limit: Int = 60,
 )

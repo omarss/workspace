@@ -19,6 +19,7 @@ import (
 
 	_ "modernc.org/sqlite"
 
+	"github.com/omarss/workspace/tweets/internal/query"
 	"github.com/omarss/workspace/tweets/internal/server"
 )
 
@@ -97,9 +98,8 @@ func (d *DB) SaveBatch(ctx context.Context, tweets []server.Tweet) error {
 //     "no city filter".
 //   * cursor — only tweets with created_at < cursor are returned.
 //     Zero value means "no upper bound" (first page).
-//   * query — free-text keyword filter, whitespace-tokenised. Every
-//     token must appear (AND) in the body, case-insensitively. Empty
-//     string disables the filter.
+//   * queryExpr — parsed boolean expression matched against the
+//     tweet body. nil means "no keyword filter".
 //
 // All filtering runs in SQL except the city + body keyword matches —
 // SQLite's LIKE is collation-dependent and SUBSTR with arbitrary
@@ -110,7 +110,7 @@ func (d *DB) Latest(
 	ctx context.Context,
 	countries []server.Country,
 	cities []string,
-	query string,
+	queryExpr query.Expr,
 	cursor time.Time,
 	limit int,
 ) ([]server.Tweet, error) {
@@ -121,7 +121,12 @@ func (d *DB) Latest(
 		countries = []server.Country{server.CountryKSA}
 	}
 
-	queryTerms := tokenizeQuery(query)
+	// Treat nil and Always as "no keyword filter" — both mean every
+	// row passes the expression.
+	hasQuery := queryExpr != nil
+	if _, alwaysTrue := queryExpr.(query.Always); alwaysTrue {
+		hasQuery = false
+	}
 
 	// Build placeholders for the IN clause.
 	args := make([]any, 0, len(countries)+2)
@@ -139,7 +144,7 @@ func (d *DB) Latest(
 	// Over-fetch when filters that may reject rows are set; we trim
 	// in memory after the substring matches run.
 	fetchLimit := limit
-	if len(cities) > 0 || len(queryTerms) > 0 {
+	if len(cities) > 0 || hasQuery {
 		fetchLimit = limit * 3
 		if fetchLimit > 600 {
 			fetchLimit = 600
@@ -154,9 +159,9 @@ func (d *DB) Latest(
 	defer rows.Close()
 
 	out := make([]server.Tweet, 0, limit)
-	for rows.Next() {
+	for rs := rows; rs.Next(); {
 		var body string
-		if err := rows.Scan(&body); err != nil {
+		if err := rs.Scan(&body); err != nil {
 			return nil, fmt.Errorf("scan: %w", err)
 		}
 		var tw server.Tweet
@@ -169,7 +174,7 @@ func (d *DB) Latest(
 		if len(cities) > 0 && !matchesAnyCity(tw.Place, cities) {
 			continue
 		}
-		if len(queryTerms) > 0 && !matchesAllTerms(tw.Text, queryTerms) {
+		if hasQuery && !queryExpr.Matches(strings.ToLower(tw.Text)) {
 			continue
 		}
 		out = append(out, tw)
@@ -178,34 +183,6 @@ func (d *DB) Latest(
 		}
 	}
 	return out, rows.Err()
-}
-
-// tokenizeQuery splits the free-text search on whitespace, lowercases,
-// and drops empties. Returns nil for an empty query so callers can use
-// `len(...) > 0` as the "filter active" check.
-func tokenizeQuery(q string) []string {
-	q = strings.TrimSpace(q)
-	if q == "" {
-		return nil
-	}
-	parts := strings.Fields(strings.ToLower(q))
-	if len(parts) == 0 {
-		return nil
-	}
-	return parts
-}
-
-// matchesAllTerms returns true iff every term appears as a substring
-// in text (case-insensitive). Terms are assumed pre-lowercased by
-// tokenizeQuery.
-func matchesAllTerms(text string, terms []string) bool {
-	low := strings.ToLower(text)
-	for _, t := range terms {
-		if !strings.Contains(low, t) {
-			return false
-		}
-	}
-	return true
 }
 
 // matchesAnyCity mirrors server.matchesAnyCity but kept local to the

@@ -4,8 +4,12 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"regexp"
 	"sort"
+	"strings"
 	"time"
+
+	"github.com/omarss/workspace/tweets/internal/query"
 )
 
 // StoreReader is the subset of the SQLite store the HTTP handler needs.
@@ -16,10 +20,10 @@ type StoreReader interface {
 	// countries with created_at < cursor (cursor zero = no upper
 	// bound). Newest first. Cities is an optional list of
 	// case-insensitive substrings matched against tweet.place; empty
-	// means "no city filter". Query is an optional whitespace-tokenised
-	// AND keyword filter applied to the tweet body; empty means "no
+	// means "no city filter". QueryExpr is an optional parsed boolean
+	// expression matched against the tweet body; nil means "no
 	// keyword filter".
-	Latest(ctx context.Context, countries []Country, cities []string, query string, cursor time.Time, limit int) ([]Tweet, error)
+	Latest(ctx context.Context, countries []Country, cities []string, queryExpr query.Expr, cursor time.Time, limit int) ([]Tweet, error)
 }
 
 // CachedSource reads from a StoreReader and falls back to a secondary
@@ -59,7 +63,18 @@ func (c *CachedSource) Feed(ctx context.Context, req FeedRequest) (FeedResult, e
 	if limit <= 0 {
 		limit = c.limit
 	}
-	tweets, err := c.store.Latest(ctx, req.Countries, req.Cities, req.Query, req.Cursor, limit)
+	// In magic mode we slightly over-fetch so the post-filter spam
+	// gate (below) still returns a full page on average. 3x is the
+	// same multiplier the store uses internally for city/query
+	// filters; reusing the constant keeps the numbers predictable.
+	storeLimit := limit
+	if req.Magic {
+		storeLimit = limit * 3
+		if storeLimit > 600 {
+			storeLimit = 600
+		}
+	}
+	tweets, err := c.store.Latest(ctx, req.Countries, req.Cities, req.QueryExpr, req.Cursor, storeLimit)
 	if err != nil {
 		c.log.Warn("store read failed; falling back to fixture", "err", err)
 		fb, fbErr := c.fallback.Feed(ctx, req)
@@ -81,6 +96,41 @@ func (c *CachedSource) Feed(ctx context.Context, req FeedRequest) (FeedResult, e
 		return fb, nil
 	}
 
+	// Magic mode: extra quality gate. The default store gate dropped
+	// rows with spam_score >= 0.45, but the curated keyword set is
+	// itself ad-adjacent (commercial Arabic vocabulary overlaps with
+	// event vocabulary), so we tighten to 0.25 specifically when the
+	// user opted into magic.
+	//
+	// Also: cross-tick dedup by (handle, normalized body). The
+	// per-tick dedup in feed/loop only sees one scrape at a time, so
+	// a bot reposting the same body with a fresh t.co URL every hour
+	// leaves three rows in the store that all pass the magic filter.
+	// We drop the duplicates here on the read path, keeping the
+	// newest.
+	if req.Magic {
+		kept := tweets[:0]
+		seen := make(map[string]bool, len(tweets))
+		for _, tw := range tweets {
+			if tw.SpamScore > 0.25 {
+				continue
+			}
+			dupKey := tw.Handle + "|" + magicDedupKey(tw.Text)
+			if tw.Handle != "" && seen[dupKey] {
+				continue
+			}
+			if tw.Handle != "" {
+				seen[dupKey] = true
+			}
+			kept = append(kept, tw)
+		}
+		tweets = kept
+		// Trim back to the caller's requested limit after the gate.
+		if len(tweets) > limit {
+			tweets = tweets[:limit]
+		}
+	}
+
 	if req.Cursor.IsZero() {
 		// First page — re-sort event-first in memory.
 		sortFeedEventFirst(tweets)
@@ -98,6 +148,20 @@ func (c *CachedSource) Feed(ctx context.Context, req FeedRequest) (FeedResult, e
 		result.NextCursor = oldest
 	}
 	return result, nil
+}
+
+// magicDedupKey normalises a tweet body for cross-tick dedup: strip
+// URLs, collapse whitespace, lowercase. Same shape the per-tick dedup
+// in feed/loop uses — kept separate here so the server package
+// doesn't import the feed package.
+var magicDedupUrlRe = regexp.MustCompile(`https?://\S+|t\.co/\S+`)
+var magicDedupSpaceRe = regexp.MustCompile(`\s+`)
+
+func magicDedupKey(text string) string {
+	low := strings.ToLower(text)
+	low = magicDedupUrlRe.ReplaceAllString(low, "")
+	low = magicDedupSpaceRe.ReplaceAllString(low, " ")
+	return strings.TrimSpace(low)
 }
 
 // sortFeedEventFirst orders the slice in place so high-event-score

@@ -30,6 +30,7 @@ import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.IosShare
 import androidx.compose.material.icons.outlined.Repeat
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -104,6 +105,7 @@ fun TwitterRoute(
         onQueryDraftChange = viewModel::setQueryDraft,
         onApplyQuery = viewModel::applyQuery,
         onClearQuery = viewModel::clearQuery,
+        onToggleMagic = viewModel::toggleMagic,
         onRefresh = viewModel::refresh,
         onLoadMore = viewModel::loadMore,
     )
@@ -120,6 +122,7 @@ private fun TwitterScreen(
     onQueryDraftChange: (String) -> Unit,
     onApplyQuery: () -> Unit,
     onClearQuery: () -> Unit,
+    onToggleMagic: () -> Unit,
     onRefresh: () -> Unit,
     onLoadMore: () -> Unit,
 ) {
@@ -166,14 +169,23 @@ private fun TwitterScreen(
                 .fillMaxSize()
                 .padding(inner),
         ) {
-            ActiveFilterRow(state.filter.selected, onOpenFilter)
-            SearchField(
-                draft = state.queryDraft,
-                committed = state.query,
-                onDraftChange = onQueryDraftChange,
-                onApply = onApplyQuery,
-                onClear = onClearQuery,
+            ActiveFilterRow(
+                selected = state.filter.selected,
+                magicOn = state.magic,
+                onOpen = onOpenFilter,
+                onToggleMagic = onToggleMagic,
             )
+            // Magic mode owns the filter — hide the manual search bar
+            // while on, so the UI doesn't show two competing inputs.
+            if (!state.magic) {
+                SearchField(
+                    draft = state.queryDraft,
+                    committed = state.query,
+                    onDraftChange = onQueryDraftChange,
+                    onApply = onApplyQuery,
+                    onClear = onClearQuery,
+                )
+            }
             PullToRefreshBox(
                 modifier = Modifier.fillMaxSize(),
                 isRefreshing = state.loading,
@@ -269,13 +281,16 @@ private fun SearchField(
 }
 
 // ── Active filter row ───────────────────────────────────────────────
-// Above the feed: shows the current selection as removable chips,
-// plus an "Add" chip that opens the sheet. Empty selection shows a
-// hint chip prompting the user to pick.
+// Above the feed: a "Magic" toggle chip on the left (server-curated
+// preset), the current location selection as removable chips, plus
+// an "Add" chip that opens the sheet. Empty selection shows a hint
+// chip prompting the user to pick.
 @Composable
 private fun ActiveFilterRow(
     selected: Set<LocationOption>,
+    magicOn: Boolean,
     onOpen: () -> Unit,
+    onToggleMagic: () -> Unit,
 ) {
     Row(
         modifier = Modifier
@@ -284,6 +299,21 @@ private fun ActiveFilterRow(
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        // Magic chip always first so its position doesn't shift as
+        // locations change. Selected state uses the Twitter-blue tint
+        // so it's visually consistent with the rest of the feed brand.
+        AssistChip(
+            onClick = onToggleMagic,
+            label = { Text(if (magicOn) "✨ Magic ON" else "✨ Magic") },
+            colors = if (magicOn) {
+                AssistChipDefaults.assistChipColors(
+                    containerColor = TwitterBlue.copy(alpha = 0.15f),
+                    labelColor = TwitterBlue,
+                )
+            } else {
+                AssistChipDefaults.assistChipColors()
+            },
+        )
         // Stable ordering: countries first, then cities, alphabetical
         // within each group. Keeps the UI calm across rapid toggles.
         val sorted = remember(selected) {

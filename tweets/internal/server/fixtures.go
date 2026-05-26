@@ -4,6 +4,8 @@ import (
 	"context"
 	"strings"
 	"time"
+
+	"github.com/omarss/workspace/tweets/internal/query"
 )
 
 // FixtureSource serves a hand-crafted list of plausible tweets per country
@@ -37,15 +39,20 @@ func (f *FixtureSource) Feed(_ context.Context, req FeedRequest) (FeedResult, er
 		}
 		out = filtered
 	}
-	// Apply keyword query when set.
-	if terms := tokenizeFixtureQuery(req.Query); len(terms) > 0 {
-		filtered := out[:0]
-		for _, tw := range out {
-			if matchesAllFixtureTerms(tw.Text, terms) {
-				filtered = append(filtered, tw)
+	// Apply keyword query when set. nil and Always both mean "no
+	// filter" — the latter is what query.Parse returns for empty
+	// input, so honor it explicitly.
+	if req.QueryExpr != nil {
+		_, alwaysTrue := req.QueryExpr.(query.Always)
+		if !alwaysTrue {
+			filtered := out[:0]
+			for _, tw := range out {
+				if req.QueryExpr.Matches(strings.ToLower(tw.Text)) {
+					filtered = append(filtered, tw)
+				}
 			}
+			out = filtered
 		}
-		out = filtered
 	}
 	// Honour cursor + limit so fixtures behave like the store does.
 	if !req.Cursor.IsZero() {
@@ -83,27 +90,6 @@ func matchesAnyCity(place string, cities []string) bool {
 	return false
 }
 
-// Local copies of the store package's tokenize / match helpers so the
-// fixture source doesn't import store (which would pull SQLite into
-// any binary that just wants the fallback). The store version is the
-// source of truth; keep them aligned.
-func tokenizeFixtureQuery(q string) []string {
-	q = strings.TrimSpace(q)
-	if q == "" {
-		return nil
-	}
-	return strings.Fields(strings.ToLower(q))
-}
-
-func matchesAllFixtureTerms(text string, terms []string) bool {
-	low := strings.ToLower(text)
-	for _, t := range terms {
-		if !strings.Contains(low, t) {
-			return false
-		}
-	}
-	return true
-}
 
 func (f *FixtureSource) ksa(now time.Time) []Tweet {
 	return []Tweet{
