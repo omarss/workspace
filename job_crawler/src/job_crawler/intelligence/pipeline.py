@@ -38,6 +38,7 @@ class IntelligenceSummary:
     dedup_pairs: int = 0
     dedup_edges: int = 0
     dedup_clusters_merged: int = 0
+    restrictions_recovered: int = 0
 
 
 async def enrich_unstructured_fields(
@@ -178,6 +179,80 @@ async def backfill_unresolved_cities(db: JobCrawlerDB) -> int:
     return n
 
 
+async def enrich_cluster_restrictions(
+    db: JobCrawlerDB,
+    *,
+    batch_size: int = 500,
+    limit: int | None = None,
+) -> int:
+    """Backfill `experience_level`, `requires_arabic`, `visa_sponsorship`
+    for clusters where the corresponding column is NULL.
+
+    These three fields are derived from text heuristics that live in
+    `core.restrictions`. Posting-level extraction wires them into
+    `to_upsert` (for `experience_level`); `requires_arabic` and
+    `visa_sponsorship` only exist on `jobs`, so they're populated here.
+
+    Idempotent: a cluster whose text doesn't trigger any heuristic stays
+    untouched on subsequent runs. Returns the count of clusters touched.
+    """
+    from ..core.restrictions import (
+        detect_experience_level,
+        detect_requires_arabic,
+        detect_visa_sponsorship,
+    )
+
+    touched = 0
+    sql = (
+        "SELECT j.id, j.title_en, j.title_ar, j.description_en, j.description_ar, "
+        "       j.experience_level, j.requires_arabic, j.visa_sponsorship "
+        "FROM   jobs j "
+        "WHERE  j.deleted_at IS NULL "
+        "  AND  ("
+        "         j.experience_level   IS NULL "
+        "      OR j.requires_arabic    IS NULL "
+        "      OR j.visa_sponsorship   IS NULL"
+        "      )"
+    )
+    if limit:
+        sql += f" LIMIT {int(limit)}"
+
+    async with db.pool.connection() as conn, conn.cursor(
+        row_factory=dict_row, name="restrictions_scan",
+    ) as cur:
+        await cur.execute(sql)
+        while batch := await cur.fetchmany(batch_size):
+            for row in batch:
+                title = row["title_en"] or row["title_ar"]
+                body = "\n".join(
+                    p for p in (row["description_en"], row["description_ar"]) if p
+                )
+                patches: dict[str, object] = {}
+
+                if row["experience_level"] is None:
+                    level = detect_experience_level(title, body)
+                    if level is not None:
+                        patches["experience_level"] = level
+
+                if row["requires_arabic"] is None:
+                    ra = detect_requires_arabic((title or "") + "\n" + body)
+                    if ra is not None:
+                        patches["requires_arabic"] = ra
+
+                if row["visa_sponsorship"] is None:
+                    vs = detect_visa_sponsorship(body)
+                    if vs is not None:
+                        patches["visa_sponsorship"] = vs
+
+                if patches:
+                    try:
+                        await db.jobs.update(row["id"], **patches)
+                        touched += 1
+                    except Exception:
+                        _LOG.exception("restrictions update failed for %s", row["id"])
+    return touched
+
+
 async def cleanup_html_entities_in_titles(db: JobCrawlerDB) -> int:
     """Strip the common HTML entities (`&amp;`, `&quot;`, `&#039;`, `&lt;`,
     `&gt;`) from existing posting titles. Modern crawls go through
@@ -228,6 +303,9 @@ async def run_all(
         summary.experience_recovered = e
         summary.education_recovered = ed
         summary.titles_normalized = t
+        # Restrictions backfill — experience_level / requires_arabic /
+        # visa_sponsorship for clusters still NULL on those columns.
+        summary.restrictions_recovered = await enrich_cluster_restrictions(db)
 
     if run_dedup:
         d = await dedup.run(db)

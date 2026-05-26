@@ -1,0 +1,196 @@
+"""Unit tests for `job_crawler.core.restrictions` heuristic detectors.
+
+Pure functions — no DB, no network. Covers the existing detectors
+(Saudi-only + gender) plus the three new ones (experience level,
+Arabic-required, visa sponsorship).
+"""
+
+from __future__ import annotations
+
+import pytest
+
+from job_crawler.core.restrictions import (
+    detect_experience_level,
+    detect_gender_preference,
+    detect_requires_arabic,
+    detect_saudi_only,
+    detect_visa_sponsorship,
+)
+from job_crawler_db import ExperienceLevel, GenderPreference
+
+# ---------------------------------------------------------------------------
+# detect_saudi_only — existing behaviour, regression coverage
+# ---------------------------------------------------------------------------
+
+
+def test_saudi_only_explicit_en() -> None:
+    assert detect_saudi_only("This role is open to Saudi nationals only.") is True
+
+
+def test_saudi_only_explicit_ar() -> None:
+    assert detect_saudi_only("الوظيفة للسعوديين فقط") is True
+
+
+def test_saudi_only_negative() -> None:
+    assert detect_saudi_only("Open to all GCC nationals.") is False
+    assert detect_saudi_only(None) is False
+    assert detect_saudi_only("") is False
+
+
+# ---------------------------------------------------------------------------
+# detect_gender_preference — existing behaviour
+# ---------------------------------------------------------------------------
+
+
+def test_gender_female_explicit() -> None:
+    assert detect_gender_preference("Female candidates only.") is GenderPreference.female_only
+
+
+def test_gender_male_explicit() -> None:
+    assert detect_gender_preference("This position is for males.") is GenderPreference.male_only
+
+
+def test_gender_both_means_any() -> None:
+    """Contradictory signals → no restriction (safer than picking one)."""
+    assert detect_gender_preference(
+        "Females only / Males only — placeholder text"
+    ) is GenderPreference.any
+
+
+def test_gender_default() -> None:
+    assert detect_gender_preference("Hiring for our growing team.") is GenderPreference.any
+
+
+# ---------------------------------------------------------------------------
+# detect_experience_level
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("title", "expected"),
+    [
+        ("Senior Python Engineer", ExperienceLevel.senior),
+        ("Sr. Backend Developer", ExperienceLevel.senior),
+        ("Junior Software Engineer", ExperienceLevel.junior),
+        ("Jr. Web Developer", ExperienceLevel.junior),
+        ("Associate Product Manager", ExperienceLevel.junior),
+        ("Lead Data Scientist", ExperienceLevel.lead),
+        ("Principal Engineer", ExperienceLevel.lead),
+        ("Staff Backend Engineer", ExperienceLevel.lead),
+        ("Engineering Manager", ExperienceLevel.manager),
+        ("Senior Engineering Manager", ExperienceLevel.manager),  # manager wins over senior
+        ("Site Reliability Supervisor", ExperienceLevel.manager),
+        ("Director of Engineering", ExperienceLevel.director),
+        ("Head of Product", ExperienceLevel.director),
+        ("Chief Technology Officer", ExperienceLevel.executive),
+        ("VP Engineering", ExperienceLevel.executive),
+        ("CFO", ExperienceLevel.executive),
+        ("Software Engineering Intern", ExperienceLevel.entry),
+        ("Graduate Software Engineer", ExperienceLevel.entry),
+        ("Trainee Engineer", ExperienceLevel.entry),
+        ("Entry-Level Data Analyst", ExperienceLevel.entry),
+    ],
+)
+def test_experience_level_title(title: str, expected: ExperienceLevel) -> None:
+    assert detect_experience_level(title) is expected
+
+
+def test_experience_level_ambiguous_title_uses_body() -> None:
+    """A neutral title like 'Python Engineer' falls back to the body's
+    first paragraph."""
+    body = "We're hiring a senior contributor to drive system design."
+    assert detect_experience_level("Python Engineer", body) is ExperienceLevel.senior
+
+
+def test_experience_level_silent_returns_none() -> None:
+    assert detect_experience_level("Python Engineer", "We build software.") is None
+
+
+def test_experience_level_body_only_late_mention_ignored() -> None:
+    """Body fallback only honours the first 500 chars — a 'what we offer'
+    section that mentions 'senior leadership opportunities' shouldn't
+    misclassify a junior role."""
+    body = "We're hiring. " + ("Engineer. " * 60) + "Senior leadership opportunities await."
+    assert detect_experience_level("Engineer", body) is None
+
+
+# ---------------------------------------------------------------------------
+# detect_requires_arabic
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Native Arabic speaker required.",
+        "Must be fluent in Arabic.",
+        "Arabic is mandatory for this role.",
+        "Arabic language required.",
+        "Must speak Arabic.",
+        "Bilingual (Arabic/English).",
+        "Proficiency in Arabic is essential.",
+        "إتقان اللغة العربية مطلوب",
+        "اللغة العربية مطلوبة",
+    ],
+)
+def test_requires_arabic_positive(text: str) -> None:
+    assert detect_requires_arabic(text) is True
+
+
+def test_requires_arabic_silent() -> None:
+    assert detect_requires_arabic("We build software.") is None
+    assert detect_requires_arabic(None) is None
+    assert detect_requires_arabic("") is None
+
+
+def test_requires_arabic_mention_without_qualifier_is_none() -> None:
+    """A casual mention of Arabic (without 'required / fluent / native')
+    is NOT enough — we don't want to mis-flag postings that merely say
+    'Arabic speakers welcome'."""
+    assert detect_requires_arabic("Arabic speakers welcome to apply.") is None
+
+
+# ---------------------------------------------------------------------------
+# detect_visa_sponsorship
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Visa sponsorship available.",
+        "We will sponsor your work visa.",
+        "Employer provides iqama.",
+        "Iqama will be provided.",
+        "We sponsor employment visas for qualified candidates.",
+    ],
+)
+def test_visa_sponsorship_positive(text: str) -> None:
+    assert detect_visa_sponsorship(text) is True
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Must have transferable iqama.",
+        "No visa sponsorship provided.",
+        "Does not offer visa sponsorship.",
+        "Candidates must have own valid iqama.",
+        "Iqama transferable required.",
+    ],
+)
+def test_visa_sponsorship_negative(text: str) -> None:
+    assert detect_visa_sponsorship(text) is False
+
+
+def test_visa_sponsorship_silent() -> None:
+    assert detect_visa_sponsorship("We're hiring a backend engineer.") is None
+    assert detect_visa_sponsorship(None) is None
+    assert detect_visa_sponsorship("") is None
+
+
+def test_visa_sponsorship_contradictory_returns_none() -> None:
+    """When the text mentions both sponsorship-yes and sponsorship-no
+    phrases (e.g. mixed eligibility paragraphs), stay silent."""
+    text = "Visa sponsorship for engineers. No visa sponsorship for contractors."
+    assert detect_visa_sponsorship(text) is None

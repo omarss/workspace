@@ -287,13 +287,25 @@ def to_upsert(
     # parser already populated the fields with a non-default value.
     from job_crawler_db import GenderPreference
 
-    from .restrictions import detect_gender_preference, detect_saudi_only
+    from .restrictions import (
+        detect_experience_level,
+        detect_gender_preference,
+        detect_saudi_only,
+    )
 
     body = " ".join(p for p in (parsed.title, parsed.description) if p)
     saudi_only = parsed.saudi_nationals_only or detect_saudi_only(body)
     gender = parsed.gender_preference
     if gender is GenderPreference.any:
         gender = detect_gender_preference(body)
+
+    # Experience level — extracted from title (most predictive — every
+    # ATS includes a level keyword in the role's title) with a fallback
+    # to the first paragraph of the description. Parser-provided values
+    # win; heuristic only fills the blank.
+    experience_level = parsed.experience_level or detect_experience_level(
+        parsed.title, parsed.description,
+    )
 
     # Centralised text sanitisation — runs on every source so the
     # downstream consumer (search vectors, dedupe content_hash,
@@ -321,7 +333,7 @@ def to_upsert(
         raw_poster_name=parsed.raw_poster_name,
         employment_type=parsed.employment_type,
         work_arrangement=parsed.work_arrangement,
-        experience_level=parsed.experience_level,
+        experience_level=experience_level,
         raw_location=raw_location,
         city_id=loc.city_id,
         region_code=loc.region_code,
