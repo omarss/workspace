@@ -583,6 +583,38 @@ def test_clean_text_strips_bom_zws_rtl_marks_and_collapses_whitespace() -> None:
     assert _clean_text("Tab\there") == "Tab\there"
 
 
+def test_bayt_strips_navbar_prefix_from_title() -> None:
+    """Live regression: 1 Bayt title in the v6 corpus stored as
+    'View More Jobs Talent Pool (Buildings Project) - HSE Manager ...'
+    because Bayt's h3#job_title block occasionally grabs the adjacent
+    'View More Jobs' link text. Strip the known navbar prefixes."""
+    from job_crawler.boards.bayt import _strip_bayt_title_nav_prefix
+
+    assert (
+        _strip_bayt_title_nav_prefix(
+            "View More Jobs Talent Pool (Buildings Project) - HSE Manager"
+        )
+        == "Talent Pool (Buildings Project) - HSE Manager"
+    )
+    # Variant — leading whitespace + different case
+    assert (
+        _strip_bayt_title_nav_prefix(" view more jobs Senior Engineer")
+        == "Senior Engineer"
+    )
+    # Other prefixes
+    assert _strip_bayt_title_nav_prefix("All Jobs Sales Manager") == "Sales Manager"
+    assert _strip_bayt_title_nav_prefix("Back to Jobs Engineer") == "Engineer"
+    # Mid-string occurrences are real text — must not strip
+    assert (
+        _strip_bayt_title_nav_prefix("Manager - View More Jobs Apply Department")
+        == "Manager - View More Jobs Apply Department"
+    )
+    # Normal title untouched
+    assert _strip_bayt_title_nav_prefix("Senior Backend Engineer") == "Senior Backend Engineer"
+    # Don't return empty if the title IS exactly a nav prefix
+    assert _strip_bayt_title_nav_prefix("View More Jobs") == "View More Jobs"
+
+
 def test_to_upsert_runs_clean_text_on_all_text_fields() -> None:
     """End-to-end: every free-text field on JobPostingUpsert is sanitised."""
     parsed = ParsedPosting(
