@@ -153,6 +153,12 @@ class CompanyCareersCrawler(BoardCrawler):
     # that hydrate their listings client-side; a raw HTML fetch returns
     # an empty shell or boilerplate.
     use_playwright: ClassVar[bool] = True
+    # Multinationals' career sites (DXC, Cisco, Accenture, ...) serve
+    # *global* postings even when we seeded the SA-region URL. The runner's
+    # GCC-only geo filter drops anything whose `raw_location` isn't a GCC
+    # country, preventing Melbourne/Bangalore/Eschborn rows from polluting
+    # the SA-focused corpus.
+    requires_gcc_location: ClassVar[bool] = True
 
     async def discover_listings(self, *, since: datetime) -> AsyncIterator[Listing]:
         if self.db is None:
