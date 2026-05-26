@@ -554,19 +554,20 @@ def _stable_id(url: str) -> str:
 def _ld_from_detail_html(html: str) -> JobPostingLD:
     """Build a JobPostingLD from a detail-page HTML.
 
-    JSON-LD wins when present. Otherwise we fall back to generic DOM
-    selectors that cover the majority of HR-managed careers pages: an
-    `<h1>` near the top for the title, the largest plausible content
-    block for the description, and any `[class*="location"]` node we
-    can find.
+    JSON-LD is the first-class source — but when the detail page's
+    JSON-LD omits a field (datePosted is the common gap on
+    Cisco / Halliburton / Petrofac), we top up from DOM. Refresh
+    every gap independently so a partial JSON-LD doesn't block us
+    from extracting the bits that ARE in the DOM.
     """
-    ld = extract_job_postings(html)
-    if ld:
-        return ld[0]
+    from dataclasses import replace as _dc_replace
+
+    ld_list = extract_job_postings(html)
+    ld = ld_list[0] if ld_list else JobPostingLD()
     try:
         tree = HTMLParser(html)
     except Exception:
-        return JobPostingLD()
+        return ld
 
     def _txt(node: object) -> str | None:
         if node is None:
@@ -575,11 +576,61 @@ def _ld_from_detail_html(html: str) -> JobPostingLD:
         text = re.sub(r"\s+", " ", text or "").strip()
         return text or None
 
-    return JobPostingLD(
-        title=_txt(tree.css_first(_DETAIL_TITLE_CSS)),
-        description=_txt(tree.css_first(_DETAIL_BODY_CSS)),
-        city=_txt(tree.css_first(_DETAIL_LOCATION_CSS)),
-    )
+    fields: dict[str, object] = {}
+    if not ld.title:
+        fields["title"] = _txt(tree.css_first(_DETAIL_TITLE_CSS))
+    if not ld.description:
+        fields["description"] = _txt(tree.css_first(_DETAIL_BODY_CSS))
+    if not ld.city:
+        fields["city"] = _txt(tree.css_first(_DETAIL_LOCATION_CSS))
+    if not ld.posted_at:
+        dom_posted = _dom_posted_at(tree)
+        if dom_posted is not None:
+            fields["posted_at"] = dom_posted
+    if fields:
+        ld = _dc_replace(ld, **fields)  # type: ignore[arg-type]
+    return ld
+
+
+def _dom_posted_at(tree: HTMLParser) -> datetime | None:
+    """Best-effort publish-date extraction from a detail-page DOM.
+
+    Tries (in order):
+      1. `[itemprop="datePosted"]` — schema.org microdata.
+      2. `<time datetime="...">` — canonical HTML5 form.
+      3. `<meta property="article:published_time" content="...">` — OG.
+    All three are widely used by enterprise ATS templates (Cisco,
+    Halliburton, Petrofac) even when their JSON-LD blocks omit dates.
+    """
+    candidates: list[str] = []
+    for css, attr in (
+        ('[itemprop="datePosted"]', "content"),
+        ('[itemprop="datePosted"]', "datetime"),
+        ("time[datetime]", "datetime"),
+        ('meta[property="article:published_time"]', "content"),
+        ('meta[name="datePosted"]', "content"),
+    ):
+        node = tree.css_first(css)
+        if node is None:
+            continue
+        value = node.attributes.get(attr) if node.attributes else None
+        if value:
+            candidates.append(value.strip())
+    for raw in candidates:
+        if not raw:
+            continue
+        # ISO 8601 with optional trailing Z — datetime.fromisoformat handles
+        # most browsers' output. Python 3.11+ accepts the "Z" suffix; below
+        # that requires a swap. We're on 3.13 in this repo, so direct call
+        # is fine.
+        try:
+            dt = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+        except ValueError:
+            continue
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=UTC)
+        return dt
+    return None
 
 
 def _join_location(ld: JobPostingLD) -> str | None:
