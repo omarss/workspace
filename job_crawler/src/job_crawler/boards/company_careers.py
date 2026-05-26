@@ -127,6 +127,16 @@ _DETAIL_LOCATION_CSS: Final[str] = (
     "[data-test*='location']"
 )
 
+# Detail-page body extractors on .gov.sa templates (KKU was the live
+# example) latch onto the SA-government "verification banner" — a
+# 12k-char Arabic disclaimer that wraps the main content. The DOM
+# selectors can't tell it apart from real content, so we filter on the
+# distinctive opening phrase: "Official government site affiliated
+# with the Government of the Kingdom of Saudi Arabia".
+_SA_GOV_BOILERPLATE_PREFIX: Final[str] = (
+    "موقع حكومي رسمي تابع لحكومة المملكة العربية السعودية"
+)
+
 
 class CompanyCareersCrawler(BoardCrawler):
     source_slug: ClassVar[str] = "company_careers"
@@ -330,6 +340,18 @@ class CompanyCareersCrawler(BoardCrawler):
                 title[:60], len(description or ""), raw.canonical_url,
             )
             return None
+        # KKU-style .gov.sa pages: the DOM extractor latches onto the
+        # SA-gov "verification banner" wrapping the main content. The
+        # banner is large (12k chars) so the >=100 gate doesn't catch
+        # it. If the description STARTS with that exact phrase, treat
+        # the body as junk — set to None so the row keeps its real
+        # title + company_id (PR #40) but doesn't mislead in search.
+        if description.startswith(_SA_GOV_BOILERPLATE_PREFIX):
+            _LOG.info(
+                "company_careers: dropping SA-gov-portal boilerplate body "
+                "for %s (kept title + company)", raw.canonical_url,
+            )
+            description = None
 
         raw_location = _join_location(ld)
         company_id_str = raw.payload.get("company_id")
@@ -351,7 +373,12 @@ class CompanyCareersCrawler(BoardCrawler):
             ),
         ]
 
-        parsed_fields = {"title", "description"}
+        parsed_fields = {"title"}
+        if description:
+            parsed_fields.add("description")
+        else:
+            # description was dropped (boilerplate); track as missing
+            pass
         missing_fields: set[str] = set()
         for name, value in (
             ("raw_location", raw_location),
