@@ -363,6 +363,40 @@ MVP gates audit reads with `auth.AssertTenant` only. The `audit.read`
 permission exists in the catalogue (Phase 10 migration) and is reserved
 for the v1 RBAC hardening pass alongside the §2 retrofit set.
 
+## 15. Destructive operations require explicit confirmation flags
+
+Every adapter exposing a destructive Remove / Drop / Destroy operation
+MUST gate it behind a typed confirmation field on the input struct AND
+a matching `--confirm-*` flag on its `saasctl debug` surface. The
+adapter returns an `ErrConfirmationRequired` sentinel without touching
+any state when the flag is absent. The CLI also displays a 5-second
+countdown before executing as defense in depth against accidental
+destruction.
+
+The contract per-resource:
+
+| Adapter | Confirmation field | CLI flag | What is destroyed |
+|---|---|---|---|
+| `provision/postgres` | `RemoveInput.ConfirmDropDatabase` | `--confirm-drop-database` | DROP DATABASE + DROP ROLE (every row in the per-Deployment DB) |
+| `provision/openbao` | `RemoveInput.ConfirmDestroyKey` | `--confirm-destroy-key` | DELETE transit key (every ciphertext encrypted under it becomes permanently undecryptable) |
+| `provision/k3s` | (none — namespace delete is cascade-safe and reversible by re-applying) | — | — |
+| `provision/nginx` | (none — vhost delete leaves cert in place; reversible) | — | — |
+
+Adding a new destructive adapter:
+
+1. Add a `Confirm<Action>` bool to the RemoveInput / similar struct.
+2. Make `Validate()` return `ErrConfirmationRequired` when the bool is false.
+3. Add `--confirm-<action>` to the saasctl debug subcommand with a
+   matching long-form description that names what is destroyed.
+4. Print a 5-second countdown to stderr before the actual call.
+5. Add a row to this table.
+
+The OpenBao transit key delete in particular is uniquely dangerous
+because it has no on-disk equivalent of `WITH (FORCE)` or
+`CASCADE` — once the key material is gone, every wrapped_dek that
+references it is dead. Both the field name and the CLI flag use the
+verb "destroy" rather than "drop" / "remove" to telegraph this.
+
 ---
 
 ## Appendix A — Platform package map
@@ -387,6 +421,7 @@ these instead of re-implementing.
 | `otel/` | OpenTelemetry tracer-provider boot (no-op skeleton in Phase 3; OTLP exporter in Phase 15) |
 | `crypto/` | Encryptor interface + reflection walker for `pii:"true"` (Phase 3) + EnvelopeAdapter that wraps the OpenBao client (Phase 4) |
 | `crypto/envelope/` | OpenBao envelope client (Encrypt / Decrypt with kid binding, EnsureKey, RotateKey, Rewrap, KV v2 helper); k8s + AppRole auth flows (Phase 4) |
+| `controlplane/provision/openbao/` | Per-Deployment OpenBao provisioner: transit key + per-Deployment HCL policy (embedded template) + kubernetes auth role + KV namespace marker (Phase 12d) |
 
 ## Appendix B — Naming collisions
 

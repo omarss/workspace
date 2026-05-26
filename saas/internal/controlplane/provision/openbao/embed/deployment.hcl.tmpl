@@ -1,0 +1,56 @@
+# OpenBao policy template for a single Deployment.
+#
+# Rendered + uploaded during Deployment provisioning (Phase 12d). The control
+# plane substitutes {{.DeploymentID}} via Go's text/template, then writes the
+# rendered file via `bao policy write dep-<id> -`. Phase 4 only ships the
+# template — the renderer is wired in Phase 12.
+#
+# IMPORTANT: no glob in transit paths. Each Deployment may only encrypt /
+# decrypt under its own kid. Layer 5 of the eight-layer tenant isolation
+# invariant depends on this (AGENTS.md §18.1 §18.7).
+
+# Envelope encryption — generate DEK + ciphertext in one call.
+path "transit/datakey/plaintext/{{.DeploymentID}}" {
+  capabilities = ["update"]
+}
+
+# Decrypt a wrapped DEK. The application-level kid binding check in
+# envelope.Decrypt sits in front of this call; the policy is the second
+# line of defence.
+path "transit/decrypt/{{.DeploymentID}}" {
+  capabilities = ["update"]
+}
+
+# Encrypt directly (used by the batch helper for prefix-search indices
+# that don't need the DEK-and-payload envelope shape).
+path "transit/encrypt/{{.DeploymentID}}" {
+  capabilities = ["update"]
+}
+
+# Rotate to a new key version. Triggered by the per-Deployment rotation
+# scheduler; old versions stay decrypt-capable.
+path "transit/keys/{{.DeploymentID}}/rotate" {
+  capabilities = ["update"]
+}
+
+# Rewrap an existing wrapped_dek against the latest key version (background
+# batch job; no plaintext exposure).
+path "transit/rewrap/{{.DeploymentID}}" {
+  capabilities = ["update"]
+}
+
+# Read-only access to the key metadata (current version, rotation period).
+# Required for the rewrap walker to know which rows still need migrating.
+path "transit/keys/{{.DeploymentID}}" {
+  capabilities = ["read"]
+}
+
+# Per-Deployment KV v2 namespace. The `data/` and `metadata/` prefixes are
+# KV v2's required path shape — see https://openbao.org/docs/secrets/kv/kv-v2.
+path "secret/data/{{.DeploymentID}}/*" {
+  capabilities = ["create", "read", "update", "delete"]
+}
+
+path "secret/metadata/{{.DeploymentID}}/*" {
+  capabilities = ["list", "read", "delete"]
+}
