@@ -51,6 +51,50 @@ func deploymentCmd() *cobra.Command {
 	c.AddCommand(deploymentDeleteCmd(&baseURL, &operator, &scopes))
 	c.AddCommand(deploymentHealthCmd(&baseURL, &operator, &scopes))
 	c.AddCommand(deploymentRevisionsCmd(&baseURL, &operator, &scopes))
+	// Phase 12e additions.
+	c.AddCommand(deploymentLedgerCmd(&baseURL, &operator, &scopes))
+	c.AddCommand(deploymentFreezeKeysCmd(&baseURL, &operator, &scopes))
+	return c
+}
+
+// deploymentLedgerCmd prints the §6.2 provisioning step ledger. Phase
+// 12e wires the server-side route at GET /control/v1/deployments/{id}/
+// provision-steps (added to the deployments handler once the
+// control-plane skeleton lands; until then, the saasctl command exists
+// so the CLI surface is stable from CHECKPOINT 9).
+func deploymentLedgerCmd(baseURL, op, scopes *string) *cobra.Command {
+	return &cobra.Command{
+		Use:   "ledger <deployment_id>",
+		Short: "Print a Deployment's provisioning step ledger.",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			req := newOpRequest(cmd.Context(), http.MethodGet,
+				*baseURL+"/control/v1/deployments/"+args[0]+"/provision-steps", nil, *op, *scopes)
+			return runOperatorRequest(req)
+		},
+	}
+}
+
+// deploymentFreezeKeysCmd freezes the per-Deployment OpenBao transit
+// key (§18.7). Requires step-up MFA in production (Phase 13); the
+// dev path uses the mock-operator headers.
+func deploymentFreezeKeysCmd(baseURL, op, scopes *string) *cobra.Command {
+	var reason string
+	c := &cobra.Command{
+		Use:   "freeze-keys <deployment_id>",
+		Short: "Freeze a Deployment's per-Deployment OpenBao keys (incident response).",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			body, _ := json.Marshal(map[string]any{"reason": reason})
+			req := newOpRequest(cmd.Context(), http.MethodPost,
+				*baseURL+"/control/v1/deployments/"+args[0]+"/freeze-keys", reader(body), *op, *scopes)
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("Idempotency-Key", "idem_"+ulid.Make().String())
+			return runOperatorRequest(req)
+		},
+	}
+	c.Flags().StringVar(&reason, "reason", "", "Reason for the freeze (recorded in the audit row).")
+	_ = c.MarkFlagRequired("reason")
 	return c
 }
 
