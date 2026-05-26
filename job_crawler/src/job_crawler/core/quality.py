@@ -206,6 +206,14 @@ def check_parsed(parsed: ParsedPosting, *, now: datetime | None = None) -> Quali
 
     posted_at = parsed.posted_at
     if posted_at is not None:
+        # Per-source parsers are inconsistent about whether `posted_at`
+        # carries tzinfo — Bayt emits tz-naive datetimes while JSON-LD
+        # parsers (Cisco, DXC, Greenhouse) emit tz-aware ones. A direct
+        # comparison crashes with "can't compare offset-naive and
+        # offset-aware datetimes". Coerce naive values to UTC so the
+        # quality check is the same regardless of source.
+        if posted_at.tzinfo is None:
+            posted_at = posted_at.replace(tzinfo=UTC)
         current = now or datetime.now(UTC)
         if posted_at > current + _FUTURE_POSTED_AT_TOLERANCE:
             return QualityReject(

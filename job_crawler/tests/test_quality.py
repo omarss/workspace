@@ -203,6 +203,26 @@ def test_parsed_accepts_missing_posted_at() -> None:
     assert check_parsed(_parsed(posted_at=None)) is None
 
 
+def test_parsed_handles_tz_naive_posted_at() -> None:
+    """Per-source parsers are inconsistent about tzinfo. The Bayt parser
+    emits tz-naive `posted_at`; JSON-LD parsers emit tz-aware ones. Both
+    must work without raising `TypeError: can't compare offset-naive and
+    offset-aware datetimes`. Regression from the live v12 crawl where
+    every Bayt posting aborted the run."""
+    from datetime import datetime as dt
+    now = datetime.now(UTC)
+    naive_recent = dt(now.year, now.month, now.day)  # tz-naive
+    # Should NOT raise; should return None (recent date passes both gates).
+    assert check_parsed(_parsed(posted_at=naive_recent), now=now) is None
+
+    # Tz-naive far-future date is still rejected (gate fires, comparison
+    # works after the naive→UTC coercion).
+    future_naive = (now + timedelta(days=10)).replace(tzinfo=None)
+    reject = check_parsed(_parsed(posted_at=future_naive), now=now)
+    assert reject is not None
+    assert reject.reason == "future_posted_at"
+
+
 # ---------------------------------------------------------------------------
 # check_parsed — order of checks
 # ---------------------------------------------------------------------------
