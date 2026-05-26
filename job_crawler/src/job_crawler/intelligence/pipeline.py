@@ -39,6 +39,8 @@ class IntelligenceSummary:
     dedup_edges: int = 0
     dedup_clusters_merged: int = 0
     restrictions_recovered: int = 0
+    centroids_filled: int = 0
+    legit_scored: int = 0
 
 
 async def enrich_unstructured_fields(
@@ -253,6 +255,74 @@ async def enrich_cluster_restrictions(
     return touched
 
 
+async def backfill_office_centroids(db: JobCrawlerDB) -> int:
+    """Mirror the city centroid into the cluster's office_latitude / longitude
+    when both are NULL and the cluster has a resolved city.
+
+    A cluster's `office_*` columns are intended for street-level pins;
+    until we have a geocoder wired to the office_address text, the city
+    centroid is the closest signal available. Idempotent: a cluster that
+    already has office_latitude set isn't touched.
+
+    Returns the count of clusters updated.
+    """
+    sql = """
+        UPDATE jobs j
+        SET    office_latitude  = c.latitude,
+               office_longitude = c.longitude
+        FROM   cities c
+        WHERE  j.city_id          = c.id
+          AND  j.office_latitude  IS NULL
+          AND  j.office_longitude IS NULL
+          AND  c.latitude         IS NOT NULL
+          AND  c.longitude        IS NOT NULL
+          AND  j.deleted_at       IS NULL;
+    """
+    async with db.pool.connection() as conn, conn.cursor() as cur:
+        await cur.execute(sql)
+        return max(0, cur.rowcount or 0)
+
+
+async def backfill_legit_score(
+    db: JobCrawlerDB,
+    *,
+    batch_size: int = 500,
+    limit: int | None = None,
+) -> int:
+    """Run `recompute_score` against every cluster missing a `legit_score`.
+
+    With no fake-signal evidence in the cluster yet, recompute_score
+    stamps the default 0.85 score + `verdict=pending`. The point isn't
+    to detect fakes here (that's a separate detector); it's to
+    populate the column so downstream queries don't see NULL for
+    legit_score on every row. Once fake-signal detectors land, the
+    same call refreshes the score from the accumulated evidence.
+
+    Idempotent: a cluster that already has a legit_score is skipped.
+    """
+    sql = (
+        "SELECT id FROM jobs "
+        "WHERE  legit_score IS NULL "
+        "  AND  deleted_at  IS NULL"
+    )
+    if limit:
+        sql += f" LIMIT {int(limit)}"
+
+    scored = 0
+    async with db.pool.connection() as conn, conn.cursor(
+        row_factory=dict_row, name="legit_score_scan",
+    ) as cur:
+        await cur.execute(sql)
+        while batch := await cur.fetchmany(batch_size):
+            for row in batch:
+                try:
+                    await db.fake_signals.recompute_score(row["id"])
+                    scored += 1
+                except Exception:
+                    _LOG.exception("recompute_score failed for %s", row["id"])
+    return scored
+
+
 async def cleanup_html_entities_in_titles(db: JobCrawlerDB) -> int:
     """Strip the common HTML entities (`&amp;`, `&quot;`, `&#039;`, `&lt;`,
     `&gt;`) from existing posting titles. Modern crawls go through
@@ -306,6 +376,13 @@ async def run_all(
         # Restrictions backfill — experience_level / requires_arabic /
         # visa_sponsorship for clusters still NULL on those columns.
         summary.restrictions_recovered = await enrich_cluster_restrictions(db)
+        # Office centroid backfill — clusters with a resolved city but no
+        # office_lat/long inherit the city's centroid as a coarse pin.
+        summary.centroids_filled = await backfill_office_centroids(db)
+        # legit_score backfill — recompute_score stamps the default 0.85
+        # / pending verdict on clusters that have no signal evidence,
+        # so the column stops reporting NULL across the board.
+        summary.legit_scored = await backfill_legit_score(db)
 
     if run_dedup:
         d = await dedup.run(db)
