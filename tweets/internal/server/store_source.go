@@ -63,16 +63,19 @@ func (c *CachedSource) Feed(ctx context.Context, req FeedRequest) (FeedResult, e
 	if limit <= 0 {
 		limit = c.limit
 	}
-	// In magic mode we slightly over-fetch so the post-filter spam
-	// gate (below) still returns a full page on average. 3x is the
-	// same multiplier the store uses internally for city/query
-	// filters; reusing the constant keeps the numbers predictable.
+	// In magic mode the curated keyword expression matches < 1% of
+	// rows in the live store (~7 of 1900 at 2026-05-26). The store's
+	// default over-fetch (limit*3 capped at 600 internally) covers
+	// only the most recent ~6 hours of scrapes, so the older half of
+	// the retention window's matches were silently dropped — the
+	// user-visible "magic shows only 2 tweets" bug.
+	//
+	// Ask the store for the full retention window's worth so every
+	// match surfaces, then the spam-gate + dedup + page-trim below
+	// cut back to the caller's requested limit.
 	storeLimit := limit
 	if req.Magic {
-		storeLimit = limit * 3
-		if storeLimit > 600 {
-			storeLimit = 600
-		}
+		storeLimit = 5000
 	}
 	tweets, err := c.store.Latest(ctx, req.Countries, req.Cities, req.QueryExpr, req.Cursor, storeLimit)
 	if err != nil {
