@@ -3,7 +3,11 @@
 // deliberately small — every byte travels over a phone radio.
 package server
 
-import "time"
+import (
+	"time"
+
+	"github.com/omarss/workspace/tweets/internal/query"
+)
 
 // Country selects which feed the client wants. The service holds a small
 // fixed set; anything outside it returns 400. Mapping to scraper queries
@@ -68,12 +72,21 @@ type FeedRequest struct {
 	// places within the selected countries pass". OR semantics — a
 	// tweet whose place contains any one substring matches.
 	Cities []string
-	// Query is a free-text keyword filter applied to the tweet body
-	// (case-insensitive substring match). Whitespace-separated terms
-	// are AND-ed — every term must appear somewhere in the body.
-	// Empty string disables the filter. Cleans incoming text in the
-	// handler so the store doesn't see SQL metachars from clients.
+	// Query is the raw user-facing keyword expression as it arrived
+	// from the client. Kept around so the handler can echo it back
+	// in the response (useful debugging context for the app). The
+	// store layer uses QueryExpr, not Query.
 	Query string
+	// QueryExpr is Query parsed into a boolean tree. nil when no
+	// keyword filter is active. Computed by the handler so the
+	// store / fixture sources don't need to repeat the parse on
+	// every page fetch.
+	QueryExpr query.Expr
+	// Magic, when true, signals that the handler swapped in the
+	// curated "interesting to me" preset. The actual expression
+	// lives in QueryExpr; Magic just tags the request so the echoed
+	// response can announce which preset was active.
+	Magic bool
 	// Cursor is an RFC3339 timestamp; only tweets with `created_at`
 	// strictly less than this pass. Zero value means "first page" and
 	// triggers event-first sort for the response.
@@ -91,6 +104,7 @@ type FeedResponse struct {
 	Countries   []Country `json:"countries"`
 	Cities      []string  `json:"cities,omitempty"`
 	Query       string    `json:"query,omitempty"`
+	Magic       bool      `json:"magic,omitempty"`
 	GeneratedAt time.Time `json:"generated_at"`
 	NextCursor  string    `json:"next_cursor,omitempty"`
 	Tweets      []Tweet   `json:"tweets"`

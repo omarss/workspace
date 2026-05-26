@@ -455,6 +455,38 @@ func TestScore_SuspiciousHandle_NormalNotFlagged(t *testing.T) {
 	}
 }
 
+func TestScore_MlmMoneySpam_VerbatimPyramid(t *testing.T) {
+	// Verbatim live-feed pattern — must drop on its own.
+	got, breakdown := Score(Compute(Input{
+		Text: "「ME 730」: Real Impact I've started earning daily unconditional " +
+			"basic Income and helping more people do the same, " +
+			"Create your impact with us and win up to $20,000 in rewards! " +
+			"Join here:... Read more: https://t.co/x",
+	}))
+	if got < 0.7 {
+		t.Errorf("MLM pyramid post expected >= 0.7, got %.3f breakdown=%v", got, breakdown)
+	}
+}
+
+func TestScore_MlmMoneySpam_DollarReward(t *testing.T) {
+	got, _ := Score(Compute(Input{
+		Text: "Sign up now! $5,000 in rewards waiting for you!",
+	}))
+	if got < 0.5 {
+		t.Errorf("$-rewards shape expected >= 0.5, got %.3f", got)
+	}
+}
+
+func TestScore_MlmMoneySpam_NotFiredOnLegitFinanceTalk(t *testing.T) {
+	// Talking about salaries / hiring in normal terms must not fire.
+	got, _ := Score(Compute(Input{
+		Text: "Saudi Aramco is hiring — competitive salary and great benefits.",
+	}))
+	if got >= 0.5 {
+		t.Errorf("legit hiring post must not fire MLM, got %.3f", got)
+	}
+}
+
 func TestScore_ReligiousRepeat_NotFiredAsSpam(t *testing.T) {
 	// "الله أكبر الله أكبر..." chant — must not fire any blocklist
 	// despite repeated words. This is THE most common false-positive

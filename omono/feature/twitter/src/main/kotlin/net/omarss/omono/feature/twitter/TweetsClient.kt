@@ -57,7 +57,12 @@ class TweetsClient @Inject constructor(
         if (request.cities.isNotEmpty()) {
             builder.addQueryParameter("city", request.cities.joinToString(","))
         }
-        if (request.query.isNotBlank()) {
+        if (request.magic) {
+            // magic=1 takes precedence on the server; we still send
+            // any user query alongside it for parity (server ignores
+            // q when magic is on).
+            builder.addQueryParameter("magic", "1")
+        } else if (request.query.isNotBlank()) {
             builder.addQueryParameter("q", request.query.trim())
         }
         request.cursor?.takeIf { it.isNotBlank() }

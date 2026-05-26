@@ -82,6 +82,16 @@ class TwitterViewModel @Inject constructor(
         refresh()
     }
 
+    /** Toggle the server-curated "magic" preset. Mutually exclusive
+     *  with the user's keyword query — turning magic on clears the
+     *  field; turning it off leaves the field cleared so the user can
+     *  type their own again. */
+    fun toggleMagic() {
+        val on = !_uiState.value.magic
+        _uiState.update { it.copy(magic = on, query = "", queryDraft = "") }
+        refresh()
+    }
+
     /** Pull-to-refresh: drop the list, refetch from the first page. */
     fun refresh() {
         if (!repository.isConfigured) return
@@ -89,11 +99,13 @@ class TwitterViewModel @Inject constructor(
         _uiState.update { it.copy(loading = true, errorMessage = null) }
         currentJob = viewModelScope.launch {
             val snapshot = _uiState.value
-            val page = fetchPage(snapshot.filter, snapshot.query, cursor = null)
-            // Discard if the user changed the filter / query while we
-            // were in flight — refresh() runs again with the new state.
+            val page = fetchPage(snapshot.filter, snapshot.query, snapshot.magic, cursor = null)
+            // Discard if the user changed the filter / query / magic
+            // while we were in flight — refresh() runs again with the
+            // new state.
             if (_uiState.value.filter.selected != snapshot.filter.selected ||
-                _uiState.value.query != snapshot.query
+                _uiState.value.query != snapshot.query ||
+                _uiState.value.magic != snapshot.magic
             ) {
                 return@launch
             }
@@ -121,9 +133,11 @@ class TwitterViewModel @Inject constructor(
         viewModelScope.launch {
             val filter = state.filter
             val query = state.query
-            val page = fetchPage(filter, query, cursor)
+            val magic = state.magic
+            val page = fetchPage(filter, query, magic, cursor)
             if (_uiState.value.filter.selected != filter.selected ||
-                _uiState.value.query != query
+                _uiState.value.query != query ||
+                _uiState.value.magic != magic
             ) {
                 return@launch
             }
@@ -145,12 +159,14 @@ class TwitterViewModel @Inject constructor(
     private suspend fun fetchPage(
         filter: LocationFilter,
         query: String,
+        magic: Boolean,
         cursor: String?,
     ): FeedPage? {
         val request = FeedRequest(
             countries = filter.countries,
             cities = filter.cities,
             query = query,
+            magic = magic,
             cursor = cursor,
             limit = 60,
         )
@@ -176,4 +192,8 @@ data class TwitterUiState(
     // Live draft as the user types — used by the text field so we
     // can re-render character-by-character without refetching.
     val queryDraft: String = "",
+    // Server-curated "interesting to me" preset toggle. Mutually
+    // exclusive with `query`; the VM clears query when magic flips
+    // on so the UI doesn't show two competing filters.
+    val magic: Boolean = false,
 )

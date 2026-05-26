@@ -95,6 +95,12 @@ type Features struct {
 	// shape. Tracked separately from blocklists so legitimate
 	// auto-handle accounts aren't dropped wholesale.
 	SuspiciousHandle bool
+	// MLM / "make money online" pyramid spam: posts pushing
+	// "earn daily $X", "join here for rewards", "unconditional
+	// basic income", "passive income from home". Crosses both
+	// English and Arabic variants; the curated keyword set is
+	// narrow because the patterns recur verbatim.
+	BlocklistMlmMoneySpam bool
 }
 
 // Score returns a value in [0, 1]. Higher = more spam-like. The mapping
@@ -241,6 +247,13 @@ func Score(f Features) (float64, map[string]float64) {
 	if f.SuspiciousHandle {
 		add(contrib, "suspicious_handle", 0.15)
 	}
+	// MLM / pyramid money spam — single match drops on its own.
+	// The keyword set is precise (verbatim recurring phrases from
+	// the live feed), false positives on regular finance / income
+	// talk are unlikely.
+	if f.BlocklistMlmMoneySpam {
+		add(contrib, "mlm_money_spam", 0.7)
+	}
 
 	// Sum the components, clamp.
 	total := 0.0
@@ -290,6 +303,7 @@ func Compute(in Input) Features {
 		BlocklistFurnitureService: matchFurnitureService(in.Text),
 		BlocklistEscortCaption:    matchEscortCaption(in.Text),
 		SuspiciousHandle:          matchSuspiciousHandle(in.Handle),
+		BlocklistMlmMoneySpam:     matchMlmMoneySpam(in.Text),
 	}
 }
 
@@ -827,6 +841,60 @@ func matchSuspiciousHandle(handle string) bool {
 }
 
 var trailingDigitRe = regexp.MustCompile(`\d{5,}$`)
+
+// ── MLM / pyramid / money-online spam ──────────────────────────────
+//
+// Verbatim phrases observed on the live feed (2026-05-27):
+//
+//   "I've started earning daily unconditional basic Income and
+//    helping more people do the same, Create your impact with us and
+//    win up to $20,000 in rewards! Join here:... Read more: …"
+//
+// Pattern is unmistakable — "earn(ing) daily", "win up to $X",
+// "Join here", "basic income", "passive income from home". One
+// keyword fires on its own; even legit content ("we hire to make
+// money") wouldn't write any of these verbatim.
+
+func matchMlmMoneySpam(text string) bool {
+	low := strings.ToLower(text)
+	for _, k := range mlmMoneyKeywords {
+		if strings.Contains(low, k) {
+			return true
+		}
+	}
+	// Money + reward shape: "$NNN in rewards" / "$NNN reward"
+	if dollarRewardRe.MatchString(low) {
+		return true
+	}
+	return false
+}
+
+var mlmMoneyKeywords = []string{
+	// Verbatim English phrases
+	"earn daily",
+	"earning daily",
+	"daily earnings",
+	"basic income",
+	"unconditional income",
+	"passive income from home",
+	"make money online",
+	"earn from home",
+	"easy money",
+	"win up to $",
+	"join here for",
+	"join now and earn",
+	"real impact i've started",
+	// Arabic equivalents
+	"اربح يومي",
+	"دخل شهري سهل",
+	"كسب يومي",
+	"اشتغل من البيت واكسب",
+	"دخل سلبي",
+}
+
+// Catches "$5000 in rewards" / "$5,000 reward" — the dollar-amount-
+// plus-reward shape is uncommon outside MLM funnels.
+var dollarRewardRe = regexp.MustCompile(`\$[\d,]+\s+(?:in\s+)?reward`)
 
 func add(m map[string]float64, key string, v float64) {
 	m[key] += v

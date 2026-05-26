@@ -56,7 +56,7 @@ func TestTick_FiltersSpamAboveThreshold(t *testing.T) {
 
 	loop.tick(context.Background())
 
-	got, _ := db.Latest(context.Background(), []server.Country{server.CountryKSA}, nil, "", time.Time{}, 10)
+	got, _ := db.Latest(context.Background(), []server.Country{server.CountryKSA}, nil, nil, time.Time{}, 10)
 	if len(got) != 1 || got[0].ID != "clean" {
 		t.Errorf("expected only 'clean' kept, got %v", got)
 	}
@@ -73,7 +73,7 @@ func TestTick_ScrapeFailureDoesNotPropagate(t *testing.T) {
 	// Must not panic and must not return an error (tick is fire-and-forget).
 	loop.tick(context.Background())
 
-	got, _ := db.Latest(context.Background(), []server.Country{server.CountryKSA}, nil, "", time.Time{}, 10)
+	got, _ := db.Latest(context.Background(), []server.Country{server.CountryKSA}, nil, nil, time.Time{}, 10)
 	if len(got) != 0 {
 		t.Errorf("expected empty store after scrape failure, got %v", got)
 	}
@@ -112,7 +112,7 @@ func TestTick_PurgesOldRows(t *testing.T) {
 	loop := NewLoop(scraper, db, nil, Config{Interval: time.Hour, Retention: 20 * time.Millisecond})
 	loop.tick(context.Background())
 
-	got, _ := db.Latest(context.Background(), []server.Country{server.CountryKSA}, nil, "", time.Time{}, 10)
+	got, _ := db.Latest(context.Background(), []server.Country{server.CountryKSA}, nil, nil, time.Time{}, 10)
 	for _, tw := range got {
 		if tw.ID == "old" {
 			t.Errorf("expected 'old' to be purged, still present")
