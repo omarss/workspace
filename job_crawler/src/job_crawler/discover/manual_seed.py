@@ -90,6 +90,42 @@ async def _ensure_reference(db: JobCrawlerDB) -> None:
         ("utilities",         "Utilities",            "المرافق"),
     ):
         await db.reference.upsert_industry(code=code, name_en=en, name_ar=ar)
+    # Job-category taxonomy — flat, ~25 codes covering the dominant SA-market
+    # role types. Used by `detect_category_code` (core/restrictions) and
+    # surfaced on the cluster's `category_code` column. Bilingual names are
+    # picked from common Arabic translations on SA boards.
+    for code, en, ar in (
+        ("software_engineering",    "Software Engineering",     "هندسة البرمجيات"),
+        ("data_analytics",          "Data & Analytics",         "البيانات والتحليلات"),
+        ("cybersecurity",           "Cybersecurity",            "الأمن السيبراني"),
+        ("it_infrastructure",       "IT & Infrastructure",      "تقنية المعلومات والبنية التحتية"),
+        ("product_management",      "Product Management",       "إدارة المنتجات"),
+        ("design_creative",         "Design & Creative",        "التصميم والإبداع"),
+        ("engineering_civil",       "Civil Engineering",        "الهندسة المدنية"),
+        ("engineering_mechanical",  "Mechanical Engineering",   "الهندسة الميكانيكية"),
+        ("engineering_electrical",  "Electrical Engineering",   "الهندسة الكهربائية"),
+        ("engineering_chemical",    "Chemical & Petroleum Eng.","الهندسة الكيميائية والبترولية"),
+        ("engineering_mep",         "MEP / HVAC",               "الميكانيكا والكهرباء والسباكة"),
+        ("architecture",            "Architecture",             "الهندسة المعمارية"),
+        ("finance_accounting",      "Finance & Accounting",     "المالية والمحاسبة"),
+        ("sales_business_dev",      "Sales & Business Dev.",    "المبيعات وتطوير الأعمال"),
+        ("marketing",               "Marketing",                "التسويق"),
+        ("hr_recruitment",          "HR & Recruitment",         "الموارد البشرية والتوظيف"),
+        ("legal_compliance",        "Legal & Compliance",       "القانون والامتثال"),
+        ("operations_supply_chain", "Operations & Supply Chain","العمليات وسلسلة التوريد"),
+        ("customer_service",        "Customer Service",         "خدمة العملاء"),
+        ("healthcare",              "Healthcare",               "الرعاية الصحية"),
+        ("education_academic",      "Education & Academic",     "التعليم والأكاديميا"),
+        ("hospitality",             "Hospitality",              "الضيافة"),
+        ("retail",                  "Retail",                   "التجزئة"),
+        ("construction",            "Construction",             "البناء والتشييد"),
+        ("transport_logistics",     "Transport & Logistics",    "النقل واللوجستيات"),
+        ("manufacturing_production","Manufacturing & Production","التصنيع والإنتاج"),
+        ("hse_safety",              "HSE / Safety",             "الصحة والسلامة والبيئة"),
+        ("administrative",          "Administrative",           "الشؤون الإدارية"),
+        ("consulting",              "Consulting",               "الاستشارات"),
+    ):
+        await db.reference.upsert_category(code=code, name_en=en, name_ar=ar)
     # Regions, grouped by country. Each country also gets a synthetic catch-all
     # region (`<cc>_other`) used by cities we know belong to the country but
     # have no specific admin region modelled yet.

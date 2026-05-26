@@ -199,6 +199,7 @@ async def enrich_cluster_restrictions(
     untouched on subsequent runs. Returns the count of clusters touched.
     """
     from ..core.restrictions import (
+        detect_category_code,
         detect_experience_level,
         detect_hybrid_days_per_week,
         detect_relocation_assistance,
@@ -212,7 +213,7 @@ async def enrich_cluster_restrictions(
         "SELECT j.id, j.title_en, j.title_ar, j.description_en, j.description_ar, "
         "       j.experience_level, j.requires_arabic, j.visa_sponsorship, "
         "       j.hybrid_days_per_week, j.remote_country_restriction, "
-        "       j.relocation_assistance "
+        "       j.relocation_assistance, j.category_code "
         "FROM   jobs j "
         "WHERE  j.deleted_at IS NULL "
         "  AND  ("
@@ -221,7 +222,8 @@ async def enrich_cluster_restrictions(
         "      OR j.visa_sponsorship         IS NULL "
         "      OR j.hybrid_days_per_week     IS NULL "
         "      OR j.remote_country_restriction IS NULL "
-        "      OR j.relocation_assistance    IS NULL"
+        "      OR j.relocation_assistance    IS NULL "
+        "      OR j.category_code            IS NULL"
         "      )"
     )
     if limit:
@@ -268,6 +270,11 @@ async def enrich_cluster_restrictions(
                     ra2 = detect_relocation_assistance(body)
                     if ra2 is not None:
                         patches["relocation_assistance"] = ra2
+
+                if row["category_code"] is None:
+                    cat = detect_category_code(title, body)
+                    if cat is not None:
+                        patches["category_code"] = cat
 
                 if patches:
                     try:
