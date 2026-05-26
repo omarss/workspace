@@ -8,6 +8,54 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type ApiKey struct {
+	ID                     string             `json:"id"`
+	TenantID               string             `json:"tenant_id"`
+	EnvironmentID          *string            `json:"environment_id"`
+	Name                   string             `json:"name"`
+	Prefix                 string             `json:"prefix"`
+	ArgonPhc               string             `json:"argon_phc"`
+	PredecessorArgonPhc    *string            `json:"predecessor_argon_phc"`
+	PredecessorExpiresAt   pgtype.Timestamptz `json:"predecessor_expires_at"`
+	PrefixLookupHash       []byte             `json:"prefix_lookup_hash"`
+	PrefixLookupCiphertext []byte             `json:"prefix_lookup_ciphertext"`
+	PrefixLookupWrappedDek string             `json:"prefix_lookup_wrapped_dek"`
+	PrefixLookupNonce      []byte             `json:"prefix_lookup_nonce"`
+	PrefixLookupKid        string             `json:"prefix_lookup_kid"`
+	PrefixLookupKeyVersion int32              `json:"prefix_lookup_key_version"`
+	Scopes                 []string           `json:"scopes"`
+	Status                 string             `json:"status"`
+	RateLimitPerMinute     *int32             `json:"rate_limit_per_minute"`
+	IpAllowlist            []string           `json:"ip_allowlist"`
+	CreatedBy              string             `json:"created_by"`
+	CreatedAt              pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt              pgtype.Timestamptz `json:"updated_at"`
+	ExpiresAt              pgtype.Timestamptz `json:"expires_at"`
+	LastUsedAt             pgtype.Timestamptz `json:"last_used_at"`
+	RevokedAt              pgtype.Timestamptz `json:"revoked_at"`
+	RotatedAt              pgtype.Timestamptz `json:"rotated_at"`
+	RowSeq                 int64              `json:"row_seq"`
+}
+
+type AuditEvent struct {
+	ID            string             `json:"id"`
+	TenantID      string             `json:"tenant_id"`
+	ActorType     string             `json:"actor_type"`
+	ActorID       string             `json:"actor_id"`
+	Action        string             `json:"action"`
+	ResourceType  string             `json:"resource_type"`
+	ResourceID    *string            `json:"resource_id"`
+	OccurredAt    pgtype.Timestamptz `json:"occurred_at"`
+	IpAddress     *string            `json:"ip_address"`
+	UserAgent     *string            `json:"user_agent"`
+	RequestID     *string            `json:"request_id"`
+	Metadata      []byte             `json:"metadata"`
+	SourceEventID *string            `json:"source_event_id"`
+	PrevHash      []byte             `json:"prev_hash"`
+	RowHash       []byte             `json:"row_hash"`
+	ChainSequence int64              `json:"chain_sequence"`
+}
+
 type CasbinRule struct {
 	ID    int64   `json:"id"`
 	Ptype string  `json:"ptype"`

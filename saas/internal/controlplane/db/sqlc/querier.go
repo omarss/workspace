@@ -11,10 +11,46 @@ import (
 )
 
 type Querier interface {
+	// Idempotent: only writes ended_at when the row is still active. The
+	// trigger forbids touching any column other than ended_at and
+	// ended_reason, so this projection is the only legal UPDATE shape.
+	EndImpersonationSession(ctx context.Context, arg EndImpersonationSessionParams) error
 	// Placeholder. Real control-plane queries land in Phase 11 (control plane
 	// skeleton). sqlc rejects empty query directories so this stub satisfies the
 	// generator without emitting any Go.
 	GetControlPlaneBootstrap(ctx context.Context) (pgtype.Timestamptz, error)
+	GetImpersonationSession(ctx context.Context, id string) (ImpersonationSession, error)
+	// Operator inventory read-side queries.
+	//
+	// The Phase 13 ipallowlist + step-up middleware and the saasctl
+	// operator subtree both look operators up by id (JWT subject) or by
+	// keycloak_user_id (when the realm-linked path is used). These three
+	// queries are the only read paths exposed today; write paths (add /
+	// remove / update-allowlist) land alongside the gocloak admin client.
+	//
+	// All three projections return the same column set so the Querier
+	// interface in internal/controlplane/operatorrepo/ stays small and the
+	// saasctl operator list / inspect commands can share rendering code.
+	GetOperatorByID(ctx context.Context, id string) (GetOperatorByIDRow, error)
+	GetOperatorByKeycloakUserID(ctx context.Context, keycloakUserID *string) (GetOperatorByKeycloakUserIDRow, error)
+	// Impersonation session lifecycle queries.
+	//
+	// The impersonation service.go (Phase 13) drives this table through
+	// four operations:
+	//
+	//   - Insert  — at session start, BEFORE the JWT is signed so a token
+	//     never escapes without an audit row.
+	//   - Get     — to surface the row to the operator (end / inspect).
+	//   - IsActive — fast existence check used by the data-plane auth
+	//     middleware on every request that carries an impersonation JWT.
+	//   - End     — sets ended_at + ended_reason. The append-only trigger
+	//     on impersonation_session refuses changes to any other column.
+	InsertImpersonationSession(ctx context.Context, arg InsertImpersonationSessionParams) error
+	// Active = exists, not yet ended, not yet expired. The middleware
+	// consults this on every request so we keep the predicate index-friendly
+	// (matches the partial index impersonation_session_active_idx).
+	IsImpersonationSessionActive(ctx context.Context, id string) (bool, error)
+	ListActiveOperators(ctx context.Context) ([]ListActiveOperatorsRow, error)
 }
 
 var _ Querier = (*Queries)(nil)

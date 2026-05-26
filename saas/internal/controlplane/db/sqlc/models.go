@@ -8,6 +8,118 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type Deployment struct {
+	ID              string             `json:"id"`
+	ProjectSlug     string             `json:"project_slug"`
+	EnvironmentSlug string             `json:"environment_slug"`
+	Region          *string            `json:"region"`
+	Modules         []string           `json:"modules"`
+	ImageVersion    string             `json:"image_version"`
+	DataResidency   *string            `json:"data_residency"`
+	PrimaryVhost    string             `json:"primary_vhost"`
+	Status          string             `json:"status"`
+	DbName          string             `json:"db_name"`
+	DbAppRole       string             `json:"db_app_role"`
+	Namespace       string             `json:"namespace"`
+	BaoKid          string             `json:"bao_kid"`
+	Metadata        []byte             `json:"metadata"`
+	LastEventID     *string            `json:"last_event_id"`
+	RetainUntil     pgtype.Timestamptz `json:"retain_until"`
+	RowSeq          int64              `json:"row_seq"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
+}
+
+type DeploymentDomain struct {
+	ID                 string             `json:"id"`
+	DeploymentID       string             `json:"deployment_id"`
+	Domain             string             `json:"domain"`
+	IsPrimary          bool               `json:"is_primary"`
+	Status             string             `json:"status"`
+	VerificationMethod string             `json:"verification_method"`
+	VerificationRecord []byte             `json:"verification_record"`
+	VerificationToken  string             `json:"verification_token"`
+	VerifiedAt         pgtype.Timestamptz `json:"verified_at"`
+	LastCheckAt        pgtype.Timestamptz `json:"last_check_at"`
+	LastCheckError     *string            `json:"last_check_error"`
+	CertStatus         string             `json:"cert_status"`
+	CertIssuedAt       pgtype.Timestamptz `json:"cert_issued_at"`
+	CreatedAt          pgtype.Timestamptz `json:"created_at"`
+}
+
+type DeploymentProvisionStep struct {
+	ID           int64              `json:"id"`
+	DeploymentID string             `json:"deployment_id"`
+	StepName     string             `json:"step_name"`
+	Status       string             `json:"status"`
+	StartedAt    pgtype.Timestamptz `json:"started_at"`
+	CompletedAt  pgtype.Timestamptz `json:"completed_at"`
+	ErrorMessage *string            `json:"error_message"`
+	Metadata     []byte             `json:"metadata"`
+}
+
+type DeploymentRevision struct {
+	ID           string             `json:"id"`
+	DeploymentID string             `json:"deployment_id"`
+	ImageVersion string             `json:"image_version"`
+	AppliedAt    pgtype.Timestamptz `json:"applied_at"`
+	IsRolledBack bool               `json:"is_rolled_back"`
+	AppliedBy    string             `json:"applied_by"`
+	Metadata     []byte             `json:"metadata"`
+}
+
+type ImpersonationSession struct {
+	ID              string             `json:"id"`
+	DeploymentID    string             `json:"deployment_id"`
+	OperatorID      string             `json:"operator_id"`
+	OperatorEmail   string             `json:"operator_email"`
+	TargetMemberID  *string            `json:"target_member_id"`
+	TargetTenantID  string             `json:"target_tenant_id"`
+	Reason          string             `json:"reason"`
+	DurationSeconds int32              `json:"duration_seconds"`
+	IssuedAt        pgtype.Timestamptz `json:"issued_at"`
+	ExpiresAt       pgtype.Timestamptz `json:"expires_at"`
+	EndedAt         pgtype.Timestamptz `json:"ended_at"`
+	EndedReason     *string            `json:"ended_reason"`
+}
+
+type Operator struct {
+	ID              string             `json:"id"`
+	EmailHash       []byte             `json:"email_hash"`
+	EmailCiphertext []byte             `json:"email_ciphertext"`
+	EmailWrappedDek string             `json:"email_wrapped_dek"`
+	EmailNonce      []byte             `json:"email_nonce"`
+	EmailKid        string             `json:"email_kid"`
+	EmailKeyVersion int32              `json:"email_key_version"`
+	IsActive        bool               `json:"is_active"`
+	MfaEnabled      bool               `json:"mfa_enabled"`
+	IpAllowlist     []string           `json:"ip_allowlist"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
+	KeycloakUserID  *string            `json:"keycloak_user_id"`
+	Email           *string            `json:"email"`
+	Name            *string            `json:"name"`
+	Amr             []string           `json:"amr"`
+	LastStepUpAt    pgtype.Timestamptz `json:"last_step_up_at"`
+	MfaRequired     bool               `json:"mfa_required"`
+}
+
+type OperatorAuditEvent struct {
+	ID            string             `json:"id"`
+	OperatorID    string             `json:"operator_id"`
+	Action        string             `json:"action"`
+	DeploymentID  *string            `json:"deployment_id"`
+	ResourceType  *string            `json:"resource_type"`
+	ResourceID    *string            `json:"resource_id"`
+	OccurredAt    pgtype.Timestamptz `json:"occurred_at"`
+	IpAddress     *string            `json:"ip_address"`
+	RequestID     *string            `json:"request_id"`
+	Metadata      []byte             `json:"metadata"`
+	ChainSequence int64              `json:"chain_sequence"`
+	PrevHash      []byte             `json:"prev_hash"`
+	RowHash       []byte             `json:"row_hash"`
+}
+
 type SchemaBootstrapControlplane struct {
 	BootstrappedAt pgtype.Timestamptz `json:"bootstrapped_at"`
 }
