@@ -38,6 +38,7 @@ async def _main(*, skills: bool, enrich: bool, do_dedup: bool, limit: int | None
         f"restrictions_recovered={summary.restrictions_recovered} "
         f"centroids_filled={summary.centroids_filled} "
         f"legit_scored={summary.legit_scored} "
+        f"industries_classified={summary.industries_classified} "
         f"titles_normalized={summary.titles_normalized} "
         f"titles_depolluted={summary.titles_depolluted} "
         f"cities_resolved={summary.cities_resolved} "

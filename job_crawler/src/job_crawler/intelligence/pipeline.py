@@ -42,6 +42,7 @@ class IntelligenceSummary:
     centroids_filled: int = 0
     legit_scored: int = 0
     titles_depolluted: int = 0
+    industries_classified: int = 0
 
 
 async def enrich_unstructured_fields(
@@ -314,6 +315,56 @@ async def backfill_office_centroids(db: JobCrawlerDB) -> int:
         return max(0, cur.rowcount or 0)
 
 
+async def backfill_company_industries(
+    db: JobCrawlerDB,
+    *,
+    batch_size: int = 500,
+    limit: int | None = None,
+) -> int:
+    """Classify companies with NULL `industry_code` via keyword heuristics.
+
+    Uses `detect_industry_code` from `core.restrictions`, which maps
+    name signals ("factory", "contracting", "investments", "real estate",
+    Arabic equivalents, well-known brand names like SABIC / Aramco /
+    Cognizant) to the seeded `industries` codes.
+
+    Idempotent: a company that already has an `industry_code` is
+    skipped. Returns the count of companies updated.
+    """
+    from ..core.restrictions import detect_industry_code
+
+    sql = (
+        "SELECT id, name_en, name_ar FROM companies "
+        "WHERE  industry_code IS NULL "
+        "  AND  deleted_at    IS NULL"
+    )
+    if limit:
+        sql += f" LIMIT {int(limit)}"
+
+    touched = 0
+    async with db.pool.connection() as conn, conn.cursor(
+        row_factory=dict_row, name="industry_scan",
+    ) as cur:
+        await cur.execute(sql)
+        while batch := await cur.fetchmany(batch_size):
+            for row in batch:
+                code = detect_industry_code(row["name_en"], row["name_ar"])
+                if code is None:
+                    continue
+                try:
+                    async with db.pool.connection() as wconn, wconn.cursor() as wcur:
+                        await wcur.execute(
+                            "UPDATE companies SET industry_code = %(c)s "
+                            "WHERE id = %(id)s AND industry_code IS NULL",
+                            {"c": code, "id": row["id"]},
+                        )
+                        if wcur.rowcount:
+                            touched += 1
+                except Exception:
+                    _LOG.exception("industry update failed for %s", row["id"])
+    return touched
+
+
 async def backfill_legit_score(
     db: JobCrawlerDB,
     *,
@@ -477,6 +528,11 @@ async def run_all(
         # / pending verdict on clusters that have no signal evidence,
         # so the column stops reporting NULL across the board.
         summary.legit_scored = await backfill_legit_score(db)
+        # Industry classification — fuzzy-resolved companies don't get
+        # an industry_code from the seed CSV. Keyword heuristics map
+        # the most common patterns ("factory", "contracting", brand
+        # names) to the seeded `industries` codes.
+        summary.industries_classified = await backfill_company_industries(db)
 
     if run_dedup:
         d = await dedup.run(db)

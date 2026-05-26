@@ -872,3 +872,294 @@ def detect_category_code(
             if pattern.search(src):
                 return code
     return None
+
+
+# ---------------------------------------------------------------------------
+# Industry classification (companies, not postings)
+# ---------------------------------------------------------------------------
+# Maps a company name (and optionally a description) to one of the codes
+# seeded in the `industries` table. Same playbook as `_CATEGORY_PATTERNS`:
+# specificity-first ordered list, first match wins. Conservative — when no
+# pattern fires confidently, return None so the column stays NULL rather
+# than mis-classifying.
+
+_INDUSTRY_PATTERNS: Final[tuple[tuple[str, re.Pattern[str]], ...]] = (
+    # --- Specific tech / digital subspecialties first ------------------
+    ("cybersecurity", re.compile(
+        r"\b(cyber\s*security|information\s+security|infosec|"
+        r"penetration\s+test|الأمن\s+السيبراني|أمن\s+المعلومات)\b",
+        re.IGNORECASE),
+    ),
+    ("fintech", re.compile(
+        r"\b(fintech|fin[- ]?tech|payments?\s+(platform|gateway)|"
+        r"e[- ]?wallet|tabby|tamara|stc\s+pay|"
+        r"تقنية\s+مالية|مدفوعات)\b",
+        re.IGNORECASE),
+    ),
+    ("ecommerce", re.compile(
+        r"\b(e[- ]?commerce|online\s+(store|shop|retail|marketplace)|"
+        r"تجارة\s+إلكترونية)\b",
+        re.IGNORECASE),
+    ),
+    ("tech_software", re.compile(
+        r"\b(software|tech(?:nology|nologies)?|technologies\s+(co|inc|llc)|"
+        r"systems\s+(llc|co|company)|"
+        r"digital\s+(solutions|services)|it\s+(services|solutions|consulting)|"
+        r"saas|cloud\s+(solutions|services)|"
+        r"data\s+(solutions|services|labs?)|"
+        r"informatics|telematics|"
+        r"cognizant|infosys|accenture|tcs|wipro|"
+        r"البرمجيات|تقنية\s+المعلومات)\b",
+        re.IGNORECASE),
+    ),
+    ("telecom", re.compile(
+        r"\b(telecom(?:munications?)?|stc\b|mobily|zain|virgin\s+mobile|"
+        r"اتصالات)\b",
+        re.IGNORECASE),
+    ),
+    # --- Energy / oil / petrochemicals ---------------------------------
+    ("oil_gas", re.compile(
+        r"\b(oil\s+(and|&)\s+gas|petroleum|aramco|adnoc|drilling|"
+        r"upstream\s+services?|"
+        r"النفط|البترول|الغاز)\b",
+        re.IGNORECASE),
+    ),
+    ("petrochemicals", re.compile(
+        r"\b(petrochem(?:icals?)?|sabic|"
+        r"البتروكيماويات)\b",
+        re.IGNORECASE),
+    ),
+    ("chemicals", re.compile(
+        r"\b(chemicals?\s+(co|company|industries|llc)|"
+        r"الكيماويات)\b",
+        re.IGNORECASE),
+    ),
+    ("mining", re.compile(
+        r"\b(mining\s+(co|company|industries)|maaden|"
+        r"التعدين)\b",
+        re.IGNORECASE),
+    ),
+    ("energy", re.compile(
+        r"\b(energy|electric(?:al)?\s+power|power\s+(company|co)|"
+        r"renewables?|solar\s+(co|company|power)|wind\s+(power|farm)|"
+        r"الطاقة)\b",
+        re.IGNORECASE),
+    ),
+    ("utilities", re.compile(
+        r"\b(utilities|water\s+(co|company|services)|electricity\s+(co|company)|"
+        r"sewage|waste\s+management|"
+        r"المرافق|كهرباء|مياه)\b",
+        re.IGNORECASE),
+    ),
+    # --- Financial services / investment -------------------------------
+    ("banking", re.compile(
+        r"\b(bank|banking|alinma|alrajhi|al\s+rajhi|sabb|riyad\s+bank|"
+        r"snb\b|saudi\s+national\s+bank|"
+        r"بنك|البنك|مصرف)\b",
+        re.IGNORECASE),
+    ),
+    ("insurance", re.compile(
+        r"\b(insurance|reinsurance|takaful|"
+        r"التأمين)\b",
+        re.IGNORECASE),
+    ),
+    ("investment", re.compile(
+        r"\b(investments?|capital\s+(partners|group)|"
+        r"asset\s+management|wealth\s+management|"
+        r"private\s+equity|venture\s+capital|"
+        r"investments?\s+co|"
+        r"الاستثمار)\b",
+        re.IGNORECASE),
+    ),
+    # --- Real estate / construction / cement ---------------------------
+    ("real_estate", re.compile(
+        r"\b(real\s+estate|properties|property\s+(management|developer)|"
+        r"developer\s+(co|group)|developments?\s+(co|group)|"
+        r"العقارية|عقارات|عقاري|الإسكان)\b",
+        re.IGNORECASE),
+    ),
+    ("construction", re.compile(
+        r"\b(construction|contracting\s+(co|company)|"
+        r"contractors?\s+(llc|co|company)|"
+        r"building\s+(co|company)|builders\s+(co|company)|"
+        r"engineering\s+(co|company|services|works)|"
+        r"البناء|تشييد|مقاولات|إنشاءات)\b",
+        re.IGNORECASE),
+    ),
+    ("cement", re.compile(
+        r"\b(cement|building\s+materials|concrete\s+(co|company)|"
+        r"الإسمنت|الأسمنت)\b",
+        re.IGNORECASE),
+    ),
+    # --- Healthcare / pharma -------------------------------------------
+    ("healthcare", re.compile(
+        r"\b(hospital|clinic|medical\s+(centre|center|services|group|"
+        r"college|complex)|health(?:care)?\s+(services|group|systems)|"
+        r"dental\s+(clinic|college)|polyclinic|"
+        r"المستشفى|مستشفى|طبي|الطبية|الصحية|الصحة)\b",
+        re.IGNORECASE),
+    ),
+    ("pharma", re.compile(
+        r"\b(pharma(?:ceuticals?)?|pharmacy\s+(co|chain|group)|"
+        r"\w+\s+pharmacy\b|"
+        r"الأدوية|صيدلية|للأدوية)\b",
+        re.IGNORECASE),
+    ),
+    # --- Food / agriculture / retail / hospitality ---------------------
+    ("food_beverage", re.compile(
+        r"\b(food\s+(co|company|industries|products)|"
+        r"chocolate|confectionery|bakery|"
+        r"beverages?\s+(co|company)|coffee\s+(co|company|roasters?)|"
+        r"restaurants?\s+(group|holding|management)|"
+        r"dairy|meat\s+(co|company|industries)|"
+        r"الأغذية|الأطعمة|المخبوزات)\b",
+        re.IGNORECASE),
+    ),
+    ("agriculture", re.compile(
+        r"\b(agriculture|farming|farms?\s+(co|company)|"
+        r"crops?\s+(co|company)|agricultural\s+(co|company|products)|"
+        r"الزراعة|مزرعة)\b",
+        re.IGNORECASE),
+    ),
+    ("retail", re.compile(
+        r"\b(retail(?:ers?)?|stores?\s+(co|group|chain)|"
+        r"shopping\s+(centre|center|mall)|mall\s+(co|group)|"
+        r"fashion\s+(retail|group)|"
+        r"trading\s+(co|company|est)|"
+        r"تجارية|التجزئة|المتاجر|الأسواق)\b",
+        re.IGNORECASE),
+    ),
+    ("hospitality", re.compile(
+        r"\b(hotel|hotels?\s+\w+|resort(?:s)?|"
+        r"hospitality|tourism|"
+        r"restaurant|café|cafe|coffee\s+(shop|cafe)|cafeteria|"
+        r"الفنادق|للفنادق|السياحة|الضيافة|فندق|فنادق|مطعم|مقهى)\b",
+        re.IGNORECASE),
+    ),
+    # --- Education / NGO / government ----------------------------------
+    ("education", re.compile(
+        r"\b(school|schools?\s+(group|company)|academy|university|"
+        r"college|institute|education(?:al)?\s+(services|group)|"
+        r"e[- ]?learning|tutoring|"
+        r"المدرسة|الجامعة|الكلية|التعليم|التدريب|أكاديمية)\b",
+        re.IGNORECASE),
+    ),
+    ("ngo", re.compile(
+        r"\b(non[- ]?profit|ngo|foundation\s+for|charity|charit(?:able|y)|"
+        r"endowment|society\s+for|association\s+for|"
+        r"غير\s+ربحية|جمعية\s+خيرية|مؤسسة\s+خيرية|وقف)\b",
+        re.IGNORECASE),
+    ),
+    ("government", re.compile(
+        r"\b(ministry\s+of|authority\s+(for|of)|commission\s+(for|of)|"
+        r"municipality|royal\s+(commission|court)|government\s+(of|services)|"
+        r"وزارة|الهيئة|البلدية|الحكومة)\b",
+        re.IGNORECASE),
+    ),
+    # --- Transport / logistics / airlines ------------------------------
+    ("airline", re.compile(
+        r"\b(airlines?|airways|aviation|aero(?:nautics|space)|"
+        r"saudia|riyadh\s+air|flyadeal|flynas|"
+        r"الطيران|الخطوط\s+الجوية)\b",
+        re.IGNORECASE),
+    ),
+    ("transport", re.compile(
+        r"\b(transport(?:ation)?\s+(co|company|services)|"
+        r"\w+\s+transport(?:ation)?\b|"
+        r"mobility\s+(co|company|services)|"
+        r"taxi|ride[- ]hailing|"
+        r"النقل|التنقل|للنقل)\b",
+        re.IGNORECASE),
+    ),
+    ("logistics", re.compile(
+        r"\b(logistics?\s+(co|company|services|solutions|group)|"
+        r"freight|shipping\s+(co|line|company)|cargo\s+(co|services)|"
+        r"warehousing\s+(co|services)|customs?\s+(broker|clearance)|"
+        r"اللوجستيات|الشحن|التخليص\s+الجمركي)\b",
+        re.IGNORECASE),
+    ),
+    # --- Manufacturing / automotive ------------------------------------
+    ("automotive", re.compile(
+        r"\b(automotive|motors\s+(co|company)|auto\s+(parts|dealers)|"
+        r"cars?\s+(co|company|dealership)|"
+        r"السيارات|للسيارات)\b",
+        re.IGNORECASE),
+    ),
+    ("manufacturing", re.compile(
+        r"\b(factory|factories|manufacturing|industries\s+(co|company|ltd)|"
+        r"industrial\s+(co|company)|production\s+(co|company)|"
+        r"steel\s+(co|company|industries)|"
+        r"plastics?\s+(co|company)|"
+        r"glass\s+(co|company|industries)|"
+        r"مصنع|المصنع|الصناعات|التصنيع|للصناعة|للصناعات)\b",
+        re.IGNORECASE),
+    ),
+    # --- Media / entertainment / sports --------------------------------
+    ("media", re.compile(
+        r"\b(media\s+(co|group|services)|publishing|"
+        r"broadcasting|advertising\s+(co|agency|group)|"
+        r"production\s+house|content\s+(studio|production)|"
+        r"الإعلام|النشر)\b",
+        re.IGNORECASE),
+    ),
+    ("entertainment", re.compile(
+        r"\b(entertainment|events?\s+(co|company|management|group|services)|"
+        r"\w+\s+events?\b|"
+        r"cinema|gaming\s+(co|studio)|theme\s+park|"
+        r"الترفيه)\b",
+        re.IGNORECASE),
+    ),
+    ("sports", re.compile(
+        r"\b(sports?\s+(co|company|club|academy|management)|"
+        r"fitness\s+(co|club|chain)|football\s+(club|federation)|"
+        r"الرياضة|نادي\s+رياضي)\b",
+        re.IGNORECASE),
+    ),
+    # --- Services ------------------------------------------------------
+    ("security_services", re.compile(
+        r"\b(security\s+services|security\s+(guards|guarding)|"
+        r"safe\s+guards?\s+(co|company)|protection\s+services|"
+        r"الحراسة|الأمن\s+والحراسة|الخدمات\s+الأمنية)\b",
+        re.IGNORECASE),
+    ),
+    ("hr_services", re.compile(
+        r"\b(staffing|recruit(?:ment|ing)\s+(agency|services|co)|"
+        r"manpower|human\s+resources\s+services|talent\s+solutions|"
+        r"hr\s+(consulting|services|outsourcing)|"
+        r"التوظيف|الموارد\s+البشرية)\b",
+        re.IGNORECASE),
+    ),
+    # --- Diversified holding -------------------------------------------
+    ("conglomerate", re.compile(
+        r"\b(conglomerate|holding\s+co\b|diversified\s+(group|holding)|"
+        r"group\s+(of\s+companies|holdings)|"
+        r"مجموعة\s+شركات)\b",
+        re.IGNORECASE),
+    ),
+)
+
+
+def detect_industry_code(
+    name_en: str | None,
+    name_ar: str | None = None,
+    description: str | None = None,
+) -> str | None:
+    """Classify a company into one of the seeded `industries` codes.
+
+    Order of signals: English name → Arabic name → first 500 chars of
+    description (a company-about blurb if available). First confident
+    match wins. Specificity-first ordering inside `_INDUSTRY_PATTERNS`
+    so "Saudi Lebanese Factories For Chocolate" hits `food_beverage`
+    before falling through to the broader `manufacturing` bucket.
+
+    Returns None when nothing matches — better to leave the column
+    NULL than to mis-classify a generic-named company.
+    """
+    sources = (name_en, name_ar, (description or "")[:500])
+    for src in sources:
+        if not src:
+            continue
+        for code, pattern in _INDUSTRY_PATTERNS:
+            if pattern.search(src):
+                return code
+    return None
