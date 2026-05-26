@@ -554,6 +554,62 @@ def test_company_careers_parses_relative_arabic() -> None:
     assert 2 < delta.days <= 3
 
 
+def test_clean_text_strips_bom_zws_rtl_marks_and_collapses_whitespace() -> None:
+    """Audit on the v6 corpus found 19 descriptions with BOM/ZWS/RTL
+    chars (18 Bayt + 1 cc) and a Greenhouse title with a trailing
+    space. The centralised _clean_text in to_upsert covers all of it."""
+    from job_crawler.core.normalise import _clean_text
+
+    # BOM (U+FEFF)
+    assert _clean_text("﻿Senior Engineer") == "Senior Engineer"
+    # zero-width space (U+200B)
+    assert _clean_text("Sales​Executive") == "SalesExecutive"
+    # bidi LRM (U+200E)
+    assert _clean_text("Software‎Engineer") == "SoftwareEngineer"
+    # trailing whitespace (the Greenhouse "Contact Center Agent " case)
+    assert _clean_text("Contact Center Agent ") == "Contact Center Agent"
+    # whitespace-only → None (so the column ends up NULL not '')
+    assert _clean_text("   ") is None
+    assert _clean_text("") is None
+    assert _clean_text(None) is None
+    # html.unescape still runs first
+    assert _clean_text("Sales &amp; Marketing") == "Sales & Marketing"
+    # Inner runs of 2+ spaces collapse to one
+    assert _clean_text("Senior     Engineer") == "Senior Engineer"
+    # Newlines preserved (description structure matters)
+    assert _clean_text("Line 1\nLine 2") == "Line 1\nLine 2"
+    # Control chars (e.g. \x07 bell) stripped, but TAB/LF/CR preserved
+    assert _clean_text("Title\x07with bell") == "Titlewith bell"
+    assert _clean_text("Tab\there") == "Tab\there"
+
+
+def test_to_upsert_runs_clean_text_on_all_text_fields() -> None:
+    """End-to-end: every free-text field on JobPostingUpsert is sanitised."""
+    parsed = ParsedPosting(
+        source_job_external_id="sanity-1",
+        canonical_url="https://example.invalid/x",
+        title="﻿Senior Engineer ",
+        description="​We build great things.\n" + "A" * 200,
+        raw_company_name="Acme‎ Co",
+        raw_location="Riyadh ",
+        office_address="﻿PO Box 123",
+        hiring_manager_name="Sarah  Smith",  # double space
+    )
+    up = to_upsert(
+        parsed,
+        source_id=UUID(int=10),
+        company_id=None,
+        recruiter_id=None,
+        location=None,
+    )
+    assert up.title == "Senior Engineer"
+    assert up.description is not None and not up.description.startswith("​")
+    assert up.raw_company_name == "Acme Co"
+    assert up.raw_location == "Riyadh"
+    assert up.office_address == "PO Box 123"
+    assert up.hiring_manager_name == "Sarah Smith"
+
+
 def test_company_careers_parses_absolute_posted_on() -> None:
     from job_crawler.boards.company_careers import _ld_from_detail_html
 
