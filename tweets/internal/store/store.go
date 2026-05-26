@@ -142,12 +142,16 @@ func (d *DB) Latest(
 	}
 	q += " ORDER BY created_at DESC LIMIT ?"
 	// Over-fetch when filters that may reject rows are set; we trim
-	// in memory after the substring matches run.
+	// in memory after the substring matches run. The 5000 ceiling
+	// covers the entire retention window (24h × ~80 tweets/scrape ≈
+	// ~2000 rows max) with headroom — magic-mode callers need this
+	// because the curated keyword set hits a tiny fraction of rows
+	// and the matches are distributed across the whole window.
 	fetchLimit := limit
 	if len(cities) > 0 || hasQuery {
 		fetchLimit = limit * 3
-		if fetchLimit > 600 {
-			fetchLimit = 600
+		if fetchLimit > 5000 {
+			fetchLimit = 5000
 		}
 	}
 	args = append(args, fetchLimit)

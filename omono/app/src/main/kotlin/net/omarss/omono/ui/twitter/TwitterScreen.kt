@@ -2,6 +2,8 @@ package net.omarss.omono.ui.twitter
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -747,9 +749,15 @@ private fun FilterSheet(
         onDismissRequest = onClose,
         sheetState = sheetState,
     ) {
+        // The sheet content (KSA's 18 cities + EG's 10 + headers + Done)
+        // is taller than the visible sheet area on most phones. Without
+        // a verticalScroll modifier the Egypt section sits below the
+        // fold and the user has no way to reach it — that's the bug
+        // behind "I don't have Egypt cities" reported on 2026-05-26.
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp, vertical = 8.dp),
         ) {
             Text(
