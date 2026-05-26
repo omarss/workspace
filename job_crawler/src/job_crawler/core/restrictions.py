@@ -465,3 +465,317 @@ def detect_relocation_assistance(text: str | None) -> bool | None:
     if no_spans:
         return False
     return None
+
+
+# ---------------------------------------------------------------------------
+# Job-category classification
+# ---------------------------------------------------------------------------
+# Ordered (specificity-first) list of (code, pattern). The first pattern
+# that matches the title (or, as a fallback, the first 500 chars of the
+# description) wins. Codes match the taxonomy seeded by
+# `discover/manual_seed._ensure_reference`.
+#
+# Order matters: specific subcategories MUST come before catch-alls so
+# "Mechanical Engineer" maps to engineering_mechanical, not a generic
+# "engineer" bucket. "Sr. Software Engineer" maps to
+# software_engineering before any "engineer" fallback.
+#
+# Patterns are intentionally written with word boundaries so the classifier
+# is whitespace/punctuation-robust. Arabic title keywords are added inline
+# where they're meaningfully different from translations of the English
+# keywords.
+
+_CATEGORY_PATTERNS: Final[tuple[tuple[str, re.Pattern[str]], ...]] = (
+    # --- Tech / engineering subspecialties (specific first) ------------
+    ("software_engineering", re.compile(
+        r"\b(software\s+engineer|software\s+developer|swe|"
+        r"backend|front[- ]?end|full[- ]?stack|web\s+developer|"
+        r"mobile\s+developer|ios\s+developer|android\s+developer|"
+        r"\.net\s+developer|java\s+(developer|engineer)|"
+        r"python\s+(developer|engineer)|"
+        r"node\s+(developer|engineer)|node\.?js\s+(developer|engineer)|"
+        r"ruby\s+(developer|engineer)|php\s+(developer|engineer)|"
+        r"(kotlin|scala|swift|go(?:lang)?|c\#)\s+(developer|engineer)|"
+        r"programmer|qa\s+engineer|"
+        r"quality\s+assurance\s+engineer|sdet|"
+        r"مهندس\s+برمجيات|مطور)\b",
+        re.IGNORECASE),
+    ),
+    ("data_analytics", re.compile(
+        r"\b(data\s+(engineer|analyst|scientist|architect)|"
+        r"business\s+intelligence|bi\s+(developer|analyst)|"
+        r"machine\s+learning\s+engineer|ml\s+engineer|"
+        r"ai\s+engineer|ai\s+researcher|"
+        r"analytics\s+engineer|business\s+analyst|"
+        r"محلل\s+بيانات|عالم\s+بيانات)\b",
+        re.IGNORECASE),
+    ),
+    ("cybersecurity", re.compile(
+        r"\b(security\s+(engineer|analyst|consultant|architect)|"
+        r"information\s+security|infosec|cyber\s*security|"
+        r"penetration\s+test|pen\s*tester|soc\s+analyst|"
+        r"vulnerability\s+(analyst|manager)|"
+        r"الأمن\s+السيبراني|أمن\s+المعلومات)\b",
+        re.IGNORECASE),
+    ),
+    ("it_infrastructure", re.compile(
+        r"\b(devops|sre|site\s+reliability|"
+        r"systems?\s+administrator|sys\s*admin|"
+        r"network\s+engineer|network\s+administrator|"
+        r"cloud\s+(engineer|architect)|aws\s+engineer|azure\s+engineer|"
+        r"platform\s+engineer|kubernetes\s+engineer|"
+        r"it\s+(support|technician|helpdesk)|help\s*desk|"
+        r"تقنية\s+المعلومات|دعم\s+فني)\b",
+        re.IGNORECASE),
+    ),
+    ("product_management", re.compile(
+        r"\b(product\s+(manager|owner|director|lead)|"
+        r"technical\s+product\s+manager|"
+        r"مدير\s+منتج)\b",
+        re.IGNORECASE),
+    ),
+    ("design_creative", re.compile(
+        r"\b(ui\s+designer|ux\s+designer|ui/ux|product\s+designer|"
+        r"graphic\s+designer|graphic\s+artist|"
+        r"art\s+director|creative\s+director|"
+        r"motion\s+designer|video\s+editor|photographer|"
+        r"interior\s+designer|fashion\s+designer|"
+        r"مصمم\s+(جرافيك|واجهات|منتج))\b",
+        re.IGNORECASE),
+    ),
+    ("engineering_civil", re.compile(
+        r"\b(civil\s+engineer|structural\s+engineer|"
+        r"geotechnical\s+engineer|surveyor|site\s+engineer|"
+        r"highway\s+engineer|transportation\s+engineer|"
+        r"مهندس\s+مدني|مهندس\s+إنشائي)\b",
+        re.IGNORECASE),
+    ),
+    ("engineering_mechanical", re.compile(
+        r"\b(mechanical\s+engineer|mechanical\s+designer|"
+        r"automotive\s+engineer|maintenance\s+engineer|"
+        r"مهندس\s+ميكانيكي)\b",
+        re.IGNORECASE),
+    ),
+    ("engineering_electrical", re.compile(
+        r"\b(electrical\s+engineer|electronics\s+engineer|"
+        r"power\s+engineer|control\s+systems\s+engineer|"
+        r"مهندس\s+كهرباء)\b",
+        re.IGNORECASE),
+    ),
+    ("engineering_chemical", re.compile(
+        r"\b(chemical\s+engineer|process\s+engineer|"
+        r"petroleum\s+engineer|reservoir\s+engineer|drilling\s+engineer|"
+        r"petrochemical\s+engineer|"
+        r"مهندس\s+كيميائي|مهندس\s+بترول)\b",
+        re.IGNORECASE),
+    ),
+    ("engineering_mep", re.compile(
+        r"\b(mep\s+engineer|mep\s+technician|hvac\s+(engineer|technician)|"
+        r"refrigeration\s+(engineer|technician)|"
+        r"plumbing\s+(engineer|technician)|fire\s+alarm\s+technician|"
+        r"tendering\s+engineer\s*[-]\s*mep|"
+        r"مهندس\s+تكييف|فني\s+تبريد)\b",
+        re.IGNORECASE),
+    ),
+    ("architecture", re.compile(
+        r"\b(architect|urban\s+planner|landscape\s+architect|"
+        r"interior\s+architect|"
+        r"مهندس\s+معماري|معماري)\b",
+        re.IGNORECASE),
+    ),
+    # --- Commercial / support functions -------------------------------
+    ("finance_accounting", re.compile(
+        r"\b(accountant|chief\s+accountant|senior\s+accountant|"
+        r"treasury\s+accountant|treasury\s+manager|"
+        r"financial\s+(analyst|controller|manager|planner)|"
+        r"audit(or|ing)?\b|internal\s+audit|tax\s+(manager|specialist)|"
+        r"finance\s+(manager|director|lead)|controller|cfo|"
+        r"محاسب|مدير\s+مالي)\b",
+        re.IGNORECASE),
+    ),
+    ("sales_business_dev", re.compile(
+        r"\b(sales\s+(executive|representative|manager|engineer|associate|"
+        r"director|consultant|specialist|coordinator)|"
+        r"sales\s*man|sales\s+girl|sales\s+lady|"
+        r"account\s+(executive|manager|director)|"
+        r"business\s+development|business\s+developer|"
+        r"key\s+account|territory\s+manager|"
+        r"horeca\s+sales|b2b\s+sales|inside\s+sales|outside\s+sales|"
+        r"مبيعات|مندوب\s+مبيعات|تطوير\s+الأعمال)\b",
+        re.IGNORECASE),
+    ),
+    ("marketing", re.compile(
+        r"\b(marketing\s+(manager|director|executive|specialist|coordinator|"
+        r"analyst|consultant|lead)|"
+        r"brand\s+(manager|director|specialist)|"
+        r"digital\s+marketing|content\s+(manager|writer|strategist|creator)|"
+        r"social\s+media\s+(manager|specialist|executive)|"
+        r"seo\s+specialist|sem\s+specialist|"
+        r"growth\s+(marketer|hacker|manager)|"
+        r"public\s+relations|pr\s+(manager|specialist)|"
+        r"تسويق|مدير\s+تسويق)\b",
+        re.IGNORECASE),
+    ),
+    ("hr_recruitment", re.compile(
+        r"\b(human\s+resources|"
+        r"hr\s+(manager|director|executive|specialist|coordinator|"
+        r"business\s+partner|generalist)|"
+        r"recruit(er|ment|ing)|"
+        r"talent\s+(acquisition|partner|specialist)|"
+        r"people\s+(operations|partner)|"
+        r"learning\s+and\s+development|l&d\s+(manager|specialist)|"
+        r"compensation\s+and\s+benefits|c&b\s+(manager|specialist)|"
+        r"موارد\s+بشرية|توظيف)\b",
+        re.IGNORECASE),
+    ),
+    ("legal_compliance", re.compile(
+        r"\b(lawyer|"
+        r"legal\s+(counsel|advisor|manager|consultant|director)|"
+        r"attorney|paralegal|"
+        r"compliance\s+(officer|manager|analyst|specialist)|"
+        r"corporate\s+governance(\s+manager)?|"
+        r"قانوني|مستشار\s+قانوني)\b",
+        re.IGNORECASE),
+    ),
+    ("operations_supply_chain", re.compile(
+        r"\b(operations\s+(manager|director|executive|specialist|coordinator|"
+        r"analyst)|"
+        r"supply\s+chain\s+(manager|analyst|specialist|engineer|coordinator)|"
+        r"logistics\s+(manager|coordinator|specialist|analyst|supervisor)|"
+        r"warehouse\s+(manager|supervisor|associate|operator)|"
+        r"procurement\s+(manager|officer|specialist|director)|"
+        r"buyer|sourcing\s+(manager|specialist)|"
+        r"planning\s+(manager|engineer)|"
+        r"عمليات|سلسلة\s+التوريد|مشتريات)\b",
+        re.IGNORECASE),
+    ),
+    ("customer_service", re.compile(
+        r"\b(customer\s+(service|support|experience|success)\s+"
+        r"(representative|agent|specialist|manager|associate|executive|"
+        r"coordinator)|"
+        r"call\s+center\s+(agent|representative|supervisor|manager)|"
+        r"contact\s+center\s+(agent|representative)|"
+        r"client\s+services\s+(specialist|manager)|"
+        r"خدمة\s+العملاء|مركز\s+اتصال)\b",
+        re.IGNORECASE),
+    ),
+    ("healthcare", re.compile(
+        r"\b(doctor|physician|nurse|pharmacist|dentist|"
+        r"general\s+practitioner|specialist\s+doctor|consultant\s+doctor|"
+        r"radiologist|cardiologist|anesthesiologist|surgeon|"
+        r"medical\s+(director|officer|representative|technician)|"
+        r"clinical\s+(specialist|coordinator|pharmacist)|"
+        r"laboratory\s+technician|lab\s+technician|"
+        r"physiotherapist|nutritionist|midwife|paramedic|"
+        r"healthcare\s+(specialist|manager|coordinator)|"
+        r"faculty\s+member\s+in\s+(nursing|medical|respiratory|dental|pharmacy)|"
+        r"طبيب|ممرض|صيدلي)\b",
+        re.IGNORECASE),
+    ),
+    ("education_academic", re.compile(
+        r"\b(teacher|"
+        r"professor|associate\s+professor|assistant\s+professor|"
+        r"instructor|lecturer|tutor|"
+        r"academic\s+(director|coordinator|advisor)|"
+        r"dean|provost|"
+        r"faculty\s+member|"
+        r"curriculum\s+(developer|designer|specialist)|"
+        r"معلم|أستاذ|محاضر|عضو\s+هيئة\s+تدريس)\b",
+        re.IGNORECASE),
+    ),
+    ("hospitality", re.compile(
+        r"\b(chef|sous\s+chef|head\s+chef|executive\s+chef|line\s+cook|cook|"
+        r"barista|waiter|waitress|server|host(?:ess)?|"
+        r"front\s+(desk|office)\s+(agent|supervisor|manager)|"
+        r"hotel\s+(manager|director|supervisor)|"
+        r"restaurant\s+(manager|supervisor)|"
+        r"housekeeping\s+(supervisor|attendant)|"
+        r"bartender|sommelier|food\s+and\s+beverage|"
+        r"f&b\s+(manager|supervisor)|"
+        r"بارستا|طاهٍ|نادل)\b",
+        re.IGNORECASE),
+    ),
+    ("retail", re.compile(
+        r"\b(retail\s+(manager|supervisor|associate|sales\s+associate)|"
+        r"store\s+(manager|supervisor|associate)|"
+        r"shop\s+(manager|assistant)|"
+        r"cashier|merchandiser|visual\s+merchandiser|"
+        r"stock\s+(controller|keeper)|"
+        r"مدير\s+معرض|بائع|محاسب\s+صندوق)\b",
+        re.IGNORECASE),
+    ),
+    ("construction", re.compile(
+        r"\b(construction\s+(manager|engineer|supervisor|foreman)|"
+        r"project\s+manager\s*(?:-)?\s*construction|"
+        r"foreman|site\s+supervisor|site\s+(foreman|inspector)|"
+        r"steel\s+fixer|carpenter|mason|"
+        r"بناء|تشييد|رئيس\s+ورشة)\b",
+        re.IGNORECASE),
+    ),
+    ("transport_logistics", re.compile(
+        r"\b(driver|truck\s+driver|delivery\s+(driver|rider)|"
+        r"ride[- ]?hailing\s+driver|chauffeur|"
+        r"dispatcher|fleet\s+(manager|coordinator)|"
+        r"freight\s+(coordinator|forwarder)|"
+        r"customs\s+(officer|broker)|"
+        r"سائق|مرسل)\b",
+        re.IGNORECASE),
+    ),
+    ("manufacturing_production", re.compile(
+        r"\b(production\s+(manager|supervisor|engineer|operator|planner)|"
+        r"manufacturing\s+(engineer|supervisor|technician|manager)|"
+        r"assembly\s+(line\s+worker|operator|technician)|"
+        r"machine\s+operator|cnc\s+(operator|machinist)|"
+        r"diesel\s+pump.*\bmaintenance|injection\s+technician)\b",
+        re.IGNORECASE),
+    ),
+    ("hse_safety", re.compile(
+        r"\b(hse\s+(engineer|officer|coordinator|trainer|manager|specialist)|"
+        r"safety\s+(engineer|officer|supervisor|manager|coordinator)|"
+        r"health\s+and\s+safety|"
+        r"environmental\s+(specialist|engineer|consultant|coordinator)|"
+        r"الصحة\s+والسلامة|مهندس\s+سلامة)\b",
+        re.IGNORECASE),
+    ),
+    ("administrative", re.compile(
+        r"\b(administrative\s+(assistant|coordinator|officer|manager)|"
+        r"executive\s+(assistant|secretary)|"
+        r"office\s+(manager|administrator|coordinator)|"
+        r"receptionist|secretary|personal\s+assistant|"
+        r"data\s+entry\s+(operator|clerk)|"
+        r"سكرتير|مساعد\s+إداري)\b",
+        re.IGNORECASE),
+    ),
+    ("consulting", re.compile(
+        r"\b(consultants?|strategy\s+(consultants?|advisors?)|"
+        r"management\s+consultants?|business\s+consultants?|"
+        r"advisors?|advisory\s+(manager|director))\b",
+        re.IGNORECASE),
+    ),
+)
+
+
+def detect_category_code(
+    title: str | None,
+    description: str | None = None,
+) -> str | None:
+    """Classify a posting into one of the seeded `job_categories` codes.
+
+    Specificity-first: patterns are ordered so the most specific match
+    wins (e.g. "Mechanical Engineer" → `engineering_mechanical` rather
+    than falling through to a generic engineering bucket). The title is
+    the primary signal — if the title is silent, the first 500 chars of
+    the description are scanned as a fallback.
+
+    Returns None when no pattern matches confidently. The classifier is
+    intentionally conservative — a None at the cluster level is better
+    than a wrong category that pollutes search facets.
+    """
+    sources = (title, (description or "")[:500])
+    for src in sources:
+        if not src:
+            continue
+        for code, pattern in _CATEGORY_PATTERNS:
+            if pattern.search(src):
+                return code
+    return None

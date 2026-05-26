@@ -10,6 +10,7 @@ from __future__ import annotations
 import pytest
 
 from job_crawler.core.restrictions import (
+    detect_category_code,
     detect_experience_level,
     detect_gender_preference,
     detect_hybrid_days_per_week,
@@ -307,3 +308,98 @@ def test_relocation_silent_returns_none() -> None:
 def test_relocation_contradictory_returns_none() -> None:
     text = "Relocation assistance for engineers. No relocation for contractors."
     assert detect_relocation_assistance(text) is None
+
+
+# ---------------------------------------------------------------------------
+# detect_category_code
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("title", "expected"),
+    [
+        # Software / tech
+        ("Senior Python Engineer", "software_engineering"),
+        ("Backend Developer", "software_engineering"),
+        ("Mobile Developer (iOS)", "software_engineering"),
+        ("QA Engineer", "software_engineering"),
+        # Data / analytics
+        ("Data Engineer", "data_analytics"),
+        ("Business Analyst", "data_analytics"),
+        ("Machine Learning Engineer", "data_analytics"),
+        # Security / infrastructure / product / design
+        ("Security Engineer", "cybersecurity"),
+        ("SOC Analyst", "cybersecurity"),
+        ("DevOps Engineer", "it_infrastructure"),
+        ("IT Support Technician", "it_infrastructure"),
+        ("Cloud Architect", "it_infrastructure"),
+        ("Product Manager", "product_management"),
+        ("UI/UX Designer", "design_creative"),
+        # Engineering subspecialties
+        ("Civil Engineer", "engineering_civil"),
+        ("Site Engineer", "engineering_civil"),
+        ("Mechanical Engineer", "engineering_mechanical"),
+        ("Electrical Engineer", "engineering_electrical"),
+        ("Chemical Engineer", "engineering_chemical"),
+        ("Petroleum Engineer", "engineering_chemical"),
+        ("HVAC Engineer", "engineering_mep"),
+        ("Hiring Now | Tendering Engineer - MEP", "engineering_mep"),
+        ("Architect", "architecture"),
+        # Commercial / support
+        ("Senior Treasury Accountant", "finance_accounting"),
+        ("Tax Manager", "finance_accounting"),
+        ("Sales Executive", "sales_business_dev"),
+        ("Business Development Manager", "sales_business_dev"),
+        ("Marketing Manager", "marketing"),
+        ("Digital Marketing Specialist", "marketing"),
+        ("HR Manager", "hr_recruitment"),
+        ("Talent Acquisition Partner", "hr_recruitment"),
+        ("Legal Counsel", "legal_compliance"),
+        ("Corporate Governance Manager", "legal_compliance"),
+        ("Operations Manager", "operations_supply_chain"),
+        ("Supply Chain Analyst", "operations_supply_chain"),
+        ("Procurement Officer", "operations_supply_chain"),
+        ("Customer Service Representative", "customer_service"),
+        # Healthcare / academic
+        ("Senior Pharmacist", "healthcare"),
+        ("Faculty Member in Respiratory Therapy", "healthcare"),
+        ("Lecturer in Computer Science", "education_academic"),
+        # Hospitality / retail / construction / transport / production
+        ("Chef de Partie", "hospitality"),
+        ("Barista And Cashier", "hospitality"),  # 'barista' wins over 'cashier'
+        ("Store Manager", "retail"),
+        ("Construction Manager", "construction"),
+        ("Private And Ride-Hailing Driver", "transport_logistics"),
+        ("Production Supervisor", "manufacturing_production"),
+        ("HSE Trainer", "hse_safety"),
+        ("Safety Officer", "hse_safety"),
+        ("Executive Assistant", "administrative"),
+        ("Receptionist", "administrative"),
+        ("Strategy Consultants", "consulting"),
+    ],
+)
+def test_category_code_title(title: str, expected: str) -> None:
+    assert detect_category_code(title) == expected
+
+
+def test_category_code_silent_returns_none() -> None:
+    """A generic role with no taxonomy keyword stays None — better to
+    leave the cluster uncategorised than to misclassify it."""
+    assert detect_category_code("General Application") is None
+    assert detect_category_code("Open Position") is None
+    assert detect_category_code(None) is None
+    assert detect_category_code("") is None
+
+
+def test_category_code_body_fallback() -> None:
+    """A neutral title falls back to the first 500 chars of the body."""
+    body = "We are hiring a mechanical engineer for our Riyadh plant."
+    assert detect_category_code("Engineering Role", body) == "engineering_mechanical"
+
+
+def test_category_code_specificity_wins() -> None:
+    """Specific subcategories beat generic catch-alls."""
+    # 'Mechanical Engineer' is more specific than any generic engineering pattern.
+    assert detect_category_code("Senior Mechanical Engineer") == "engineering_mechanical"
+    # 'Sales Engineer' is a sales role, not engineering (per taxonomy intent).
+    assert detect_category_code("Sales Engineer - SaaS") == "sales_business_dev"
