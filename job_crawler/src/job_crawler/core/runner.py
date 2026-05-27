@@ -21,7 +21,7 @@ import logging
 import os
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from typing import Final
 from uuid import UUID
 
@@ -131,7 +131,18 @@ class CrawlerRunner:
         new_count = 0
         updated_count = 0
         errors = 0
-        since = cutoff()
+        # `since` is the discover-stage date hint. For crawlers that honour
+        # `posted_at`-based recency (job boards), it's the lookback cutoff
+        # so the discover step can server-side-filter old listings. For
+        # ATS / company-careers crawlers that bypass the date window
+        # (`requires_recent_posted_at=False`), we pass a far-past cutoff —
+        # the API only returns currently-hiring roles anyway, so this
+        # gets us the full active set and the runner decides per posting.
+        since = (
+            cutoff()
+            if self.crawler.requires_recent_posted_at
+            else datetime(1970, 1, 1, tzinfo=UTC)
+        )
         # Intra-run dedup set, scoped to this single run. Catches
         # paginators that surface the same listing on multiple pages.
         seen_content_hashes: set[bytes] = set()
@@ -241,12 +252,16 @@ class CrawlerRunner:
                         error_message="non-GCC location",
                     )
                     continue
-                # `source_updated_at` is the safety net for long-lived ATS
-                # roles whose `first_published` is months old but whose
-                # `updated_at` shows recent activity (refresh, bump, or
-                # description edit). is_within_window() returns True when
-                # EITHER timestamp is fresh.
-                if not is_within_window(
+                # Per-source date filter. Job-board crawlers (Bayt, Wuzzuf,
+                # Tanqeeb, ...) have honest `posted_at` (listing creation
+                # date; old roles get cleaned up by the source). ATS APIs
+                # + company careers pages report `first_published` — often
+                # months old even when the role is actively recruiting —
+                # so they set `requires_recent_posted_at=False` and bypass
+                # the window gate entirely. The `telegram_broadcasts`
+                # dedup + the "was_new" cluster-create check prevent
+                # re-broadcasting an ATS role on subsequent runs.
+                if self.crawler.requires_recent_posted_at and not is_within_window(
                     parsed.posted_at,
                     source_updated_at=parsed.source_updated_at,
                 ):

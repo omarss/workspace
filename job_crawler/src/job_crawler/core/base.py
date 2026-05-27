@@ -52,6 +52,20 @@ class BaseCrawler(ABC):
     # (SA + UAE + BH + KW + QA + OM). ATS crawlers set this; boards leave it
     # off because their search URLs are already SA-scoped.
     requires_gcc_location: ClassVar[bool] = False
+    # When True (default), the runner enforces the `JC_LOOKBACK_DAYS` date
+    # window against `posted_at` / `source_updated_at`. Job-board crawlers
+    # (Bayt, Wuzzuf, Tanqeeb, ...) want this: their `posted_at` is the
+    # actual listing-creation date and old roles get removed.
+    #
+    # Set to False for ATS / company-careers crawlers. Their `posted_at`
+    # reports `first_published` (the original go-live date, often months
+    # old) but the role is STILL actively recruiting as long as the API
+    # / careers page returns it — employers remove closed roles
+    # immediately. Treating `first_seen_at` in our DB as the freshness
+    # signal (rather than source-side dates) lets us broadcast each ATS
+    # role once when we first see it, and the `telegram_broadcasts`
+    # dedup prevents re-broadcasting on subsequent runs.
+    requires_recent_posted_at: ClassVar[bool] = True
     # When True, the CLI uses an HTTP/1.1-only AsyncClient for this crawler.
     # Some sites (Naukrigulf) reset HTTP/2 streams mid-response; HTTP/1.1
     # works around it.

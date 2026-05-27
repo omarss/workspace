@@ -159,6 +159,11 @@ class CompanyCareersCrawler(BoardCrawler):
     # country, preventing Melbourne/Bangalore/Eschborn rows from polluting
     # the SA-focused corpus.
     requires_gcc_location: ClassVar[bool] = True
+    # Same rationale as `ATSBoardCrawler`: companies' careers pages list
+    # actively-hiring roles only, so the `JC_LOOKBACK_DAYS` date window
+    # would over-drop. Treat "first seen by us" as the freshness signal;
+    # `telegram_broadcasts` prevents re-broadcasting on subsequent runs.
+    requires_recent_posted_at: ClassVar[bool] = False
 
     async def discover_listings(self, *, since: datetime) -> AsyncIterator[Listing]:
         if self.db is None:
