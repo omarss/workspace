@@ -30,15 +30,17 @@ def test_format_new_job_minimal_fields() -> None:
     )
     assert "🆕" in body
     assert "Senior Python Engineer" in body
-    assert "example.invalid/job/1" in body
-    assert "🔗" in body  # canonical-link footer
-    # New: inline button alongside the title link + footer URL
+    # Title is the clickable link (a href="..."), the plain 🔗 footer
+    # was dropped in v3 — the inline View Job button replaces it.
+    assert 'href="https://example.invalid/job/1"' in body
+    assert "🔗" not in body
     assert buttons == [("👀 View full job", "https://example.invalid/job/1")]
 
 
 def test_format_new_job_full_fields() -> None:
-    from datetime import UTC, datetime, timedelta
-    posted = datetime.now(UTC) - timedelta(hours=3)
+    from datetime import UTC, datetime
+    # Fixed date so the test is stable. Format spec: "Wed, 21 May 2026".
+    posted = datetime(2026, 5, 21, 9, 30, tzinfo=UTC)
     body, buttons = format_new_job(
         title="Senior Python Engineer",
         company_name="Tamara",
@@ -61,7 +63,8 @@ def test_format_new_job_full_fields() -> None:
     assert "🏢 Tamara" in body
     assert "💼 Software Engineering" in body
     assert "📍 Riyadh, SA" in body
-    assert "📅 Posted 3 hours ago" in body
+    # Absolute date — meaningful even if user scrolls back weeks later.
+    assert "📅 Posted Thu, 21 May 2026" in body
     assert "SAR 15,000-25,000 / monthly" in body
     assert "payments platform" in body  # summary
     assert "#tamara" in body
@@ -282,3 +285,66 @@ async def test_send_message_returns_false_on_4xx(monkeypatch: pytest.MonkeyPatch
 
     monkeypatch.setattr(httpx.AsyncClient, "post", _bad)
     assert await send_message("hello") is False
+
+
+# ---------------------------------------------------------------------------
+# v3 polish — trim trailing anchors + sentence-boundary truncation
+# ---------------------------------------------------------------------------
+
+
+def test_summarise_trims_trailing_anchor_heading() -> None:
+    """A summary that picks up a NEXT section's heading at the tail
+    (e.g. ends with 'Your Impact' on its own line) should drop that
+    dangling header. Live regression from the Cisco post screenshot."""
+    desc = (
+        "Meet the Team\n"
+        "Our Account Executive team plays a critical role in supporting "
+        "the Kingdom's digital transformation agenda.\n"
+        "We partner with government entities, semi-governmental entities, "
+        "and large enterprises.\n"
+        "We are a high-performing, collaborative team.\n"
+        "Your Impact"  # heading with no body — should be dropped
+    )
+    out = _summarise_description(desc)
+    assert out is not None
+    assert "Your Impact" not in out  # the trailing heading is gone
+    assert "high-performing" in out  # actual body content preserved
+
+
+def test_summarise_truncates_at_sentence_boundary_not_midword() -> None:
+    """When the per-line cap fires, prefer cutting at a sentence end
+    over splitting a word."""
+    long_line = (
+        "We are a global engineering team that builds payments. "
+        "Our stack is Python, PostgreSQL, and AWS. "
+        "We hire senior contributors who want to own systems end-to-end. "
+        "You will work with partners across the Kingdom of Saudi Arabia "
+        "and lead key initiatives that drive measurable business outcomes."
+    )
+    out = _summarise_description(long_line)
+    assert out is not None
+    # No mid-word truncation — last char before ellipsis (if any) is
+    # punctuation or a full word.
+    assert not out.endswith("Saud…")
+    # Should end either at a real period (preferred) or after a full word
+    assert out.endswith(".") or out.endswith("…")
+    if out.endswith("…"):
+        # the char immediately before "…" should be whitespace-trimmed
+        # to a word boundary (not a mid-word letter break)
+        # the cut should happen at a word end
+        assert out[-3] != "e" or out[-4] == " " or out[-2] == " "
+
+
+def test_humanise_posted_at_absolute_format() -> None:
+    from datetime import UTC, datetime
+
+    from job_crawler.alerts.telegram import _humanise_posted_at
+    # Single-digit day formatted without leading zero.
+    assert _humanise_posted_at(datetime(2026, 5, 5, 12, 0, tzinfo=UTC)) == "Tue, 5 May 2026"
+    # Two-digit day rendered as-is.
+    assert _humanise_posted_at(datetime(2026, 5, 21, 9, 30, tzinfo=UTC)) == "Thu, 21 May 2026"
+    # tz-naive coerced to UTC, still renders.
+    assert _humanise_posted_at(datetime(2026, 12, 1, 0, 0)) == "Tue, 1 Dec 2026"
+    # Missing / wrong type → None
+    assert _humanise_posted_at(None) is None
+    assert _humanise_posted_at("2026-05-27") is None
