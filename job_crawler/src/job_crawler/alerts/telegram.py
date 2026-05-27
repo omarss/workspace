@@ -26,6 +26,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import re
 import time
 from decimal import Decimal
 from typing import Final
@@ -71,6 +72,7 @@ async def send_message(
     *,
     parse_mode: str = "HTML",
     disable_web_page_preview: bool = True,
+    inline_buttons: list[tuple[str, str]] | None = None,
 ) -> bool:
     """POST one message to the configured channel.
 
@@ -82,6 +84,11 @@ async def send_message(
     HTML-special chars in dynamic parts must already be escaped by the
     caller (`html.escape`); see `format_new_job` for the canonical
     helper that does this.
+
+    `inline_buttons` is an optional list of (label, url) pairs rendered
+    as a horizontal row of tap-targets below the message body — Telegram
+    natively renders these as proper buttons on mobile + desktop. Each
+    button opens the URL when tapped.
     """
     token = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
     channel = os.environ.get("TELEGRAM_CHANNEL_ID", "").strip()
@@ -103,12 +110,20 @@ async def send_message(
     _LAST_SEND_TS = time.monotonic()
 
     url = f"https://api.telegram.org/bot{token}/sendMessage"
-    payload = {
+    payload: dict[str, object] = {
         "chat_id": channel,
         "text": text,
         "parse_mode": parse_mode,
         "disable_web_page_preview": disable_web_page_preview,
     }
+    if inline_buttons:
+        # One row, N buttons. Telegram's inline_keyboard is a list of
+        # rows; each row is a list of {text, url} dicts.
+        payload["reply_markup"] = {
+            "inline_keyboard": [
+                [{"text": label, "url": btn_url} for label, btn_url in inline_buttons]
+            ]
+        }
     try:
         async with httpx.AsyncClient(timeout=15.0) as client:
             resp = await client.post(url, json=payload)
@@ -159,15 +174,131 @@ _SUMMARY_MIN_LINES: Final = 3
 _SUMMARY_MAX_CHARS: Final = 600
 
 
+# Anchor headings that mark the start of role-substantive content.
+# When one of these appears anywhere in the description, we start the
+# summary from the line AFTER it. Matched as whole-line headings
+# (allowing punctuation + colons) — never as inline mentions.
+_ROLE_ANCHORS_RE: Final = re.compile(
+    r"^\s*"
+    r"(your\s+role"
+    r"|the\s+role"
+    r"|about\s+the\s+role"
+    r"|role\s+(description|overview|summary)"
+    r"|job\s+(description|overview|summary|details|purpose)"
+    r"|position\s+(description|overview|summary)"
+    r"|what\s+you('?ll|\s+will)\s+do"
+    r"|what\s+you\s+do"
+    r"|responsibilities"
+    r"|key\s+responsibilities"
+    r"|main\s+responsibilities"
+    r"|duties"
+    r"|tasks\s+and\s+responsibilities"
+    r"|الدور(\s+الوظيفي)?"
+    r"|المهام(\s+و\s*المسؤوليات)?"
+    r"|المسؤوليات(\s+الرئيسية)?"
+    r"|الوصف\s+الوظيفي"
+    r")\s*[:؟]?\s*$",
+    re.IGNORECASE,
+)
+
+# Lines that indicate company-pitch boilerplate. When the description's
+# FIRST non-empty line matches one of these, we skip the entire opening
+# paragraph (everything until the first blank line or anchor) and start
+# from there.
+_COMPANY_INTRO_RE: Final = re.compile(
+    r"^\s*"
+    r"(about\s+(us|the\s+(company|organi[sz]ation)|"
+    r"\w[\w\s\.&'-]{0,40}?)"  # "About <CompanyName>" — up to ~40 chars
+    r"|who\s+we\s+are"
+    r"|our\s+(company|story|mission)"
+    r"|company\s+(overview|profile|description)"
+    r"|نبذة\s+(عن(\s+الشركة)?|عنا)"
+    r"|عن(ا)?\s+الشركة"  # noqa: RUF001 (Arabic letter alef intended)
+    r"|من\s+نحن"
+    r")\s*[:؟]?\s*$",
+    re.IGNORECASE,
+)
+
+
+def _skip_company_intro(text: str) -> str:
+    """Drop the leading "About Us / About the Company" block when present.
+
+    Two passes:
+      1. If a role-anchor heading appears anywhere, return everything
+         AFTER that line.
+      2. Else, if the very first non-empty line matches a company-intro
+         heading OR pitch sentence, skip until the first blank line
+         (paragraph break) or anchor heading.
+
+    Returns the trimmed text. Always returns at least the original input
+    when no boilerplate is detected.
+    """
+    raw_lines = text.splitlines()
+    # Pass 1 — anchor match anywhere in the description
+    for i, line in enumerate(raw_lines):
+        if _ROLE_ANCHORS_RE.match(line):
+            after = "\n".join(raw_lines[i + 1 :]).strip()
+            if after:
+                return after
+            break  # anchor matched but nothing after → fall through
+
+    # Pass 2 — first non-empty line is a company-intro heading or
+    # opens with a pitch sentence ("X is the leading ...")
+    first_nonempty_idx = next(
+        (i for i, ln in enumerate(raw_lines) if ln.strip()), None
+    )
+    if first_nonempty_idx is None:
+        return text
+    first_line = raw_lines[first_nonempty_idx].strip()
+
+    is_intro_heading = bool(_COMPANY_INTRO_RE.match(first_line))
+    # Heuristic: company-pitch first sentence like
+    # "Tamara is the leading fintech ..." / "We are a Saudi-based ..."
+    is_pitch_sentence = bool(
+        re.match(
+            r"^(we\s+are\s+(a|the|an)\s|"
+            r"\w[\w\s\.&'-]{1,60}\s+is\s+(a|the|an|leading|founded|building)\s)",
+            first_line,
+            re.IGNORECASE,
+        )
+    )
+    if not (is_intro_heading or is_pitch_sentence):
+        return text
+
+    # Skip from the first_nonempty line until the next blank line OR
+    # the next anchor heading. Then return everything after.
+    j = first_nonempty_idx + 1
+    while j < len(raw_lines):
+        ln = raw_lines[j].strip()
+        if not ln:
+            j += 1
+            break  # paragraph break — start summarising from j
+        if _ROLE_ANCHORS_RE.match(ln):
+            j += 1  # skip the anchor itself
+            break
+        j += 1
+    rest = "\n".join(raw_lines[j:]).strip()
+    return rest or text  # if we'd return empty, fall back to original
+
+
 def _summarise_description(description: str | None) -> str | None:
     """Return the first 3-5 non-empty lines (~600 chars cap) of the
-    description. Designed to give the reader a quick "what's the role"
-    glance without burying the canonical link.
+    description, skipping leading company-intro boilerplate.
 
-    Falls back gracefully on:
-      * None / empty → None (skip the line)
-      * Single-paragraph blob → first ~3-4 sentences
-      * Excess length → truncate with ellipsis at the boundary
+    Saudi job posts typically open with "About Us / About the company"
+    paragraphs — useful on the source page but pure noise in a job-feed
+    channel. We try to jump past those and start at role-substantive
+    content.
+
+    Strategy:
+      1. Defensive char strip (`_clean_text`).
+      2. Find an explicit role-anchor heading ("Your Role", "About the
+         Role", "Job Description", "Responsibilities", "What you'll do",
+         Arabic equivalents). If found, start summarising AFTER it.
+      3. Else, if the description opens with "About Us / About the
+         company / Who we are" boilerplate, skip the first paragraph.
+      4. Otherwise, take the first 3-5 non-empty lines as-is.
+      5. Cap line count and total chars; ellipsis-truncate.
     """
     if not description:
         return None
@@ -181,6 +312,9 @@ def _summarise_description(description: str | None) -> str | None:
         return None
     import re
     text = cleaned.strip()
+    if not text:
+        return None
+    text = _skip_company_intro(text)
     if not text:
         return None
 
@@ -216,6 +350,38 @@ def _summarise_description(description: str | None) -> str | None:
     return summary
 
 
+def _humanise_posted_at(posted_at: object) -> str | None:
+    """Render a datetime as a 'posted X ago' label, or None if missing.
+
+    Accepts `datetime` (tz-aware preferred; tz-naive coerced to UTC).
+    Examples: "just now", "3 hours ago", "yesterday", "5 days ago",
+    "2 weeks ago", or YYYY-MM-DD when older than 30 days.
+    """
+    from datetime import UTC, datetime
+    if posted_at is None:
+        return None
+    if not isinstance(posted_at, datetime):
+        return None
+    ts = posted_at if posted_at.tzinfo else posted_at.replace(tzinfo=UTC)
+    delta = datetime.now(UTC) - ts
+    seconds = max(0, int(delta.total_seconds()))
+    minutes, hours, days = seconds // 60, seconds // 3600, seconds // 86400
+    if seconds < 60:
+        return "just now"
+    if minutes < 60:
+        return f"{minutes} minute{'s' if minutes != 1 else ''} ago"
+    if hours < 24:
+        return f"{hours} hour{'s' if hours != 1 else ''} ago"
+    if days == 1:
+        return "yesterday"
+    if days < 7:
+        return f"{days} days ago"
+    if days < 30:
+        weeks = days // 7
+        return f"{weeks} week{'s' if weeks != 1 else ''} ago"
+    return ts.date().isoformat()
+
+
 def format_new_job(
     *,
     title: str,
@@ -229,14 +395,25 @@ def format_new_job(
     salary_max: SalaryNum | None = None,
     salary_currency: str | None = None,
     salary_period: str | None = None,
+    posted_at: object = None,
     url: str,
-) -> str:
-    """Build the HTML-formatted message body for one newly-ingested job.
+) -> tuple[str, list[tuple[str, str]]]:
+    """Build the HTML-formatted message body + inline-button list.
+
+    Returns `(body, buttons)`:
+      * `body` — the HTML-formatted message text
+      * `buttons` — list of `(label, url)` pairs to render as a row of
+        tappable buttons below the message. Empty list when no URL.
 
     Caller is responsible for passing CLEAN already-stripped values —
     the runner already does this via `_clean_title` / `_clean_company_name`
-    before calling us. `url` is the authoritative source URL (the
-    `canonical_url` of the canonical posting in the cluster).
+    before calling us. `url` is the authoritative source URL.
+
+    The title in the body is still rendered as a clickable link (for
+    Telegram clients that hide the button row), AND the URL is shown
+    in plain form at the bottom (for users who want to see / copy the
+    actual URL). The new inline button gives a third affordance —
+    a prominent tap-target that opens the job page.
     """
     import html
 
@@ -257,6 +434,10 @@ def format_new_job(
         loc = ", ".join(p for p in (city_name, (country_code or "").upper()) if p)
         if loc:
             lines.append(f"📍 {html.escape(loc)}")
+
+    posted_label = _humanise_posted_at(posted_at)
+    if posted_label:
+        lines.append(f"📅 Posted {html.escape(posted_label)}")
 
     salary = _format_salary(salary_min, salary_max, salary_currency, salary_period)
     if salary:
@@ -285,4 +466,8 @@ def format_new_job(
     if tags:
         lines.append(" ".join(tags))
 
-    return "\n".join(lines)
+    buttons: list[tuple[str, str]] = []
+    if url:
+        buttons.append(("👀 View full job", url))
+
+    return "\n".join(lines), buttons
