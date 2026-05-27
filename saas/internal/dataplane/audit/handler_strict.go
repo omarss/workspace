@@ -21,7 +21,7 @@ import (
 func (h *Handler) ListAuditEvents(ctx context.Context, req httpapi.ListAuditEventsRequestObject) (httpapi.ListAuditEventsResponseObject, error) {
 	filter := ListFilter{TenantID: req.TenantId, Limit: 25}
 	if req.Params.Limit != nil {
-		filter.Limit = int(*req.Params.Limit)
+		filter.Limit = *req.Params.Limit
 	}
 	if req.Params.Action != nil {
 		filter.Action = *req.Params.Action
@@ -207,7 +207,7 @@ func toHTTPAuditEvent(e Event) httpapi.AuditEvent {
 	}
 	var metaPtr *map[string]interface{}
 	if e.Metadata != nil {
-		m := map[string]interface{}(e.Metadata)
+		m := e.Metadata
 		metaPtr = &m
 	}
 	return httpapi.AuditEvent{

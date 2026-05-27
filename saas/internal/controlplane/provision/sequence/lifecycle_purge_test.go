@@ -22,8 +22,8 @@ type stubOpenBao struct {
 func (s *stubOpenBao) Apply(_ context.Context, _ openbao.ApplyInput) (openbao.ApplyResult, error) {
 	return openbao.ApplyResult{}, nil
 }
-func (s *stubOpenBao) Remove(_ context.Context, _ openbao.RemoveInput) error          { return nil }
-func (s *stubOpenBao) VerifyAccess(_ context.Context, _ string) error                 { return nil }
+func (s *stubOpenBao) Remove(_ context.Context, _ openbao.RemoveInput) error { return nil }
+func (s *stubOpenBao) VerifyAccess(_ context.Context, _ string) error        { return nil }
 func (s *stubOpenBao) FreezeKeys(_ context.Context, _ string) error {
 	s.freezeCalled = true
 	return nil
@@ -37,37 +37,37 @@ func (stubPostgres) Apply(_ context.Context, _ postgres.ApplyInput) (postgres.Ap
 		DBName:           "saas_acme_prod",
 		RoleName:         "saas_acme_prod_app",
 		RolePassword:     "test-pw",
-		PerDeploymentDSN: "postgres://saas_acme_prod_app:test-pw@localhost:5432/saas_acme_prod",
+		PerDeploymentDSN: "postgres://saas_acme_prod_app:test-pw@localhost:5432/saas_acme_prod", // #nosec G101 -- stub adapter fixture; not a real credential
 	}, nil
 }
-func (stubPostgres) Remove(_ context.Context, _ postgres.RemoveInput) error  { return nil }
-func (stubPostgres) VerifyRLS(_ context.Context, _ string) error             { return nil }
+func (stubPostgres) Remove(_ context.Context, _ postgres.RemoveInput) error { return nil }
+func (stubPostgres) VerifyRLS(_ context.Context, _ string) error            { return nil }
 
 // stubK3s satisfies k3s.Adapter.
 type stubK3s struct{}
 
-func (stubK3s) Apply(_ context.Context, _ k3s.ApplyInput) error    { return nil }
-func (stubK3s) Remove(_ context.Context, _ k3s.RemoveInput) error  { return nil }
-func (stubK3s) WaitReady(_ context.Context, _ string) error        { return nil }
+func (stubK3s) Apply(_ context.Context, _ k3s.ApplyInput) error   { return nil }
+func (stubK3s) Remove(_ context.Context, _ k3s.RemoveInput) error { return nil }
+func (stubK3s) WaitReady(_ context.Context, _ string) error       { return nil }
 
 // stubNginx satisfies nginx.Adapter.
 type stubNginx struct{}
 
-func (stubNginx) Apply(_ context.Context, _ nginx.ApplyInput) error      { return nil }
-func (stubNginx) IssueCert(_ context.Context, _ nginx.ApplyInput) error  { return nil }
-func (stubNginx) Remove(_ context.Context, _ nginx.RemoveInput) error    { return nil }
+func (stubNginx) Apply(_ context.Context, _ nginx.ApplyInput) error     { return nil }
+func (stubNginx) IssueCert(_ context.Context, _ nginx.ApplyInput) error { return nil }
+func (stubNginx) Remove(_ context.Context, _ nginx.RemoveInput) error   { return nil }
 
 func newStubAdapters() (sequence.Adapters, *stubOpenBao) {
 	bao := &stubOpenBao{}
 	return sequence.Adapters{
-		OpenBao:              bao,
-		Postgres:             stubPostgres{},
-		K3s:                  stubK3s{},
-		Nginx:                stubNginx{},
-		PostgresAdminDSN:     "postgres://admin@localhost:5432/postgres",
-		K3sHostNginxCIDR:     "10.0.0.0/24",
-		K3sHostPostgresCIDR:  "10.0.0.0/24",
-		K3sHostOpenBaoCIDR:   "10.0.0.0/24",
+		OpenBao:             bao,
+		Postgres:            stubPostgres{},
+		K3s:                 stubK3s{},
+		Nginx:               stubNginx{},
+		PostgresAdminDSN:    "postgres://admin@localhost:5432/postgres",
+		K3sHostNginxCIDR:    "10.0.0.0/24",
+		K3sHostPostgresCIDR: "10.0.0.0/24",
+		K3sHostOpenBaoCIDR:  "10.0.0.0/24",
 	}, bao
 }
 

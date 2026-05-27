@@ -24,7 +24,7 @@ func TestValidateApplyInput(t *testing.T) {
 				DeploymentID:    "dep_01H",
 				ProjectSlug:     "acme",
 				EnvironmentSlug: "prod",
-				AdminDSN:        "postgres://saas:saas@localhost:55432/saas",
+				AdminDSN:        "postgres://saas:saas@localhost:55432/saas", // #nosec G101 -- local docker-compose superuser DSN; harmless test fixture
 			},
 		},
 		{
@@ -101,7 +101,6 @@ func TestValidateApplyInput(t *testing.T) {
 		},
 	}
 	for _, tc := range cases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			err := tc.in.Validate()

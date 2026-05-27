@@ -17,9 +17,9 @@ import (
 // is faithful to production behaviour.
 type MemoryRepository struct {
 	mu      sync.Mutex
-	events  []Event              // append-only; ordered by insert
-	bySrcID map[string]int       // source_event_id → events index, for idempotency
-	chains  map[string][]int     // tenant_id → ordered indices into events
+	events  []Event          // append-only; ordered by insert
+	bySrcID map[string]int   // source_event_id → events index, for idempotency
+	chains  map[string][]int // tenant_id → ordered indices into events
 	now     func() time.Time
 }
 

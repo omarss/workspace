@@ -14,8 +14,8 @@ func TestValidateImageVersion(t *testing.T) {
 		{"v0.3.1", true},
 		{"v1.2.3-alpha.1", true},
 		{"v1.2.3-rc1", true},
-		{"1.0.0", false},      // missing v
-		{"v1.0", false},       // missing patch
+		{"1.0.0", false},       // missing v
+		{"v1.0", false},        // missing patch
 		{"v1.0.0+meta", false}, // build metadata not supported
 		{"latest", false},
 		{"", false},

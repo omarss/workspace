@@ -20,17 +20,17 @@
 //
 // Step ordering respects all phase dependencies:
 //
-//  1.  validate         — slugs (handler already enforced)
-//  2.  allocate_id      — dep_<ulid>
-//  3.  record_state     — INSERT deployment + provision_step rows
-//  4.  openbao          — transit key + policy + k8s role + KV path
-//                          (must precede postgres so the pg password
-//                          has a place to live)
-//  5.  postgres         — CREATE DB + role + grants + migrations + RLS
-//  6.  seed             — bootstrap tenant + admin + API key
-//  7.  render_k3s       — kustomize render to bytes
-//  8.  k3s_apply        — SSA + WaitReady
-//  9.  render_nginx     — vhost template render
+//  1. validate         — slugs (handler already enforced)
+//  2. allocate_id      — dep_<ulid>
+//  3. record_state     — INSERT deployment + provision_step rows
+//  4. openbao          — transit key + policy + k8s role + KV path
+//     (must precede postgres so the pg password
+//     has a place to live)
+//  5. postgres         — CREATE DB + role + grants + migrations + RLS
+//  6. seed             — bootstrap tenant + admin + API key
+//  7. render_k3s       — kustomize render to bytes
+//  8. k3s_apply        — SSA + WaitReady
+//  9. render_nginx     — vhost template render
 //  10. nginx_apply      — install + nginx -t + reload + certbot
 //  11. healthz          — poll https://<vhost>/healthz until 200
 //  12. flip_active      — status=active + deployment.provisioned event

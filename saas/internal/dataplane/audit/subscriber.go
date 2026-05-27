@@ -57,9 +57,9 @@ var AuditedEventTypes = map[string]string{
 	"member.removed":      "member.remove",
 	"member.role_changed": "member.role_change",
 	// RBAC
-	"role.created":         "role.create",
-	"role.updated":         "role.update",
-	"role.deleted":         "role.delete",
+	"role.created":           "role.create",
+	"role.updated":           "role.update",
+	"role.deleted":           "role.delete",
 	"member_role.assigned":   "member_role.assign",
 	"member_role.unassigned": "member_role.unassign",
 	"permission.granted":     "permission.grant",
@@ -71,23 +71,23 @@ var AuditedEventTypes = map[string]string{
 	"api_key.revoked": "api_key.revoke",
 	// Notifications (channel CRUD is audited; per-message sends are
 	// noisy and excluded — only failures audit, per §18.3 list).
-	"notification.delivery_failed":         "notification.delivery_fail",
-	"notification_channel.created":         "notification_channel.create",
-	"notification_channel.rotated":         "notification_channel.rotate",
-	"notification_channel.deleted":         "notification_channel.delete",
+	"notification.delivery_failed": "notification.delivery_fail",
+	"notification_channel.created": "notification_channel.create",
+	"notification_channel.rotated": "notification_channel.rotate",
+	"notification_channel.deleted": "notification_channel.delete",
 	// Operator / Control plane events (consumed once Phase 11+ emits them;
 	// keys exist here so audit-eligibility is centralised in one map).
 	"operator.login":                 "operator.login",
 	"operator.impersonation_started": "operator.impersonation_start",
 	"operator.impersonation_ended":   "operator.impersonation_end",
-	"deployment.provisioned":   "deployment.provision",
-	"deployment.upgraded":      "deployment.upgrade",
-	"deployment.rollback":      "deployment.rollback",
-	"deployment.destroyed":     "deployment.destroy",
-	"deployment.purged":        "deployment.purge",
-	"deployment.domain_attached": "deployment.domain_attach",
-	"deployment.domain_verified": "deployment.domain_verify",
-	"deployment.domain_detached": "deployment.domain_detach",
+	"deployment.provisioned":         "deployment.provision",
+	"deployment.upgraded":            "deployment.upgrade",
+	"deployment.rollback":            "deployment.rollback",
+	"deployment.destroyed":           "deployment.destroy",
+	"deployment.purged":              "deployment.purge",
+	"deployment.domain_attached":     "deployment.domain_attach",
+	"deployment.domain_verified":     "deployment.domain_verify",
+	"deployment.domain_detached":     "deployment.domain_detach",
 }
 
 // IsAudited reports whether eventType produces an audit_event row.
