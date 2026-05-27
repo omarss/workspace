@@ -543,12 +543,26 @@ class CrawlerRunner:
             return  # require resolved city
         if (posting.description or "").strip().__len__() < 300:
             return
-        # Require a clear posted date — subscribers can't make sense of
-        # a job whose age we don't know. `source_updated_at` is NOT a
-        # substitute (Greenhouse refreshes long-lived roles, but the
-        # original posted_at is what subscribers expect).
-        if parsed.posted_at is None:
-            return
+        # Require a clear date for subscribers. `posted_at` is the
+        # canonical signal (board's listing creation date) — we prefer
+        # that when present. Some sources (notably `company_careers`,
+        # which scrapes SPA career pages) cannot extract a posted-at
+        # from the HTML; for those we fall back to `first_seen_at`
+        # (when our crawler first ingested the URL), gated to the last
+        # 48 hours so a bulk-backfill or re-seed cannot retroactively
+        # spam the channel with stale listings. `source_updated_at` is
+        # NOT a substitute (Greenhouse refreshes long-lived roles, but
+        # the original posted_at is what subscribers expect).
+        from datetime import UTC, datetime, timedelta
+        display_date: datetime | None = parsed.posted_at
+        if display_date is None:
+            seen_ts = (
+                posting.first_seen_at if posting.first_seen_at.tzinfo
+                else posting.first_seen_at.replace(tzinfo=UTC)
+            )
+            if seen_ts < datetime.now(UTC) - timedelta(hours=48):
+                return
+            display_date = seen_ts
 
         # --- Cluster-level dedup (telegram_broadcasts) --------------------
         async with self.db.pool.connection() as conn, conn.cursor() as cur:
@@ -586,6 +600,9 @@ class CrawlerRunner:
                 parsed.salary_period.value if parsed.salary_period else None
             ),
             posted_at=parsed.posted_at,
+            first_seen_at=(
+                display_date if parsed.posted_at is None else None
+            ),
             url=parsed.canonical_url,
         )
         sent = await send_message(body, inline_buttons=buttons)

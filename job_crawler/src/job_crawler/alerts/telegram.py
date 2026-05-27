@@ -449,6 +449,7 @@ def format_new_job(
     salary_currency: str | None = None,
     salary_period: str | None = None,
     posted_at: object = None,
+    first_seen_at: object = None,
     url: str,
 ) -> tuple[str, list[tuple[str, str]]]:
     """Build the HTML-formatted message body + inline-button list.
@@ -491,6 +492,13 @@ def format_new_job(
     posted_label = _humanise_posted_at(posted_at)
     if posted_label:
         lines.append(f"📅 Posted {html.escape(posted_label)}")
+    else:
+        # Sources without a board-supplied posted-at (e.g. company
+        # career pages parsed by `company_careers`) pass through the
+        # first-seen timestamp so subscribers still get a date anchor.
+        seen_label = _humanise_posted_at(first_seen_at)
+        if seen_label:
+            lines.append(f"📅 First seen {html.escape(seen_label)}")
 
     salary = _format_salary(salary_min, salary_max, salary_currency, salary_period)
     if salary:
