@@ -49,6 +49,12 @@ class ATSBoardCrawler(BaseCrawler):
     # ATS boards return jobs for *all* their tenants' locations. We only
     # care about GCC roles, so the runner drops the rest.
     requires_gcc_location: ClassVar[bool] = True
+    # ATS APIs return `first_published` as posted_at — the original
+    # go-live date, often months old even when the role is actively
+    # recruiting. We don't want the runner's date-window gate to drop
+    # these. Companies remove closed roles from the API immediately,
+    # so "still in the API" = "still hiring".
+    requires_recent_posted_at: ClassVar[bool] = False
     # Subclasses set `boards_env_var` to the env var name they read.
     boards_env_var: ClassVar[str] = ""
     default_boards: ClassVar[tuple[str, ...]] = ()
