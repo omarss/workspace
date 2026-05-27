@@ -9,6 +9,7 @@ import html
 import logging
 import re
 from dataclasses import dataclass
+from decimal import Decimal as _Decimal
 from typing import Final
 from uuid import UUID
 
@@ -218,6 +219,86 @@ def _clean_title(value: str | None) -> str | None:
     return cleaned or None
 
 
+# ---------------------------------------------------------------------------
+# Salary normalisation
+# ---------------------------------------------------------------------------
+# Every posting stored as SAR so the search facets / range filters /
+# sort-by-salary queries operate on a single unit. The SAR/USD peg has
+# been fixed by SAMA at 3.75 since 1986 — safe to hardcode as a static
+# rate. Other GCC currencies have similar pegs but we leave non-SAR
+# salaries alone for now (returning them as-is) rather than risk a
+# bad rate. Future enhancement: per-currency rate table + occasional
+# refresh from a free FX endpoint.
+
+_USD_TO_SAR: Final[_Decimal] = _Decimal("3.75")
+_KNOWN_CONVERSIONS: Final[dict[str, _Decimal]] = {
+    "USD": _USD_TO_SAR,
+    # Other GCC pegs (round figures — close enough for display, don't
+    # use for accounting):
+    "AED": _Decimal("1.02"),   # AED to SAR (3.67 USD/AED, SAR=3.75)
+    "BHD": _Decimal("9.95"),   # BHD to SAR
+    "KWD": _Decimal("12.2"),   # KWD to SAR (approx, KWD floats)
+    "OMR": _Decimal("9.75"),   # OMR to SAR
+    "QAR": _Decimal("1.03"),   # QAR pegged to USD at 3.64
+}
+
+
+def _normalise_salary_to_sar(
+    salary_min: _Decimal | int | float | None,
+    salary_max: _Decimal | int | float | None,
+    salary_currency: str | None,
+) -> tuple[_Decimal | None, _Decimal | None, str | None]:
+    """Convert salary values to SAR using static GCC pegs.
+
+    Behaviour:
+      * Both values None or unknown currency → pass through unchanged.
+      * Currency already SAR / sar → trim to two decimals, return as SAR.
+      * Currency in `_KNOWN_CONVERSIONS` → multiply each non-None value
+        by the rate, return as SAR.
+      * Unknown / freeform currency → pass through unchanged (caller
+        decides how to render).
+
+    Conservative: never invents a value where None was passed in.
+    """
+    if salary_min is None and salary_max is None:
+        return None, None, salary_currency
+
+    if not salary_currency:
+        return _to_decimal(salary_min), _to_decimal(salary_max), salary_currency
+
+    upper = salary_currency.strip().upper()
+    if upper == "SAR":
+        return _to_decimal(salary_min), _to_decimal(salary_max), "SAR"
+
+    rate = _KNOWN_CONVERSIONS.get(upper)
+    if rate is None:
+        # Unknown currency — leave numbers and label as-is; the dashboard
+        # / Telegram formatter will render whatever the source said.
+        return _to_decimal(salary_min), _to_decimal(salary_max), salary_currency
+
+    dmin = _to_decimal(salary_min)
+    dmax = _to_decimal(salary_max)
+    return (
+        dmin * rate if dmin is not None else None,
+        dmax * rate if dmax is not None else None,
+        "SAR",
+    )
+
+
+def _to_decimal(value: _Decimal | int | float | None) -> _Decimal | None:
+    """Coerce a numeric-ish value to Decimal for arithmetic + storage.
+
+    Decimal-from-float goes via str() to avoid binary-float artefacts
+    like `Decimal('1500.0000000000000909494701772928237915')`. None
+    passes through.
+    """
+    if value is None:
+        return None
+    if isinstance(value, _Decimal):
+        return value
+    return _Decimal(str(value))
+
+
 # Free-text aliases + sub-city neighborhoods → canonical cities.name_en.
 # Bayt and a few other sources frequently emit raw_location values that are
 # neighborhoods (e.g. "An Narjis", "Al Olaya"), district names, or alternate
@@ -413,6 +494,14 @@ def to_upsert(
     )
     relocation_assistance = detect_relocation_assistance(parsed.description)
 
+    # Salary normalisation — everything stored as SAR for consistent
+    # range queries / facets / sorting in the UI. USD pegged to SAR at
+    # 3.75 (the SAMA-set rate, stable since 1986). See
+    # `_normalise_salary_to_sar` for the conversion rules.
+    sal_min, sal_max, sal_currency = _normalise_salary_to_sar(
+        parsed.salary_min, parsed.salary_max, parsed.salary_currency,
+    )
+
     # Centralised text sanitisation — runs on every source so the
     # downstream consumer (search vectors, dedupe content_hash,
     # dashboard) never has to deal with invisible junk that leaks
@@ -455,9 +544,9 @@ def to_upsert(
         hiring_manager_linkedin_url=parsed.hiring_manager_linkedin_url,
         saudi_nationals_only=saudi_only,
         gender_preference=gender,
-        salary_min=parsed.salary_min,
-        salary_max=parsed.salary_max,
-        salary_currency=parsed.salary_currency,
+        salary_min=sal_min,
+        salary_max=sal_max,
+        salary_currency=sal_currency,
         salary_period=parsed.salary_period,
         posted_at=parsed.posted_at,
         source_updated_at=parsed.source_updated_at,
