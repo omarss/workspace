@@ -1,0 +1,4006 @@
+{
+	"info": {
+		"name": "SaaS Data Plane API",
+		"description": {
+		    "content": "Per-deployment data plane API. One vhost per Deployment under *.saas.omarss.net.",
+		    "type": "text/markdown"
+		},
+		"version": "0.0.3",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+	        {
+	            "name": "tenants",
+	            "description": "Tenant CRUD. Tenant is the unit of isolation and billing.",
+	            "item": [
+	                        {
+    "name": "/v1/tenants",
+                "description": "Idempotent. Replays with the same Idempotency-Key + body return the cached 201 response; with the same key + a different body return 422 idempotency-key-conflict (see AGENTS.md section 5.2). ",
+                 "item": [
+                            {
+                                "name": "Create a tenant. Auto-creates a default Organization.",
+                                "request": {
+    "method": "POST",
+    "header": [
+        {
+        "key": "Content-Type",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        },
+        {
+        "key": "Accept",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        },
+        {
+        "key": "Idempotency-Key",
+        "value": "",
+        "description": "24-hour idempotency key (idem_<ulid>).",
+        "disabled": true
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "{\n \"slug\": \"<string>\",\n \"name\": \"<string>\",\n \"metadata\": \"<string>\"\n}",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/v1/tenants",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "v1",
+        "tenants"
+    ],
+    "variable": [
+    ],
+    "query": [
+    ]
+    },
+    "description": "Idempotent. Replays with the same Idempotency-Key + body return the cached 201 response; with the same key + a different body return 422 idempotency-key-conflict (see AGENTS.md section 5.2). "
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        },
+	                        {
+    "name": "/v1/tenants",
+                "description": "Returns the tenants the caller is authorised to see. In Phase 2 the Data Plane caller's token resolves to exactly one tenant, so the list contains one element. Operator impersonation across tenants lands in Phase 13. ",
+                 "item": [
+                            {
+                                "name": "List tenants visible to the caller's Deployment.",
+                                "request": {
+    "method": "GET",
+    "header": [
+        {
+        "key": "Accept",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/v1/tenants",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "v1",
+        "tenants"
+    ],
+    "variable": [
+    ],
+    "query": [
+        {
+        "key": "limit",
+        "value": "56",
+        "description": "Max items to return (default 25, max 200).",
+        "disabled": true
+        },
+        {
+        "key": "cursor",
+        "value": "cursor_example",
+        "description": "Opaque pagination cursor; obtained from a previous response.",
+        "disabled": true
+        },
+        {
+        "key": "sort",
+        "value": "sort_example",
+        "description": "Sort token. Default \"-created_at\".",
+        "disabled": true
+        }
+    ]
+    },
+    "description": "Returns the tenants the caller is authorised to see. In Phase 2 the Data Plane caller's token resolves to exactly one tenant, so the list contains one element. Operator impersonation across tenants lands in Phase 13. "
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        },
+	                        {
+    "name": "/v1/tenants/:tenant_id",
+                "description": "Soft-deletes the tenant; status flips to \"deleted\" and a retention window applies before any physical purge (purge endpoint lands in Phase 18). ",
+                 "item": [
+                            {
+                                "name": "Soft-delete a tenant. Retention applies before physical purge.",
+                                "request": {
+    "method": "DELETE",
+    "header": [
+        {
+        "key": "Accept",
+        "value": "application/problem+json",
+        "description": "",
+        "disabled": false
+        },
+        {
+        "key": "If-Match",
+        "value": "",
+        "description": "Weak ETag from a prior GET; rejects on mismatch with 412.",
+        "disabled": true
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/v1/tenants/:tenant_id",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "v1",
+        "tenants",
+        ":tenant_id"
+    ],
+    "variable": [
+        {
+        "key": "tenantId",
+        "value": "",
+        "description": ""
+        }
+    ],
+    "query": [
+    ]
+    },
+    "description": "Soft-deletes the tenant; status flips to \"deleted\" and a retention window applies before any physical purge (purge endpoint lands in Phase 18). "
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        },
+	                        {
+    "name": "/v1/tenants/:tenant_id",
+                "description": "Returns the tenant if the caller's tenant context matches the path id; 403 otherwise.",
+                 "item": [
+                            {
+                                "name": "Fetch a tenant by id.",
+                                "request": {
+    "method": "GET",
+    "header": [
+        {
+        "key": "Accept",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/v1/tenants/:tenant_id",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "v1",
+        "tenants",
+        ":tenant_id"
+    ],
+    "variable": [
+        {
+        "key": "tenantId",
+        "value": "",
+        "description": ""
+        }
+    ],
+    "query": [
+    ]
+    },
+    "description": "Returns the tenant if the caller's tenant context matches the path id; 403 otherwise."
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        },
+	                        {
+    "name": "/v1/tenants/:tenant_id",
+                "description": "PATCH requires the current Weak ETag in If-Match; a stale ETag returns 412. Idempotency-Key replays the cached response when the body hash matches. ",
+                 "item": [
+                            {
+                                "name": "Update a tenant. Idempotent. ETag concurrency control required.",
+                                "request": {
+    "method": "PATCH",
+    "header": [
+        {
+        "key": "Content-Type",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        },
+        {
+        "key": "Accept",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        },
+        {
+        "key": "If-Match",
+        "value": "",
+        "description": "Weak ETag from a prior GET; rejects on mismatch with 412.",
+        "disabled": true
+        },
+        {
+        "key": "Idempotency-Key",
+        "value": "",
+        "description": "24-hour idempotency key (idem_<ulid>).",
+        "disabled": true
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "{\n \"name\": \"<string>\",\n \"status\": \"<string>\",\n \"metadata\": \"<string>\"\n}",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/v1/tenants/:tenant_id",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "v1",
+        "tenants",
+        ":tenant_id"
+    ],
+    "variable": [
+        {
+        "key": "tenantId",
+        "value": "",
+        "description": ""
+        }
+    ],
+    "query": [
+    ]
+    },
+    "description": "PATCH requires the current Weak ETag in If-Match; a stale ETag returns 412. Idempotency-Key replays the cached response when the body hash matches. "
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        }
+	                    ]
+	        },
+	        {
+	            "name": "api-keys",
+	            "description": "Tenant-bound bearer-token API keys (AGENTS.md §8.5). Plaintext\nsecrets are returned exactly once at create and rotate time;\nsubsequent reads expose only the visible prefix. argon2id PHC\nhashing + envelope-encrypted prefix-search index per ADR 008.\nRotation preserves the previous secret for a configurable grace\nwindow (default 24h, max 7d) so clients can roll over without\ndowntime.\n",
+	            "item": [
+	                        {
+    "name": "/v1/api-keys/:api_key_id",
+                "description": "",
+                 "item": [
+                            {
+                                "name": "Soft-revoke an API key (alias of revoke).",
+                                "request": {
+    "method": "DELETE",
+    "header": [
+        {
+        "key": "Accept",
+        "value": "application/problem+json",
+        "description": "",
+        "disabled": false
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/v1/api-keys/:api_key_id",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "v1",
+        "api-keys",
+        ":api_key_id"
+    ],
+    "variable": [
+        {
+        "key": "apiKeyId",
+        "value": "",
+        "description": ""
+        }
+    ],
+    "query": [
+    ]
+    },
+    "description": ""
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        },
+	                        {
+    "name": "/v1/api-keys/:api_key_id",
+                "description": "",
+                 "item": [
+                            {
+                                "name": "Fetch an API key by id (no plaintext).",
+                                "request": {
+    "method": "GET",
+    "header": [
+        {
+        "key": "Accept",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/v1/api-keys/:api_key_id",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "v1",
+        "api-keys",
+        ":api_key_id"
+    ],
+    "variable": [
+        {
+        "key": "apiKeyId",
+        "value": "",
+        "description": ""
+        }
+    ],
+    "query": [
+    ]
+    },
+    "description": ""
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        },
+	                        {
+    "name": "/v1/api-keys/:api_key_id",
+                "description": "",
+                 "item": [
+                            {
+                                "name": "Update name, scopes, ip_allowlist, rate_limit.",
+                                "request": {
+    "method": "PATCH",
+    "header": [
+        {
+        "key": "Content-Type",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        },
+        {
+        "key": "Accept",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        },
+        {
+        "key": "If-Match",
+        "value": "",
+        "description": "Weak ETag from a prior GET; rejects on mismatch with 412.",
+        "disabled": true
+        },
+        {
+        "key": "Idempotency-Key",
+        "value": "",
+        "description": "24-hour idempotency key (idem_<ulid>).",
+        "disabled": true
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "{\n \"name\": \"<string>\",\n \"scopes\": \"<string>\",\n \"rate_limit_per_minute\": \"<number>\",\n \"ip_allowlist\": \"<string>\",\n \"expires_at\": \"<string>\"\n}",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/v1/api-keys/:api_key_id",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "v1",
+        "api-keys",
+        ":api_key_id"
+    ],
+    "variable": [
+        {
+        "key": "apiKeyId",
+        "value": "",
+        "description": ""
+        }
+    ],
+    "query": [
+    ]
+    },
+    "description": ""
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        },
+	                        {
+    "name": "/v1/api-keys/:api_key_id/revoke",
+                "description": "",
+                 "item": [
+                            {
+                                "name": "Immediately revoke an API key (no grace).",
+                                "request": {
+    "method": "POST",
+    "header": [
+        {
+        "key": "Accept",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        },
+        {
+        "key": "Idempotency-Key",
+        "value": "",
+        "description": "24-hour idempotency key (idem_<ulid>).",
+        "disabled": true
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/v1/api-keys/:api_key_id/revoke",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "v1",
+        "api-keys",
+        ":api_key_id",
+        "revoke"
+    ],
+    "variable": [
+        {
+        "key": "apiKeyId",
+        "value": "",
+        "description": ""
+        }
+    ],
+    "query": [
+    ]
+    },
+    "description": ""
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        },
+	                        {
+    "name": "/v1/api-keys/:api_key_id/rotate",
+                "description": "Mints a new plaintext secret for the same row id and demotes the previous secret into a predecessor PHC valid until `predecessor_expires_at`. Requires `apikey.write` when SAAS_RBAC_ENFORCE_DESTRUCTIVE=true. ",
+                 "item": [
+                            {
+                                "name": "Rotate an API key with optional grace period.",
+                                "request": {
+    "method": "POST",
+    "header": [
+        {
+        "key": "Content-Type",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        },
+        {
+        "key": "Accept",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        },
+        {
+        "key": "Idempotency-Key",
+        "value": "",
+        "description": "24-hour idempotency key (idem_<ulid>).",
+        "disabled": true
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "{\n \"grace_period_seconds\": \"<number>\"\n}",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/v1/api-keys/:api_key_id/rotate",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "v1",
+        "api-keys",
+        ":api_key_id",
+        "rotate"
+    ],
+    "variable": [
+        {
+        "key": "apiKeyId",
+        "value": "",
+        "description": ""
+        }
+    ],
+    "query": [
+    ]
+    },
+    "description": "Mints a new plaintext secret for the same row id and demotes the previous secret into a predecessor PHC valid until `predecessor_expires_at`. Requires `apikey.write` when SAAS_RBAC_ENFORCE_DESTRUCTIVE=true. "
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        },
+	                        {
+    "name": "/v1/tenants/:tenant_id/api-keys",
+                "description": "Creates an API key under the named tenant. The response body carries the plaintext bearer in `secret` — this is the only time it is returned. Subsequent reads expose only the prefix. The `apikey.write` permission is required when the deployment has SAAS_RBAC_ENFORCE_DESTRUCTIVE=true (Phase 8 retrofit). ",
+                 "item": [
+                            {
+                                "name": "Mint a new API key. Plaintext returned ONCE.",
+                                "request": {
+    "method": "POST",
+    "header": [
+        {
+        "key": "Content-Type",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        },
+        {
+        "key": "Accept",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        },
+        {
+        "key": "Idempotency-Key",
+        "value": "",
+        "description": "24-hour idempotency key (idem_<ulid>).",
+        "disabled": true
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "{\n \"name\": \"<string>\",\n \"scopes\": \"<string>\",\n \"environment_id\": \"<string>\",\n \"expires_at\": \"<string>\",\n \"rate_limit_per_minute\": \"<number>\",\n \"ip_allowlist\": \"<string>\"\n}",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/v1/tenants/:tenant_id/api-keys",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "v1",
+        "tenants",
+        ":tenant_id",
+        "api-keys"
+    ],
+    "variable": [
+        {
+        "key": "tenantId",
+        "value": "",
+        "description": ""
+        }
+    ],
+    "query": [
+    ]
+    },
+    "description": "Creates an API key under the named tenant. The response body carries the plaintext bearer in `secret` — this is the only time it is returned. Subsequent reads expose only the prefix. The `apikey.write` permission is required when the deployment has SAAS_RBAC_ENFORCE_DESTRUCTIVE=true (Phase 8 retrofit). "
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        },
+	                        {
+    "name": "/v1/tenants/:tenant_id/api-keys",
+                "description": "",
+                 "item": [
+                            {
+                                "name": "List API keys for a tenant.",
+                                "request": {
+    "method": "GET",
+    "header": [
+        {
+        "key": "Accept",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/v1/tenants/:tenant_id/api-keys",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "v1",
+        "tenants",
+        ":tenant_id",
+        "api-keys"
+    ],
+    "variable": [
+        {
+        "key": "tenantId",
+        "value": "",
+        "description": ""
+        }
+    ],
+    "query": [
+        {
+        "key": "limit",
+        "value": "56",
+        "description": "Max items to return (default 25, max 200).",
+        "disabled": true
+        },
+        {
+        "key": "cursor",
+        "value": "cursor_example",
+        "description": "Opaque pagination cursor; obtained from a previous response.",
+        "disabled": true
+        }
+    ]
+    },
+    "description": ""
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        }
+	                    ]
+	        },
+	        {
+	            "name": "organizations",
+	            "description": "Organizations group platform users inside a Tenant. Every Tenant gets\na default organization on creation. Multi-org tenants must opt in via\ntenant.metadata.multi_org.\n",
+	            "item": [
+	                        {
+    "name": "/v1/organizations/:organization_id",
+                "description": "",
+                 "item": [
+                            {
+                                "name": "Soft-delete an organization. Refuses while active members remain.",
+                                "request": {
+    "method": "DELETE",
+    "header": [
+        {
+        "key": "Accept",
+        "value": "application/problem+json",
+        "description": "",
+        "disabled": false
+        },
+        {
+        "key": "If-Match",
+        "value": "",
+        "description": "Weak ETag from a prior GET; rejects on mismatch with 412.",
+        "disabled": true
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/v1/organizations/:organization_id",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "v1",
+        "organizations",
+        ":organization_id"
+    ],
+    "variable": [
+        {
+        "key": "organizationId",
+        "value": "",
+        "description": ""
+        }
+    ],
+    "query": [
+    ]
+    },
+    "description": ""
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        },
+	                        {
+    "name": "/v1/organizations/:organization_id",
+                "description": "",
+                 "item": [
+                            {
+                                "name": "Fetch an organization by id.",
+                                "request": {
+    "method": "GET",
+    "header": [
+        {
+        "key": "Accept",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/v1/organizations/:organization_id",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "v1",
+        "organizations",
+        ":organization_id"
+    ],
+    "variable": [
+        {
+        "key": "organizationId",
+        "value": "",
+        "description": ""
+        }
+    ],
+    "query": [
+    ]
+    },
+    "description": ""
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        },
+	                        {
+    "name": "/v1/organizations/:organization_id",
+                "description": "",
+                 "item": [
+                            {
+                                "name": "Update an organization.",
+                                "request": {
+    "method": "PATCH",
+    "header": [
+        {
+        "key": "Content-Type",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        },
+        {
+        "key": "Accept",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        },
+        {
+        "key": "If-Match",
+        "value": "",
+        "description": "Weak ETag from a prior GET; rejects on mismatch with 412.",
+        "disabled": true
+        },
+        {
+        "key": "Idempotency-Key",
+        "value": "",
+        "description": "24-hour idempotency key (idem_<ulid>).",
+        "disabled": true
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "{\n \"name\": \"<string>\",\n \"status\": \"<string>\",\n \"metadata\": \"<string>\"\n}",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/v1/organizations/:organization_id",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "v1",
+        "organizations",
+        ":organization_id"
+    ],
+    "variable": [
+        {
+        "key": "organizationId",
+        "value": "",
+        "description": ""
+        }
+    ],
+    "query": [
+    ]
+    },
+    "description": ""
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        },
+	                        {
+    "name": "/v1/tenants/:tenant_id/organizations",
+                "description": "Creating extra organizations requires `tenant.metadata.multi_org=true`. The default organization is auto-created on tenant.create and cannot be created via this endpoint. ",
+                 "item": [
+                            {
+                                "name": "Create a new organization in a tenant (multi_org required).",
+                                "request": {
+    "method": "POST",
+    "header": [
+        {
+        "key": "Content-Type",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        },
+        {
+        "key": "Accept",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        },
+        {
+        "key": "Idempotency-Key",
+        "value": "",
+        "description": "24-hour idempotency key (idem_<ulid>).",
+        "disabled": true
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "{\n \"slug\": \"<string>\",\n \"name\": \"<string>\",\n \"metadata\": \"<string>\"\n}",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/v1/tenants/:tenant_id/organizations",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "v1",
+        "tenants",
+        ":tenant_id",
+        "organizations"
+    ],
+    "variable": [
+        {
+        "key": "tenantId",
+        "value": "",
+        "description": ""
+        }
+    ],
+    "query": [
+    ]
+    },
+    "description": "Creating extra organizations requires `tenant.metadata.multi_org=true`. The default organization is auto-created on tenant.create and cannot be created via this endpoint. "
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        },
+	                        {
+    "name": "/v1/tenants/:tenant_id/organizations",
+                "description": "",
+                 "item": [
+                            {
+                                "name": "List organizations in a tenant.",
+                                "request": {
+    "method": "GET",
+    "header": [
+        {
+        "key": "Accept",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/v1/tenants/:tenant_id/organizations",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "v1",
+        "tenants",
+        ":tenant_id",
+        "organizations"
+    ],
+    "variable": [
+        {
+        "key": "tenantId",
+        "value": "",
+        "description": ""
+        }
+    ],
+    "query": [
+        {
+        "key": "limit",
+        "value": "56",
+        "description": "Max items to return (default 25, max 200).",
+        "disabled": true
+        },
+        {
+        "key": "cursor",
+        "value": "cursor_example",
+        "description": "Opaque pagination cursor; obtained from a previous response.",
+        "disabled": true
+        }
+    ]
+    },
+    "description": ""
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        }
+	                    ]
+	        },
+	        {
+	            "name": "social-providers",
+	            "description": "Social login linking via Keycloak's IdP brokering. POST returns a\nKeycloak-brokered authorization URL — the caller redirects there\nand Keycloak completes the OAuth dance + writes the federated_identity\nrow itself. ADR 014 records the design.\n",
+	            "item": [
+	                        {
+    "name": "/v1/users/:user_id/social-providers",
+                "description": "Per ADR 014: we never call CreateUserFederatedIdentity from a user-facing endpoint (no proof-of-possession). Instead, the platform mints Keycloak's hashed link URL — the caller redirects the user's browser there and Keycloak completes the OAuth dance with the external IdP, writing the federated_identity row itself. ",
+                 "item": [
+                            {
+                                "name": "Start a social-provider link flow. Returns the Keycloak link URL.",
+                                "request": {
+    "method": "POST",
+    "header": [
+        {
+        "key": "Content-Type",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        },
+        {
+        "key": "Accept",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        },
+        {
+        "key": "Idempotency-Key",
+        "value": "",
+        "description": "24-hour idempotency key (idem_<ulid>).",
+        "disabled": true
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "{\n \"provider\": \"<string>\",\n \"return_to\": \"<string>\"\n}",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/v1/users/:user_id/social-providers",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "v1",
+        "users",
+        ":user_id",
+        "social-providers"
+    ],
+    "variable": [
+        {
+        "key": "userId",
+        "value": "",
+        "description": ""
+        }
+    ],
+    "query": [
+    ]
+    },
+    "description": "Per ADR 014: we never call CreateUserFederatedIdentity from a user-facing endpoint (no proof-of-possession). Instead, the platform mints Keycloak's hashed link URL — the caller redirects the user's browser there and Keycloak completes the OAuth dance with the external IdP, writing the federated_identity row itself. "
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        },
+	                        {
+    "name": "/v1/users/:user_id/social-providers",
+                "description": "",
+                 "item": [
+                            {
+                                "name": "List linked social providers for a user.",
+                                "request": {
+    "method": "GET",
+    "header": [
+        {
+        "key": "Accept",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/v1/users/:user_id/social-providers",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "v1",
+        "users",
+        ":user_id",
+        "social-providers"
+    ],
+    "variable": [
+        {
+        "key": "userId",
+        "value": "",
+        "description": ""
+        }
+    ],
+    "query": [
+    ]
+    },
+    "description": ""
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        },
+	                        {
+    "name": "/v1/users/:user_id/social-providers/:provider",
+                "description": "",
+                 "item": [
+                            {
+                                "name": "Unlink a social provider. Emits user.social_unlinked.",
+                                "request": {
+    "method": "DELETE",
+    "header": [
+        {
+        "key": "Accept",
+        "value": "application/problem+json",
+        "description": "",
+        "disabled": false
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/v1/users/:user_id/social-providers/:provider",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "v1",
+        "users",
+        ":user_id",
+        "social-providers",
+        ":provider"
+    ],
+    "variable": [
+        {
+        "key": "userId",
+        "value": "",
+        "description": ""
+        },
+        {
+        "key": "provider",
+        "value": "",
+        "description": ""
+        }
+    ],
+    "query": [
+    ]
+    },
+    "description": ""
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        }
+	                    ]
+	        },
+	        {
+	            "name": "authorization",
+	            "description": "RBAC roles, permissions, member-role assignments, and the\nsynchronous check API. Uses Casbin's RBAC-with-domains model with\ndom = tenant_id (ADR 005). Wildcard domains are forbidden by DB\nCHECK + service-layer validation. Every denied check emits an\n`authorization.denied` outbox event for the Phase 10 audit log.\n",
+	            "item": [
+	                        {
+    "name": "/v1/authorization/batch-check",
+                "description": "",
+                 "item": [
+                            {
+                                "name": "Evaluate many checks in one call (max 100).",
+                                "request": {
+    "method": "POST",
+    "header": [
+        {
+        "key": "Content-Type",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        },
+        {
+        "key": "Accept",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "{\n \"checks\": \"<string>\"\n}",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/v1/authorization/batch-check",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "v1",
+        "authorization",
+        "batch-check"
+    ],
+    "variable": [
+    ],
+    "query": [
+    ]
+    },
+    "description": ""
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        },
+	                        {
+    "name": "/v1/authorization/check",
+                "description": "Synchronous policy check. Returns `allowed=true` plus the role that matched, or `allowed=false`. Denied checks emit an `authorization.denied` outbox event so the audit log records the attempt. ",
+                 "item": [
+                            {
+                                "name": "Evaluate a single (member, permission, tenant) check.",
+                                "request": {
+    "method": "POST",
+    "header": [
+        {
+        "key": "Content-Type",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        },
+        {
+        "key": "Accept",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "{\n \"member_id\": \"<string>\",\n \"permission\": \"<string>\",\n \"tenant_id\": \"<string>\"\n}",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/v1/authorization/check",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "v1",
+        "authorization",
+        "check"
+    ],
+    "variable": [
+    ],
+    "query": [
+    ]
+    },
+    "description": "Synchronous policy check. Returns `allowed=true` plus the role that matched, or `allowed=false`. Denied checks emit an `authorization.denied` outbox event so the audit log records the attempt. "
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        },
+	                        {
+    "name": "/v1/members/:member_id/roles",
+                "description": "",
+                 "item": [
+                            {
+                                "name": "Assign a role to a member.",
+                                "request": {
+    "method": "POST",
+    "header": [
+        {
+        "key": "Content-Type",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        },
+        {
+        "key": "Accept",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        },
+        {
+        "key": "Idempotency-Key",
+        "value": "",
+        "description": "24-hour idempotency key (idem_<ulid>).",
+        "disabled": true
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "{\n \"role_id\": \"<string>\",\n \"tenant_id\": \"<string>\"\n}",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/v1/members/:member_id/roles",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "v1",
+        "members",
+        ":member_id",
+        "roles"
+    ],
+    "variable": [
+        {
+        "key": "memberId",
+        "value": "",
+        "description": ""
+        }
+    ],
+    "query": [
+    ]
+    },
+    "description": ""
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        },
+	                        {
+    "name": "/v1/members/:member_id/roles",
+                "description": "",
+                 "item": [
+                            {
+                                "name": "List roles assigned to a member.",
+                                "request": {
+    "method": "GET",
+    "header": [
+        {
+        "key": "Accept",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/v1/members/:member_id/roles",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "v1",
+        "members",
+        ":member_id",
+        "roles"
+    ],
+    "variable": [
+        {
+        "key": "memberId",
+        "value": "",
+        "description": ""
+        }
+    ],
+    "query": [
+    ]
+    },
+    "description": ""
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        },
+	                        {
+    "name": "/v1/members/:member_id/roles/:role_id",
+                "description": "",
+                 "item": [
+                            {
+                                "name": "Unassign a role from a member.",
+                                "request": {
+    "method": "DELETE",
+    "header": [
+        {
+        "key": "Accept",
+        "value": "application/problem+json",
+        "description": "",
+        "disabled": false
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/v1/members/:member_id/roles/:role_id",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "v1",
+        "members",
+        ":member_id",
+        "roles",
+        ":role_id"
+    ],
+    "variable": [
+        {
+        "key": "memberId",
+        "value": "",
+        "description": ""
+        },
+        {
+        "key": "roleId",
+        "value": "",
+        "description": ""
+        }
+    ],
+    "query": [
+    ]
+    },
+    "description": ""
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        },
+	                        {
+    "name": "/v1/permissions",
+                "description": "",
+                 "item": [
+                            {
+                                "name": "List the deployment-wide permission catalogue.",
+                                "request": {
+    "method": "GET",
+    "header": [
+        {
+        "key": "Accept",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/v1/permissions",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "v1",
+        "permissions"
+    ],
+    "variable": [
+    ],
+    "query": [
+    ]
+    },
+    "description": ""
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        },
+	                        {
+    "name": "/v1/roles/:role_id",
+                "description": "",
+                 "item": [
+                            {
+                                "name": "Delete a role. System roles refuse delete with 422.",
+                                "request": {
+    "method": "DELETE",
+    "header": [
+        {
+        "key": "Accept",
+        "value": "application/problem+json",
+        "description": "",
+        "disabled": false
+        },
+        {
+        "key": "If-Match",
+        "value": "",
+        "description": "Weak ETag from a prior GET; rejects on mismatch with 412.",
+        "disabled": true
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/v1/roles/:role_id",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "v1",
+        "roles",
+        ":role_id"
+    ],
+    "variable": [
+        {
+        "key": "roleId",
+        "value": "",
+        "description": ""
+        }
+    ],
+    "query": [
+    ]
+    },
+    "description": ""
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        },
+	                        {
+    "name": "/v1/roles/:role_id",
+                "description": "",
+                 "item": [
+                            {
+                                "name": "Fetch a role by id.",
+                                "request": {
+    "method": "GET",
+    "header": [
+        {
+        "key": "Accept",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/v1/roles/:role_id",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "v1",
+        "roles",
+        ":role_id"
+    ],
+    "variable": [
+        {
+        "key": "roleId",
+        "value": "",
+        "description": ""
+        }
+    ],
+    "query": [
+    ]
+    },
+    "description": ""
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        },
+	                        {
+    "name": "/v1/roles/:role_id",
+                "description": "",
+                 "item": [
+                            {
+                                "name": "Update a role. Permissions slice is set-replace.",
+                                "request": {
+    "method": "PATCH",
+    "header": [
+        {
+        "key": "Content-Type",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        },
+        {
+        "key": "Accept",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        },
+        {
+        "key": "If-Match",
+        "value": "",
+        "description": "Weak ETag from a prior GET; rejects on mismatch with 412.",
+        "disabled": true
+        },
+        {
+        "key": "Idempotency-Key",
+        "value": "",
+        "description": "24-hour idempotency key (idem_<ulid>).",
+        "disabled": true
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "{\n \"name\": \"<string>\",\n \"description\": \"<string>\",\n \"permissions\": \"<string>\",\n \"metadata\": \"<string>\"\n}",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/v1/roles/:role_id",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "v1",
+        "roles",
+        ":role_id"
+    ],
+    "variable": [
+        {
+        "key": "roleId",
+        "value": "",
+        "description": ""
+        }
+    ],
+    "query": [
+    ]
+    },
+    "description": ""
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        },
+	                        {
+    "name": "/v1/tenants/:tenant_id/roles",
+                "description": "Roles are tenant-scoped. The optional `permissions` array seeds the role's p-rows in a single transaction. Permission ids must exist in the deployment-wide catalogue (`/v1/permissions`). ",
+                 "item": [
+                            {
+                                "name": "Create a new role in a tenant.",
+                                "request": {
+    "method": "POST",
+    "header": [
+        {
+        "key": "Content-Type",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        },
+        {
+        "key": "Accept",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        },
+        {
+        "key": "Idempotency-Key",
+        "value": "",
+        "description": "24-hour idempotency key (idem_<ulid>).",
+        "disabled": true
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "{\n \"name\": \"<string>\",\n \"description\": \"<string>\",\n \"permissions\": \"<string>\",\n \"metadata\": \"<string>\"\n}",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/v1/tenants/:tenant_id/roles",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "v1",
+        "tenants",
+        ":tenant_id",
+        "roles"
+    ],
+    "variable": [
+        {
+        "key": "tenantId",
+        "value": "",
+        "description": ""
+        }
+    ],
+    "query": [
+    ]
+    },
+    "description": "Roles are tenant-scoped. The optional `permissions` array seeds the role's p-rows in a single transaction. Permission ids must exist in the deployment-wide catalogue (`/v1/permissions`). "
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        },
+	                        {
+    "name": "/v1/tenants/:tenant_id/roles",
+                "description": "",
+                 "item": [
+                            {
+                                "name": "List roles in a tenant.",
+                                "request": {
+    "method": "GET",
+    "header": [
+        {
+        "key": "Accept",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/v1/tenants/:tenant_id/roles",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "v1",
+        "tenants",
+        ":tenant_id",
+        "roles"
+    ],
+    "variable": [
+        {
+        "key": "tenantId",
+        "value": "",
+        "description": ""
+        }
+    ],
+    "query": [
+        {
+        "key": "limit",
+        "value": "56",
+        "description": "Max items to return (default 25, max 200).",
+        "disabled": true
+        }
+    ]
+    },
+    "description": ""
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        }
+	                    ]
+	        },
+	        {
+	            "name": "invitations",
+	            "description": "Pending invitations for an Organization. POST returns 202 with the\none-time accept URL + plaintext token; subsequent reads return only\nthe token_prefix.\n",
+	            "item": [
+	                        {
+    "name": "/v1/invitations/:invitation_id",
+                "description": "",
+                 "item": [
+                            {
+                                "name": "Fetch an invitation by id. Plaintext token never echoed.",
+                                "request": {
+    "method": "GET",
+    "header": [
+        {
+        "key": "Accept",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/v1/invitations/:invitation_id",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "v1",
+        "invitations",
+        ":invitation_id"
+    ],
+    "variable": [
+        {
+        "key": "invitationId",
+        "value": "",
+        "description": ""
+        }
+    ],
+    "query": [
+    ]
+    },
+    "description": ""
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        },
+	                        {
+    "name": "/v1/invitations/:invitation_id",
+                "description": "",
+                 "item": [
+                            {
+                                "name": "Revoke a pending invitation. Returns 204.",
+                                "request": {
+    "method": "DELETE",
+    "header": [
+        {
+        "key": "Accept",
+        "value": "application/problem+json",
+        "description": "",
+        "disabled": false
+        },
+        {
+        "key": "If-Match",
+        "value": "",
+        "description": "Weak ETag from a prior GET; rejects on mismatch with 412.",
+        "disabled": true
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/v1/invitations/:invitation_id",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "v1",
+        "invitations",
+        ":invitation_id"
+    ],
+    "variable": [
+        {
+        "key": "invitationId",
+        "value": "",
+        "description": ""
+        }
+    ],
+    "query": [
+    ]
+    },
+    "description": ""
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        },
+	                        {
+    "name": "/v1/invitations/:invitation_id/accept",
+                "description": "Consumes a one-time accept token. The caller's JWT supplies the user identity; the invitation's stored tenant_id is constant-time-compared to the caller's tenant. Returns the newly-created Member. ",
+                 "item": [
+                            {
+                                "name": "Accept a pending invitation. Creates the Member row.",
+                                "request": {
+    "method": "POST",
+    "header": [
+        {
+        "key": "Content-Type",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        },
+        {
+        "key": "Accept",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        },
+        {
+        "key": "Idempotency-Key",
+        "value": "",
+        "description": "24-hour idempotency key (idem_<ulid>).",
+        "disabled": true
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "{\n \"token\": \"<string>\"\n}",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/v1/invitations/:invitation_id/accept",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "v1",
+        "invitations",
+        ":invitation_id",
+        "accept"
+    ],
+    "variable": [
+        {
+        "key": "invitationId",
+        "value": "",
+        "description": ""
+        }
+    ],
+    "query": [
+    ]
+    },
+    "description": "Consumes a one-time accept token. The caller's JWT supplies the user identity; the invitation's stored tenant_id is constant-time-compared to the caller's tenant. Returns the newly-created Member. "
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        },
+	                        {
+    "name": "/v1/organizations/:organization_id/invitations",
+                "description": "Returns 202 Accepted because the email dispatch is queued via the Notifications module. The response carries `accept_url` and the one-time plaintext token alongside `state` + `expires_at`; subsequent reads of this invitation return only the `token_prefix`. Never log the response body. ",
+                 "item": [
+                            {
+                                "name": "Create an invitation. Email is queued; plaintext token returned ONCE.",
+                                "request": {
+    "method": "POST",
+    "header": [
+        {
+        "key": "Content-Type",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        },
+        {
+        "key": "Accept",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        },
+        {
+        "key": "Idempotency-Key",
+        "value": "",
+        "description": "24-hour idempotency key (idem_<ulid>).",
+        "disabled": true
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "{\n \"invitee_email\": \"<string>\",\n \"proposed_role_id\": \"<string>\",\n \"expires_in_seconds\": \"<number>\"\n}",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/v1/organizations/:organization_id/invitations",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "v1",
+        "organizations",
+        ":organization_id",
+        "invitations"
+    ],
+    "variable": [
+        {
+        "key": "organizationId",
+        "value": "",
+        "description": ""
+        }
+    ],
+    "query": [
+    ]
+    },
+    "description": "Returns 202 Accepted because the email dispatch is queued via the Notifications module. The response carries `accept_url` and the one-time plaintext token alongside `state` + `expires_at`; subsequent reads of this invitation return only the `token_prefix`. Never log the response body. "
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        },
+	                        {
+    "name": "/v1/organizations/:organization_id/invitations",
+                "description": "",
+                 "item": [
+                            {
+                                "name": "List invitations for an organization.",
+                                "request": {
+    "method": "GET",
+    "header": [
+        {
+        "key": "Accept",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/v1/organizations/:organization_id/invitations",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "v1",
+        "organizations",
+        ":organization_id",
+        "invitations"
+    ],
+    "variable": [
+        {
+        "key": "organizationId",
+        "value": "",
+        "description": ""
+        }
+    ],
+    "query": [
+        {
+        "key": "limit",
+        "value": "56",
+        "description": "Max items to return (default 25, max 200).",
+        "disabled": true
+        }
+    ]
+    },
+    "description": ""
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        }
+	                    ]
+	        },
+	        {
+	            "name": "notifications",
+	            "description": "Send and inspect transactional notifications. POST /send returns 202\nAccepted; status transitions are owned by the outbox-consuming worker\n(ADR 013).\n",
+	            "item": [
+	                        {
+    "name": "/v1/notifications",
+                "description": "",
+                 "item": [
+                            {
+                                "name": "List notifications in the caller's tenant.",
+                                "request": {
+    "method": "GET",
+    "header": [
+        {
+        "key": "Accept",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/v1/notifications",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "v1",
+        "notifications"
+    ],
+    "variable": [
+    ],
+    "query": [
+        {
+        "key": "limit",
+        "value": "56",
+        "description": "Max items to return (default 25, max 200).",
+        "disabled": true
+        },
+        {
+        "key": "cursor",
+        "value": "cursor_example",
+        "description": "Opaque pagination cursor; obtained from a previous response.",
+        "disabled": true
+        }
+    ]
+    },
+    "description": ""
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        },
+	                        {
+    "name": "/v1/notifications/:notification_id",
+                "description": "",
+                 "item": [
+                            {
+                                "name": "Fetch a notification by id.",
+                                "request": {
+    "method": "GET",
+    "header": [
+        {
+        "key": "Accept",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/v1/notifications/:notification_id",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "v1",
+        "notifications",
+        ":notification_id"
+    ],
+    "variable": [
+        {
+        "key": "notificationId",
+        "value": "",
+        "description": ""
+        }
+    ],
+    "query": [
+    ]
+    },
+    "description": ""
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        },
+	                        {
+    "name": "/v1/notifications/send",
+                "description": "Returns 202 Accepted; Novu trigger happens via the outbox worker so Novu downtime does not block the request response. Status transitions live on the worker — clients poll GET /v1/notifications/{id}. ",
+                 "item": [
+                            {
+                                "name": "Queue a notification for delivery via Novu.",
+                                "request": {
+    "method": "POST",
+    "header": [
+        {
+        "key": "Content-Type",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        },
+        {
+        "key": "Accept",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        },
+        {
+        "key": "Idempotency-Key",
+        "value": "",
+        "description": "24-hour idempotency key (idem_<ulid>).",
+        "disabled": true
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "{\n \"workflow_name\": \"<string>\",\n \"to\": \"<string>\",\n \"payload\": \"<string>\"\n}",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/v1/notifications/send",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "v1",
+        "notifications",
+        "send"
+    ],
+    "variable": [
+    ],
+    "query": [
+    ]
+    },
+    "description": "Returns 202 Accepted; Novu trigger happens via the outbox worker so Novu downtime does not block the request response. Status transitions live on the worker — clients poll GET /v1/notifications/{id}. "
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        }
+	                    ]
+	        },
+	        {
+	            "name": "notification-workflows",
+	            "description": "Workflow registry: mapping platform-stable workflow names to Novu\nworkflow ids. Templates themselves live in Novu.\n",
+	            "item": [
+	                        {
+    "name": "/v1/notification-workflows",
+                "description": "",
+                 "item": [
+                            {
+                                "name": "List registered notification workflows for the caller's tenant.",
+                                "request": {
+    "method": "GET",
+    "header": [
+        {
+        "key": "Accept",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/v1/notification-workflows",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "v1",
+        "notification-workflows"
+    ],
+    "variable": [
+    ],
+    "query": [
+    ]
+    },
+    "description": ""
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        },
+	                        {
+    "name": "/v1/notification-workflows",
+                "description": "",
+                 "item": [
+                            {
+                                "name": "Register a (name → Novu workflow id) mapping.",
+                                "request": {
+    "method": "POST",
+    "header": [
+        {
+        "key": "Content-Type",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        },
+        {
+        "key": "Accept",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        },
+        {
+        "key": "Idempotency-Key",
+        "value": "",
+        "description": "24-hour idempotency key (idem_<ulid>).",
+        "disabled": true
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "{\n \"name\": \"<string>\",\n \"novu_workflow_id\": \"<string>\",\n \"description\": \"<string>\"\n}",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/v1/notification-workflows",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "v1",
+        "notification-workflows"
+    ],
+    "variable": [
+    ],
+    "query": [
+    ]
+    },
+    "description": ""
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        },
+	                        {
+    "name": "/v1/notification-workflows/:workflow_id",
+                "description": "Partial-update endpoint. Either field may be omitted to leave it unchanged. Emits a `notification_workflow.updated` outbox event so downstream consumers can refresh their cache. Workflow renames (changing the `name`) are not supported in v1 — register a new workflow with the new name and deprecate the old one. ",
+                 "item": [
+                            {
+                                "name": "Update the Novu workflow id and/or description for a registered workflow.",
+                                "request": {
+    "method": "PATCH",
+    "header": [
+        {
+        "key": "Content-Type",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        },
+        {
+        "key": "Accept",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "{\n \"novu_workflow_id\": \"<string>\",\n \"description\": \"<string>\"\n}",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/v1/notification-workflows/:workflow_id",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "v1",
+        "notification-workflows",
+        ":workflow_id"
+    ],
+    "variable": [
+        {
+        "key": "workflowId",
+        "value": "",
+        "description": ""
+        }
+    ],
+    "query": [
+    ]
+    },
+    "description": "Partial-update endpoint. Either field may be omitted to leave it unchanged. Emits a `notification_workflow.updated` outbox event so downstream consumers can refresh their cache. Workflow renames (changing the `name`) are not supported in v1 — register a new workflow with the new name and deprecate the old one. "
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        }
+	                    ]
+	        },
+	        {
+	            "name": "users",
+	            "description": "Identity façade for the data plane. Wraps Keycloak; consumers never\nsee Keycloak details. Email and other PII are envelope-encrypted at\nrest (see AGENTS.md §18.7).\n",
+	            "item": [
+	                        {
+    "name": "/v1/users",
+                "description": "Idempotent. The platform creates a row + a Keycloak user in the shared `saas-data-local` realm (per-Deployment realm lands in Phase 12). Email is envelope-encrypted; an HMAC-SHA256 lookup hash backs the per-tenant uniqueness index. ",
+                 "item": [
+                            {
+                                "name": "Create a platform user. Mirrors the row into Keycloak.",
+                                "request": {
+    "method": "POST",
+    "header": [
+        {
+        "key": "Content-Type",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        },
+        {
+        "key": "Accept",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        },
+        {
+        "key": "Idempotency-Key",
+        "value": "",
+        "description": "24-hour idempotency key (idem_<ulid>).",
+        "disabled": true
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "{\n \"email\": \"<string>\",\n \"name\": \"<string>\",\n \"send_verification_email\": \"<string>\",\n \"metadata\": \"<string>\"\n}",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/v1/users",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "v1",
+        "users"
+    ],
+    "variable": [
+    ],
+    "query": [
+    ]
+    },
+    "description": "Idempotent. The platform creates a row + a Keycloak user in the shared `saas-data-local` realm (per-Deployment realm lands in Phase 12). Email is envelope-encrypted; an HMAC-SHA256 lookup hash backs the per-tenant uniqueness index. "
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        },
+	                        {
+    "name": "/v1/users",
+                "description": "Returns the platform users belonging to the caller's tenant. Email plaintext is returned (decrypted at the persistence boundary); the envelope columns stay on the server. Set the `email` query parameter to look up a single user by email (HMAC-prefix lookup; never sends plaintext to the DB). ",
+                 "item": [
+                            {
+                                "name": "List users in the caller's tenant.",
+                                "request": {
+    "method": "GET",
+    "header": [
+        {
+        "key": "Accept",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/v1/users",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "v1",
+        "users"
+    ],
+    "variable": [
+    ],
+    "query": [
+        {
+        "key": "limit",
+        "value": "56",
+        "description": "Max items to return (default 25, max 200).",
+        "disabled": true
+        },
+        {
+        "key": "cursor",
+        "value": "cursor_example",
+        "description": "Opaque pagination cursor; obtained from a previous response.",
+        "disabled": true
+        },
+        {
+        "key": "sort",
+        "value": "sort_example",
+        "description": "Sort token. Default \"-created_at\".",
+        "disabled": true
+        },
+        {
+        "key": "email",
+        "value": "email_example",
+        "description": "HMAC-prefix lookup; matches on email_lookup_hash.",
+        "disabled": true
+        }
+    ]
+    },
+    "description": "Returns the platform users belonging to the caller's tenant. Email plaintext is returned (decrypted at the persistence boundary); the envelope columns stay on the server. Set the `email` query parameter to look up a single user by email (HMAC-prefix lookup; never sends plaintext to the DB). "
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        },
+	                        {
+    "name": "/v1/users/:user_id",
+                "description": "",
+                 "item": [
+                            {
+                                "name": "Soft-delete a platform user. Disables the Keycloak user.",
+                                "request": {
+    "method": "DELETE",
+    "header": [
+        {
+        "key": "Accept",
+        "value": "application/problem+json",
+        "description": "",
+        "disabled": false
+        },
+        {
+        "key": "If-Match",
+        "value": "",
+        "description": "Weak ETag from a prior GET; rejects on mismatch with 412.",
+        "disabled": true
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/v1/users/:user_id",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "v1",
+        "users",
+        ":user_id"
+    ],
+    "variable": [
+        {
+        "key": "userId",
+        "value": "",
+        "description": ""
+        }
+    ],
+    "query": [
+    ]
+    },
+    "description": ""
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        },
+	                        {
+    "name": "/v1/users/:user_id",
+                "description": "",
+                 "item": [
+                            {
+                                "name": "Fetch a platform user by id.",
+                                "request": {
+    "method": "GET",
+    "header": [
+        {
+        "key": "Accept",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/v1/users/:user_id",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "v1",
+        "users",
+        ":user_id"
+    ],
+    "variable": [
+        {
+        "key": "userId",
+        "value": "",
+        "description": ""
+        }
+    ],
+    "query": [
+    ]
+    },
+    "description": ""
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        },
+	                        {
+    "name": "/v1/users/:user_id",
+                "description": "",
+                 "item": [
+                            {
+                                "name": "Update a platform user. ETag concurrency control required.",
+                                "request": {
+    "method": "PATCH",
+    "header": [
+        {
+        "key": "Content-Type",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        },
+        {
+        "key": "Accept",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        },
+        {
+        "key": "If-Match",
+        "value": "",
+        "description": "Weak ETag from a prior GET; rejects on mismatch with 412.",
+        "disabled": true
+        },
+        {
+        "key": "Idempotency-Key",
+        "value": "",
+        "description": "24-hour idempotency key (idem_<ulid>).",
+        "disabled": true
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "{\n \"name\": \"<string>\",\n \"phone\": \"<string>\",\n \"metadata\": \"<string>\"\n}",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/v1/users/:user_id",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "v1",
+        "users",
+        ":user_id"
+    ],
+    "variable": [
+        {
+        "key": "userId",
+        "value": "",
+        "description": ""
+        }
+    ],
+    "query": [
+    ]
+    },
+    "description": ""
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        },
+	                        {
+    "name": "/v1/users/:user_id/disable",
+                "description": "",
+                 "item": [
+                            {
+                                "name": "Disable a platform user. Emits user.disabled.",
+                                "request": {
+    "method": "POST",
+    "header": [
+        {
+        "key": "Accept",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        },
+        {
+        "key": "Idempotency-Key",
+        "value": "",
+        "description": "24-hour idempotency key (idem_<ulid>).",
+        "disabled": true
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/v1/users/:user_id/disable",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "v1",
+        "users",
+        ":user_id",
+        "disable"
+    ],
+    "variable": [
+        {
+        "key": "userId",
+        "value": "",
+        "description": ""
+        }
+    ],
+    "query": [
+    ]
+    },
+    "description": ""
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        },
+	                        {
+    "name": "/v1/users/:user_id/enable",
+                "description": "",
+                 "item": [
+                            {
+                                "name": "Enable a previously-disabled platform user.",
+                                "request": {
+    "method": "POST",
+    "header": [
+        {
+        "key": "Accept",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        },
+        {
+        "key": "Idempotency-Key",
+        "value": "",
+        "description": "24-hour idempotency key (idem_<ulid>).",
+        "disabled": true
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/v1/users/:user_id/enable",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "v1",
+        "users",
+        ":user_id",
+        "enable"
+    ],
+    "variable": [
+        {
+        "key": "userId",
+        "value": "",
+        "description": ""
+        }
+    ],
+    "query": [
+    ]
+    },
+    "description": ""
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        },
+	                        {
+    "name": "/v1/users/:user_id/reset-password",
+                "description": "Phase 5 uses Keycloak's built-in SMTP (ExecuteActionsEmail with UPDATE_PASSWORD). Phase 6 swaps the transport to the Notifications module + Novu without changing this endpoint. ",
+                 "item": [
+                            {
+                                "name": "Trigger a password-reset email via Keycloak.",
+                                "request": {
+    "method": "POST",
+    "header": [
+        {
+        "key": "Accept",
+        "value": "application/problem+json",
+        "description": "",
+        "disabled": false
+        },
+        {
+        "key": "Idempotency-Key",
+        "value": "",
+        "description": "24-hour idempotency key (idem_<ulid>).",
+        "disabled": true
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/v1/users/:user_id/reset-password",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "v1",
+        "users",
+        ":user_id",
+        "reset-password"
+    ],
+    "variable": [
+        {
+        "key": "userId",
+        "value": "",
+        "description": ""
+        }
+    ],
+    "query": [
+    ]
+    },
+    "description": "Phase 5 uses Keycloak's built-in SMTP (ExecuteActionsEmail with UPDATE_PASSWORD). Phase 6 swaps the transport to the Notifications module + Novu without changing this endpoint. "
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        },
+	                        {
+    "name": "/v1/users/:user_id/verify-email",
+                "description": "",
+                 "item": [
+                            {
+                                "name": "Trigger an email-verification action via Keycloak.",
+                                "request": {
+    "method": "POST",
+    "header": [
+        {
+        "key": "Accept",
+        "value": "application/problem+json",
+        "description": "",
+        "disabled": false
+        },
+        {
+        "key": "Idempotency-Key",
+        "value": "",
+        "description": "24-hour idempotency key (idem_<ulid>).",
+        "disabled": true
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/v1/users/:user_id/verify-email",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "v1",
+        "users",
+        ":user_id",
+        "verify-email"
+    ],
+    "variable": [
+        {
+        "key": "userId",
+        "value": "",
+        "description": ""
+        }
+    ],
+    "query": [
+    ]
+    },
+    "description": ""
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        }
+	                    ]
+	        },
+	        {
+	            "name": "audit",
+	            "description": "Append-only audit log with a per-tenant SHA-256 hash chain\n(AGENTS.md §8.6, §18.3, ADR 012). Rows enter the table only via\nthe outbox subscriber; the HTTP surface is read-only. Each row\ncarries prev_hash and row_hash so external auditors can verify\nintegrity via the control-plane /audit-integrity endpoint\nwithout trusting the data-plane. Canonicalisation is RFC 8785\nJCS — see ADR 012.\n",
+	            "item": [
+	                        {
+    "name": "/v1/audit-events/:audit_event_id",
+                "description": "",
+                 "item": [
+                            {
+                                "name": "Fetch a single audit event by id.",
+                                "request": {
+    "method": "GET",
+    "header": [
+        {
+        "key": "Accept",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/v1/audit-events/:audit_event_id",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "v1",
+        "audit-events",
+        ":audit_event_id"
+    ],
+    "variable": [
+        {
+        "key": "auditEventId",
+        "value": "",
+        "description": ""
+        }
+    ],
+    "query": [
+    ]
+    },
+    "description": ""
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        },
+	                        {
+    "name": "/v1/audit-events/export",
+                "description": "Synchronous export bounded to ExportSyncBudget (1 MiB). Larger exports return 413; the async export path (background worker + signed URL) lands with the v1 Files module. ",
+                 "item": [
+                            {
+                                "name": "Export filtered audit events as JSON or CSV.",
+                                "request": {
+    "method": "POST",
+    "header": [
+        {
+        "key": "Content-Type",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        },
+        {
+        "key": "Accept",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "{\n \"tenant_id\": \"<string>\",\n \"action\": \"<string>\",\n \"resource_type\": \"<string>\",\n \"resource_id\": \"<string>\",\n \"actor_id\": \"<string>\",\n \"occurred_after\": \"<string>\",\n \"occurred_before\": \"<string>\",\n \"format\": \"<string>\",\n \"limit\": \"<number>\"\n}",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/v1/audit-events/export",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "v1",
+        "audit-events",
+        "export"
+    ],
+    "variable": [
+    ],
+    "query": [
+    ]
+    },
+    "description": "Synchronous export bounded to ExportSyncBudget (1 MiB). Larger exports return 413; the async export path (background worker + signed URL) lands with the v1 Files module. "
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        },
+	                        {
+    "name": "/v1/tenants/:tenant_id/audit-events",
+                "description": "Returns audit events ordered by occurred_at DESC. MVP gates this endpoint with AssertTenant only; the audit.read permission lands with the v1 RBAC hardening pass (ADR 012). ",
+                 "item": [
+                            {
+                                "name": "List audit events for a tenant.",
+                                "request": {
+    "method": "GET",
+    "header": [
+        {
+        "key": "Accept",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/v1/tenants/:tenant_id/audit-events",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "v1",
+        "tenants",
+        ":tenant_id",
+        "audit-events"
+    ],
+    "variable": [
+        {
+        "key": "tenantId",
+        "value": "",
+        "description": ""
+        }
+    ],
+    "query": [
+        {
+        "key": "limit",
+        "value": "56",
+        "description": "Max items to return (default 25, max 200).",
+        "disabled": true
+        },
+        {
+        "key": "cursor",
+        "value": "cursor_example",
+        "description": "Opaque pagination cursor; obtained from a previous response.",
+        "disabled": true
+        },
+        {
+        "key": "action",
+        "value": "action_example",
+        "description": "",
+        "disabled": true
+        },
+        {
+        "key": "resourceType",
+        "value": "resourceType_example",
+        "description": "",
+        "disabled": true
+        },
+        {
+        "key": "resourceId",
+        "value": "resourceId_example",
+        "description": "",
+        "disabled": true
+        },
+        {
+        "key": "actorId",
+        "value": "actorId_example",
+        "description": "",
+        "disabled": true
+        },
+        {
+        "key": "occurredAfter",
+        "value": "2013-10-20T19:20:30+01:00",
+        "description": "",
+        "disabled": true
+        },
+        {
+        "key": "occurredBefore",
+        "value": "2013-10-20T19:20:30+01:00",
+        "description": "",
+        "disabled": true
+        }
+    ]
+    },
+    "description": "Returns audit events ordered by occurred_at DESC. MVP gates this endpoint with AssertTenant only; the audit.read permission lands with the v1 RBAC hardening pass (ADR 012). "
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        }
+	                    ]
+	        },
+	        {
+	            "name": "notification-channels",
+	            "description": "BYOK vendor channel configurations. Per ADR 017 every channel stores\nprovider-shaped credentials envelope-encrypted at rest; rotation is a\ndistinct verb and credential plaintext is never echoed in any response.\n",
+	            "item": [
+	                        {
+    "name": "/v1/notification-channels",
+                "description": "Idempotent. Per ADR 017 credentials in the body are envelope-encrypted before the row is inserted and the persisted plaintext is zeroed immediately. The response NEVER echoes credentials — only a credentials_present flag and last_rotated_at timestamp. ",
+                 "item": [
+                            {
+                                "name": "Create a BYOK notification channel.",
+                                "request": {
+    "method": "POST",
+    "header": [
+        {
+        "key": "Content-Type",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        },
+        {
+        "key": "Accept",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        },
+        {
+        "key": "Idempotency-Key",
+        "value": "",
+        "description": "24-hour idempotency key (idem_<ulid>).",
+        "disabled": true
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "{\n \"provider\": \"<string>\",\n \"name\": \"<string>\",\n \"config\": \"<string>\",\n \"is_default_for\": \"<string>\",\n \"credentials\": \"<string>\"\n}",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/v1/notification-channels",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "v1",
+        "notification-channels"
+    ],
+    "variable": [
+    ],
+    "query": [
+    ]
+    },
+    "description": "Idempotent. Per ADR 017 credentials in the body are envelope-encrypted before the row is inserted and the persisted plaintext is zeroed immediately. The response NEVER echoes credentials — only a credentials_present flag and last_rotated_at timestamp. "
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        },
+	                        {
+    "name": "/v1/notification-channels",
+                "description": "",
+                 "item": [
+                            {
+                                "name": "List BYOK notification channels in the caller's tenant.",
+                                "request": {
+    "method": "GET",
+    "header": [
+        {
+        "key": "Accept",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/v1/notification-channels",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "v1",
+        "notification-channels"
+    ],
+    "variable": [
+    ],
+    "query": [
+        {
+        "key": "limit",
+        "value": "56",
+        "description": "Max items to return (default 25, max 200).",
+        "disabled": true
+        }
+    ]
+    },
+    "description": ""
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        },
+	                        {
+    "name": "/v1/notification-channels/:channel_id",
+                "description": "",
+                 "item": [
+                            {
+                                "name": "Soft-delete a notification channel.",
+                                "request": {
+    "method": "DELETE",
+    "header": [
+        {
+        "key": "Accept",
+        "value": "application/problem+json",
+        "description": "",
+        "disabled": false
+        },
+        {
+        "key": "If-Match",
+        "value": "",
+        "description": "Weak ETag from a prior GET; rejects on mismatch with 412.",
+        "disabled": true
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/v1/notification-channels/:channel_id",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "v1",
+        "notification-channels",
+        ":channel_id"
+    ],
+    "variable": [
+        {
+        "key": "channelId",
+        "value": "",
+        "description": ""
+        }
+    ],
+    "query": [
+    ]
+    },
+    "description": ""
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        },
+	                        {
+    "name": "/v1/notification-channels/:channel_id",
+                "description": "",
+                 "item": [
+                            {
+                                "name": "Fetch a notification channel by id.",
+                                "request": {
+    "method": "GET",
+    "header": [
+        {
+        "key": "Accept",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/v1/notification-channels/:channel_id",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "v1",
+        "notification-channels",
+        ":channel_id"
+    ],
+    "variable": [
+        {
+        "key": "channelId",
+        "value": "",
+        "description": ""
+        }
+    ],
+    "query": [
+    ]
+    },
+    "description": ""
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        },
+	                        {
+    "name": "/v1/notification-channels/:channel_id",
+                "description": "Per ADR 017 PATCH never accepts credentials. Use the dedicated rotate-credentials endpoint to change secrets. ",
+                 "item": [
+                            {
+                                "name": "Update a notification channel (metadata only).",
+                                "request": {
+    "method": "PATCH",
+    "header": [
+        {
+        "key": "Content-Type",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        },
+        {
+        "key": "Accept",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        },
+        {
+        "key": "If-Match",
+        "value": "",
+        "description": "Weak ETag from a prior GET; rejects on mismatch with 412.",
+        "disabled": true
+        },
+        {
+        "key": "Idempotency-Key",
+        "value": "",
+        "description": "24-hour idempotency key (idem_<ulid>).",
+        "disabled": true
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "{\n \"name\": \"<string>\",\n \"status\": \"<string>\",\n \"is_default_for\": \"<string>\",\n \"config\": \"<string>\"\n}",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/v1/notification-channels/:channel_id",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "v1",
+        "notification-channels",
+        ":channel_id"
+    ],
+    "variable": [
+        {
+        "key": "channelId",
+        "value": "",
+        "description": ""
+        }
+    ],
+    "query": [
+    ]
+    },
+    "description": "Per ADR 017 PATCH never accepts credentials. Use the dedicated rotate-credentials endpoint to change secrets. "
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        },
+	                        {
+    "name": "/v1/notification-channels/:channel_id/rotate-credentials",
+                "description": "ADR 017: rotation is the only verb that accepts new credentials. Bumps row_seq and stamps last_rotated_at; emits the notification_channel.rotated audit event. ",
+                 "item": [
+                            {
+                                "name": "Rotate a channel's BYOK credentials.",
+                                "request": {
+    "method": "POST",
+    "header": [
+        {
+        "key": "Content-Type",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        },
+        {
+        "key": "Accept",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        },
+        {
+        "key": "Idempotency-Key",
+        "value": "",
+        "description": "24-hour idempotency key (idem_<ulid>).",
+        "disabled": true
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "{\n \"credentials\": \"<string>\"\n}",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/v1/notification-channels/:channel_id/rotate-credentials",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "v1",
+        "notification-channels",
+        ":channel_id",
+        "rotate-credentials"
+    ],
+    "variable": [
+        {
+        "key": "channelId",
+        "value": "",
+        "description": ""
+        }
+    ],
+    "query": [
+    ]
+    },
+    "description": "ADR 017: rotation is the only verb that accepts new credentials. Bumps row_seq and stamps last_rotated_at; emits the notification_channel.rotated audit event. "
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        }
+	                    ]
+	        },
+	        {
+	            "name": "members",
+	            "description": "Memberships link a platform User to an Organization. Role assignment\nlands in Phase 8 RBAC; Phase 7 ships the role_id placeholder column.\n",
+	            "item": [
+	                        {
+    "name": "/v1/organizations/:organization_id/members",
+                "description": "",
+                 "item": [
+                            {
+                                "name": "List members of an organization.",
+                                "request": {
+    "method": "GET",
+    "header": [
+        {
+        "key": "Accept",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/v1/organizations/:organization_id/members",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "v1",
+        "organizations",
+        ":organization_id",
+        "members"
+    ],
+    "variable": [
+        {
+        "key": "organizationId",
+        "value": "",
+        "description": ""
+        }
+    ],
+    "query": [
+        {
+        "key": "limit",
+        "value": "56",
+        "description": "Max items to return (default 25, max 200).",
+        "disabled": true
+        },
+        {
+        "key": "cursor",
+        "value": "cursor_example",
+        "description": "Opaque pagination cursor; obtained from a previous response.",
+        "disabled": true
+        }
+    ]
+    },
+    "description": ""
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        },
+	                        {
+    "name": "/v1/organizations/:organization_id/members/:member_id",
+                "description": "",
+                 "item": [
+                            {
+                                "name": "Fetch a member by id.",
+                                "request": {
+    "method": "GET",
+    "header": [
+        {
+        "key": "Accept",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/v1/organizations/:organization_id/members/:member_id",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "v1",
+        "organizations",
+        ":organization_id",
+        "members",
+        ":member_id"
+    ],
+    "variable": [
+        {
+        "key": "organizationId",
+        "value": "",
+        "description": ""
+        },
+        {
+        "key": "memberId",
+        "value": "",
+        "description": ""
+        }
+    ],
+    "query": [
+    ]
+    },
+    "description": ""
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        },
+	                        {
+    "name": "/v1/organizations/:organization_id/members/:member_id",
+                "description": "",
+                 "item": [
+                            {
+                                "name": "Remove a member (soft-delete; status='removed').",
+                                "request": {
+    "method": "DELETE",
+    "header": [
+        {
+        "key": "Accept",
+        "value": "application/problem+json",
+        "description": "",
+        "disabled": false
+        },
+        {
+        "key": "If-Match",
+        "value": "",
+        "description": "Weak ETag from a prior GET; rejects on mismatch with 412.",
+        "disabled": true
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/v1/organizations/:organization_id/members/:member_id",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "v1",
+        "organizations",
+        ":organization_id",
+        "members",
+        ":member_id"
+    ],
+    "variable": [
+        {
+        "key": "organizationId",
+        "value": "",
+        "description": ""
+        },
+        {
+        "key": "memberId",
+        "value": "",
+        "description": ""
+        }
+    ],
+    "query": [
+    ]
+    },
+    "description": ""
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        },
+	                        {
+    "name": "/v1/organizations/:organization_id/members/:member_id",
+                "description": "",
+                 "item": [
+                            {
+                                "name": "Update a member's role assignment (Phase 8 RBAC placeholder).",
+                                "request": {
+    "method": "PATCH",
+    "header": [
+        {
+        "key": "Content-Type",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        },
+        {
+        "key": "Accept",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        },
+        {
+        "key": "If-Match",
+        "value": "",
+        "description": "Weak ETag from a prior GET; rejects on mismatch with 412.",
+        "disabled": true
+        },
+        {
+        "key": "Idempotency-Key",
+        "value": "",
+        "description": "24-hour idempotency key (idem_<ulid>).",
+        "disabled": true
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "{\n \"role_id\": \"<string>\"\n}",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/v1/organizations/:organization_id/members/:member_id",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "v1",
+        "organizations",
+        ":organization_id",
+        "members",
+        ":member_id"
+    ],
+    "variable": [
+        {
+        "key": "organizationId",
+        "value": "",
+        "description": ""
+        },
+        {
+        "key": "memberId",
+        "value": "",
+        "description": ""
+        }
+    ],
+    "query": [
+    ]
+    },
+    "description": ""
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        }
+	                    ]
+	        },
+	        {
+	            "name": "meta",
+	            "description": "Health and metadata.",
+	            "item": [
+	                        {
+    "name": "/healthz",
+                "description": "Returns 200 with a small status payload when the data plane is alive.",
+                 "item": [
+                            {
+                                "name": "Liveness probe.",
+                                "request": {
+    "method": "GET",
+    "header": [
+        {
+        "key": "Accept",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/healthz",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "healthz"
+    ],
+    "variable": [
+    ],
+    "query": [
+    ]
+    },
+    "description": "Returns 200 with a small status payload when the data plane is alive."
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        }
+	                    ]
+	        }
+    ],
+    
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "https://{env}.{project}.saas.omarss.net",
+			"type": "string"
+        },
+		{
+			"key": "project",
+			"value": "example",
+			"type": "string"
+		},
+		{
+			"key": "env",
+			"value": "dev",
+			"type": "string"
+		}
+	]
+}
+

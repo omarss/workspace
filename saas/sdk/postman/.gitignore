@@ -1,0 +1,6 @@
+# openapi-generator metadata is non-deterministic across runs (lists
+# files generated, including .openapi-generator-ignore self-references).
+# We only track the postman.json output + the environment template; the
+# generator's housekeeping files are regenerated on every `make postman`.
+.openapi-generator/
+.openapi-generator-ignore

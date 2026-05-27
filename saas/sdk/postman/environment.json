@@ -1,0 +1,46 @@
+{
+  "id": "saas-platform-local-dev",
+  "name": "SaaS Platform — local-dev",
+  "values": [
+    {
+      "key": "control_url",
+      "value": "http://localhost:8080",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "data_plane_url",
+      "value": "http://localhost:9090",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "operator_token",
+      "value": "",
+      "type": "secret",
+      "enabled": true,
+      "description": "Operator bearer token. Paste the value from ~/.saas/credentials.json or your kcadm.sh get-token output."
+    },
+    {
+      "key": "user_token",
+      "value": "",
+      "type": "secret",
+      "enabled": true,
+      "description": "Data-plane user/member token from a Keycloak data-realm PKCE login."
+    },
+    {
+      "key": "tenant_id",
+      "value": "tenant_01HSEEDSEEDSEEDSEEDSEEDSEED",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "idempotency_key",
+      "value": "idem_{{$guid}}",
+      "type": "default",
+      "enabled": true,
+      "description": "Pre-request: regenerated via Postman's dynamic variable; safe to leave as-is."
+    }
+  ],
+  "_postman_variable_scope": "environment"
+}

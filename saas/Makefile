@@ -74,6 +74,7 @@ GOLANGCI_LINT := $(DOCKER) run --rm \
         compose-up compose-down migrate migrate-down sqlc-gen sdk-ts sdk-go sdk-go-test sdk-go-quickstart \
         openbao-init openbao-status openbao-rotate openbao-policies openbao-approle-creds \
         operators-realm-import operators-realm-validate \
+        postman postman-check recipes-sync recipes-check \
         fmt vet tidy clean help
 
 help:
@@ -125,7 +126,7 @@ tidy:
 	$(GO) mod tidy
 
 # ── OpenAPI ─────────────────────────────────────────────────────────────────
-openapi-check: openapi-lint openapi-overlay openapi-gen-go openapi-gen-ts sdk-go openapi-diff-check
+openapi-check: openapi-lint openapi-overlay openapi-gen-go openapi-gen-ts sdk-go postman-check recipes-check openapi-diff-check
 
 openapi-lint:
 	$(SPECTRAL) lint openapi/control-plane.yaml openapi/data-plane.yaml -r .spectral.yaml
@@ -279,6 +280,38 @@ operators-realm-import:
 	@curl -fsS http://localhost:8081/realms/operators/.well-known/openid-configuration \
 	    | python3 -c "import json,sys; d=json.load(sys.stdin); print('operators realm discovered:', d['issuer'])"
 	@$(DOCKER) kill saas-operators-realm >/dev/null
+
+# ── Postman collections (Phase 15) ──────────────────────────────────────────
+# Both planes export to sdk/postman/<plane>/postman.json. The generator
+# overwrites the directory contents on every run, so postman-check
+# regenerates and asserts the working tree is clean — catches drift
+# the same way openapi-diff-check does for the SDKs.
+postman: openapi-overlay
+	@mkdir -p sdk/postman/control-plane sdk/postman/data-plane
+	$(OPENAPI_GEN) generate -i /work/openapi/_generated/control-plane.yaml \
+	    -g postman-collection -o /work/sdk/postman/control-plane \
+	    --additional-properties=collectionName="SaaS Control Plane API",folderStrategy=Tags
+	$(OPENAPI_GEN) generate -i /work/openapi/_generated/data-plane.yaml \
+	    -g postman-collection -o /work/sdk/postman/data-plane \
+	    --additional-properties=collectionName="SaaS Data Plane API",folderStrategy=Tags
+
+postman-check: postman
+	@git diff --exit-code -- sdk/postman \
+	    || { echo "ERROR: postman collections drifted — commit \`make postman\` output"; exit 1; }
+
+# ── Recipes (Phase 15) ──────────────────────────────────────────────────────
+# Canonical recipes live under docs/recipes/. The saasctl binary embeds
+# its copy from cmd/saasctl/recipes/ via go:embed — go:embed cannot
+# climb out of the package directory, so we keep an in-package mirror
+# and re-sync it whenever the canonical set changes. recipes-check
+# enforces that the two stay byte-for-byte identical.
+recipes-sync:
+	@mkdir -p cmd/saasctl/recipes
+	@cp docs/recipes/*.md cmd/saasctl/recipes/
+
+recipes-check: recipes-sync
+	@git diff --exit-code -- cmd/saasctl/recipes \
+	    || { echo "ERROR: embedded recipes drifted — commit \`make recipes-sync\` output"; exit 1; }
 
 # ── housekeeping ────────────────────────────────────────────────────────────
 clean:
