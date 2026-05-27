@@ -53,7 +53,8 @@ func runIPAllow(t *testing.T, p auth.Principal, remoteAddr string, lookup operat
 }
 
 func TestIPAllowlistNonOperatorPassesThrough(t *testing.T) {
-	w := runIPAllow(t,
+	w := runIPAllow(
+		t,
 		auth.Principal{ActorType: auth.ActorUser, ActorID: "user_x"},
 		"203.0.113.5:5000",
 		&fakeLookup{},
@@ -64,7 +65,8 @@ func TestIPAllowlistNonOperatorPassesThrough(t *testing.T) {
 }
 
 func TestIPAllowlistEmptyListAllowsAny(t *testing.T) {
-	w := runIPAllow(t,
+	w := runIPAllow(
+		t,
 		auth.Principal{ActorType: auth.ActorOperator, ActorID: "op_x"},
 		"203.0.113.5:5000",
 		&fakeLookup{allowlist: map[string][]string{"op_x": nil}},
@@ -75,7 +77,8 @@ func TestIPAllowlistEmptyListAllowsAny(t *testing.T) {
 }
 
 func TestIPAllowlistInsideCIDRAllowed(t *testing.T) {
-	w := runIPAllow(t,
+	w := runIPAllow(
+		t,
 		auth.Principal{ActorType: auth.ActorOperator, ActorID: "op_x"},
 		"10.0.0.5:5000",
 		&fakeLookup{allowlist: map[string][]string{"op_x": {"10.0.0.0/24"}}},
@@ -86,7 +89,8 @@ func TestIPAllowlistInsideCIDRAllowed(t *testing.T) {
 }
 
 func TestIPAllowlistOutsideCIDRRefused(t *testing.T) {
-	w := runIPAllow(t,
+	w := runIPAllow(
+		t,
 		auth.Principal{ActorType: auth.ActorOperator, ActorID: "op_x"},
 		"192.168.1.1:5000",
 		&fakeLookup{allowlist: map[string][]string{"op_x": {"10.0.0.0/24"}}},
@@ -112,7 +116,8 @@ func TestIPAllowlistMixedV4V6Honored(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			w := runIPAllow(t,
+			w := runIPAllow(
+				t,
 				auth.Principal{ActorType: auth.ActorOperator, ActorID: "op_x"},
 				c.remote,
 				&fakeLookup{allowlist: map[string][]string{"op_x": {"10.0.0.0/24", "2001:db8::/32"}}},
@@ -125,7 +130,8 @@ func TestIPAllowlistMixedV4V6Honored(t *testing.T) {
 }
 
 func TestIPAllowlistLookupErrorReturns401(t *testing.T) {
-	w := runIPAllow(t,
+	w := runIPAllow(
+		t,
 		auth.Principal{ActorType: auth.ActorOperator, ActorID: "op_x"},
 		"10.0.0.5:5000",
 		&fakeLookup{err: errors.New("boom")},

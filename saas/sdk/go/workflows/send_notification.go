@@ -52,7 +52,9 @@ func SendNotification(
 
 	body := dp.SendNotificationRequest{
 		WorkflowName: in.WorkflowName,
-		To:           struct{ UserId string `json:"user_id"` }{UserId: in.ToUserID},
+		To: struct {
+			UserId string `json:"user_id"`
+		}{UserId: in.ToUserID},
 	}
 	if in.Payload != nil {
 		p := in.Payload

@@ -54,7 +54,8 @@ VALUES (
 )
 RETURNING row_seq, created_at, updated_at;
 `
-	row := r.pool.QueryRow(ctx, stmt,
+	row := r.pool.QueryRow(
+		ctx, stmt,
 		k.ID, k.TenantID, k.EnvironmentID, k.Name, k.Prefix,
 		k.ArgonPHC,
 		k.PrefixLookupHash,
@@ -205,7 +206,8 @@ SET predecessor_argon_phc = argon_phc,
     row_seq = row_seq + 1
 WHERE id = $1 AND tenant_id = $2 AND status = 'active'
 RETURNING ` + apiKeyCols
-	row, err := r.scanOne(ctx, stmt,
+	row, err := r.scanOne(
+		ctx, stmt,
 		apiKeyID, tenantID, predecessorExpiresAt,
 		newPHC, newPrefix, newHash,
 		newEnv.Ciphertext, newEnv.WrappedDEK, newEnv.Nonce, newEnv.KID, newEnv.KeyVersion,

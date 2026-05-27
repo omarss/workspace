@@ -148,7 +148,8 @@ VALUES ($1,$2,$3,$4,$5,$6,NULLIF($7,''),
         $8, NULLIF($9,''), NULLIF($10,''), NULLIF($11,''), $12, NULLIF($13,''),
         $14, $15, $16)
 `
-	if _, err := tx.Exec(ctx, insert,
+	if _, err := tx.Exec(
+		ctx, insert,
 		ev.ID, ev.TenantID, string(ev.ActorType), ev.ActorID, ev.Action,
 		ev.ResourceType, ev.ResourceID,
 		ev.OccurredAt, ev.IPAddress, ev.UserAgent, ev.RequestID, metaJSON, ev.SourceEventID,

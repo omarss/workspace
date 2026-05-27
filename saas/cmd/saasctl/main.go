@@ -26,7 +26,9 @@ func main() {
 	}
 	root.AddCommand(
 		versionCmd(),
-		initCmd(),
+		// Phase 15 — full saasctl init wizard (ADR 020). Replaces the
+		// Phase-2 placeholder that just printed "not yet implemented".
+		initCommand(),
 		tenantCmd(),
 		deploymentCmd(),
 		domainCmd(),
@@ -38,6 +40,9 @@ func main() {
 		// runbooks have a stable command set from Phase 13 onward.
 		operatorCmd(),
 		impersonationCmd(),
+		// Phase 15 — DX polish commands.
+		recipeCommand(),
+		statusCommand(),
 	)
 	// Phase 12a-d shipped `saasctl debug <adapter>` helpers behind
 	// CHECKPOINT 5/6/7/8. Phase 12e composes the four adapters into
@@ -54,19 +59,6 @@ func versionCmd() *cobra.Command {
 		Use:   "version",
 		Short: "Print version.",
 		Run:   func(*cobra.Command, []string) { fmt.Println("saasctl dev") },
-	}
-}
-
-// initCmd is the Phase-15 easy-setup wizard placeholder (ADR 016). It exists
-// in Phase 2 so the command surface is stable from the first release; the
-// implementation prints a polite "not yet implemented" message.
-func initCmd() *cobra.Command {
-	return &cobra.Command{
-		Use:   "init",
-		Short: "Bootstrap a local SaaS stack (wired in Phase 15).",
-		Run: func(*cobra.Command, []string) {
-			fmt.Println("init: not yet implemented; runs in Phase 15")
-		},
 	}
 }
 
