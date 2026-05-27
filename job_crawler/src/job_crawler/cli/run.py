@@ -101,6 +101,7 @@ async def _run_one(db: JobCrawlerDB, slug: str) -> int:
             f"[{slug}] {summary.status.value}: "
             f"fetched={summary.fetched} parsed={summary.parsed} "
             f"new={summary.new_postings} updated={summary.updated_postings} "
+            f"fresh_skipped={summary.fresh_skipped} "
             f"errors={summary.errors}",
         )
         if summary.status.value == "failed":

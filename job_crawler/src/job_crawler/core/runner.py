@@ -18,6 +18,7 @@ crawlers stay pure (parse + normalize).
 from __future__ import annotations
 
 import logging
+import os
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -41,6 +42,31 @@ from .types import Listing, ParsedPosting
 
 _LOG: Final = logging.getLogger("job_crawler.runner")
 
+# Default freshness window (hours) for the incremental-crawl skip. With
+# a 4-runs-per-day cron, 6 hours catches every cycle without thrashing.
+# Set `JC_LISTING_FRESH_HOURS=0` to disable and force every listing to
+# be re-fetched (legacy behaviour). Negative values clamp to 0.
+_DEFAULT_FRESH_HOURS: Final = 6
+
+
+def _get_fresh_hours() -> int:
+    """Read JC_LISTING_FRESH_HOURS from env with a sane fallback.
+
+    Returns 0 if the env value is unparseable or negative — that keeps
+    the skip disabled rather than crashing the run on a bad config.
+    """
+    raw = os.environ.get("JC_LISTING_FRESH_HOURS")
+    if raw is None:
+        return _DEFAULT_FRESH_HOURS
+    try:
+        return max(0, int(raw))
+    except ValueError:
+        _LOG.warning(
+            "JC_LISTING_FRESH_HOURS=%r is not an integer; disabling skip",
+            raw,
+        )
+        return 0
+
 
 @dataclass(slots=True)
 class RunSummary:
@@ -54,6 +80,11 @@ class RunSummary:
     updated_postings: int
     errors: int
     status: CrawlRunStatus
+    # Listings discovered but short-circuited by the incremental-crawl
+    # freshness skip — they never reached `fetch_detail`, so they don't
+    # show up in `fetched` either. Surface them separately so the CLI
+    # summary lets operators see how much HTTP budget the skip saved.
+    fresh_skipped: int = 0
 
 
 class CrawlerRunner:
@@ -105,6 +136,24 @@ class CrawlerRunner:
         # paginators that surface the same listing on multiple pages.
         seen_content_hashes: set[bytes] = set()
 
+        # Incremental-crawl freshness skip. When JC_LISTING_FRESH_HOURS is
+        # set to a positive integer, the runner bulk-loads every
+        # `source_job_external_id` whose posting was fetched within that
+        # window for this source, and short-circuits before `fetch_detail`
+        # for any listing already in the set. Defaults to 6h — fits a
+        # 4-runs-per-day cron without losing description / status edits
+        # that happen quicker than that.
+        fresh_hours = _get_fresh_hours()
+        fresh_external_ids: set[str] = await self.db.postings.fresh_external_ids(
+            source_id, hours=fresh_hours,
+        )
+        if fresh_external_ids:
+            _LOG.info(
+                "incremental crawl: %d listings will be skipped if seen "
+                "within %dh (source=%s)",
+                len(fresh_external_ids), fresh_hours, self.crawler.source_slug,
+            )
+
         try:
             async for listing in self._safe_iter(self.crawler.discover_listings(since=since)):
                 # Listing-stage gate: skip nav / search URLs before paying
@@ -118,6 +167,22 @@ class CrawlerRunner:
                         listing_reject.reason,
                         listing.detail_url,
                         listing_reject.detail,
+                    )
+                    continue
+                # Incremental skip: posting was fetched recently, no
+                # reason to re-pay the HTTP + Playwright cost. Recorded
+                # as `outcome='unchanged'` so the crawl_fetches ledger
+                # still reflects that we considered this URL this cycle.
+                if listing.source_job_external_id in fresh_external_ids:
+                    stats.fresh_skipped += 1
+                    await self.db.crawl.record_fetch(
+                        run.id,
+                        source_id,
+                        listing.detail_url,
+                        outcome="unchanged",
+                        error_message=(
+                            f"skipped: fresh within {fresh_hours}h"
+                        ),
                     )
                     continue
                 stats.fetched += 1
@@ -289,6 +354,7 @@ class CrawlerRunner:
                 updated_postings=updated_count,
                 errors=errors + 1,
                 status=CrawlRunStatus.failed,
+                fresh_skipped=stats.fresh_skipped,
             )
 
         await self.db.crawl.increment_counter(
@@ -310,6 +376,7 @@ class CrawlerRunner:
             updated_postings=updated_count,
             errors=errors,
             status=CrawlRunStatus.completed,
+            fresh_skipped=stats.fresh_skipped,
         )
 
     # ---- internals ----------------------------------------------------

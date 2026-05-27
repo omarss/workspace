@@ -242,3 +242,73 @@ async def test_runner_drops_intra_run_duplicates(db: JobCrawlerDB) -> None:
     rejected = [r for r in records if r["outcome"] == "rejected"]
     assert len(rejected) == 1
     assert rejected[0]["error_message"].startswith("quality:intra_run_dup")
+
+
+async def test_runner_skips_listings_fetched_within_freshness_window(
+    db: JobCrawlerDB,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Incremental crawl: after a posting has been ingested once, a
+    second run within the freshness window should skip it before
+    paying the HTTP cost.
+
+    Asserts:
+      - first run creates 1 posting (normal path)
+      - second run's stub yields the same listing again
+      - second run's `fresh_skipped` counter is 1
+      - second run's `fetched` is 0 (no HTTP call)
+      - the `crawl_fetches` row from the second run is outcome='unchanged'
+        with the freshness reason in error_message
+    """
+    monkeypatch.setenv("JC_LISTING_FRESH_HOURS", "24")
+    listings = [
+        Listing(source_job_external_id="abc", detail_url="https://stub.invalid/jobs/abc"),
+    ]
+    parsed = {"abc": _good_parsed(eid="abc", url="https://stub.invalid/jobs/abc")}
+
+    # --- Run 1: cold crawl, posting gets ingested ----------------------
+    runner1 = CrawlerRunner(db, _StubCrawler(listings, parsed))
+    summary1 = await runner1.run()
+    assert summary1.new_postings == 1
+    assert summary1.fresh_skipped == 0
+
+    # --- Run 2: same listing, should be skipped pre-fetch --------------
+    runner2 = CrawlerRunner(db, _StubCrawler(listings, parsed))
+    summary2 = await runner2.run()
+    assert summary2.fresh_skipped == 1
+    assert summary2.fetched == 0
+    assert summary2.new_postings == 0
+    assert summary2.updated_postings == 0
+
+    source_id = await runner2.ensure_source()
+    records = await _fetch_records(db, source_id)
+    # 1 from run 1 (created), 1 from run 2 (unchanged: skipped fresh)
+    assert any(
+        r["outcome"] == "unchanged" and "skipped: fresh within 24h" in (r["error_message"] or "")
+        for r in records
+    )
+
+
+async def test_runner_refetches_after_freshness_window_expires(
+    db: JobCrawlerDB,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """When `JC_LISTING_FRESH_HOURS=0` the skip is disabled and every
+    listing is fetched again (legacy behaviour). Confirms the env knob
+    actually controls the gate."""
+    monkeypatch.setenv("JC_LISTING_FRESH_HOURS", "0")
+    listings = [
+        Listing(source_job_external_id="abc", detail_url="https://stub.invalid/jobs/abc"),
+    ]
+    parsed = {"abc": _good_parsed(eid="abc", url="https://stub.invalid/jobs/abc")}
+
+    runner1 = CrawlerRunner(db, _StubCrawler(listings, parsed))
+    s1 = await runner1.run()
+    assert s1.new_postings == 1
+
+    runner2 = CrawlerRunner(db, _StubCrawler(listings, parsed))
+    s2 = await runner2.run()
+    # Second run re-fetches → posting is "updated", not skipped.
+    assert s2.fresh_skipped == 0
+    assert s2.fetched == 1
+    assert s2.updated_postings == 1
