@@ -301,15 +301,14 @@ class BaytCrawler(BoardCrawler):
             min_experience_years=ld.min_experience_years if ld else None,
             salary_min=ld.salary_min if ld else None,
             salary_max=ld.salary_max if ld else None,
-            # Bayt's JSON-LD mis-labels every SA salary as "USD" — observed
-            # 266 of 269 salaried rows on 2026-05-26 with absurdly-low USD
-            # values (e.g. 1500-2000 USD/month for a junior accountant).
-            # The Bayt crawler is hardwired to the saudi-arabia section
-            # (see `_search_url` / `discover_listings`), so the currency is
-            # always SAR by definition. Override what JSON-LD claims.
-            salary_currency=(
-                "SAR" if (ld and ld.salary_min is not None) else None
-            ),
+            # Keep whatever currency Bayt's JSON-LD reports — typically
+            # USD for SA postings. Normalisation to SAR (USD * 3.75)
+            # happens centrally in `to_upsert` so every source benefits
+            # from the same rule. The earlier hard "SAR" override was
+            # wrong: Bayt's numbers ARE USD-denominated (just often
+            # placeholder tier-signal ranges); blindly relabeling kept
+            # the magnitudes wrong.
+            salary_currency=ld.salary_currency if ld else None,
             salary_period=ld.salary_period if ld else None,
             application_channels=channels,
             parsed_fields=parsed_fields,

@@ -828,3 +828,70 @@ def test_clean_title_idempotent() -> None:
     twice = _clean_title(once)
     assert once == "Mechanical Engineer"
     assert twice == once
+
+
+# ---------------------------------------------------------------------------
+# _normalise_salary_to_sar
+# ---------------------------------------------------------------------------
+
+
+def test_normalise_salary_usd_to_sar() -> None:
+    """Bayt's JSON-LD reports USD; we convert to SAR at the SAMA peg
+    (3.75). Live data sample: '$500 - $1,000' should become
+    'SAR 1,875 - SAR 3,750'."""
+    from decimal import Decimal
+
+    from job_crawler.core.normalise import _normalise_salary_to_sar
+    smin, smax, cur = _normalise_salary_to_sar(500, 1000, "USD")
+    assert smin == Decimal("1875.00")
+    assert smax == Decimal("3750.00")
+    assert cur == "SAR"
+
+
+def test_normalise_salary_sar_passthrough() -> None:
+    from decimal import Decimal
+
+    from job_crawler.core.normalise import _normalise_salary_to_sar
+    smin, smax, cur = _normalise_salary_to_sar(8000, 12000, "SAR")
+    assert smin == Decimal("8000")
+    assert smax == Decimal("12000")
+    assert cur == "SAR"
+
+
+def test_normalise_salary_none_passthrough() -> None:
+    from job_crawler.core.normalise import _normalise_salary_to_sar
+    smin, smax, _ = _normalise_salary_to_sar(None, None, "SAR")
+    assert smin is None
+    assert smax is None
+
+
+def test_normalise_salary_other_gcc_pegs() -> None:
+    """AED / BHD / KWD / OMR / QAR convert via static pegs."""
+    from decimal import Decimal
+
+    from job_crawler.core.normalise import _normalise_salary_to_sar
+    smin_aed, _, cur = _normalise_salary_to_sar(1000, None, "AED")
+    assert cur == "SAR"
+    # AED rate ≈ 1.02
+    assert smin_aed == Decimal("1020.00")
+
+
+def test_normalise_salary_unknown_currency_passthrough() -> None:
+    """A currency we don't know is left as-is — better than guessing."""
+    from decimal import Decimal
+
+    from job_crawler.core.normalise import _normalise_salary_to_sar
+    smin, _smax, cur = _normalise_salary_to_sar(100, 200, "ZAR")
+    assert smin == Decimal("100")
+    assert cur == "ZAR"
+
+
+def test_normalise_salary_single_value_min_only() -> None:
+    """A USD min without a max still converts."""
+    from decimal import Decimal
+
+    from job_crawler.core.normalise import _normalise_salary_to_sar
+    smin, smax, cur = _normalise_salary_to_sar(2000, None, "USD")
+    assert smin == Decimal("7500.00")
+    assert smax is None
+    assert cur == "SAR"
