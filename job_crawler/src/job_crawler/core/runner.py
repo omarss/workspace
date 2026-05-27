@@ -528,6 +528,12 @@ class CrawlerRunner:
             return  # require resolved city
         if (posting.description or "").strip().__len__() < 300:
             return
+        # Require a clear posted date — subscribers can't make sense of
+        # a job whose age we don't know. `source_updated_at` is NOT a
+        # substitute (Greenhouse refreshes long-lived roles, but the
+        # original posted_at is what subscribers expect).
+        if parsed.posted_at is None:
+            return
 
         # --- Cluster-level dedup (telegram_broadcasts) --------------------
         async with self.db.pool.connection() as conn, conn.cursor() as cur:
@@ -550,7 +556,7 @@ class CrawlerRunner:
 
         from ..alerts.telegram import format_new_job, send_message
 
-        body = format_new_job(
+        body, buttons = format_new_job(
             title=parsed.title,
             company_name=company_name,
             city_name=city_name,
@@ -564,9 +570,10 @@ class CrawlerRunner:
             salary_period=(
                 parsed.salary_period.value if parsed.salary_period else None
             ),
+            posted_at=parsed.posted_at,
             url=parsed.canonical_url,
         )
-        sent = await send_message(body)
+        sent = await send_message(body, inline_buttons=buttons)
         if sent:
             # Record successful broadcast so future runs / re-fetches
             # don't repost. INSERT ... ON CONFLICT DO NOTHING in case

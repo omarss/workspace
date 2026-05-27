@@ -22,7 +22,7 @@ from job_crawler.alerts.telegram import (
 
 def test_format_new_job_minimal_fields() -> None:
     """Title + URL only — the bare minimum a new posting carries."""
-    body = format_new_job(
+    body, buttons = format_new_job(
         title="Senior Python Engineer",
         company_name=None, city_name=None, country_code=None,
         category_code=None, category_name=None,
@@ -32,10 +32,14 @@ def test_format_new_job_minimal_fields() -> None:
     assert "Senior Python Engineer" in body
     assert "example.invalid/job/1" in body
     assert "🔗" in body  # canonical-link footer
+    # New: inline button alongside the title link + footer URL
+    assert buttons == [("👀 View full job", "https://example.invalid/job/1")]
 
 
 def test_format_new_job_full_fields() -> None:
-    body = format_new_job(
+    from datetime import UTC, datetime, timedelta
+    posted = datetime.now(UTC) - timedelta(hours=3)
+    body, buttons = format_new_job(
         title="Senior Python Engineer",
         company_name="Tamara",
         city_name="Riyadh",
@@ -51,22 +55,26 @@ def test_format_new_job_full_fields() -> None:
         ),
         salary_min=15000, salary_max=25000,
         salary_currency="SAR", salary_period="monthly",
+        posted_at=posted,
         url="https://job-boards.eu.greenhouse.io/tamara/jobs/4683204101",
     )
     assert "🏢 Tamara" in body
     assert "💼 Software Engineering" in body
     assert "📍 Riyadh, SA" in body
+    assert "📅 Posted 3 hours ago" in body
     assert "SAR 15,000-25,000 / monthly" in body
     assert "payments platform" in body  # summary
     assert "#tamara" in body
     assert "#software_engineering" in body
     assert "#riyadh" in body
+    assert buttons[0][0].startswith("👀")
+    assert buttons[0][1] == "https://job-boards.eu.greenhouse.io/tamara/jobs/4683204101"
 
 
 def test_format_new_job_escapes_html() -> None:
     """A company name containing &/</> must not break the HTML
     parse_mode body."""
-    body = format_new_job(
+    body, _buttons = format_new_job(
         title="QA & Test Engineer",
         company_name="<script>alert(1)</script>",
         city_name="Riyadh", country_code="sa",
@@ -76,6 +84,50 @@ def test_format_new_job_escapes_html() -> None:
     assert "<script>" not in body
     assert "&lt;script&gt;" in body
     assert "&amp;" in body  # the & in the title
+
+
+def test_format_new_job_skips_about_us_intro() -> None:
+    """A description that opens with "About Us / About the company"
+    boilerplate should have that paragraph stripped — subscribers
+    don't care about the marketing pitch, they want the role."""
+    body, _buttons = format_new_job(
+        title="Application Support Engineer",
+        company_name="Tamara",
+        city_name="Riyadh", country_code="sa",
+        category_code=None, category_name=None,
+        description=(
+            "About Us\n"
+            "Tamara is the leading fintech platform in Saudi Arabia "
+            "with millions of customers and partnerships with Apple, "
+            "SHEIN, and noon.\n\n"
+            "Your Role\n"
+            "We are seeking a dedicated Application Support Engineer "
+            "to investigate, troubleshoot, and resolve technical issues."
+        ),
+        url="https://example.invalid/job/1",
+    )
+    assert "Tamara is the leading fintech" not in body
+    assert "Application Support Engineer" in body  # title
+    assert "investigate, troubleshoot" in body
+
+
+def test_format_new_job_skips_pitch_first_sentence() -> None:
+    """Even without an explicit 'About Us' heading, a pitch sentence
+    like 'Tamara is the leading ...' counts as boilerplate."""
+    body, _ = format_new_job(
+        title="Engineer",
+        company_name="Tamara",
+        city_name="Riyadh", country_code="sa",
+        category_code=None, category_name=None,
+        description=(
+            "Tamara is the leading fintech platform in Saudi Arabia.\n\n"
+            "You will own the payments platform and drive technical "
+            "decisions across the stack."
+        ),
+        url="https://example.invalid/job/1",
+    )
+    assert "leading fintech platform" not in body
+    assert "own the payments platform" in body
 
 
 # ---------------------------------------------------------------------------
@@ -189,7 +241,8 @@ async def test_send_message_swallows_transport_error(monkeypatch: pytest.MonkeyP
 
 @pytest.mark.asyncio
 async def test_send_message_returns_true_on_ok(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Happy path — a 200 from Telegram returns True."""
+    """Happy path — a 200 from Telegram returns True; inline_buttons
+    pass through as reply_markup."""
     monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "x:y")
     monkeypatch.setenv("TELEGRAM_CHANNEL_ID", "@test")
     monkeypatch.setenv("TELEGRAM_RATE_LIMIT_MS", "0")
@@ -201,13 +254,21 @@ async def test_send_message_returns_true_on_ok(monkeypatch: pytest.MonkeyPatch) 
         return httpx.Response(200, json={"ok": True})
 
     monkeypatch.setattr(httpx.AsyncClient, "post", _ok)
-    assert await send_message("hello world") is True
+    assert await send_message(
+        "hello world",
+        inline_buttons=[("👀 View", "https://example.invalid/x")],
+    ) is True
     assert "api.telegram.org/botx:y/sendMessage" in str(captured["url"])
     payload = captured["json"]
     assert isinstance(payload, dict)
     assert payload["chat_id"] == "@test"
     assert payload["text"] == "hello world"
     assert payload["parse_mode"] == "HTML"
+    markup = payload["reply_markup"]
+    assert isinstance(markup, dict)
+    assert markup["inline_keyboard"] == [
+        [{"text": "👀 View", "url": "https://example.invalid/x"}]
+    ]
 
 
 @pytest.mark.asyncio
