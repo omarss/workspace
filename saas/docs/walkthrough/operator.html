@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Operator Walkthrough — SaaS Platform</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <h1>Operator Walkthrough</h1>
+    <p>Five concrete tasks. Each is one CLI call, one curl, and the
+       expected response. About ten minutes end-to-end.</p>
+  </header>
+
+  <nav>
+    <a href="index.html">&larr; Home</a>
+    <a href="operator.html" class="current">Operator</a>
+    <a href="PERSONAS.md">Builder</a>
+    <a href="PERSONAS.md">Tenant Admin</a>
+    <a href="PERSONAS.md">End User</a>
+    <a href="PERSONAS.md">Machine Client</a>
+  </nav>
+
+  <main>
+    <h2>Who you are</h2>
+    <p>
+      You are the platform operator. You stand up Deployments, attach
+      custom domains, freeze a tenant's encryption keys when an incident
+      lands on the rota, and read the audit log when compliance asks.
+      Your CLI is <code>saasctl</code>; your auth token comes from the
+      operators realm in Keycloak (see
+      <a href="../adr/019-operators-realm-mfa-stepup.md">ADR 019</a>).
+    </p>
+
+    <h2>Prerequisites</h2>
+    <ul>
+      <li>
+        Local stack up: <code>saasctl init</code> finished, or you ran
+        <code>make compose-up</code> and the migrations yourself.
+      </li>
+      <li>
+        Operator bearer token cached at
+        <code>~/.saas/credentials.json</code> (the wizard wrote it for
+        you on <code>--operator-token-file</code>; otherwise the CLI
+        falls back to the mock headers in local-dev).
+      </li>
+      <li>
+        Familiarity with the <a href="../recipes/">first-class recipes</a>
+        for deeper detail.
+      </li>
+    </ul>
+
+    <h2>Step 1 — Provision a Deployment</h2>
+    <p>Recipe: <a href="../recipes/provision-deployment.md">provision-deployment</a>.</p>
+    <pre><code>$ saasctl deployment create \
+    --project default \
+    --environment dev \
+    --image v0.3.1
+Deployment created: dep_01HXAAAAAAAAAAAAAAAAAA
+Primary vhost:      https://dev.default.saas.omarss.net
+Bootstrap API key:  api_01HXBBBBBBBBBBBBBBBBBB
+Bootstrap secret:   sk_live_…   # COPY NOW — shown ONCE</code></pre>
+    <div class="warning">
+      <strong>One-shot secret.</strong> The bootstrap secret is shown
+      <em>once</em>. Pipe it to your secret manager immediately. If you
+      lose it, rotate the API key — the original secret cannot be
+      recovered (ADR 008).
+    </div>
+
+    <h2>Step 2 — Inspect the §6.2 step ledger</h2>
+    <p>
+      Provisioning runs nine adapters in sequence (nginx, k3s, Postgres,
+      OpenBao, …). The ledger shows which step is at which state — useful
+      when a Deployment is stuck in <code>provisioning</code>.
+    </p>
+    <pre><code>$ saasctl deployment ledger dep_01HXAA…
+{
+  "data": [
+    {"step": "nginx_vhost",     "state": "applied"},
+    {"step": "k3s_namespace",   "state": "applied"},
+    {"step": "postgres_db",     "state": "applied"},
+    {"step": "openbao_transit", "state": "applied"}
+    …
+  ]
+}</code></pre>
+
+    <h2>Step 3 — Attach a custom domain (BYOD)</h2>
+    <p>Recipe: <a href="../recipes/attach-custom-domain.md">attach-custom-domain</a>.</p>
+    <ol class="steps">
+      <li>
+        <strong>Attach.</strong>
+        <pre><code>$ saasctl domain attach dep_01HXAA… --domain app.acme.test
+{
+  "data": {
+    "id": "dom_01HX…",
+    "state": "pending_verification",
+    "txt_record": { "name": "_saas-verify.app.acme.test", "value": "saas-verify=abc…" }
+  }
+}</code></pre>
+      </li>
+      <li>
+        <strong>Publish the TXT record</strong> on the customer's
+        authoritative DNS. Wait for propagation (<code>dig +short TXT
+        _saas-verify.app.acme.test</code> should return the value).
+      </li>
+      <li>
+        <strong>Verify.</strong>
+        <pre><code>$ saasctl domain verify dep_01HXAA… --domain-id dom_01HX…
+{"data":{"state":"verified","cert_issued_at":"…"}}</code></pre>
+      </li>
+    </ol>
+    <div class="note">
+      <strong>Cert vs. apply-nginx.</strong> The control plane re-renders
+      the per-Deployment vhost and runs <code>nginx -s reload</code> —
+      it does NOT call homelab's <code>make apply-nginx</code>, which
+      would clobber certbot's 443 blocks (workspace gotcha #1).
+    </div>
+
+    <h2>Step 4 — Freeze keys (incident response)</h2>
+    <p>
+      When a tenant suspects an in-progress compromise you can freeze
+      their per-Deployment OpenBao transit key without taking the rest
+      of the Deployment down (ADR 016, §18.7).
+    </p>
+    <pre><code>$ saasctl deployment freeze-keys dep_01HXAA… \
+    --reason "PD-1234 — investigating suspicious data export"
+{"data":{"frozen_at":"…","by":"op_01HX…"}}</code></pre>
+    <p>
+      After freeze, reads continue (existing data plane sessions cache
+      the DEK), but no new envelope-encrypted writes succeed. Unfreeze
+      via the same endpoint with <code>--unfreeze</code> once the
+      incident is closed.
+    </p>
+
+    <h2>Step 5 — Read the audit chain</h2>
+    <p>Recipe: <a href="../recipes/view-audit-events.md">view-audit-events</a>.</p>
+    <pre><code>$ saasctl audit list \
+    --tenant tenant_01HX… \
+    --since  2026-05-20T00:00:00Z \
+    --limit  20
+{
+  "data": [
+    {
+      "id":     "audit_01HX…",
+      "actor":  "user_01HX…",
+      "action": "tenant.create",
+      "at":     "2026-05-26T10:11:12Z",
+      "prev":   "blake3:…",
+      "self":   "blake3:…"
+    }
+  ],
+  "next_cursor": "v1:…"
+}</code></pre>
+    <p>
+      Integrity verification is a separate control-plane endpoint:
+    </p>
+    <pre><code>$ curl -X POST \
+    "https://control.saas.omarss.net/control/v1/deployments/$DEP_ID/audit-integrity" \
+    -H "Authorization: Bearer $OPERATOR_TOKEN" \
+    -H "Idempotency-Key: idem_$(uuidgen)"</code></pre>
+
+    <h2>What to read next</h2>
+    <ul>
+      <li>
+        <a href="../recipes/">All recipes</a> — quick reference cards.
+      </li>
+      <li>
+        <a href="../adr/">ADR index</a> — the why behind each decision.
+      </li>
+      <li>
+        AGENTS.md §6 (provisioning sequence), §18 (security posture),
+        §21 (DX requirements).
+      </li>
+    </ul>
+  </main>
+
+  <footer>
+    <p>
+      Exemplar persona page. The four remaining personas (Product
+      Builder, Tenant Admin, End User, Machine Client) are outlined in
+      <a href="PERSONAS.md">PERSONAS.md</a> for the next DX iteration.
+    </p>
+  </footer>
+</body>
+</html>
