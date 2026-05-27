@@ -348,3 +348,54 @@ def test_humanise_posted_at_absolute_format() -> None:
     # Missing / wrong type → None
     assert _humanise_posted_at(None) is None
     assert _humanise_posted_at("2026-05-27") is None
+
+
+def test_format_new_job_renders_first_seen_when_posted_at_missing() -> None:
+    """company_careers postings have no board-supplied posted_at —
+    the runner passes first_seen_at as a fallback so subscribers
+    still get a date anchor. Label switches from 'Posted' to
+    'First seen' to make the provenance explicit."""
+    from datetime import UTC, datetime
+    first_seen = datetime(2026, 5, 27, 18, 30, tzinfo=UTC)
+    body, _buttons = format_new_job(
+        title="Senior Product Manager",
+        company_name="Tamara", city_name="Riyadh", country_code="sa",
+        category_code=None, category_name=None,
+        description=("Role overview. " * 30),
+        posted_at=None,
+        first_seen_at=first_seen,
+        url="https://example.invalid/careers/42",
+    )
+    assert "📅 First seen Wed, 27 May 2026" in body
+    assert "📅 Posted" not in body
+
+
+def test_format_new_job_prefers_posted_at_over_first_seen() -> None:
+    """When both dates are supplied, the canonical posted_at wins."""
+    from datetime import UTC, datetime
+    body, _buttons = format_new_job(
+        title="Senior Python Engineer",
+        company_name="Tamara", city_name="Riyadh", country_code="sa",
+        category_code=None, category_name=None,
+        description=("Role overview. " * 30),
+        posted_at=datetime(2026, 5, 21, 9, 30, tzinfo=UTC),
+        first_seen_at=datetime(2026, 5, 27, 18, 30, tzinfo=UTC),
+        url="https://example.invalid/careers/42",
+    )
+    assert "📅 Posted Thu, 21 May 2026" in body
+    assert "First seen" not in body
+
+
+def test_format_new_job_omits_date_line_when_both_missing() -> None:
+    """Defensive: if both dates are None, no 📅 line is rendered.
+    Runner is supposed to gate this out, but format_new_job should
+    not crash."""
+    body, _buttons = format_new_job(
+        title="Senior Python Engineer",
+        company_name=None, city_name=None, country_code=None,
+        category_code=None, category_name=None,
+        posted_at=None,
+        first_seen_at=None,
+        url="https://example.invalid/careers/42",
+    )
+    assert "📅" not in body
