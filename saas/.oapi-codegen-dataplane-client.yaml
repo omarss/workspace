@@ -1,0 +1,15 @@
+package: dataplaneclient
+output: sdk/go/dataplane/client.gen.go
+generate:
+  models: true
+  client: true
+# response-type-suffix renames the WithResponse wrapper types (e.g.
+# CreateAPIKeyResponseResp instead of CreateAPIKeyResponse) so they don't
+# collide with model schemas that happen to be named "*Response".
+# Keeps the spec untouched and the wire shape unchanged.
+output-options:
+  skip-fmt: false
+  skip-prune: false
+  response-type-suffix: Resp
+  overlay:
+    path: openapi/overlays/30-downgrade.yaml
