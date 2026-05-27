@@ -147,7 +147,8 @@ func verifyRLSProbe(ctx context.Context, conn *pgx.Conn) error {
 	)
 
 	// Insert two rows under fixture A.
-	if _, err := tx.Exec(ctx,
+	if _, err := tx.Exec(
+		ctx,
 		`SELECT set_config('app.current_tenant_id', $1, true)`, tenantA,
 	); err != nil {
 		return fmt.Errorf("set guc A: %w", err)
@@ -156,7 +157,8 @@ func verifyRLSProbe(ctx context.Context, conn *pgx.Conn) error {
 		// `tenant` table doubles as the tenant catalog AND the
 		// RLS-bound payload. Insert rows where id matches the GUC
 		// so the policy permits both INSERT and subsequent SELECT.
-		if _, err := tx.Exec(ctx,
+		if _, err := tx.Exec(
+			ctx,
 			`INSERT INTO tenant (id, slug, name)
 			 VALUES ($1, $2, $2)
 			 ON CONFLICT (id) DO NOTHING`,
@@ -178,7 +180,8 @@ func verifyRLSProbe(ctx context.Context, conn *pgx.Conn) error {
 	}
 
 	// Switch to fixture B; expect 0 rows.
-	if _, err := tx.Exec(ctx,
+	if _, err := tx.Exec(
+		ctx,
 		`SELECT set_config('app.current_tenant_id', $1, true)`, tenantB,
 	); err != nil {
 		return fmt.Errorf("set guc B: %w", err)
@@ -193,7 +196,8 @@ func verifyRLSProbe(ctx context.Context, conn *pgx.Conn) error {
 
 	// Cleanup: back to A and delete. Important to run before commit
 	// so the fixtures do not persist beyond the probe.
-	if _, err := tx.Exec(ctx,
+	if _, err := tx.Exec(
+		ctx,
 		`SELECT set_config('app.current_tenant_id', $1, true)`, tenantA,
 	); err != nil {
 		return fmt.Errorf("set guc A for cleanup: %w", err)

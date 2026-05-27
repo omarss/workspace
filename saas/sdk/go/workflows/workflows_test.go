@@ -152,7 +152,7 @@ func TestCreateTenant_HappyPath(t *testing.T) {
 	h.on("POST", "/v1/tenants", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(t, w, http.StatusCreated, map[string]any{
 			"data": map[string]any{
-				"id": "tenant_01H1234567890ABCDEFGHIJKLM",
+				"id":   "tenant_01H1234567890ABCDEFGHIJKLM",
 				"slug": "acme", "name": "Acme", "object": "tenant", "status": "active",
 				"created_at": time.Now(), "updated_at": time.Now(), "etag": `W/"v1"`,
 			},
@@ -217,7 +217,7 @@ func TestProvisionDeployment_HappyPath(t *testing.T) {
 	h.on("POST", "/control/v1/deployments", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(t, w, http.StatusCreated, map[string]any{
 			"data": map[string]any{
-				"id": "dep_01H000000000000000000000",
+				"id":           "dep_01H000000000000000000000",
 				"project_slug": "demo", "environment_slug": "dev", "status": "active",
 				"image_version": "v0.1.0", "primary_vhost": "dev.demo.saas.omarss.net",
 				"created_at": time.Now(),
@@ -253,7 +253,7 @@ func TestInviteMember_AcceptsEmailForNonExistentUser(t *testing.T) {
 	h.on("POST", "/v1/organizations/org_X/invitations", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(t, w, http.StatusAccepted, map[string]any{
 			"data": map[string]any{
-				"id": "inv_01H000000000000000000000",
+				"id":              "inv_01H000000000000000000000",
 				"organization_id": "org_X", "tenant_id": "tenant_X",
 				"invitee_email": "new@example.com", "state": "pending",
 				"token_prefix": "abc12345",
@@ -402,7 +402,7 @@ func TestListAuditEvents_Pagination(t *testing.T) {
 				map[string]any{
 					"id": "audit_01H000000000000000000000", "tenant_id": "tenant_X",
 					"actor_type": "user", "actor_id": "user_X",
-					"action":     "tenant.create", "resource_type": "tenant",
+					"action": "tenant.create", "resource_type": "tenant",
 					"occurred_at":    time.Now(),
 					"chain_sequence": 1,
 					"prev_hash":      "0000",
@@ -432,7 +432,7 @@ func TestSendNotification_Async(t *testing.T) {
 	h.on("POST", "/v1/notifications/send", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(t, w, http.StatusAccepted, map[string]any{
 			"data": map[string]any{
-				"id": "notif_01H000000000000000000000",
+				"id":     "notif_01H000000000000000000000",
 				"object": "notification", "tenant_id": "tenant_X",
 				"workflow_name": "welcome", "to_user_id": "user_X",
 				"status":    "queued",
@@ -461,7 +461,7 @@ func TestSendNotification_PollUntilTerminal(t *testing.T) {
 	h.on("POST", "/v1/notifications/send", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(t, w, http.StatusAccepted, map[string]any{
 			"data": map[string]any{
-				"id": "notif_01H000000000000000000000",
+				"id":     "notif_01H000000000000000000000",
 				"object": "notification", "tenant_id": "tenant_X",
 				"workflow_name": "welcome", "to_user_id": "user_X",
 				"status":    "queued",
@@ -478,7 +478,7 @@ func TestSendNotification_PollUntilTerminal(t *testing.T) {
 		}
 		writeJSON(t, w, 200, map[string]any{
 			"data": map[string]any{
-				"id": "notif_01H000000000000000000000",
+				"id":     "notif_01H000000000000000000000",
 				"object": "notification", "tenant_id": "tenant_X",
 				"workflow_name": "welcome", "to_user_id": "user_X",
 				"status":    status,
@@ -718,7 +718,7 @@ func TestVerifyAuditIntegrity_FirstMismatch(t *testing.T) {
 			writeJSON(t, w, 200, map[string]any{
 				"data": map[string]any{
 					"verified": false, "rows_checked": 7, "tenants_checked": 1,
-					"first_mismatch_id": "audit_01H000000000000000000000",
+					"first_mismatch_id":        "audit_01H000000000000000000000",
 					"first_mismatch_tenant_id": "tenant_X",
 					"first_mismatch_sequence":  3,
 					"first_mismatch_reason":    "row_hash_mismatch",

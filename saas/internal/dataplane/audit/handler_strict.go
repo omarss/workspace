@@ -61,7 +61,8 @@ func (h *Handler) GetAuditEvent(ctx context.Context, req httpapi.GetAuditEventRe
 	if !ok {
 		return httpapi.GetAuditEvent401ApplicationProblemPlusJSONResponse{
 			UnauthorizedApplicationProblemPlusJSONResponse: httpapi.UnauthorizedApplicationProblemPlusJSONResponse(
-				newProblem(401, problem.TypeUnauthorized, "Missing or invalid bearer token / API key.", "", "/v1/audit-events/"+req.AuditEventId)),
+				newProblem(401, problem.TypeUnauthorized, "Missing or invalid bearer token / API key.", "", "/v1/audit-events/"+req.AuditEventId),
+			),
 		}, nil
 	}
 	e, err := h.svc.Get(ctx, tenantID, req.AuditEventId)
@@ -70,17 +71,20 @@ func (h *Handler) GetAuditEvent(ctx context.Context, req httpapi.GetAuditEventRe
 		case errors.Is(err, ErrNotFound):
 			return httpapi.GetAuditEvent404ApplicationProblemPlusJSONResponse{
 				NotFoundApplicationProblemPlusJSONResponse: httpapi.NotFoundApplicationProblemPlusJSONResponse(
-					newProblem(404, problem.TypeNotFound, "Resource not found.", "", "/v1/audit-events/"+req.AuditEventId)),
+					newProblem(404, problem.TypeNotFound, "Resource not found.", "", "/v1/audit-events/"+req.AuditEventId),
+				),
 			}, nil
 		case errors.Is(err, auth.ErrUnauthorized):
 			return httpapi.GetAuditEvent401ApplicationProblemPlusJSONResponse{
 				UnauthorizedApplicationProblemPlusJSONResponse: httpapi.UnauthorizedApplicationProblemPlusJSONResponse(
-					newProblem(401, problem.TypeUnauthorized, "Missing or invalid bearer token / API key.", "", "/v1/audit-events/"+req.AuditEventId)),
+					newProblem(401, problem.TypeUnauthorized, "Missing or invalid bearer token / API key.", "", "/v1/audit-events/"+req.AuditEventId),
+				),
 			}, nil
 		case errors.Is(err, auth.ErrCrossTenant):
 			return httpapi.GetAuditEvent403ApplicationProblemPlusJSONResponse{
 				ForbiddenApplicationProblemPlusJSONResponse: httpapi.ForbiddenApplicationProblemPlusJSONResponse(
-					newProblem(403, problem.TypeCrossTenant, "Cross-tenant access denied.", "", "/v1/audit-events/"+req.AuditEventId)),
+					newProblem(403, problem.TypeCrossTenant, "Cross-tenant access denied.", "", "/v1/audit-events/"+req.AuditEventId),
+				),
 			}, nil
 		}
 		return nil, err
@@ -95,7 +99,8 @@ func (h *Handler) ExportAuditEvents(ctx context.Context, req httpapi.ExportAudit
 	if !ok {
 		return httpapi.ExportAuditEvents401ApplicationProblemPlusJSONResponse{
 			UnauthorizedApplicationProblemPlusJSONResponse: httpapi.UnauthorizedApplicationProblemPlusJSONResponse(
-				newProblem(401, problem.TypeUnauthorized, "Missing or invalid bearer token / API key.", "", "/v1/audit-events/export")),
+				newProblem(401, problem.TypeUnauthorized, "Missing or invalid bearer token / API key.", "", "/v1/audit-events/export"),
+			),
 		}, nil
 	}
 	body := req.Body
@@ -137,16 +142,19 @@ func (h *Handler) ExportAuditEvents(ctx context.Context, req httpapi.ExportAudit
 		case errors.Is(err, auth.ErrCrossTenant):
 			return httpapi.ExportAuditEvents403ApplicationProblemPlusJSONResponse{
 				ForbiddenApplicationProblemPlusJSONResponse: httpapi.ForbiddenApplicationProblemPlusJSONResponse(
-					newProblem(403, problem.TypeCrossTenant, "Cross-tenant access denied.", "", "/v1/audit-events/export")),
+					newProblem(403, problem.TypeCrossTenant, "Cross-tenant access denied.", "", "/v1/audit-events/export"),
+				),
 			}, nil
 		case errors.Is(err, auth.ErrUnauthorized):
 			return httpapi.ExportAuditEvents401ApplicationProblemPlusJSONResponse{
 				UnauthorizedApplicationProblemPlusJSONResponse: httpapi.UnauthorizedApplicationProblemPlusJSONResponse(
-					newProblem(401, problem.TypeUnauthorized, "Missing or invalid bearer token / API key.", "", "/v1/audit-events/export")),
+					newProblem(401, problem.TypeUnauthorized, "Missing or invalid bearer token / API key.", "", "/v1/audit-events/export"),
+				),
 			}, nil
 		case errors.Is(err, ErrExportTooLarge):
 			return httpapi.ExportAuditEvents413ApplicationProblemPlusJSONResponse(
-				newProblem(413, problem.TypeValidation, "Export exceeds sync size budget.", "use async export (v1 roadmap)", "/v1/audit-events/export")), nil
+				newProblem(413, problem.TypeValidation, "Export exceeds sync size budget.", "use async export (v1 roadmap)", "/v1/audit-events/export"),
+			), nil
 		}
 		return nil, err
 	}
@@ -171,19 +179,22 @@ func listErrorResponse(err error, instance string) httpapi.ListAuditEventsRespon
 	case errors.Is(err, auth.ErrUnauthorized):
 		return httpapi.ListAuditEvents401ApplicationProblemPlusJSONResponse{
 			UnauthorizedApplicationProblemPlusJSONResponse: httpapi.UnauthorizedApplicationProblemPlusJSONResponse(
-				newProblem(401, problem.TypeUnauthorized, "Missing or invalid bearer token / API key.", "", instance)),
+				newProblem(401, problem.TypeUnauthorized, "Missing or invalid bearer token / API key.", "", instance),
+			),
 		}
 	case errors.Is(err, auth.ErrCrossTenant):
 		return httpapi.ListAuditEvents403ApplicationProblemPlusJSONResponse{
 			ForbiddenApplicationProblemPlusJSONResponse: httpapi.ForbiddenApplicationProblemPlusJSONResponse(
-				newProblem(403, problem.TypeCrossTenant, "Cross-tenant access denied.", "", instance)),
+				newProblem(403, problem.TypeCrossTenant, "Cross-tenant access denied.", "", instance),
+			),
 		}
 	}
 	// Generic 401 envelope is used as a catch-all to satisfy the typed
 	// interface; the orchestrator-side log captures the real error.
 	return httpapi.ListAuditEvents401ApplicationProblemPlusJSONResponse{
 		UnauthorizedApplicationProblemPlusJSONResponse: httpapi.UnauthorizedApplicationProblemPlusJSONResponse(
-			newProblem(500, problem.TypeURI+"internal", "Unexpected error.", err.Error(), instance)),
+			newProblem(500, problem.TypeURI+"internal", "Unexpected error.", err.Error(), instance),
+		),
 	}
 }
 

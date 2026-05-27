@@ -1,0 +1,1501 @@
+{
+	"info": {
+		"name": "SaaS Control Plane API",
+		"description": {
+		    "content": "Operator-only API for provisioning and operating isolated SaaS\ndeployments. Audience saas-control; the operators Keycloak realm is the\nsole issuer (Phase 13 wires MFA + step-up + IP allowlist). The\nBring-Your-Own-Domain endpoints live alongside core deployment CRUD\nbecause the verification + cert lifecycle is operator-owned (ADR 015).\n",
+		    "type": "text/markdown"
+		},
+		"version": "0.1.0",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+	        {
+	            "name": "deployments",
+	            "description": "Provision, operate, and decommission isolated SaaS deployments.",
+	            "item": [
+	                        {
+    "name": "/control/v1/deployments",
+                "description": "",
+                 "item": [
+                            {
+                                "name": "Provision a new Deployment.",
+                                "request": {
+    "method": "POST",
+    "header": [
+        {
+        "key": "Content-Type",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        },
+        {
+        "key": "Accept",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        },
+        {
+        "key": "Idempotency-Key",
+        "value": "",
+        "description": "",
+        "disabled": true
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "{\n \"project_slug\": \"<string>\",\n \"environment_slug\": \"<string>\",\n \"region\": \"<string>\",\n \"modules\": \"<string>\",\n \"image_version\": \"<string>\",\n \"data_residency\": \"<string>\",\n \"metadata\": \"<string>\"\n}",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/control/v1/deployments",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "control",
+        "v1",
+        "deployments"
+    ],
+    "variable": [
+    ],
+    "query": [
+    ]
+    },
+    "description": ""
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        },
+	                        {
+    "name": "/control/v1/deployments",
+                "description": "",
+                 "item": [
+                            {
+                                "name": "List Deployments.",
+                                "request": {
+    "method": "GET",
+    "header": [
+        {
+        "key": "Accept",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/control/v1/deployments",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "control",
+        "v1",
+        "deployments"
+    ],
+    "variable": [
+    ],
+    "query": [
+        {
+        "key": "limit",
+        "value": "56",
+        "description": "",
+        "disabled": true
+        },
+        {
+        "key": "cursor",
+        "value": "cursor_example",
+        "description": "",
+        "disabled": true
+        },
+        {
+        "key": "status",
+        "value": "status_example",
+        "description": "",
+        "disabled": true
+        }
+    ]
+    },
+    "description": ""
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        },
+	                        {
+    "name": "/control/v1/deployments/:deployment_id",
+                "description": "",
+                 "item": [
+                            {
+                                "name": "deleteDeployment",
+                                "request": {
+    "method": "DELETE",
+    "header": [
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/control/v1/deployments/:deployment_id",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "control",
+        "v1",
+        "deployments",
+        ":deployment_id"
+    ],
+    "variable": [
+        {
+        "key": "deploymentId",
+        "value": "",
+        "description": ""
+        }
+    ],
+    "query": [
+        {
+        "key": "retainDays",
+        "value": "56",
+        "description": "",
+        "disabled": true
+        }
+    ]
+    },
+    "description": ""
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        },
+	                        {
+    "name": "/control/v1/deployments/:deployment_id",
+                "description": "",
+                 "item": [
+                            {
+                                "name": "getDeployment",
+                                "request": {
+    "method": "GET",
+    "header": [
+        {
+        "key": "Accept",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/control/v1/deployments/:deployment_id",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "control",
+        "v1",
+        "deployments",
+        ":deployment_id"
+    ],
+    "variable": [
+        {
+        "key": "deploymentId",
+        "value": "",
+        "description": ""
+        }
+    ],
+    "query": [
+    ]
+    },
+    "description": ""
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        },
+	                        {
+    "name": "/control/v1/deployments/:deployment_id",
+                "description": "",
+                 "item": [
+                            {
+                                "name": "updateDeployment",
+                                "request": {
+    "method": "PATCH",
+    "header": [
+        {
+        "key": "Content-Type",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        },
+        {
+        "key": "Accept",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        },
+        {
+        "key": "If-Match",
+        "value": "",
+        "description": "",
+        "disabled": true
+        },
+        {
+        "key": "Idempotency-Key",
+        "value": "",
+        "description": "",
+        "disabled": true
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "{\n \"image_version\": \"<string>\",\n \"metadata\": \"<string>\"\n}",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/control/v1/deployments/:deployment_id",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "control",
+        "v1",
+        "deployments",
+        ":deployment_id"
+    ],
+    "variable": [
+        {
+        "key": "deploymentId",
+        "value": "",
+        "description": ""
+        }
+    ],
+    "query": [
+    ]
+    },
+    "description": ""
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        },
+	                        {
+    "name": "/control/v1/deployments/:deployment_id/freeze-keys",
+                "description": "",
+                 "item": [
+                            {
+                                "name": "freezeDeploymentKeys",
+                                "request": {
+    "method": "POST",
+    "header": [
+        {
+        "key": "Accept",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        },
+        {
+        "key": "Idempotency-Key",
+        "value": "",
+        "description": "",
+        "disabled": true
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/control/v1/deployments/:deployment_id/freeze-keys",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "control",
+        "v1",
+        "deployments",
+        ":deployment_id",
+        "freeze-keys"
+    ],
+    "variable": [
+        {
+        "key": "deploymentId",
+        "value": "",
+        "description": ""
+        }
+    ],
+    "query": [
+    ]
+    },
+    "description": ""
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        },
+	                        {
+    "name": "/control/v1/deployments/:deployment_id/health",
+                "description": "",
+                 "item": [
+                            {
+                                "name": "getDeploymentHealth",
+                                "request": {
+    "method": "GET",
+    "header": [
+        {
+        "key": "Accept",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/control/v1/deployments/:deployment_id/health",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "control",
+        "v1",
+        "deployments",
+        ":deployment_id",
+        "health"
+    ],
+    "variable": [
+        {
+        "key": "deploymentId",
+        "value": "",
+        "description": ""
+        }
+    ],
+    "query": [
+    ]
+    },
+    "description": ""
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        },
+	                        {
+    "name": "/control/v1/deployments/:deployment_id/impersonation-sessions",
+                "description": "",
+                 "item": [
+                            {
+                                "name": "startImpersonationSession",
+                                "request": {
+    "method": "POST",
+    "header": [
+        {
+        "key": "Content-Type",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        },
+        {
+        "key": "Accept",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        },
+        {
+        "key": "Idempotency-Key",
+        "value": "",
+        "description": "",
+        "disabled": true
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "{\n \"target_member_id\": \"<string>\",\n \"reason\": \"<string>\",\n \"duration_seconds\": \"<number>\"\n}",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/control/v1/deployments/:deployment_id/impersonation-sessions",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "control",
+        "v1",
+        "deployments",
+        ":deployment_id",
+        "impersonation-sessions"
+    ],
+    "variable": [
+        {
+        "key": "deploymentId",
+        "value": "",
+        "description": ""
+        }
+    ],
+    "query": [
+    ]
+    },
+    "description": ""
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        },
+	                        {
+    "name": "/control/v1/deployments/:deployment_id/logs",
+                "description": "",
+                 "item": [
+                            {
+                                "name": "tailDeploymentLogs",
+                                "request": {
+    "method": "GET",
+    "header": [
+        {
+        "key": "Accept",
+        "value": "application/x-ndjson",
+        "description": "",
+        "disabled": false
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/control/v1/deployments/:deployment_id/logs",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "control",
+        "v1",
+        "deployments",
+        ":deployment_id",
+        "logs"
+    ],
+    "variable": [
+        {
+        "key": "deploymentId",
+        "value": "",
+        "description": ""
+        }
+    ],
+    "query": [
+        {
+        "key": "since",
+        "value": "2013-10-20T19:20:30+01:00",
+        "description": "",
+        "disabled": true
+        },
+        {
+        "key": "filter",
+        "value": "filter_example",
+        "description": "",
+        "disabled": true
+        },
+        {
+        "key": "tail",
+        "value": "56",
+        "description": "",
+        "disabled": true
+        }
+    ]
+    },
+    "description": ""
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        },
+	                        {
+    "name": "/control/v1/deployments/:deployment_id/purge",
+                "description": "",
+                 "item": [
+                            {
+                                "name": "purgeDeployment",
+                                "request": {
+    "method": "POST",
+    "header": [
+        {
+        "key": "Accept",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        },
+        {
+        "key": "Idempotency-Key",
+        "value": "",
+        "description": "",
+        "disabled": true
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/control/v1/deployments/:deployment_id/purge",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "control",
+        "v1",
+        "deployments",
+        ":deployment_id",
+        "purge"
+    ],
+    "variable": [
+        {
+        "key": "deploymentId",
+        "value": "",
+        "description": ""
+        }
+    ],
+    "query": [
+    ]
+    },
+    "description": ""
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        },
+	                        {
+    "name": "/control/v1/deployments/:deployment_id/restart",
+                "description": "",
+                 "item": [
+                            {
+                                "name": "restartDeployment",
+                                "request": {
+    "method": "POST",
+    "header": [
+        {
+        "key": "Accept",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        },
+        {
+        "key": "Idempotency-Key",
+        "value": "",
+        "description": "",
+        "disabled": true
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/control/v1/deployments/:deployment_id/restart",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "control",
+        "v1",
+        "deployments",
+        ":deployment_id",
+        "restart"
+    ],
+    "variable": [
+        {
+        "key": "deploymentId",
+        "value": "",
+        "description": ""
+        }
+    ],
+    "query": [
+    ]
+    },
+    "description": ""
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        },
+	                        {
+    "name": "/control/v1/deployments/:deployment_id/restore",
+                "description": "",
+                 "item": [
+                            {
+                                "name": "restoreDeployment",
+                                "request": {
+    "method": "POST",
+    "header": [
+        {
+        "key": "Content-Type",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        },
+        {
+        "key": "Accept",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        },
+        {
+        "key": "Idempotency-Key",
+        "value": "",
+        "description": "",
+        "disabled": true
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "{\n \"to_timestamp\": \"<string>\"\n}",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/control/v1/deployments/:deployment_id/restore",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "control",
+        "v1",
+        "deployments",
+        ":deployment_id",
+        "restore"
+    ],
+    "variable": [
+        {
+        "key": "deploymentId",
+        "value": "",
+        "description": ""
+        }
+    ],
+    "query": [
+    ]
+    },
+    "description": ""
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        },
+	                        {
+    "name": "/control/v1/deployments/:deployment_id/revisions",
+                "description": "",
+                 "item": [
+                            {
+                                "name": "listDeploymentRevisions",
+                                "request": {
+    "method": "GET",
+    "header": [
+        {
+        "key": "Accept",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/control/v1/deployments/:deployment_id/revisions",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "control",
+        "v1",
+        "deployments",
+        ":deployment_id",
+        "revisions"
+    ],
+    "variable": [
+        {
+        "key": "deploymentId",
+        "value": "",
+        "description": ""
+        }
+    ],
+    "query": [
+    ]
+    },
+    "description": ""
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        },
+	                        {
+    "name": "/control/v1/deployments/:deployment_id/rollback",
+                "description": "",
+                 "item": [
+                            {
+                                "name": "rollbackDeployment",
+                                "request": {
+    "method": "POST",
+    "header": [
+        {
+        "key": "Accept",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        },
+        {
+        "key": "Idempotency-Key",
+        "value": "",
+        "description": "",
+        "disabled": true
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/control/v1/deployments/:deployment_id/rollback",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "control",
+        "v1",
+        "deployments",
+        ":deployment_id",
+        "rollback"
+    ],
+    "variable": [
+        {
+        "key": "deploymentId",
+        "value": "",
+        "description": ""
+        }
+    ],
+    "query": [
+    ]
+    },
+    "description": ""
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        },
+	                        {
+    "name": "/control/v1/deployments/:deployment_id/upgrade",
+                "description": "",
+                 "item": [
+                            {
+                                "name": "upgradeDeployment",
+                                "request": {
+    "method": "POST",
+    "header": [
+        {
+        "key": "Content-Type",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        },
+        {
+        "key": "Accept",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        },
+        {
+        "key": "Idempotency-Key",
+        "value": "",
+        "description": "",
+        "disabled": true
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "{\n \"image_version\": \"<string>\",\n \"run_migrations\": \"<string>\"\n}",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/control/v1/deployments/:deployment_id/upgrade",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "control",
+        "v1",
+        "deployments",
+        ":deployment_id",
+        "upgrade"
+    ],
+    "variable": [
+        {
+        "key": "deploymentId",
+        "value": "",
+        "description": ""
+        }
+    ],
+    "query": [
+    ]
+    },
+    "description": ""
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        }
+	                    ]
+	        },
+	        {
+	            "name": "domains",
+	            "description": "Bring-Your-Own-Domain attachments for a Deployment.",
+	            "item": [
+	                        {
+    "name": "/control/v1/deployments/:deployment_id/domains",
+                "description": "",
+                 "item": [
+                            {
+                                "name": "attachDeploymentDomain",
+                                "request": {
+    "method": "POST",
+    "header": [
+        {
+        "key": "Content-Type",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        },
+        {
+        "key": "Accept",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        },
+        {
+        "key": "Idempotency-Key",
+        "value": "",
+        "description": "",
+        "disabled": true
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "{\n \"domain\": \"<string>\"\n}",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/control/v1/deployments/:deployment_id/domains",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "control",
+        "v1",
+        "deployments",
+        ":deployment_id",
+        "domains"
+    ],
+    "variable": [
+        {
+        "key": "deploymentId",
+        "value": "",
+        "description": ""
+        }
+    ],
+    "query": [
+    ]
+    },
+    "description": ""
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        },
+	                        {
+    "name": "/control/v1/deployments/:deployment_id/domains",
+                "description": "",
+                 "item": [
+                            {
+                                "name": "listDeploymentDomains",
+                                "request": {
+    "method": "GET",
+    "header": [
+        {
+        "key": "Accept",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/control/v1/deployments/:deployment_id/domains",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "control",
+        "v1",
+        "deployments",
+        ":deployment_id",
+        "domains"
+    ],
+    "variable": [
+        {
+        "key": "deploymentId",
+        "value": "",
+        "description": ""
+        }
+    ],
+    "query": [
+    ]
+    },
+    "description": ""
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        },
+	                        {
+    "name": "/control/v1/deployments/:deployment_id/domains/:domain_id",
+                "description": "",
+                 "item": [
+                            {
+                                "name": "detachDeploymentDomain",
+                                "request": {
+    "method": "DELETE",
+    "header": [
+        {
+        "key": "If-Match",
+        "value": "",
+        "description": "",
+        "disabled": true
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/control/v1/deployments/:deployment_id/domains/:domain_id",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "control",
+        "v1",
+        "deployments",
+        ":deployment_id",
+        "domains",
+        ":domain_id"
+    ],
+    "variable": [
+        {
+        "key": "deploymentId",
+        "value": "",
+        "description": ""
+        },
+        {
+        "key": "domainId",
+        "value": "",
+        "description": ""
+        }
+    ],
+    "query": [
+    ]
+    },
+    "description": ""
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        },
+	                        {
+    "name": "/control/v1/deployments/:deployment_id/domains/:domain_id",
+                "description": "",
+                 "item": [
+                            {
+                                "name": "getDeploymentDomain",
+                                "request": {
+    "method": "GET",
+    "header": [
+        {
+        "key": "Accept",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/control/v1/deployments/:deployment_id/domains/:domain_id",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "control",
+        "v1",
+        "deployments",
+        ":deployment_id",
+        "domains",
+        ":domain_id"
+    ],
+    "variable": [
+        {
+        "key": "deploymentId",
+        "value": "",
+        "description": ""
+        },
+        {
+        "key": "domainId",
+        "value": "",
+        "description": ""
+        }
+    ],
+    "query": [
+    ]
+    },
+    "description": ""
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        },
+	                        {
+    "name": "/control/v1/deployments/:deployment_id/domains/:domain_id/verify",
+                "description": "",
+                 "item": [
+                            {
+                                "name": "verifyDeploymentDomain",
+                                "request": {
+    "method": "POST",
+    "header": [
+        {
+        "key": "Accept",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        },
+        {
+        "key": "Idempotency-Key",
+        "value": "",
+        "description": "",
+        "disabled": true
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/control/v1/deployments/:deployment_id/domains/:domain_id/verify",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "control",
+        "v1",
+        "deployments",
+        ":deployment_id",
+        "domains",
+        ":domain_id",
+        "verify"
+    ],
+    "variable": [
+        {
+        "key": "deploymentId",
+        "value": "",
+        "description": ""
+        },
+        {
+        "key": "domainId",
+        "value": "",
+        "description": ""
+        }
+    ],
+    "query": [
+    ]
+    },
+    "description": ""
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        }
+	                    ]
+	        },
+	        {
+	            "name": "audit",
+	            "description": "Audit-integrity verify endpoint + control-plane audit feed.\nOperator-only — walks the data-plane hash chain per AGENTS.md §8.6.\n",
+	            "item": [
+	                        {
+    "name": "/control/v1/audit-events",
+                "description": "",
+                 "item": [
+                            {
+                                "name": "List control-plane operator audit events.",
+                                "request": {
+    "method": "GET",
+    "header": [
+        {
+        "key": "Accept",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/control/v1/audit-events",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "control",
+        "v1",
+        "audit-events"
+    ],
+    "variable": [
+    ],
+    "query": [
+        {
+        "key": "limit",
+        "value": "56",
+        "description": "",
+        "disabled": true
+        },
+        {
+        "key": "cursor",
+        "value": "cursor_example",
+        "description": "",
+        "disabled": true
+        },
+        {
+        "key": "deploymentId",
+        "value": "deploymentId_example",
+        "description": "",
+        "disabled": true
+        },
+        {
+        "key": "operatorId",
+        "value": "operatorId_example",
+        "description": "",
+        "disabled": true
+        }
+    ]
+    },
+    "description": ""
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        },
+	                        {
+    "name": "/control/v1/deployments/:deployment_id/audit-integrity",
+                "description": "",
+                 "item": [
+                            {
+                                "name": "Walk the audit chain and report the first mismatch (if any).",
+                                "request": {
+    "method": "GET",
+    "header": [
+        {
+        "key": "Accept",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/control/v1/deployments/:deployment_id/audit-integrity",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "control",
+        "v1",
+        "deployments",
+        ":deployment_id",
+        "audit-integrity"
+    ],
+    "variable": [
+        {
+        "key": "deploymentId",
+        "value": "",
+        "description": ""
+        }
+    ],
+    "query": [
+        {
+        "key": "tenantId",
+        "value": "tenantId_example",
+        "description": "",
+        "disabled": true
+        }
+    ]
+    },
+    "description": ""
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        }
+	                    ]
+	        },
+	        {
+	            "name": "meta",
+	            "description": "Health and metadata.",
+	            "item": [
+	                        {
+    "name": "/healthz",
+                "description": "Returns 200 with a small status payload when the control plane is alive.",
+                 "item": [
+                            {
+                                "name": "Liveness probe.",
+                                "request": {
+    "method": "GET",
+    "header": [
+        {
+        "key": "Accept",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/healthz",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "healthz"
+    ],
+    "variable": [
+    ],
+    "query": [
+    ]
+    },
+    "description": "Returns 200 with a small status payload when the control plane is alive."
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        }
+	                    ]
+	        },
+	        {
+	            "name": "operators",
+	            "description": "Operator inventory (extended in Phase 13).",
+	            "item": [
+	                        {
+    "name": "/control/v1/operators",
+                "description": "",
+                 "item": [
+                            {
+                                "name": "List operators (Phase 13 extends with MFA status).",
+                                "request": {
+    "method": "GET",
+    "header": [
+        {
+        "key": "Accept",
+        "value": "application/json",
+        "description": "",
+        "disabled": false
+        }
+    ],
+    "body": {
+    "mode": "raw",
+    "raw": "",
+    "options": {
+    "raw": {
+    "language": "json"
+    }
+    }
+    },
+    "url": {
+    "raw": "{{baseUrl}}/control/v1/operators",
+    "host": [
+    "{{baseUrl}}"
+    ],
+    "path": [
+        "control",
+        "v1",
+        "operators"
+    ],
+    "variable": [
+    ],
+    "query": [
+    ]
+    },
+    "description": ""
+}
+                                ,"response": [
+                            ]
+                            }
+                            ]
+                        }
+	                    ]
+	        }
+    ],
+    
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "https://control.saas.omarss.net",
+			"type": "string"
+        }
+	]
+}
+

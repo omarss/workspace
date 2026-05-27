@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>SaaS Platform — Walkthrough</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <h1>SaaS Platform — Get Started</h1>
+    <p>A five-minute walkthrough. Pick your persona.</p>
+  </header>
+
+  <nav>
+    <a href="operator.html">Operator</a>
+    <a href="PERSONAS.md">Builder (placeholder)</a>
+    <a href="PERSONAS.md">Tenant Admin (placeholder)</a>
+    <a href="PERSONAS.md">End User (placeholder)</a>
+    <a href="PERSONAS.md">Machine Client (placeholder)</a>
+  </nav>
+
+  <main>
+    <h2>What is this?</h2>
+    <p>
+      A SaaS control plane plus per-Deployment data planes. Each Deployment is
+      its own k3s namespace, its own Postgres database, and its own host
+      nginx vhost. The control plane provisions Deployments; the data plane
+      handles per-tenant traffic.
+    </p>
+
+    <h2>Install</h2>
+    <p>From a fresh clone you need:</p>
+    <pre><code>git clone https://github.com/omarss/saas.git
+cd saas
+make build           # builds bin/controlplane, bin/dataplane, bin/migrate, bin/saasctl
+./bin/saasctl init   # 8-step bootstrap (see ADR 020)</code></pre>
+
+    <p>
+      <code>saasctl init</code> takes about ten minutes on a cold machine
+      (most of which is docker pulling images). Re-running is idempotent;
+      see <a href="../adr/020-saasctl-init-wizard.md">ADR 020</a> for the
+      details and the PKCE deferral note.
+    </p>
+
+    <div class="note">
+      <strong>Tip.</strong> Open <code>saasctl init --help</code> for the
+      full flag set. The wizard accepts <code>--config init.yaml</code> for
+      unattended runs.
+    </div>
+
+    <h2>Walkthroughs by persona</h2>
+    <p>
+      Each persona page is a hands-on script: 5-7 concrete tasks, each with
+      a verbatim curl example, an SDK snippet (TypeScript or Go), and the
+      expected output. Open the page for your role and copy-paste your way
+      through. The
+      <a href="../recipes/">first-class recipes</a> directory holds the
+      reference cards each page links to.
+    </p>
+
+    <ul>
+      <li>
+        <a href="operator.html">Operator</a> — provision a Deployment,
+        attach a custom domain, freeze keys, read audit events. (Exemplar
+        page; the others land in <a href="PERSONAS.md">PERSONAS.md</a>.)
+      </li>
+      <li>
+        <a href="PERSONAS.md">Product Builder</a> — embed the data-plane
+        SDK in a customer app. (Placeholder; outline in PERSONAS.md.)
+      </li>
+      <li>
+        <a href="PERSONAS.md">Tenant Admin</a> — invite members, assign
+        roles, configure notification channels. (Placeholder.)
+      </li>
+      <li>
+        <a href="PERSONAS.md">End User</a> — sign up, link a social
+        provider, accept an invitation. (Placeholder.)
+      </li>
+      <li>
+        <a href="PERSONAS.md">Machine Client</a> — create an API key, call
+        the data plane with it, rotate when needed. (Placeholder.)
+      </li>
+    </ul>
+
+    <h2>Service endpoints (local-dev)</h2>
+    <p>After <code>saasctl init</code> finishes, the following are live:</p>
+    <pre><code>Keycloak admin    http://localhost:8081/admin/
+OpenBao           http://localhost:8200
+Mailhog UI        http://localhost:8025
+Novu dashboard    http://localhost:4200
+Prism mock (CP)   http://localhost:4010
+Prism mock (DP)   http://localhost:4011
+Control plane     http://localhost:8080
+Data plane        http://localhost:9090</code></pre>
+  </main>
+
+  <footer>
+    <p>
+      Authored as part of Phase 15 (DX polish). Walkthrough scope reduced
+      for this MVP cut: only the Operator persona ships as a full HTML
+      page; the remaining four are documented in
+      <a href="PERSONAS.md">PERSONAS.md</a> for later expansion.
+      Screenshots live under <code>screenshots/</code> and are added
+      manually (no PNGs are checked in by default).
+    </p>
+  </footer>
+</body>
+</html>

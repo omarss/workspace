@@ -58,7 +58,8 @@ func main() {
 	// 2) Talk to the data plane using the one-time bootstrap secret.
 	dpClient, err := dp.NewClientWithResponses(
 		"https://"+prov.Deployment.PrimaryVhost,
-		dp.WithRequestEditorFn(workflows.BearerDataPlane(prov.BootstrapSecret)))
+		dp.WithRequestEditorFn(workflows.BearerDataPlane(prov.BootstrapSecret)),
+	)
 	if err != nil {
 		log.Fatalf("data plane client: %v", err)
 	}

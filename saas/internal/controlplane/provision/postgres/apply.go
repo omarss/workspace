@@ -176,7 +176,8 @@ func (a *HostAdapter) Remove(ctx context.Context, in RemoveInput) error {
 // the syntax), so a presence query is the only idempotent path.
 func createDatabaseIfMissing(ctx context.Context, conn *pgx.Conn, dbName string) error {
 	var exists bool
-	if err := conn.QueryRow(ctx,
+	if err := conn.QueryRow(
+		ctx,
 		`SELECT EXISTS (SELECT 1 FROM pg_database WHERE datname = $1)`, dbName,
 	).Scan(&exists); err != nil {
 		return fmt.Errorf("check pg_database: %w", err)
@@ -204,7 +205,8 @@ func createDatabaseIfMissing(ctx context.Context, conn *pgx.Conn, dbName string)
 // SUPERUSER or CREATEDB").
 func createOrRotateRolePassword(ctx context.Context, conn *pgx.Conn, roleName, password string) error {
 	var exists bool
-	if err := conn.QueryRow(ctx,
+	if err := conn.QueryRow(
+		ctx,
 		`SELECT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = $1)`, roleName,
 	).Scan(&exists); err != nil {
 		return fmt.Errorf("check pg_roles: %w", err)
