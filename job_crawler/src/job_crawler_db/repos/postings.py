@@ -165,6 +165,35 @@ class PostingsRepo(Repo):
         )
         return self._to_model(JobPosting, row)
 
+    async def fresh_external_ids(
+        self,
+        source_id: UUID,
+        *,
+        hours: int,
+    ) -> set[str]:
+        """Return the set of `source_job_external_id` values fetched within
+        the past `hours`. Used by the runner to skip listings the crawler
+        would otherwise re-fetch on every cycle — the discover step still
+        runs (we need the listing iterator to surface external_ids in the
+        first place), but we short-circuit before the expensive
+        `fetch_detail` call.
+
+        Returns an empty set when `hours <= 0` (incremental skip disabled).
+        """
+        if hours <= 0:
+            return set()
+        rows = await self._fetchall(
+            """
+            SELECT source_job_external_id
+            FROM   job_postings
+            WHERE  source_id    = %(s)s
+              AND  last_fetch_at > now() - make_interval(hours => %(h)s)
+              AND  status        = 'active';
+            """,
+            {"s": source_id, "h": hours},
+        )
+        return {row["source_job_external_id"] for row in rows}
+
     # -- list / stream ---------------------------------------------------
 
     async def list_active(

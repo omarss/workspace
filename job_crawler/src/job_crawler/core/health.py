@@ -35,6 +35,10 @@ class RunStats:
     parsed: int = 0
     field_coverage_sum: float = 0.0  # sum of per-posting field_coverage()
     quality_rejects: dict[str, int] = field(default_factory=dict)
+    # Listings discovered but short-circuited by the incremental-crawl
+    # freshness skip (posting was last_fetch'd within the window). Counted
+    # separately from `fetched` because no HTTP call was made.
+    fresh_skipped: int = 0
 
     @property
     def parse_rate(self) -> float | None:
