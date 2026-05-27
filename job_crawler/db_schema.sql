@@ -1247,6 +1247,23 @@ CREATE TRIGGER trg_jobs_updated_at            BEFORE UPDATE ON jobs
 
 
 -- ----------------------------------------------------------------------------
+-- Telegram broadcasts: one row per cluster that has been posted to a channel.
+-- The runner's alerts/telegram path consults this table before posting to
+-- avoid double-broadcasting the same job (across re-fetches, cross-source
+-- ingestion that lands in an existing cluster, or restarts of the cron).
+-- ----------------------------------------------------------------------------
+CREATE TABLE telegram_broadcasts (
+    job_id      uuid          PRIMARY KEY REFERENCES jobs(id) ON DELETE CASCADE,
+    chat_id     text          NOT NULL,
+    message_id  bigint,
+    posted_at   timestamptz   NOT NULL DEFAULT now()
+);
+COMMENT ON TABLE telegram_broadcasts IS
+    'Cluster-level dedupe for Telegram channel posts. One row per cluster '
+    'ever broadcast. Cluster delete cascades; a wipe + recrawl rebuilds.';
+
+
+-- ----------------------------------------------------------------------------
 -- Convenience view: active, non-fake clusters (the default API surface)
 -- ----------------------------------------------------------------------------
 CREATE VIEW jobs_public AS

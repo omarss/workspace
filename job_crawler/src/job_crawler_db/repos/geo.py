@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from uuid import UUID
+
 from ..models import City, Region
 from .base import Repo
 
@@ -18,6 +20,16 @@ class GeoRepo(Repo):
                 "SELECT * FROM regions ORDER BY country_code, name_en",
             )
         return self._to_models(Region, rows)
+
+    async def get_city(self, city_id: UUID) -> City | None:
+        """Single-row PK lookup. Used by alert formatters that need a
+        display name from a posting's `city_id` without paying for a
+        wider list_cities scan."""
+        row = await self._fetchone(
+            "SELECT * FROM cities WHERE id = %(id)s",
+            {"id": city_id},
+        )
+        return self._to_model(City, row)
 
     async def list_cities(
         self,

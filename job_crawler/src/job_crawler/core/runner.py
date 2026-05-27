@@ -471,7 +471,119 @@ class CrawlerRunner:
                 await self.db.jobs.create_from_posting(posting.id)
             except Exception:
                 _LOG.exception("create_from_posting failed for %s", posting.id)
+
+            # Telegram channel broadcast — Saudi jobs only, with the
+            # authoritative source URL + 3-5 line description summary.
+            # Non-fatal: a Telegram outage or missing env must not
+            # break the crawl. Fires only for genuinely new clusters,
+            # never for re-fetches.
+            try:
+                await self._maybe_broadcast_new_job(parsed, posting.id, company_id)
+            except Exception:
+                _LOG.exception("telegram broadcast failed for %s", posting.id)
         return posting.id, was_new
+
+    async def _maybe_broadcast_new_job(
+        self,
+        parsed: ParsedPosting,
+        posting_id: UUID,
+        company_id: UUID | None,
+    ) -> None:
+        """Post a single Telegram message for a newly-ingested Saudi job.
+
+        Quality gate (Telegram is stricter than the DB-ingest gate —
+        we want only top-quality posts on the channel):
+          * Must be Saudi — `country_code='sa'`.
+          * Title must be non-empty.
+          * Description must be ≥ 300 chars after cleaning (DB-ingest
+            gate allows 100; Telegram raises the bar so short stubs
+            don't reach subscribers).
+          * Company must be resolved (`company_id IS NOT NULL`) — raw
+            company strings without an entity lookup are too noisy.
+          * City must be resolved — postings without a known city give
+            subscribers nothing to filter on.
+
+        Cluster-level dedup: a row in `telegram_broadcasts` for this
+        cluster means we already posted it (in a previous run, or via
+        a sibling posting that landed in the same cluster). Skip.
+
+        `TELEGRAM_BOT_TOKEN` + `TELEGRAM_CHANNEL_ID` env-driven; missing
+        config → silent no-op via `send_message`.
+        """
+        # --- Quality gates ------------------------------------------------
+        country = (parsed.country_code or "").lower()
+        if country != "sa":
+            return
+        if not parsed.title:
+            return
+
+        posting = await self.db.postings.get(posting_id)
+        if posting is None:
+            return
+        if posting.cluster_job_id is None:
+            return  # create_from_posting failed earlier
+        if company_id is None:
+            return  # require resolved company entity
+        if posting.city_id is None:
+            return  # require resolved city
+        if (posting.description or "").strip().__len__() < 300:
+            return
+
+        # --- Cluster-level dedup (telegram_broadcasts) --------------------
+        async with self.db.pool.connection() as conn, conn.cursor() as cur:
+            await cur.execute(
+                "SELECT 1 FROM telegram_broadcasts WHERE job_id = %(j)s",
+                {"j": posting.cluster_job_id},
+            )
+            if await cur.fetchone() is not None:
+                return  # already posted
+
+        # --- Resolve display names (single-row indexed lookups) -----------
+        company = await self.db.companies.get(company_id)
+        company_name = (
+            company.name_en if company and company.name_en
+            else (company.name_ar if company else None)
+        ) or parsed.raw_company_name
+
+        city = await self.db.geo.get_city(posting.city_id)
+        city_name = city.name_en if city else None
+
+        from ..alerts.telegram import format_new_job, send_message
+
+        body = format_new_job(
+            title=parsed.title,
+            company_name=company_name,
+            city_name=city_name,
+            country_code="sa",
+            category_code=None,
+            category_name=None,
+            description=parsed.description,
+            salary_min=parsed.salary_min,
+            salary_max=parsed.salary_max,
+            salary_currency=parsed.salary_currency,
+            salary_period=(
+                parsed.salary_period.value if parsed.salary_period else None
+            ),
+            url=parsed.canonical_url,
+        )
+        sent = await send_message(body)
+        if sent:
+            # Record successful broadcast so future runs / re-fetches
+            # don't repost. INSERT ... ON CONFLICT DO NOTHING in case
+            # a concurrent broadcaster won the race (k3s CronJob's
+            # concurrencyPolicy=Forbid prevents this, but defend
+            # anyway).
+            from os import environ
+            chat_id = environ.get("TELEGRAM_CHANNEL_ID", "").strip()
+            async with self.db.pool.connection() as conn, conn.cursor() as cur:
+                await cur.execute(
+                    """
+                    INSERT INTO telegram_broadcasts (job_id, chat_id)
+                    VALUES (%(j)s, %(c)s)
+                    ON CONFLICT (job_id) DO NOTHING;
+                    """,
+                    {"j": posting.cluster_job_id, "c": chat_id},
+                )
 
 
 # Keep the imports alive for downstream code-completion. Each goes

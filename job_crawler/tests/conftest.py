@@ -21,6 +21,7 @@ from job_crawler_db import JobCrawlerDB, Settings, apply_schema
 # Names of every table populated by the lib. Order does not matter because
 # we TRUNCATE ... CASCADE, but listing them keeps the intent obvious.
 _DATA_TABLES: tuple[str, ...] = (
+    "telegram_broadcasts",
     "crawl_fetches",
     "crawl_runs",
     "posting_snapshots",
