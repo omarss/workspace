@@ -67,3 +67,84 @@ jobs:
           ./bin/migrate -plane controlplane up
           ./bin/migrate -plane dataplane    up
       - run: make test-int
+
+  # Phase 15 — contract job: spin up the data-plane binary, point a
+  # Prism proxy at it, replay test/fixtures/**/*.http through Prism, and
+  # assert every fixture returns 2xx. Catches schema drift between the
+  # OpenAPI spec and the live handlers — complements `openapi-check` in
+  # the gate job.
+  contract:
+    needs: gate
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: saas
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: saas
+          POSTGRES_PASSWORD: saas
+          POSTGRES_DB: saas
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U saas" --health-interval 2s --health-timeout 3s --health-retries 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+          cache: true
+          cache-dependency-path: saas/go.sum
+      - name: Build binaries (controlplane, dataplane, migrate, saasctl)
+        run: make build
+      - name: Apply migrations
+        env:
+          CONTROLPLANE_DATABASE_URL: "postgres://saas:saas@localhost:5432/saas?sslmode=disable"
+          DATAPLANE_DATABASE_URL: "postgres://saas:saas@localhost:5432/saas?sslmode=disable"
+        run: |
+          ./bin/migrate -plane controlplane up
+          ./bin/migrate -plane dataplane    up
+      - name: Render OpenAPI overlay (Prism reads /openapi/_generated/*)
+        run: make openapi-overlay
+      - name: Start data-plane
+        env:
+          SAAS_ENV: dev
+          DATAPLANE_DATABASE_URL: "postgres://saas:saas@localhost:5432/saas?sslmode=disable"
+        run: |
+          mkdir -p /tmp/saas-contract
+          ./bin/dataplane > /tmp/saas-contract/dataplane.log 2>&1 &
+          echo $! > /tmp/saas-contract/dataplane.pid
+          # Poll for /healthz on :9090 for up to 20 s.
+          for i in $(seq 1 20); do
+            if curl -fsS http://localhost:9090/healthz >/dev/null 2>&1; then
+              echo "data-plane up"; exit 0
+            fi
+            sleep 1
+          done
+          echo "data-plane failed to start"; cat /tmp/saas-contract/dataplane.log; exit 1
+      - name: Start Prism proxy in front of the data-plane
+        run: |
+          docker run --rm -d --name saas-contract-prism --network host \
+            -v $PWD:/work:ro \
+            stoplight/prism:5.15.10 \
+            proxy /work/openapi/_generated/data-plane.yaml \
+            http://localhost:9090 --errors -p 4011 -m=false
+          # Prism reports ready when its mock server begins logging requests;
+          # the simplest test is a 200 to /healthz routed through the proxy.
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:4011/healthz >/dev/null 2>&1; then
+              echo "prism up"; exit 0
+            fi
+            sleep 1
+          done
+          echo "prism failed to start"; docker logs saas-contract-prism; exit 1
+      - name: Replay contract fixtures
+        run: ./scripts/replay-contract-fixtures.sh http://localhost:4011
+      - name: Teardown
+        if: always()
+        run: |
+          docker kill saas-contract-prism >/dev/null 2>&1 || true
+          if [ -f /tmp/saas-contract/dataplane.pid ]; then
+            kill $(cat /tmp/saas-contract/dataplane.pid) >/dev/null 2>&1 || true
+          fi
