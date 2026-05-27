@@ -332,54 +332,107 @@ def _summarise_description(description: str | None) -> str | None:
     running = 0
     for line in lines[:_SUMMARY_MAX_LINES]:
         # Cap per-line at ~150 chars so a single huge line doesn't
-        # eat the whole budget.
+        # eat the whole budget. When we truncate, prefer the last
+        # sentence boundary inside the cap so we don't cut mid-word.
         if len(line) > 200:
-            line = line[:197] + "…"
+            line = _truncate_at_sentence_boundary(line, 200)
         if running + len(line) > _SUMMARY_MAX_CHARS and picked:
             break
         picked.append(line)
         running += len(line) + 1  # +1 for the newline join
         if running >= _SUMMARY_MAX_CHARS:
             break
+
+    # Trim trailing role-anchor headings with no body content
+    # (e.g. summary ends with "Your Impact" or "Responsibilities"
+    # because we picked up the next section's heading but the
+    # cap fired before its body). Drop trailing heading-only lines
+    # so the message doesn't end on a dangling header.
+    while picked and (
+        _ROLE_ANCHORS_RE.match(picked[-1]) or _looks_like_section_heading(picked[-1])
+    ):
+        picked.pop()
+
     if not picked:
         return None
     summary = "\n".join(picked)
-    # Final hard cap
+    # Final hard cap — prefer sentence boundary at the cut point.
     if len(summary) > _SUMMARY_MAX_CHARS:
-        summary = summary[: _SUMMARY_MAX_CHARS - 1] + "…"
+        summary = _truncate_at_sentence_boundary(summary, _SUMMARY_MAX_CHARS)
     return summary
 
 
+def _looks_like_section_heading(line: str) -> bool:
+    """Heuristic: short, Title-Case-ish, no ending punctuation, ≤6 words.
+
+    Catches generic section labels like "Your Impact", "About You",
+    "What You'll Do", "Required Skills", "Why Join Us" that aren't in
+    `_ROLE_ANCHORS_RE`. Conservative: very short OR Title-Case OR
+    ALL CAPS plus the no-ending-punctuation rule.
+    """
+    s = line.strip()
+    if not s or len(s) > 60:
+        return False
+    if s[-1] in ".!?؟,:;":
+        return False
+    words = s.split()
+    if len(words) > 6:
+        return False
+    # Title case (every word starts uppercase OR is a short article/prep)
+    short_words = {"a", "an", "the", "of", "to", "in", "on", "for", "and", "or"}
+    title_case = all(
+        w[0].isupper() or w.lower() in short_words
+        for w in words
+        if w
+    )
+    if title_case:
+        return True
+    # ALL CAPS heading
+    return s.upper() == s and any(c.isalpha() for c in s)
+
+
+def _truncate_at_sentence_boundary(text: str, max_chars: int) -> str:
+    """Cut `text` at-or-before `max_chars`, preferring a sentence end.
+
+    Looks back from `max_chars` for the last `.`, `!`, `?`, or Arabic
+    full-stop `؟`. Falls back to a word boundary; finally to a hard
+    char cut. Appends an ellipsis unless the cut happens exactly at a
+    natural sentence end.
+    """
+    if len(text) <= max_chars:
+        return text
+    head = text[: max_chars - 1]  # leave room for the ellipsis
+    sentence_end = max(
+        head.rfind("."), head.rfind("!"), head.rfind("?"), head.rfind("؟"),
+    )
+    if sentence_end >= max_chars // 2:
+        # Stop right after the punctuation; keep the period itself.
+        return head[: sentence_end + 1].rstrip()
+    word_end = head.rfind(" ")
+    if word_end >= max_chars // 2:
+        return head[:word_end].rstrip() + "…"
+    return head + "…"
+
+
 def _humanise_posted_at(posted_at: object) -> str | None:
-    """Render a datetime as a 'posted X ago' label, or None if missing.
+    """Render a datetime as an absolute date label, or None if missing.
+
+    Absolute (not relative) so the date still makes sense when a
+    subscriber scrolls back to an old post weeks later. Format:
+    `Wed, 21 May 2026` — short weekday + day + month-name + year.
 
     Accepts `datetime` (tz-aware preferred; tz-naive coerced to UTC).
-    Examples: "just now", "3 hours ago", "yesterday", "5 days ago",
-    "2 weeks ago", or YYYY-MM-DD when older than 30 days.
+    Returns None for unknown / non-datetime inputs so the caller can
+    skip the line entirely.
     """
     from datetime import UTC, datetime
-    if posted_at is None:
-        return None
-    if not isinstance(posted_at, datetime):
+    if posted_at is None or not isinstance(posted_at, datetime):
         return None
     ts = posted_at if posted_at.tzinfo else posted_at.replace(tzinfo=UTC)
-    delta = datetime.now(UTC) - ts
-    seconds = max(0, int(delta.total_seconds()))
-    minutes, hours, days = seconds // 60, seconds // 3600, seconds // 86400
-    if seconds < 60:
-        return "just now"
-    if minutes < 60:
-        return f"{minutes} minute{'s' if minutes != 1 else ''} ago"
-    if hours < 24:
-        return f"{hours} hour{'s' if hours != 1 else ''} ago"
-    if days == 1:
-        return "yesterday"
-    if days < 7:
-        return f"{days} days ago"
-    if days < 30:
-        weeks = days // 7
-        return f"{weeks} week{'s' if weeks != 1 else ''} ago"
-    return ts.date().isoformat()
+    # `%-d` strips the leading zero from the day-of-month on glibc;
+    # POSIX-portable alt: lstrip the zero from a `%d` formatted result.
+    day = ts.strftime("%d").lstrip("0") or "0"
+    return f"{ts.strftime('%a')}, {day} {ts.strftime('%b %Y')}"
 
 
 def format_new_job(
@@ -449,12 +502,10 @@ def format_new_job(
         lines.append("")
         lines.append(html.escape(summary))
 
-    # Canonical link footer — repeat the URL in plain form so users
-    # can see (and copy) the actual source URL, not just the
-    # hyperlinked title.
-    if url:
-        lines.append("")
-        lines.append(f"🔗 {safe_url}")
+    # NOTE: previously included a plain `🔗 URL` footer line. Removed
+    # in v3 — three CTAs to the same URL (clickable title at top,
+    # plain URL footer, inline button below) was redundant on mobile.
+    # The title link + inline button are enough.
 
     # Hashtags for filtering. Limited to ones that are universally
     # safe (company slug can contain spaces / Arabic, so we slugify).
@@ -464,6 +515,7 @@ def format_new_job(
         if s:
             tags.append(f"#{s}")
     if tags:
+        lines.append("")  # blank line before tags for breathing room
         lines.append(" ".join(tags))
 
     buttons: list[tuple[str, str]] = []
