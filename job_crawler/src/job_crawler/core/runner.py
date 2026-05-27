@@ -241,7 +241,15 @@ class CrawlerRunner:
                         error_message="non-GCC location",
                     )
                     continue
-                if not is_within_window(parsed.posted_at):
+                # `source_updated_at` is the safety net for long-lived ATS
+                # roles whose `first_published` is months old but whose
+                # `updated_at` shows recent activity (refresh, bump, or
+                # description edit). is_within_window() returns True when
+                # EITHER timestamp is fresh.
+                if not is_within_window(
+                    parsed.posted_at,
+                    source_updated_at=parsed.source_updated_at,
+                ):
                     # Older than the lookback — skip, but still count the fetch.
                     await self.db.crawl.record_fetch(
                         run.id,
