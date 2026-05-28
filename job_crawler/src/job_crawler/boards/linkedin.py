@@ -21,6 +21,13 @@ Env knobs:
     JC_LINKEDIN_LOCATION  (default "Saudi Arabia")
     JC_LINKEDIN_GEO_ID    (default 106155005, Saudi Arabia)
     JC_LINKEDIN_MAX_PAGES (default 10  — LinkedIn allows ~40 pages * 25 cards)
+    JC_LINKEDIN_COOKIE    (optional `name=value; …` header captured from
+                           a logged-in browser session via
+                           `make capture-linkedin-cookie`. Without it,
+                           LinkedIn's guest API ignores geo / location
+                           filters and returns MENA-wide listings —
+                           the GCC geo gate then rejects ~all of them.
+                           Cookies stay valid for ~2-4 weeks.)
 """
 
 from __future__ import annotations
@@ -110,6 +117,7 @@ class LinkedInCrawler(BoardCrawler):
         location = os.environ.get("JC_LINKEDIN_LOCATION", "Saudi Arabia").strip()
         geo_id = os.environ.get("JC_LINKEDIN_GEO_ID", self.DEFAULT_GEO_ID)
         max_pages = int(os.environ.get("JC_LINKEDIN_MAX_PAGES", "40"))
+        cookie_header = os.environ.get("JC_LINKEDIN_COOKIE", "").strip()
         # Window in seconds — LinkedIn's f_TPR=rN means "last N seconds".
         window_seconds = lookback_days() * 86400
 
@@ -126,8 +134,9 @@ class LinkedInCrawler(BoardCrawler):
                 params["keywords"] = keywords
             url = (f"{self.source_base_url}/jobs-guest/jobs/api/seeMoreJobPostings/search"
                    f"?{urlencode(params)}")
+            headers = {"Cookie": cookie_header} if cookie_header else None
             try:
-                result = await self.http.fetch(url)
+                result = await self.http.fetch(url, headers=headers)
             except Exception as exc:
                 _LOG.warning("linkedin search page %d failed: %s", page, exc)
                 break
@@ -159,8 +168,10 @@ class LinkedInCrawler(BoardCrawler):
         canonical /jobs/view/{id} page and renders the same content."""
         url = (f"{self.source_base_url}/jobs-guest/jobs/api/jobPosting/"
                f"{listing.source_job_external_id}")
+        cookie_header = os.environ.get("JC_LINKEDIN_COOKIE", "").strip()
+        headers = {"Cookie": cookie_header} if cookie_header else None
         try:
-            result = await self.http.fetch(url)
+            result = await self.http.fetch(url, headers=headers)
         except Exception:
             return None
         return RawPosting(

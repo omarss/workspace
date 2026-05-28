@@ -73,6 +73,12 @@ schema-check:  ## Validate db_schema.sql against a throwaway postgres:18-alpine
 	@docker rm -f jc_schema_check >/dev/null
 
 # ---------------------------------------------------------------------------
+# Auth-cookie capture helpers
+# ---------------------------------------------------------------------------
+capture-linkedin-cookie:  ## Launch Chromium, log in by hand, capture cookie into .env::JC_LINKEDIN_COOKIE
+	uv run python -m job_crawler.cli.capture_linkedin_cookie
+
+# ---------------------------------------------------------------------------
 # Local API (development)
 # ---------------------------------------------------------------------------
 run-api:  ## Run FastAPI locally on :8080 with the host DB (reads .env)
