@@ -152,12 +152,20 @@ class HttpClient:
         params: dict[str, Any] | None = None,
         json_body: Any = None,
         headers: dict[str, str] | None = None,
+        via_api: bool = False,
     ) -> FetchResult:
         """Polite, retried, robots-aware fetch.
 
         Returns a FetchResult or raises `httpx.HTTPError` after all retries
         are exhausted.
+
+        `via_api` is accepted for signature compatibility with
+        `PlaywrightFetcher.fetch` (where it selects the
+        APIRequestContext path for Cloudflare-gated JSON endpoints).
+        For the plain HTTP client every request already goes over the
+        same TLS path, so the flag is a no-op here.
         """
+        del via_api  # signature compat — no behavioural difference here
         ua = self._ua_fixed or random.choice(USER_AGENTS)
         request_headers = dict(headers or {})
         request_headers.setdefault("User-Agent", ua)

@@ -156,6 +156,7 @@ class PlaywrightFetcher:
         wait_for_selector: str | None = None,
         wait_for_url_pattern: str | None = None,
         timeout_ms: int | None = None,
+        via_api: bool = False,
     ) -> FetchResult:
         """Navigate to `url` in a fresh page and return its rendered HTML.
 
@@ -171,6 +172,14 @@ class PlaywrightFetcher:
           interstitials whose final URL only matches after the queue
           releases.
         * `timeout_ms` — overrides `rate.timeout_seconds * 1000`.
+        * `via_api` — when True, route the GET through
+          `context.request.fetch` (Playwright's APIRequestContext)
+          instead of full browser navigation. Required for JSON
+          endpoints behind Cloudflare's bot wall: they need a real
+          Chromium TLS fingerprint but `page.goto` waits forever for
+          `networkidle` because a JSON response never finishes
+          "loading" in the browser sense. `application/json` content
+          gets the same JSON-parse treatment as the non-GET path.
 
         Non-GET methods route through `page.request` (Playwright's built-in
         APIRequestContext) so we can still do JSON POSTs for endpoints that
@@ -190,7 +199,7 @@ class PlaywrightFetcher:
 
         timeout = timeout_ms or int(self.rate.timeout_seconds * 1000)
 
-        if method.upper() != "GET":
+        if via_api or method.upper() != "GET":
             return await self._fetch_via_api(
                 url, method=method, params=params,
                 json_body=json_body, headers=headers, timeout=timeout,
@@ -276,15 +285,25 @@ class PlaywrightFetcher:
         if headers:
             merged_headers.update(headers)
         t0 = time.monotonic()
-        resp = await request_ctx.fetch(
-            url,
-            method=method,
-            params=params,
-            data=json_body if not isinstance(json_body, (dict, list)) else None,
-            json=json_body if isinstance(json_body, (dict, list)) else None,
-            headers=merged_headers,
-            timeout=timeout,
-        )
+        # Playwright's `APIRequestContext.fetch` accepts `data` (string /
+        # bytes / dict for forms) but NOT a `json=` kwarg — the JSON body
+        # has to be serialised manually with the right Content-Type.
+        kwargs: dict[str, Any] = {
+            "method": method,
+            "params": params,
+            "headers": merged_headers,
+            "timeout": timeout,
+        }
+        if isinstance(json_body, (dict, list)):
+            import json as _json
+            kwargs["data"] = _json.dumps(json_body)
+            kwargs["headers"] = {
+                **merged_headers,
+                "content-type": "application/json",
+            }
+        elif json_body is not None:
+            kwargs["data"] = json_body
+        resp = await request_ctx.fetch(url, **kwargs)
         body = await resp.text()
         duration_ms = int((time.monotonic() - t0) * 1000)
         # Best-effort JSON parse for application/json responses.
