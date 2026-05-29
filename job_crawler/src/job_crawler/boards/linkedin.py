@@ -80,8 +80,14 @@ class LinkedInCrawler(BoardCrawler):
     # anonymous traffic, so its results are MENA-wide. Drop anything that
     # doesn't have a GCC location at the runner gate.
     requires_gcc_location: ClassVar[bool] = True
+    # 1 RPS trips LinkedIn's bot detector within 1-2 requests when we
+    # send authenticated cookies (observed ERR_TOO_MANY_REDIRECTS after
+    # the second hit). 0.2 RPS (one request every 5 s) + burst=1 keeps
+    # us inside their per-session tolerance band — at the cost of a
+    # slower per-cycle ceiling, but with `JC_LINKEDIN_MAX_PAGES=2` the
+    # whole pass still completes in ~3 minutes.
     rate: ClassVar[RateConfig] = RateConfig(
-        max_rps=1.0, burst=2, max_concurrent=1,
+        max_rps=0.2, burst=1, max_concurrent=1,
         timeout_seconds=30.0,
         user_agent=None,
         retry_attempts=4,
