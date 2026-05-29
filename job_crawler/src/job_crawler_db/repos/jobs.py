@@ -247,7 +247,20 @@ class JobsRepo(Repo):
     # -- canonical refresh ----------------------------------------------
 
     async def recompute_canonical(self, job_id: UUID) -> Job:
-        """Re-pick the canonical posting (highest source trust * recency).
+        """Re-pick the canonical posting for a cluster.
+
+        Tiering (highest wins):
+          1. **directness** — `source.kind`. Government portals (Jadarat)
+             + ATSes (Greenhouse, Workday, Lever, ...) + employer-owned
+             career pages outrank aggregator / regional / local boards.
+             This makes the cluster's `canonical_url` point to the
+             company's actual apply form whenever we have one, so a
+             subscriber tapping the Telegram link lands on the direct
+             application path — not a Bayt/LinkedIn middleman that
+             requires an aggregator account.
+          2. **trust_weight** — fine-grained tiebreaker inside a tier.
+          3. **last_seen_at** — newer wins (descriptions on
+             long-running roles get refreshed by the source).
 
         Mirrors that posting's title/description/etc. into the cluster row.
         Cheap to call after every cluster mutation.
@@ -264,7 +277,15 @@ class JobsRepo(Repo):
                         JOIN sources s ON s.id = p.source_id
                         WHERE p.cluster_job_id = %(j)s
                           AND p.status = 'active'
-                        ORDER BY s.trust_weight DESC, p.last_seen_at DESC
+                        ORDER BY
+                            CASE s.kind
+                                WHEN 'gov_board'    THEN 3
+                                WHEN 'ats'          THEN 2
+                                WHEN 'company_site' THEN 2
+                                ELSE 0
+                            END DESC,
+                            s.trust_weight DESC,
+                            p.last_seen_at DESC
                         LIMIT 1;
                         """,
                         {"j": job_id},
