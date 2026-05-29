@@ -10,14 +10,18 @@ Signals (in priority order — first hit wins per pair)
 1. **exact content_hash** — identical normalised description body. The
    strongest signal (e.g. one human pasted the same blurb into Bayt and
    LinkedIn). similarity=1.0.
-2. **same canonical_url after normalisation** — exotic but possible when
-   one source aggregates another. similarity=1.0.
-3. **title trigram + company match + city match** — the workhorse path.
-   Title similarity ≥ 0.6 and the candidates share the resolved
-   `company_id` and `city_id`. similarity = title similarity.
-4. **title trigram + raw_company_name fuzzy + city** — fallback when one
-   side hasn't resolved the company yet. Requires trigram(company_name)
-   ≥ 0.5 + title ≥ 0.65.
+2. **title trigram + company + city (both resolved & matching)** — the
+   conservative workhorse. Title sim ≥ 0.60 and the candidates share
+   the resolved `company_id` and `city_id`. similarity = title sim.
+3. **title trigram + company + city loose** — same shape as stage 2
+   but the city filter is relaxed: city must either match OR be NULL
+   on one side. Title threshold is raised to ≥ 0.85 to compensate
+   for the looser geo signal. Catches the common "recycled" pattern
+   where the same role is reposted on a second source that didn't
+   resolve the city (e.g. ATS posting with location="Remote" + Bayt
+   repost with location="Riyadh, Saudi Arabia"), AND the pattern
+   where the same role is reposted weeks later with minor title
+   rewording ("Senior Python Engineer" → "Sr. Python Engineer").
 
 For every pair that fires, we:
   * insert a `posting_duplicate_edges` row (with the reason + similarity)
@@ -146,6 +150,77 @@ async def _dedupe_by_title_company_loc(
 
 
 # ---------------------------------------------------------------------------
+# Stage 3: title trigram + company + city LOOSE
+# ---------------------------------------------------------------------------
+
+
+async def _dedupe_by_title_company_city_loose(
+    db: JobCrawlerDB,
+    summary: DedupSummary,
+    *,
+    min_title_similarity: float = 0.85,
+) -> None:
+    """Same shape as stage 2 but the city filter is relaxed: city must
+    either match OR be NULL on one side. The title threshold is raised
+    to 0.85 (vs stage 2's 0.60) to compensate for the looser geo signal.
+
+    Catches the two main recycled-job patterns:
+      * same role on direct ATS + aggregator, only one resolved the city
+      * same company reposting the same role weeks later with minor
+        title rewording ("Senior Python Engineer" → "Sr. Python Engineer")
+
+    Stage 2 runs first; pairs it already merged share a `cluster_job_id`
+    and are filtered out here by the `a.cluster_job_id <> b.cluster_job_id`
+    clause, so this stage only sees the residual.
+    """
+    async with db.pool.connection() as conn, conn.cursor(row_factory=dict_row) as cur:
+        await cur.execute(
+            """
+            WITH pairs AS (
+                SELECT a.id              AS a_id,
+                       b.id              AS b_id,
+                       a.cluster_job_id  AS a_cluster,
+                       b.cluster_job_id  AS b_cluster,
+                       similarity(normalize_text(a.title), normalize_text(b.title)) AS sim
+                FROM   job_postings a
+                JOIN   job_postings b
+                  ON   b.id > a.id                          -- canonical ordering
+                  AND  b.company_id IS NOT DISTINCT FROM a.company_id
+                  AND  a.company_id IS NOT NULL             -- skip "no company" matches
+                  AND  a.cluster_job_id <> b.cluster_job_id
+                  -- City loose: equal, or either side NULL.
+                  AND  (a.city_id IS NOT DISTINCT FROM b.city_id
+                        OR a.city_id IS NULL
+                        OR b.city_id IS NULL)
+                WHERE  a.cluster_job_id IS NOT NULL
+                  AND  b.cluster_job_id IS NOT NULL
+                  AND  normalize_text(a.title) %% normalize_text(b.title)
+            )
+            SELECT a_id, b_id, a_cluster, b_cluster, sim
+            FROM   pairs
+            WHERE  sim >= %(thr)s
+            ORDER  BY sim DESC;
+            """,
+            {"thr": min_title_similarity},
+        )
+        pairs = list(await cur.fetchall())
+
+    for row in pairs:
+        summary.pairs_considered += 1
+        try:
+            await db.dedupe.add_edge(
+                row["a_id"], row["b_id"],
+                reason=DuplicateReason.title_company_loc,
+                similarity=Decimal(str(row["sim"])).quantize(Decimal("0.001")),
+            )
+            summary.edges_recorded += 1
+        except Exception:
+            _LOG.exception("could not record edge for %s ↔ %s",
+                           row["a_id"], row["b_id"])
+        await _merge_clusters_for_pair(db, row["a_cluster"], row["b_cluster"], summary)
+
+
+# ---------------------------------------------------------------------------
 # helpers
 # ---------------------------------------------------------------------------
 
@@ -224,20 +299,40 @@ async def _pick_target_cluster(
     db: JobCrawlerDB,
     cluster_ids: list[UUID],
 ) -> UUID:
-    """Pick the cluster whose canonical posting comes from the highest-trust
-    source. Ties → whichever has the most postings; ties again → oldest."""
+    """Pick the survivor when merging clusters.
+
+    Tiering (highest wins):
+      1. **directness tier** — `source.kind`. Government portals + ATSes
+         + company-owned career pages are the canonical "apply directly"
+         path; aggregators / regional / local boards are intermediates
+         that repost what's elsewhere. Choosing the direct tier means
+         the Telegram link a subscriber taps goes to the company's own
+         application form, not to a Bayt/LinkedIn middleman that may
+         require an aggregator account to apply.
+      2. **trust_weight** — finer tiebreaker inside a tier (e.g. two
+         ATSes; Greenhouse 0.95 wins over Workday 0.92).
+      3. **posting_count** — bigger clusters absorb smaller ones so we
+         preserve the most evidence.
+      4. **first_seen_at** — oldest first as a deterministic last resort.
+    """
     async with db.pool.connection() as conn, conn.cursor(row_factory=dict_row) as cur:
         await cur.execute(
             """
             SELECT j.id,
-                   COALESCE(s.trust_weight, 0)::float AS trust,
+                   CASE s.kind
+                       WHEN 'gov_board'    THEN 3
+                       WHEN 'ats'          THEN 2
+                       WHEN 'company_site' THEN 2
+                       ELSE 0
+                   END                                  AS directness,
+                   COALESCE(s.trust_weight, 0)::float   AS trust,
                    j.posting_count,
                    j.first_seen_at
             FROM   jobs j
             LEFT   JOIN job_postings p ON p.id = j.canonical_posting_id
             LEFT   JOIN sources s ON s.id = p.source_id
             WHERE  j.id = ANY(%(ids)s)
-            ORDER  BY trust DESC, j.posting_count DESC, j.first_seen_at;
+            ORDER  BY directness DESC, trust DESC, j.posting_count DESC, j.first_seen_at;
             """,
             {"ids": cluster_ids},
         )
@@ -256,6 +351,8 @@ async def run(db: JobCrawlerDB) -> DedupSummary:
     await _dedupe_by_content_hash(db, summary)
     _LOG.info("dedup: stage 2 — title trigram + company + city")
     await _dedupe_by_title_company_loc(db, summary)
+    _LOG.info("dedup: stage 3 — title trigram + company + city loose")
+    await _dedupe_by_title_company_city_loose(db, summary)
     _LOG.info(
         "dedup done: pairs=%d edges=%d cluster_merges=%d",
         summary.pairs_considered, summary.edges_recorded, summary.clusters_merged,
