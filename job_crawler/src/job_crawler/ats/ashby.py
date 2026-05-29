@@ -74,7 +74,11 @@ class AshbyCrawler(ATSBoardCrawler):
                 f"{slug}?includeCompensation=true"
             )
             try:
-                result = await self.http.fetch(url)
+                # `via_api=True` routes through Playwright's
+                # APIRequestContext so we keep Chromium's TLS shape
+                # (Cloudflare lets us through) without `page.goto`
+                # waiting forever for `networkidle` on a JSON response.
+                result = await self.http.fetch(url, via_api=True)
             except Exception as exc:
                 _LOG.warning("ashby board %s fetch failed: %s", slug, exc)
                 continue
