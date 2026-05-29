@@ -233,3 +233,85 @@ async def test_recompute_canonical_prefers_gov_over_ats(
     assert refreshed.canonical_posting_id == p_jad.id, (
         "gov_board outranks ATS in the directness tier"
     )
+
+
+async def test_recompute_canonical_does_not_desync_geo(
+    seeded_reference: JobCrawlerDB,
+) -> None:
+    """Regression: prior code COALESCE'd `country_code` and
+    `region_code` independently, so a chosen posting with
+    `country='sa', region=NULL` against a cluster currently set to
+    `(ae, dubai)` would produce `(sa, dubai)` — a pair not in
+    `regions`, violating the composite FK and crashing recompute.
+
+    The fix derives the triple (city, country, region) atomically
+    from the chosen posting's city (every `cities` row holds a
+    consistent pair). When the chosen posting has no city, the
+    cluster's existing geo is preserved."""
+    db = seeded_reference
+    company = await db.companies.create(name_en="Atomic Geo Co")
+
+    # `seeded_reference` only seeds SA cities — add Dubai inline for
+    # this test so we can reproduce the cross-country (ae) → (sa)
+    # canonical-replace scenario that triggered the FK bug.
+    await db.geo.upsert_region(
+        country_code="ae", code="dubai", name_en="Dubai", name_ar="دبي",
+    )
+    dubai = await db.geo.upsert_city(
+        country_code="ae", region_code="dubai",
+        name_en="Dubai", name_ar="دبي",
+    )
+
+    # First posting: Dubai, with city resolved.
+    p_dubai = await db.postings.upsert(
+        await _make_posting(
+            db,
+            source_slug="linkedin",
+            external_id="li-dubai-1",
+            title="Sales Executive",
+            description="Dubai role.",
+            company_id=company.id,
+            city_id=dubai.id,
+            raw_location="Dubai, UAE",
+        ),
+    )
+    cluster = await db.jobs.create_from_posting(p_dubai.id)
+
+    # Force the cluster to (ae, dubai) — production reaches this state
+    # via the runner's geo normalisation. We're testing recompute, not
+    # the create path, so manually pin the geo here.
+    async with db.pool.connection() as conn, conn.cursor() as cur:
+        await cur.execute(
+            "UPDATE jobs SET country_code='ae', region_code='dubai' WHERE id = %(j)s",
+            {"j": cluster.id},
+        )
+    cluster_initial = await db.jobs.get(cluster.id)
+    assert cluster_initial is not None
+    assert cluster_initial.country_code == "ae"
+    assert cluster_initial.region_code == "dubai"
+
+    # Second posting: same role, higher-tier ATS, but WITHOUT a city.
+    # country defaults to 'sa', region is NULL. Pre-fix this would
+    # crash on recompute with FK violation (sa, dubai).
+    p_gh = await db.postings.upsert(
+        await _make_posting(
+            db,
+            source_slug="greenhouse",
+            external_id="gh-no-city",
+            title="Sales Executive",
+            description="Same role, posted on ATS without a resolved city.",
+            company_id=company.id,
+            city_id=None,
+        ),
+    )
+    await db.postings.attach_to_cluster(p_gh.id, cluster.id)
+
+    # Must not raise.
+    refreshed = await db.jobs.recompute_canonical(cluster.id)
+
+    # ATS is now canonical (directness > LinkedIn).
+    assert refreshed.canonical_posting_id == p_gh.id
+    # Cluster's geo is preserved (chosen posting had no city to override
+    # with). Country + region are still a valid FK pair.
+    assert refreshed.country_code == "ae"
+    assert refreshed.region_code == "dubai"

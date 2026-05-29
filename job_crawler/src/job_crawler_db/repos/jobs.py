@@ -322,6 +322,33 @@ class JobsRepo(Repo):
                     chosen_desc_ar = chosen["description"] if is_arabic_dominant(chosen["description"]) else None
                     chosen_desc_en = None if chosen_desc_ar else chosen["description"]
 
+                    # Resolve city/country/region as an atomic triple.
+                    # Previous code COALESCE'd each field independently,
+                    # which let the cluster's `region_code` update while
+                    # `country_code` didn't — producing pairs like
+                    # `(sa, dubai)` that violate the composite FK to
+                    # `regions`. Drive all three from the chosen
+                    # posting's city when present (every `cities` row
+                    # carries a self-consistent country+region pair).
+                    # When the chosen posting has no city, leave all
+                    # three None so the COALESCE below preserves the
+                    # cluster's existing geo atomically.
+                    chosen_city_id = chosen["city_id"]
+                    if chosen_city_id is not None:
+                        await cur.execute(
+                            "SELECT country_code, region_code FROM cities WHERE id = %(c)s",
+                            {"c": chosen_city_id},
+                        )
+                        city_row = await cur.fetchone()
+                        if city_row is not None:
+                            geo_city = chosen_city_id
+                            geo_country = city_row["country_code"]
+                            geo_region = city_row["region_code"]
+                        else:
+                            geo_city = geo_country = geo_region = None
+                    else:
+                        geo_city = geo_country = geo_region = None
+
                     await cur.execute(
                         """
                         UPDATE jobs SET
@@ -362,9 +389,9 @@ class JobsRepo(Repo):
                             "emp": chosen["employment_type"],
                             "work": chosen["work_arrangement"],
                             "exp": chosen["experience_level"],
-                            "city": chosen["city_id"],
-                            "region": chosen["region_code"],
-                            "country": chosen["country_code"],
+                            "city": geo_city,
+                            "region": geo_region,
+                            "country": geo_country,
                             "office": chosen["office_address"],
                             "hdays": chosen["hybrid_days_per_week"],
                             "remote": chosen["remote_country_restriction"],
