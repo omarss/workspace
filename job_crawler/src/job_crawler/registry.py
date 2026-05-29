@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 
+from .ats.ashby import AshbyCrawler
 from .ats.greenhouse import GreenhouseCrawler
 from .ats.lever import LeverCrawler
 from .ats.personio import PersonioCrawler
@@ -41,6 +42,7 @@ REGISTRY: dict[str, type[BaseCrawler]] = {
     "successfactors": SuccessFactorsCrawler,
     "recruitee": RecruiteeCrawler,
     "personio": PersonioCrawler,
+    "ashby": AshbyCrawler,
     # Regional + local boards
     "bayt": BaytCrawler,
     "naukrigulf": NaukrigulfCrawler,
