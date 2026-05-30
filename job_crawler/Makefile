@@ -133,6 +133,18 @@ db-shell:  ## psql shell as job_crawler against the host DB
 	@set -a; . ./.env; set +a; \
 		PGPASSWORD=$$JC_DB_PASSWORD psql -U job_crawler -h 127.0.0.1 -d job_crawler
 
+db-audit-geo:  ## Print clusters whose (city, country, region) triple drifted from the linked city
+	$(call _load_env)
+	@set -a; . ./.env; set +a; \
+		PGPASSWORD=$$JC_DB_PASSWORD psql -U job_crawler -h 127.0.0.1 -d job_crawler -P pager=off -c "\
+SELECT j.id AS job_id, j.city_id, \
+       j.country_code AS job_cc, c.country_code AS city_cc, \
+       j.region_code  AS job_region, c.region_code AS city_region \
+FROM jobs j JOIN cities c ON c.id = j.city_id \
+WHERE j.city_id IS NOT NULL \
+  AND (j.country_code IS DISTINCT FROM c.country_code \
+       OR (c.region_code IS NOT NULL AND j.region_code IS DISTINCT FROM c.region_code));"
+
 db-backup:  ## pg_dump custom format to ./backups/YYYYMMDD-HHMM.dump
 	$(call _load_env)
 	@mkdir -p backups

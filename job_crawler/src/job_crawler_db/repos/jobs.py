@@ -244,6 +244,46 @@ class JobsRepo(Repo):
             {"id": job_id, "ts": datetime.now(UTC)},
         )
 
+    # -- invariant audit ------------------------------------------------
+
+    async def audit_geo_atomic_triples(self) -> list[dict[str, Any]]:
+        """Return every `jobs` row whose (city, country, region) triple
+        disagrees with the linked `cities` row.
+
+        PR #85 fixed `recompute_canonical` to derive country+region as an
+        atomic triple from the chosen posting's `city_id`. This audit is
+        the standing guard: any row this surfaces means a code path
+        outside `recompute_canonical` is writing the fields independently
+        again. Returns an empty list when the invariant holds.
+
+        The returned dicts are intentionally lightweight (`job_id`,
+        `city_id`, expected vs. actual `country_code` / `region_code`)
+        so an operator can paste them into a follow-up `UPDATE` or
+        `DELETE` after eyeballing the offending rows. The audit itself
+        is read-only — callers are responsible for any remediation.
+        """
+        return await self._fetchall(
+            """
+            SELECT j.id AS job_id,
+                   j.city_id,
+                   j.country_code AS job_country_code,
+                   c.country_code AS city_country_code,
+                   j.region_code  AS job_region_code,
+                   c.region_code  AS city_region_code
+            FROM jobs j
+            JOIN cities c ON c.id = j.city_id
+            WHERE j.city_id IS NOT NULL
+              AND (
+                j.country_code IS DISTINCT FROM c.country_code
+                OR (
+                  c.region_code IS NOT NULL
+                  AND j.region_code IS DISTINCT FROM c.region_code
+                )
+              );
+            """,
+            {},
+        )
+
     # -- canonical refresh ----------------------------------------------
 
     async def recompute_canonical(self, job_id: UUID) -> Job:
