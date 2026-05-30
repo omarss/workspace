@@ -31,6 +31,7 @@ import hashlib
 import logging
 import os
 import re
+import time
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime, timedelta
 from typing import ClassVar, Final, cast
@@ -177,7 +178,26 @@ class CompanyCareersCrawler(BoardCrawler):
             len(companies), seeded, len(companies) - seeded,
         )
 
+        # Wall-clock budget for the whole discover loop. The 4-hourly
+        # systemd timer leaves ~3h45m between fires; `JC_COMPANY_CAREERS_BUDGET_SECONDS`
+        # (default 50 minutes) caps the loop so a slow run can't bleed
+        # into the next timer's slot. When the budget runs out we stop
+        # iterating new companies — the runner will finish processing
+        # whatever postings were already emitted before draining the
+        # generator and finalising the crawl_runs row.
+        budget_seconds = _budget_seconds()
+        deadline = time.monotonic() + budget_seconds
+        processed = 0
+
         for company_id, name_en, candidate_urls, kind in companies:
+            if time.monotonic() >= deadline:
+                _LOG.warning(
+                    "company_careers: budget exhausted (%ds); "
+                    "stopping after %d/%d companies",
+                    budget_seconds, processed, len(companies),
+                )
+                break
+            processed += 1
             _LOG.debug(
                 "company_careers: %s [%s] %d candidate URL(s)",
                 name_en or company_id, kind, len(candidate_urls),
@@ -906,3 +926,28 @@ def _ld_from_dict(snapshot: dict[str, object]) -> JobPostingLD:
 
 def _str(value: object) -> str | None:
     return value if isinstance(value, str) else None
+
+
+# Default budget for the whole discover loop. 50 minutes is well under
+# the 4-hour timer interval but generous enough to probe ~200 sites at
+# ~10-15s each (the steady-state arithmetic). Tune via env when running
+# a deeper one-off sweep.
+_DEFAULT_BUDGET_SECONDS: Final[int] = 50 * 60
+
+
+def _budget_seconds() -> int:
+    """Return the wall-clock budget in seconds for `discover_listings`.
+
+    Reads `JC_COMPANY_CAREERS_BUDGET_SECONDS`. Negative / unparseable
+    values fall back to the default so a typo can't unbound the loop.
+    """
+    raw = os.environ.get("JC_COMPANY_CAREERS_BUDGET_SECONDS")
+    if raw is None:
+        return _DEFAULT_BUDGET_SECONDS
+    try:
+        parsed = int(raw)
+    except ValueError:
+        return _DEFAULT_BUDGET_SECONDS
+    return parsed if parsed > 0 else _DEFAULT_BUDGET_SECONDS
+
+

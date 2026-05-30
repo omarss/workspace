@@ -12,12 +12,15 @@ Use `await self.boards()` to get the merged list.
 
 from __future__ import annotations
 
+import logging
 import os
 from collections.abc import Iterable
-from typing import ClassVar
+from typing import ClassVar, Final
 
 from ..core.base import BaseCrawler
 from ..core.db_boards import db_boards_for, merge_board_lists
+
+_LOG: Final = logging.getLogger("job_crawler.ats")
 
 
 def env_board_slugs(env_var: str, fallback: Iterable[str] = ()) -> tuple[str, ...]:
@@ -67,6 +70,17 @@ class ATSBoardCrawler(BaseCrawler):
             ones (env never *replaces* DB entirely so partial overrides work).
           * Else if any DB-discovered slugs: use those + default_boards.
           * Else: just default_boards.
+
+        When the merged list is empty, log a clear warning at WARNING
+        level. Several ATS sources (lever, recruitee, personio,
+        smartrecruiters, ashby, successfactors, workday) ship with an
+        empty `default_boards` seed: they're meant to be populated via
+        env vars or `discover --ats`. If neither has happened, the
+        crawler completes silently with 0 fetches — looking healthy in
+        `crawl_runs` while contributing nothing. The warning makes that
+        misconfiguration obvious in journalctl without changing the
+        crawler's behaviour (a quiet no-op is still the right action
+        when there's nothing to fetch).
         """
         env_slugs = env_board_slugs(self.boards_env_var, ())
         db_slugs: tuple[str, ...] = ()
@@ -77,7 +91,20 @@ class ATSBoardCrawler(BaseCrawler):
                 # Failing to read DB boards must not break the crawl.
                 db_slugs = ()
         if env_slugs:
-            return merge_board_lists(env_slugs, db_slugs)
-        if db_slugs:
-            return merge_board_lists(db_slugs, self.default_boards)
-        return self.default_boards
+            merged = merge_board_lists(env_slugs, db_slugs)
+        elif db_slugs:
+            merged = merge_board_lists(db_slugs, self.default_boards)
+        else:
+            merged = self.default_boards
+        if not merged:
+            _LOG.warning(
+                "%s: no boards configured (env=%s, db_rows=%d, default=%d). "
+                "Set %s=<csv> or run `discover --ats` to populate boards; "
+                "until then this crawler will be a no-op.",
+                self.source_slug,
+                self.boards_env_var or "<unset>",
+                len(db_slugs),
+                len(self.default_boards),
+                self.boards_env_var or "JC_*_BOARDS",
+            )
+        return merged

@@ -219,16 +219,16 @@ def test_format_salary_default_currency_period() -> None:
 
 @pytest.mark.asyncio
 async def test_send_message_skips_when_env_missing(monkeypatch: pytest.MonkeyPatch) -> None:
-    """No TELEGRAM_BOT_TOKEN env → silent no-op, returns False."""
+    """No TELEGRAM_BOT_TOKEN env → silent no-op, returns None."""
     monkeypatch.delenv("TELEGRAM_BOT_TOKEN", raising=False)
     monkeypatch.delenv("TELEGRAM_CHANNEL_ID", raising=False)
-    assert await send_message("hello") is False
+    assert await send_message("hello") is None
 
 
 @pytest.mark.asyncio
 async def test_send_message_swallows_transport_error(monkeypatch: pytest.MonkeyPatch) -> None:
     """A connection error from httpx must not propagate — alerter must
-    never crash the calling crawler."""
+    never crash the calling crawler. Failure is signalled by None."""
     monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "x:y")
     monkeypatch.setenv("TELEGRAM_CHANNEL_ID", "@test")
     monkeypatch.setenv("TELEGRAM_RATE_LIMIT_MS", "0")
@@ -239,13 +239,14 @@ async def test_send_message_swallows_transport_error(monkeypatch: pytest.MonkeyP
 
     monkeypatch.setattr(httpx.AsyncClient, "post", _boom)
     result = await send_message("hello")
-    assert result is False
+    assert result is None
 
 
 @pytest.mark.asyncio
-async def test_send_message_returns_true_on_ok(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Happy path — a 200 from Telegram returns True; inline_buttons
-    pass through as reply_markup."""
+async def test_send_message_returns_message_id_on_ok(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Happy path — a 200 from Telegram returns the message_id from
+    the JSON body's `result.message_id`. Inline_buttons pass through
+    as reply_markup."""
     monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "x:y")
     monkeypatch.setenv("TELEGRAM_CHANNEL_ID", "@test")
     monkeypatch.setenv("TELEGRAM_RATE_LIMIT_MS", "0")
@@ -254,13 +255,14 @@ async def test_send_message_returns_true_on_ok(monkeypatch: pytest.MonkeyPatch) 
     async def _ok(self: httpx.AsyncClient, url: str, **kwargs: object) -> httpx.Response:
         captured["url"] = url
         captured["json"] = kwargs.get("json")
-        return httpx.Response(200, json={"ok": True})
+        return httpx.Response(200, json={"ok": True, "result": {"message_id": 4242}})
 
     monkeypatch.setattr(httpx.AsyncClient, "post", _ok)
-    assert await send_message(
+    result = await send_message(
         "hello world",
         inline_buttons=[("👀 View", "https://example.invalid/x")],
-    ) is True
+    )
+    assert result == 4242
     assert "api.telegram.org/botx:y/sendMessage" in str(captured["url"])
     payload = captured["json"]
     assert isinstance(payload, dict)
@@ -275,7 +277,26 @@ async def test_send_message_returns_true_on_ok(monkeypatch: pytest.MonkeyPatch) 
 
 
 @pytest.mark.asyncio
-async def test_send_message_returns_false_on_4xx(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_send_message_falls_back_to_sentinel_on_missing_id(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """2xx body without a `result.message_id` returns -1 (sentinel:
+    sent but id unknown). Callers should treat any non-None return as
+    'sent'; the sentinel separates 'sent without id' from 'sent with id'
+    so the DB can store NULL rather than a fake id."""
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "x:y")
+    monkeypatch.setenv("TELEGRAM_CHANNEL_ID", "@test")
+    monkeypatch.setenv("TELEGRAM_RATE_LIMIT_MS", "0")
+
+    async def _ok_no_id(self: httpx.AsyncClient, *a: object, **kw: object) -> httpx.Response:
+        return httpx.Response(200, json={"ok": True})
+
+    monkeypatch.setattr(httpx.AsyncClient, "post", _ok_no_id)
+    assert await send_message("hello") == -1
+
+
+@pytest.mark.asyncio
+async def test_send_message_returns_none_on_4xx(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "x:y")
     monkeypatch.setenv("TELEGRAM_CHANNEL_ID", "@test")
     monkeypatch.setenv("TELEGRAM_RATE_LIMIT_MS", "0")
@@ -284,7 +305,7 @@ async def test_send_message_returns_false_on_4xx(monkeypatch: pytest.MonkeyPatch
         return httpx.Response(401, json={"ok": False, "description": "Unauthorized"})
 
     monkeypatch.setattr(httpx.AsyncClient, "post", _bad)
-    assert await send_message("hello") is False
+    assert await send_message("hello") is None
 
 
 # ---------------------------------------------------------------------------

@@ -31,6 +31,47 @@ class CrawlRepo(Repo):
         assert row is not None
         return CrawlRun.model_validate(row)
 
+    async def sweep_stale_runs(
+        self,
+        source_id: UUID,
+        *,
+        max_age_minutes: int,
+    ) -> int:
+        """Cancel any `running` crawl_runs row for this source older than
+        `max_age_minutes`. Returns the number of rows transitioned.
+
+        Why: a crawler process killed by OOM, systemd timeout, or an
+        uncaught exception that escaped the finally-block can leave its
+        `crawl_runs` row stuck on `status='running'` forever. Those
+        rows skew health gauges, accumulate forever, and break the
+        "current run" telemetry that ops dashboards depend on.
+
+        Called at the start of each new run for the SAME source — the
+        sweep is scoped to the source_id so two crawlers running in
+        parallel for different sources don't cancel each other's
+        legitimate in-flight runs. The age threshold MUST be greater
+        than the longest valid run for that source (otherwise the
+        sweep will cancel a still-healthy run).
+        """
+        rows = await self._fetchall(
+            """
+            UPDATE crawl_runs
+            SET status = 'cancelled',
+                finished_at = now(),
+                error_summary = COALESCE(
+                    error_summary,
+                    'cancelled by runner sweep: still running after '
+                    || %(m)s::int || ' minutes'
+                )
+            WHERE source_id = %(s)s
+              AND status = 'running'
+              AND started_at < now() - (%(m)s::int * INTERVAL '1 minute')
+            RETURNING id;
+            """,
+            {"s": source_id, "m": max_age_minutes},
+        )
+        return len(rows)
+
     async def finish_run(
         self,
         run_id: UUID,

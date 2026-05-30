@@ -73,12 +73,16 @@ async def send_message(
     parse_mode: str = "HTML",
     disable_web_page_preview: bool = True,
     inline_buttons: list[tuple[str, str]] | None = None,
-) -> bool:
+) -> int | None:
     """POST one message to the configured channel.
 
-    Returns True on a 2xx response from Telegram. Never raises —
-    the alerter must not break a crawl run on a Telegram outage,
-    bad token, or transient network failure.
+    Returns the Telegram `message_id` (an `int`, always truthy in
+    practice — Telegram never assigns id 0) on a 2xx response, or
+    `None` on any failure. Never raises — the alerter must not break a
+    crawl run on a Telegram outage, bad token, or transient network
+    failure. The return type is `int | None` so callers can still use
+    `if sent:` truthiness for "did it send" AND now also persist the
+    id for later edits / deletes (`telegram_broadcasts.message_id`).
 
     Caller is responsible for formatting `text`. When `parse_mode=HTML`,
     HTML-special chars in dynamic parts must already be escaped by the
@@ -94,7 +98,7 @@ async def send_message(
     channel = os.environ.get("TELEGRAM_CHANNEL_ID", "").strip()
     if not token or not channel:
         _LOG.info("TELEGRAM_BOT_TOKEN/CHANNEL_ID unset; skipping send")
-        return False
+        return None
 
     if len(text) > _MAX_BODY_CHARS:
         text = text[:_MAX_BODY_CHARS - 1] + "…"
@@ -129,14 +133,29 @@ async def send_message(
             resp = await client.post(url, json=payload)
     except httpx.HTTPError as exc:
         _LOG.warning("telegram send failed (transport): %s", exc)
-        return False
+        return None
     if resp.status_code >= 400:
         _LOG.warning(
             "telegram send failed (status=%d): %s",
             resp.status_code, resp.text[:300],
         )
-        return False
-    return True
+        return None
+    # Telegram's `sendMessage` response shape is `{ok: true, result: {message_id: N, ...}}`.
+    # Pull the id out so the broadcast ledger can persist it for future
+    # edits / deletes. On any shape surprise, fall back to a sentinel-id
+    # of -1 (still truthy) so callers can distinguish "sent but id
+    # unknown" from "did not send" (None).
+    try:
+        body = resp.json()
+    except ValueError:
+        _LOG.warning("telegram send returned non-JSON 2xx body; treating as sent")
+        return -1
+    result = body.get("result") if isinstance(body, dict) else None
+    if isinstance(result, dict):
+        msg_id = result.get("message_id")
+        if isinstance(msg_id, int):
+            return msg_id
+    return -1
 
 
 def _format_salary(

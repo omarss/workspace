@@ -100,14 +100,26 @@ def test_greenhouse_html_entity_in_text_is_decoded() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Wuzzuf required-field gate (Finding 12a)
+# Wuzzuf required-field gate (Finding 12a) — rebuilt for the
+# Emotion-CSS-in-JS layout that Wuzzuf rolled out in May 2026. The
+# detail page now hashes class names per-build, so the parser is
+# anchored on STRUCTURE (h1, /jobs/careers/ anchors, heading-walk for
+# the description body) instead of class selectors. The template below
+# mirrors that real-world DOM, including the noisy inline `<style>`
+# tags that surround every visible element.
 # ---------------------------------------------------------------------------
 _WUZZUF_DETAIL_TEMPLATE = """
 <html><body>
-  <h1>{title}</h1>
+  <style>.css-foo{{color:red;}}</style>
+  <h1 class="css-gkdl1m">{title}</h1>
+  <style>.css-p7pghv{{}}</style>
   {company_block}
-  <span data-test="job-location">Riyadh</span>
-  {body_block}
+  <strong>{company_text} - Riyadh, Saudi Arabia</strong>
+  <section>
+    <h2 class="css-19118j8">Job Description</h2>
+    <style>.css-n7fcne{{}}</style>
+    <div class="css-n7fcne">{body_block}</div>
+  </section>
 </body></html>
 """
 
@@ -123,11 +135,12 @@ def _wuzzuf(html: str) -> ParsedPosting | None:
 def test_wuzzuf_rejects_empty_description_and_company() -> None:
     """Wuzzuf detail pages that yield neither company nor body must NOT
     write a posting — Finding 12 documented 15/15 live rows missing both."""
-    html = _WUZZUF_DETAIL_TEMPLATE.format(
-        title="Performance Marketing Executive",
-        company_block="",
-        body_block="",
-    )
+    html = """
+    <html><body>
+      <style>.css-x{}</style>
+      <h1>Performance Marketing Executive</h1>
+    </body></html>
+    """
     parsed = _wuzzuf(html)
     assert parsed is None, (
         "parser should return None when company and description are absent"
@@ -135,18 +148,82 @@ def test_wuzzuf_rejects_empty_description_and_company() -> None:
 
 
 def test_wuzzuf_accepts_complete_card() -> None:
-    """Happy path: when company + body are present, parse succeeds."""
+    """Happy path: when company + body are present, parse succeeds.
+    Uses the new `/jobs/careers/<slug>` company-anchor + heading-walked
+    description body. Inline `<style>` tags must be stripped before
+    text extraction — otherwise selectolax leaks CSS rules into
+    `description` / `raw_company_name`."""
     html = _WUZZUF_DETAIL_TEMPLATE.format(
         title="Backend Engineer",
-        company_block='<a href="/jobs/at/acme">Acme Corp</a>',
-        body_block='<div data-test="job-details">We hire engineers who love Python.</div>',
+        company_text="Acme Corp",
+        company_block='<a class="css-p7pghv" href="/jobs/careers/acme-corp-12345">Acme Corp</a>',
+        body_block="We hire engineers who love Python.",
     )
     parsed = _wuzzuf(html)
     assert parsed is not None
     assert parsed.title == "Backend Engineer"
     assert parsed.raw_company_name == "Acme Corp"
+    assert parsed.raw_location == "Riyadh, Saudi Arabia"
     assert parsed.description is not None
     assert "Python" in parsed.description
+    # No CSS-rule leakage from inline <style> tags
+    assert "css-" not in (parsed.description or "")
+    assert "css-" not in (parsed.raw_company_name or "")
+
+
+def test_wuzzuf_skips_browse_all_jobs_anchor() -> None:
+    """Detail page wraps each section with multiple /jobs/careers/<slug>
+    anchors — the genuine company name, then nav anchors like
+    'Browse all jobs at X' / 'تصفّح جميع الوظائف في X'. Parser must
+    return the first REAL company anchor, not the nav text."""
+    html = """
+    <html><body>
+      <h1>Sales Lead</h1>
+      <a class="css-tdvcnh" href="/jobs/careers/acme-12345">Acme Holdings</a>
+      <a class="css-1gj5c6y" href="/jobs/careers/acme-12345">Browse all jobs at Acme Holdings</a>
+      <strong>Acme Holdings - Jeddah, Saudi Arabia</strong>
+      <section>
+        <h2>Job Description</h2>
+        <div>Drive revenue across the Gulf region.</div>
+      </section>
+    </body></html>
+    """
+    parsed = _wuzzuf(html)
+    assert parsed is not None
+    assert parsed.raw_company_name == "Acme Holdings"
+    assert parsed.raw_location == "Jeddah, Saudi Arabia"
+
+
+def test_wuzzuf_extracts_arabic_body_after_heading() -> None:
+    """The detail page is served in Arabic by default. Heading-walk
+    must find `وصف الوظيفة` and lift its body even when the parent
+    section also carries leftover Emotion `<style>` tags. Regression
+    against the live HTML that broke the parser on 27-May-2026."""
+    html = """
+    <html><body>
+      <h1>مندوب مبيعات</h1>
+      <a class="css-p7pghv" href="/jobs/careers/shrk-145">شركة معارض ومؤتمرات</a>
+      <strong>شركة معارض ومؤتمرات-الرياض, المملكة العربية السعودية</strong>
+      <section>
+        <h2 class="css-19118j8">وصف الوظيفة</h2>
+        <style>.css-n7fcne{}</style>
+        <div class="css-n7fcne">وظيفة شاغرة من مصر الى المملكة. مندوب مبيعات ذو خبرة.</div>
+        <h2 class="css-19118j8">متطلبات الوظيفة</h2>
+        <div>العمر من 25 الى 35.</div>
+      </section>
+    </body></html>
+    """
+    parsed = _wuzzuf(html)
+    assert parsed is not None
+    assert parsed.title == "مندوب مبيعات"
+    assert parsed.raw_company_name == "شركة معارض ومؤتمرات"
+    # Both body sections concatenated
+    desc = parsed.description or ""
+    assert "وظيفة شاغرة" in desc
+    assert "25 الى 35" in desc
+    # Location stripped of the company prefix
+    assert parsed.raw_location is not None
+    assert parsed.raw_location.startswith("الرياض")
 
 
 # ---------------------------------------------------------------------------

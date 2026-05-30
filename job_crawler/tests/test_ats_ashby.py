@@ -26,7 +26,10 @@ def _crawler() -> AshbyCrawler:
     return c
 
 
-def _make_raw(job_overrides: dict | None = None, board_slug: str = "linear") -> RawPosting:
+def _make_raw(
+    job_overrides: dict[str, object] | None = None,
+    board_slug: str = "linear",
+) -> RawPosting:
     """Build a RawPosting wrapping a synthetic Ashby job payload."""
     base = {
         "id": "abc-123",

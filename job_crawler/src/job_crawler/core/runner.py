@@ -49,6 +49,29 @@ _LOG: Final = logging.getLogger("job_crawler.runner")
 _DEFAULT_FRESH_HOURS: Final = 6
 
 
+# Cap on how long a `crawl_runs` row may stay in `status='running'`
+# before the next run for the same source sweeps it to `cancelled`.
+# Must exceed the longest legitimate run for any source. The hourly
+# systemd unit's TimeoutStartSec is 90 minutes; company_careers is
+# scheduled every 4 hours but each run can also be long. 240 minutes
+# (4 hours) is a safe ceiling that still cleans up week-old zombies.
+_DEFAULT_STALE_RUN_MINUTES: Final = 240
+
+
+def _stale_run_minutes() -> int:
+    """Read JC_STALE_RUN_MINUTES with a sane fallback. Negative or
+    unparseable values clamp to the default — the sweep MUST NOT cancel
+    legitimate in-flight runs."""
+    raw = os.environ.get("JC_STALE_RUN_MINUTES")
+    if raw is None:
+        return _DEFAULT_STALE_RUN_MINUTES
+    try:
+        parsed = int(raw)
+    except ValueError:
+        return _DEFAULT_STALE_RUN_MINUTES
+    return parsed if parsed > 0 else _DEFAULT_STALE_RUN_MINUTES
+
+
 def _get_fresh_hours() -> int:
     """Read JC_LISTING_FRESH_HOURS from env with a sane fallback.
 
@@ -119,6 +142,24 @@ class CrawlerRunner:
         new `crawl_runs` rows for forensics.
         """
         source_id = await self.ensure_source()
+
+        # Sweep any leftover `running` rows for THIS source whose age
+        # exceeds the configured run cap. A crawler killed by OOM,
+        # systemd timeout, or an uncaught exception in a non-finally
+        # path leaves its `crawl_runs` row stuck on `status='running'`
+        # forever; the sweep transitions those to `cancelled` so health
+        # gauges and "current run" telemetry stay honest. Scoped to
+        # source_id so two concurrent runners on different sources
+        # don't step on each other's legitimate runs.
+        stale_cap = _stale_run_minutes()
+        cancelled = await self.db.crawl.sweep_stale_runs(
+            source_id, max_age_minutes=stale_cap,
+        )
+        if cancelled:
+            _LOG.warning(
+                "swept %d stale running run(s) older than %dm for source=%s",
+                cancelled, stale_cap, self.crawler.source_slug,
+            )
 
         run = await self.db.crawl.start_run(
             source_id,
@@ -526,22 +567,49 @@ class CrawlerRunner:
         config → silent no-op via `send_message`.
         """
         # --- Quality gates ------------------------------------------------
+        # Each gate failure is logged at INFO with a short reason code so
+        # operators can answer "why didn't this post hit the channel?"
+        # without writing a 30-line CTE against the live DB. The
+        # `posting_id` is included so the log line can be cross-referenced
+        # with `job_postings`.
         country = (parsed.country_code or "").lower()
         if country != "sa":
+            _LOG.info(
+                "telegram-gate: posting=%s skipped reason=non_sa country=%r",
+                posting_id, country or "?",
+            )
             return
         if not parsed.title:
+            _LOG.info("telegram-gate: posting=%s skipped reason=empty_title", posting_id)
             return
 
         posting = await self.db.postings.get(posting_id)
         if posting is None:
+            _LOG.info("telegram-gate: posting=%s skipped reason=posting_missing", posting_id)
             return
         if posting.cluster_job_id is None:
-            return  # create_from_posting failed earlier
+            _LOG.info(
+                "telegram-gate: posting=%s skipped reason=no_cluster", posting_id,
+            )
+            return
         if company_id is None:
-            return  # require resolved company entity
+            _LOG.info(
+                "telegram-gate: posting=%s skipped reason=no_company raw=%r",
+                posting_id, (parsed.raw_company_name or "")[:60],
+            )
+            return
         if posting.city_id is None:
-            return  # require resolved city
-        if (posting.description or "").strip().__len__() < 300:
+            _LOG.info(
+                "telegram-gate: posting=%s skipped reason=no_city raw_loc=%r",
+                posting_id, (parsed.raw_location or "")[:60],
+            )
+            return
+        desc_len = len((posting.description or "").strip())
+        if desc_len < 300:
+            _LOG.info(
+                "telegram-gate: posting=%s skipped reason=desc_short len=%d",
+                posting_id, desc_len,
+            )
             return
         # Require a clear date for subscribers. `posted_at` is the
         # canonical signal (board's listing creation date) — we prefer
@@ -561,6 +629,10 @@ class CrawlerRunner:
                 else posting.first_seen_at.replace(tzinfo=UTC)
             )
             if seen_ts < datetime.now(UTC) - timedelta(hours=48):
+                _LOG.info(
+                    "telegram-gate: posting=%s skipped reason=stale_no_posted seen=%s",
+                    posting_id, seen_ts.isoformat(),
+                )
                 return
             display_date = seen_ts
 
@@ -571,6 +643,10 @@ class CrawlerRunner:
                 {"j": posting.cluster_job_id},
             )
             if await cur.fetchone() is not None:
+                _LOG.info(
+                    "telegram-gate: posting=%s skipped reason=already_broadcast cluster=%s",
+                    posting_id, posting.cluster_job_id,
+                )
                 return  # already posted
 
         # --- Resolve display names (single-row indexed lookups) -----------
@@ -605,24 +681,39 @@ class CrawlerRunner:
             ),
             url=parsed.canonical_url,
         )
-        sent = await send_message(body, inline_buttons=buttons)
-        if sent:
+        sent_message_id = await send_message(body, inline_buttons=buttons)
+        if sent_message_id is not None:
             # Record successful broadcast so future runs / re-fetches
             # don't repost. INSERT ... ON CONFLICT DO NOTHING in case
             # a concurrent broadcaster won the race (k3s CronJob's
             # concurrencyPolicy=Forbid prevents this, but defend
-            # anyway).
+            # anyway). The `message_id` is persisted so a future
+            # edit/delete pipeline can address the original message —
+            # the column has existed (nullable) since v1, but nothing
+            # was writing to it before.
             from os import environ
             chat_id = environ.get("TELEGRAM_CHANNEL_ID", "").strip()
+            # send_message returns -1 as a sentinel for "sent but id
+            # unavailable" (non-JSON or unexpected shape). Store NULL in
+            # that case so the column's semantics stay clean.
+            persisted_id = sent_message_id if sent_message_id >= 0 else None
             async with self.db.pool.connection() as conn, conn.cursor() as cur:
                 await cur.execute(
                     """
-                    INSERT INTO telegram_broadcasts (job_id, chat_id)
-                    VALUES (%(j)s, %(c)s)
+                    INSERT INTO telegram_broadcasts (job_id, chat_id, message_id)
+                    VALUES (%(j)s, %(c)s, %(m)s)
                     ON CONFLICT (job_id) DO NOTHING;
                     """,
-                    {"j": posting.cluster_job_id, "c": chat_id},
+                    {
+                        "j": posting.cluster_job_id,
+                        "c": chat_id,
+                        "m": persisted_id,
+                    },
                 )
+            _LOG.info(
+                "telegram-broadcast: posting=%s cluster=%s message_id=%s",
+                posting_id, posting.cluster_job_id, persisted_id,
+            )
 
 
 # Keep the imports alive for downstream code-completion. Each goes
