@@ -56,6 +56,19 @@ _ABBREV: Final[dict[str, str]] = {
     "aml": "AML",
 }
 
+# Short abbreviations that collide with ordinary English / French / Arabic
+# words or units. Expanding these case-insensitively corrupts real titles:
+# "Chef de Cuisine" -> "Chef Data Engineer Cuisine", "Roles to be filled"
+# -> "Roles to Backend filled", "500 ml" -> "500 Machine Learning". For
+# these tokens we ONLY expand when the source token is written in
+# uppercase (e.g. "Senior DE", "SE II") — a genuine abbreviation in a job
+# title is virtually always upper-cased, whereas the colliding words are
+# lower-case. Multi-letter unambiguous abbreviations (swe, sdet, devops,
+# hrbp, ...) stay case-insensitive.
+_AMBIGUOUS_REQUIRES_UPPER: Final[frozenset[str]] = frozenset(
+    {"se", "de", "be", "fe", "ds", "ba", "em", "ml", "ai", "pm", "ui", "ux"}
+)
+
 _TOKEN_RE: Final[re.Pattern[str]] = re.compile(r"\b[\w.&-]+\b")
 
 
@@ -76,6 +89,11 @@ def normalize_title(title: str | None) -> str | None:
         if low in _SENIORITY:
             return _SENIORITY[low]
         if low in _ABBREV:
+            # Collision-prone short abbreviations only expand when the
+            # original token is uppercase — protects ordinary words like
+            # the French "de" in "Chef de Cuisine".
+            if low in _AMBIGUOUS_REQUIRES_UPPER and not tok.isupper():
+                return tok
             return _ABBREV[low]
         return tok
 
