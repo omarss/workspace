@@ -4,6 +4,7 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.pm.PackageManager
+import android.location.Location
 import android.os.Looper
 import androidx.core.content.ContextCompat
 import com.google.android.gms.location.LocationCallback
@@ -128,10 +129,28 @@ class SpeedRepository @Inject constructor(
         val currentIntervalMs = longArrayOf(FAST_INTERVAL_MS)
         val lastMoveAtMs = longArrayOf(System.currentTimeMillis())
         val installedCallback = arrayOfNulls<LocationCallback>(1)
+        // Last fix we saw, used to detect motion by displacement. Idle
+        // mode runs on BALANCED_POWER fixes which usually carry no Doppler
+        // speed, so the speed gate alone can't promote us back — distance
+        // moved is the only signal available there.
+        val lastFix = arrayOfNulls<Location>(1)
 
         fun install(intervalMs: Long) {
             installedCallback[0]?.let { client.removeLocationUpdates(it) }
-            val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, intervalMs)
+            // Idle (slow) mode deliberately drops OFF the GPS radio:
+            // BALANCED_POWER answers from wifi/cell at roughly a tenth of
+            // the draw. A parked phone on a desk used to hold a
+            // HIGH_ACCURACY lock at SLOW_INTERVAL_MS forever (~60 mAh/h
+            // with the screen off). We don't need a metre-accurate fix to
+            // notice the user started driving again — the first coarse fix
+            // that shows displacement promotes us straight back to
+            // HIGH_ACCURACY @ FAST_INTERVAL_MS below.
+            val priority = if (intervalMs >= SLOW_INTERVAL_MS) {
+                Priority.PRIORITY_BALANCED_POWER_ACCURACY
+            } else {
+                Priority.PRIORITY_HIGH_ACCURACY
+            }
+            val request = LocationRequest.Builder(priority, intervalMs)
                 .setMinUpdateIntervalMillis(intervalMs / 2)
                 .setWaitForAccurateLocation(false)
                 .build()
@@ -194,7 +213,15 @@ class SpeedRepository @Inject constructor(
                     trySend(snapshot)
 
                     val now = System.currentTimeMillis()
-                    if (snapshot.speedMps >= MOVING_THRESHOLD_MPS) {
+                    // Motion = a trusted speed above threshold OR enough
+                    // displacement since the last fix. The displacement arm
+                    // is what wakes us out of idle: BALANCED_POWER fixes
+                    // routinely arrive with no speed, so without it the
+                    // tracker would stay stuck in slow mode once parked.
+                    val movedFar =
+                        (lastFix[0]?.distanceTo(location) ?: 0f) >= MOVE_DISTANCE_M
+                    lastFix[0] = location
+                    if (snapshot.speedMps >= MOVING_THRESHOLD_MPS || movedFar) {
                         lastMoveAtMs[0] = now
                     }
                     val idleForMs = now - lastMoveAtMs[0]
@@ -247,6 +274,13 @@ class SpeedRepository @Inject constructor(
         // No movement for this long → drop to slow mode. First real
         // sample above the threshold promotes us back immediately.
         const val IDLE_TIMEOUT_MS: Long = 60_000L
+
+        // Displacement between two fixes that counts as movement while in
+        // idle/BALANCED_POWER mode (where Doppler speed is absent). 25 m is
+        // comfortably above BALANCED_POWER's wifi/cell accuracy jitter, so a
+        // stationary phone won't false-promote, but pulling out of a parking
+        // spot will.
+        const val MOVE_DISTANCE_M: Float = 25f
 
         // Largest speed delta one sample-to-the-next we'll accept.
         // Chosen above what any street-legal car can physically produce
