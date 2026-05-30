@@ -36,6 +36,7 @@ Run via:
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import Final
@@ -45,7 +46,82 @@ from psycopg.rows import dict_row
 
 from job_crawler_db import DuplicateReason, JobCrawlerDB
 
+from .title_norm import normalize_title
+
 _LOG: Final = logging.getLogger("job_crawler.intelligence.dedup")
+
+
+# ---------------------------------------------------------------------------
+# Content-token guard — defends against trigram over-merging
+# ---------------------------------------------------------------------------
+#
+# Trigram title similarity alone CANNOT separate true duplicates from
+# distinct-but-templated roles (measured on live data: false merges land
+# 0.64-0.78, true rewordings 0.68-0.92 — fully overlapping). Boilerplate-
+# heavy titles like "Service Associate - Carpenter" vs
+# "Service Associate - Service Center" (sim 0.77), or
+# "Associate Accountant - Builders Program" vs
+# "Compliance Associate - Builders Program" (sim 0.67), clear the 0.60
+# floor and get wrongly merged — hiding genuinely distinct jobs from
+# search and the Telegram feed.
+#
+# The fix: trigram stays as a cheap candidate generator, but the actual
+# merge decision compares the *core content tokens* of the two titles.
+# Two titles are the same role only when their content-token SETS are
+# equal. Seniority words are kept (and canonicalised via normalize_title,
+# so "Sr" == "Senior"), because "Sales Executive" and "Senior Sales
+# Executive" are different roles. Pure noise — connective stopwords,
+# level markers (roman numerals / "Level N"), and internal job codes
+# (alphanumeric tokens containing a digit, e.g. "B2B011") — is dropped so
+# it never blocks a genuine duplicate.
+
+# Connectives + structural words that carry no role meaning.
+_STOPWORDS: Final[frozenset[str]] = frozenset(
+    {"and", "or", "of", "the", "to", "for", "in", "at", "a", "an", "with", "&"}
+)
+
+# Level markers stripped so "Engineer II" == "Engineer". Roman numerals
+# i-v plus "level"; ordinals like "2nd" are dropped by the digit rule below.
+_LEVEL_TOKENS: Final[frozenset[str]] = frozenset(
+    {"i", "ii", "iii", "iv", "v", "level", "l1", "l2", "l3", "l4", "l5"}
+)
+
+_WORD_RE: Final[re.Pattern[str]] = re.compile(r"[a-z0-9]+")
+
+
+def _core_role_tokens(title: str | None) -> frozenset[str]:
+    """Reduce a title to its set of meaningful role tokens.
+
+    Pipeline: seniority-abbreviation expansion (via `normalize_title`,
+    so "Sr" → "Senior"), lowercase, tokenise on alphanumerics, then drop
+    stopwords, level markers, and internal job codes (tokens containing a
+    digit). Returns a frozenset — order and repetition don't matter for
+    "is this the same role?".
+    """
+    normalised = normalize_title(title) or (title or "")
+    tokens: set[str] = set()
+    for tok in _WORD_RE.findall(normalised.lower()):
+        if tok in _STOPWORDS or tok in _LEVEL_TOKENS:
+            continue
+        if any(ch.isdigit() for ch in tok):
+            # Internal req codes ("b2b011"), ordinals ("2nd"), etc.
+            continue
+        tokens.add(tok)
+    return frozenset(tokens)
+
+
+def _same_core_role(title_a: str | None, title_b: str | None) -> bool:
+    """True when two titles describe the same role.
+
+    Same role iff their core-token sets are equal AND non-empty. An empty
+    set on either side (e.g. a title that was nothing but a job code)
+    cannot be confidently matched, so we refuse the merge — biasing
+    towards keeping distinct postings separate (zero tolerance for hiding
+    a real job).
+    """
+    a = _core_role_tokens(title_a)
+    b = _core_role_tokens(title_b)
+    return bool(a) and a == b
 
 
 @dataclass(slots=True)
@@ -111,6 +187,8 @@ async def _dedupe_by_title_company_loc(
                        b.id              AS b_id,
                        a.cluster_job_id  AS a_cluster,
                        b.cluster_job_id  AS b_cluster,
+                       a.title           AS a_title,
+                       b.title           AS b_title,
                        similarity(normalize_text(a.title), normalize_text(b.title)) AS sim
                 FROM   job_postings a
                 JOIN   job_postings b
@@ -123,7 +201,7 @@ async def _dedupe_by_title_company_loc(
                   AND  b.cluster_job_id IS NOT NULL
                   AND  normalize_text(a.title) %% normalize_text(b.title)
             )
-            SELECT a_id, b_id, a_cluster, b_cluster, sim
+            SELECT a_id, b_id, a_cluster, b_cluster, a_title, b_title, sim
             FROM   pairs
             WHERE  sim >= %(thr)s
             ORDER  BY sim DESC;
@@ -134,6 +212,16 @@ async def _dedupe_by_title_company_loc(
 
     for row in pairs:
         summary.pairs_considered += 1
+        # Trigram cleared the cheap pre-filter; the content-token guard is
+        # the authoritative decision. Distinct-but-templated titles
+        # (e.g. "Service Associate - Carpenter" vs "...- Service Center")
+        # are rejected here so they stay separate jobs.
+        if not _same_core_role(row["a_title"], row["b_title"]):
+            _LOG.debug(
+                "dedup: skip over-merge %r ↔ %r (sim=%.2f, core tokens differ)",
+                row["a_title"], row["b_title"], row["sim"],
+            )
+            continue
         # Record the edge regardless of whether merging is possible.
         try:
             await db.dedupe.add_edge(
@@ -181,6 +269,8 @@ async def _dedupe_by_title_company_city_loose(
                        b.id              AS b_id,
                        a.cluster_job_id  AS a_cluster,
                        b.cluster_job_id  AS b_cluster,
+                       a.title           AS a_title,
+                       b.title           AS b_title,
                        similarity(normalize_text(a.title), normalize_text(b.title)) AS sim
                 FROM   job_postings a
                 JOIN   job_postings b
@@ -196,7 +286,7 @@ async def _dedupe_by_title_company_city_loose(
                   AND  b.cluster_job_id IS NOT NULL
                   AND  normalize_text(a.title) %% normalize_text(b.title)
             )
-            SELECT a_id, b_id, a_cluster, b_cluster, sim
+            SELECT a_id, b_id, a_cluster, b_cluster, a_title, b_title, sim
             FROM   pairs
             WHERE  sim >= %(thr)s
             ORDER  BY sim DESC;
@@ -207,6 +297,14 @@ async def _dedupe_by_title_company_city_loose(
 
     for row in pairs:
         summary.pairs_considered += 1
+        # Same content-token guard as stage 2 — the looser geo filter here
+        # makes over-merge protection even more important.
+        if not _same_core_role(row["a_title"], row["b_title"]):
+            _LOG.debug(
+                "dedup(loose): skip over-merge %r ↔ %r (sim=%.2f, core tokens differ)",
+                row["a_title"], row["b_title"], row["sim"],
+            )
+            continue
         try:
             await db.dedupe.add_edge(
                 row["a_id"], row["b_id"],

@@ -145,6 +145,16 @@ WHERE j.city_id IS NOT NULL \
   AND (j.country_code IS DISTINCT FROM c.country_code \
        OR (c.region_code IS NOT NULL AND j.region_code IS DISTINCT FROM c.region_code));"
 
+repair-data-dryrun:  ## Show title-corruption + over-merge repairs (read-only). Run AFTER deploy.
+	$(call _load_env)
+	@set -a; . ./.env; set +a; export JCDB_DSN; \
+		uv run python -m scripts.repair_crawler_data
+
+repair-data:  ## Apply title-corruption + over-merge repairs. MUST run AFTER the fix is deployed.
+	$(call _load_env)
+	@set -a; . ./.env; set +a; export JCDB_DSN; \
+		uv run python -m scripts.repair_crawler_data --apply
+
 db-backup:  ## pg_dump custom format to ./backups/YYYYMMDD-HHMM.dump
 	$(call _load_env)
 	@mkdir -p backups
