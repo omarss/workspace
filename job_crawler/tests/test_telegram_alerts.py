@@ -309,6 +309,157 @@ async def test_send_message_returns_none_on_4xx(monkeypatch: pytest.MonkeyPatch)
 
 
 # ---------------------------------------------------------------------------
+# 429 backoff — respect `parameters.retry_after` and retry once
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_send_message_retries_once_after_429(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """First 429 → sleep `retry_after` seconds, then retry once. The
+    retry succeeds → return the new message_id. Verifies we honour the
+    server's pacing instead of giving up the first time the channel
+    saturates."""
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "x:y")
+    monkeypatch.setenv("TELEGRAM_CHANNEL_ID", "@test")
+    monkeypatch.setenv("TELEGRAM_RATE_LIMIT_MS", "0")
+
+    calls: list[float] = []
+
+    async def _fake_sleep(seconds: float) -> None:
+        calls.append(seconds)
+
+    monkeypatch.setattr("asyncio.sleep", _fake_sleep)
+
+    call_count = {"n": 0}
+
+    async def _flaky(self: httpx.AsyncClient, *a: object, **kw: object) -> httpx.Response:
+        call_count["n"] += 1
+        if call_count["n"] == 1:
+            return httpx.Response(
+                429,
+                json={
+                    "ok": False,
+                    "error_code": 429,
+                    "description": "Too Many Requests: retry after 7",
+                    "parameters": {"retry_after": 7},
+                },
+            )
+        return httpx.Response(200, json={"ok": True, "result": {"message_id": 999}})
+
+    monkeypatch.setattr(httpx.AsyncClient, "post", _flaky)
+    result = await send_message("hello")
+    assert result == 999
+    assert call_count["n"] == 2
+    # The retry slept for 7 + 1 buffer = 8 seconds
+    assert 8 in [round(s) for s in calls]
+
+
+@pytest.mark.asyncio
+async def test_send_message_gives_up_on_second_429(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Two consecutive 429s → return None. The channel is genuinely
+    saturated; the next crawl cycle's broadcaster will retry from
+    scratch (dedup ledger prevents double-post)."""
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "x:y")
+    monkeypatch.setenv("TELEGRAM_CHANNEL_ID", "@test")
+    monkeypatch.setenv("TELEGRAM_RATE_LIMIT_MS", "0")
+
+    async def _fake_sleep(seconds: float) -> None:
+        pass
+
+    monkeypatch.setattr("asyncio.sleep", _fake_sleep)
+
+    async def _always_429(self: httpx.AsyncClient, *a: object, **kw: object) -> httpx.Response:
+        return httpx.Response(
+            429,
+            json={
+                "ok": False,
+                "error_code": 429,
+                "description": "Too Many Requests: retry after 13",
+                "parameters": {"retry_after": 13},
+            },
+        )
+
+    monkeypatch.setattr(httpx.AsyncClient, "post", _always_429)
+    assert await send_message("hello") is None
+
+
+@pytest.mark.asyncio
+async def test_send_message_429_with_missing_retry_after_uses_default(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """If the 429 body lacks `parameters.retry_after`, fall back to a
+    30-second sleep — Telegram's documented minimum."""
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "x:y")
+    monkeypatch.setenv("TELEGRAM_CHANNEL_ID", "@test")
+    monkeypatch.setenv("TELEGRAM_RATE_LIMIT_MS", "0")
+
+    sleeps: list[float] = []
+
+    async def _fake_sleep(seconds: float) -> None:
+        sleeps.append(seconds)
+
+    monkeypatch.setattr("asyncio.sleep", _fake_sleep)
+
+    call_count = {"n": 0}
+
+    async def _429_then_ok(
+        self: httpx.AsyncClient, *a: object, **kw: object,
+    ) -> httpx.Response:
+        call_count["n"] += 1
+        if call_count["n"] == 1:
+            return httpx.Response(429, json={"ok": False, "description": "TMR"})
+        return httpx.Response(200, json={"ok": True, "result": {"message_id": 1}})
+
+    monkeypatch.setattr(httpx.AsyncClient, "post", _429_then_ok)
+    assert await send_message("hello") == 1
+    # Default 30s + 1s buffer
+    assert any(s >= 30 for s in sleeps)
+
+
+@pytest.mark.asyncio
+async def test_send_message_clamps_huge_retry_after(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An absurd `retry_after` value (Telegram occasionally returns
+    >hour) is clamped to `_MAX_RETRY_AFTER_SECONDS` so the run can't
+    hang for an hour on a single bad reply."""
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "x:y")
+    monkeypatch.setenv("TELEGRAM_CHANNEL_ID", "@test")
+    monkeypatch.setenv("TELEGRAM_RATE_LIMIT_MS", "0")
+
+    sleeps: list[float] = []
+
+    async def _fake_sleep(seconds: float) -> None:
+        sleeps.append(seconds)
+
+    monkeypatch.setattr("asyncio.sleep", _fake_sleep)
+
+    call_count = {"n": 0}
+
+    async def _abuse(self: httpx.AsyncClient, *a: object, **kw: object) -> httpx.Response:
+        call_count["n"] += 1
+        if call_count["n"] == 1:
+            return httpx.Response(
+                429,
+                json={
+                    "ok": False,
+                    "description": "TMR",
+                    "parameters": {"retry_after": 999999},
+                },
+            )
+        return httpx.Response(200, json={"ok": True, "result": {"message_id": 2}})
+
+    monkeypatch.setattr(httpx.AsyncClient, "post", _abuse)
+    assert await send_message("hello") == 2
+    # Clamped to 120s ceiling + 1s buffer
+    assert max(sleeps) <= 121
+
+
+# ---------------------------------------------------------------------------
 # v3 polish — trim trailing anchors + sentence-boundary truncation
 # ---------------------------------------------------------------------------
 

@@ -40,16 +40,28 @@ SalaryNum = Decimal | float | int
 
 _LOG: Final = logging.getLogger("job_crawler.alerts.telegram")
 
-# Telegram caps channel sends at ~30/sec and per-chat at 1/sec. Stay
-# well under both by spacing sends ~350ms apart (~3/sec). A single run
-# producing 50 new jobs (the typical `--max-alerts` cap) finishes in
-# ~17 seconds of background trickle.
-_DEFAULT_RATE_LIMIT_MS: Final = 350
+# Telegram caps channel sends at ~30/sec globally but channels enforce
+# a much tighter ~20 messages-per-minute ceiling before triggering 429
+# "Too Many Requests" with a `retry_after` between 13 and 35 seconds.
+# Live observation during PR #86 rollout: a 350ms gate (~3/sec) saturates
+# the bucket within ~10 sends and then chokes on retry-afters for ~30s
+# at a time, leaving most of the backlog undelivered. Default raised to
+# 3000ms (~20/min) which is the empirical sustainable channel rate.
+# Override with TELEGRAM_RATE_LIMIT_MS for tighter / looser per-deploy.
+_DEFAULT_RATE_LIMIT_MS: Final = 3000
 _LAST_SEND_TS: float = 0.0
 
 # Telegram message body cap — anything longer is rejected. We
 # truncate well below the limit because emoji + HTML escapes inflate.
 _MAX_BODY_CHARS: Final = 3800
+
+# On a 429 we respect the server-supplied `parameters.retry_after`
+# (seconds) plus a small jitter buffer, then retry ONCE. A second 429
+# means the channel is genuinely saturated — drop the message so the
+# caller can move on; the next crawl cycle will re-attempt (the
+# broadcaster's `INSERT ON CONFLICT DO NOTHING` ledger keeps idempotency).
+_RETRY_BUFFER_SECONDS: Final[float] = 1.0
+_MAX_RETRY_AFTER_SECONDS: Final[int] = 120  # ignore absurd server values
 
 
 def _rate_limit_ms() -> int:
@@ -65,6 +77,26 @@ def _rate_limit_ms() -> int:
             raw, _DEFAULT_RATE_LIMIT_MS,
         )
         return _DEFAULT_RATE_LIMIT_MS
+
+
+def _retry_after_seconds(resp_body_text: str) -> int | None:
+    """Pull `parameters.retry_after` (int seconds) from a Telegram 429
+    response. Returns None if the body isn't a Telegram error envelope
+    or doesn't carry a retry_after. Clamps to `_MAX_RETRY_AFTER_SECONDS`
+    so a malformed server reply can't stall a run for hours."""
+    try:
+        body = httpx.Response(200, text=resp_body_text).json()
+    except ValueError:
+        return None
+    if not isinstance(body, dict):
+        return None
+    params = body.get("parameters")
+    if not isinstance(params, dict):
+        return None
+    raw = params.get("retry_after")
+    if not isinstance(raw, int) or raw <= 0:
+        return None
+    return min(raw, _MAX_RETRY_AFTER_SECONDS)
 
 
 async def send_message(
@@ -103,8 +135,8 @@ async def send_message(
     if len(text) > _MAX_BODY_CHARS:
         text = text[:_MAX_BODY_CHARS - 1] + "…"
 
-    # Per-process rate limit. `asyncio.sleep` instead of `time.sleep`
-    # so concurrent senders share the budget cleanly.
+    # Per-process steady-state rate limit. `asyncio.sleep` instead of
+    # `time.sleep` so concurrent senders share the budget cleanly.
     global _LAST_SEND_TS
     gap = _rate_limit_ms() / 1000.0
     now = time.monotonic()
@@ -128,18 +160,44 @@ async def send_message(
                 [{"text": label, "url": btn_url} for label, btn_url in inline_buttons]
             ]
         }
-    try:
-        async with httpx.AsyncClient(timeout=15.0) as client:
-            resp = await client.post(url, json=payload)
-    except httpx.HTTPError as exc:
-        _LOG.warning("telegram send failed (transport): %s", exc)
-        return None
-    if resp.status_code >= 400:
-        _LOG.warning(
-            "telegram send failed (status=%d): %s",
-            resp.status_code, resp.text[:300],
-        )
-        return None
+
+    # Two attempts: the first one and one 429-respect retry. If the
+    # second attempt also 429s the channel is genuinely saturated —
+    # drop the message and let the next crawl cycle re-broadcast
+    # (the `telegram_broadcasts` ON CONFLICT DO NOTHING ledger keeps
+    # idempotency).
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        for attempt in (1, 2):
+            try:
+                resp = await client.post(url, json=payload)
+            except httpx.HTTPError as exc:
+                _LOG.warning("telegram send failed (transport): %s", exc)
+                return None
+            if resp.status_code == 429 and attempt == 1:
+                retry_after = _retry_after_seconds(resp.text) or 30
+                _LOG.warning(
+                    "telegram 429: sleeping %ds then retrying once",
+                    retry_after,
+                )
+                await asyncio.sleep(retry_after + _RETRY_BUFFER_SECONDS)
+                # Reset the steady-state pacing clock so the retry
+                # doesn't double-sleep on the per-process gate.
+                _LAST_SEND_TS = time.monotonic()
+                continue
+            if resp.status_code >= 400:
+                _LOG.warning(
+                    "telegram send failed (status=%d): %s",
+                    resp.status_code, resp.text[:300],
+                )
+                return None
+            break
+        else:
+            # for/else: both attempts exhausted without break (i.e.
+            # the second attempt's 429 path didn't fall through to
+            # the body parser). Defensive — the loop above always
+            # `break`s on success or `return`s on error.
+            return None  # pragma: no cover
+
     # Telegram's `sendMessage` response shape is `{ok: true, result: {message_id: N, ...}}`.
     # Pull the id out so the broadcast ledger can persist it for future
     # edits / deletes. On any shape surprise, fall back to a sentinel-id
