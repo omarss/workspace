@@ -78,6 +78,9 @@ schema-check:  ## Validate db_schema.sql against a throwaway postgres:18-alpine
 capture-linkedin-cookie:  ## Launch Chromium, log in by hand, capture cookie into .env::JC_LINKEDIN_COOKIE
 	uv run python -m job_crawler.cli.capture_linkedin_cookie
 
+capture-indeed-cookie:  ## Launch Chromium, solve Cloudflare by hand, capture cookie into .env::JC_INDEED_COOKIE
+	uv run python -m job_crawler.cli.capture_indeed_cookie
+
 # ---------------------------------------------------------------------------
 # Local API (development)
 # ---------------------------------------------------------------------------

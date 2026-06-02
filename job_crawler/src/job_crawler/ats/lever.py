@@ -47,7 +47,12 @@ class LeverCrawler(ATSBoardCrawler):
         "https://api.lever.co/v0/postings/lever?mode=json",
     )
     boards_env_var: ClassVar[str] = "JC_LEVER_BOARDS"
-    default_boards: ClassVar[tuple[str, ...]] = ()  # seed via env
+    # Seeded SA-relevant Lever boards. Add more via JC_LEVER_BOARDS env or
+    # `discover --ats`. Probed via `curl https://api.lever.co/v0/postings/{slug}?mode=json`;
+    # only include slugs returning a non-empty list with at least one SA-tagged role.
+    default_boards: ClassVar[tuple[str, ...]] = (
+        "soum",          # Soum (Riyadh, recommerce marketplace) — 4 SA roles at probe time
+    )
 
     async def discover_listings(self, *, since: datetime) -> AsyncIterator[Listing]:
         boards = await self.boards()

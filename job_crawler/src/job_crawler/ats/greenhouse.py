@@ -43,9 +43,11 @@ class GreenhouseCrawler(ATSBoardCrawler):
     # health detector. Add new ones from the auto-detector output
     # (`make discover-ats`) which writes them to company_source_profiles.
     default_boards: ClassVar[tuple[str, ...]] = (
-        "tamara",        # Tamara (SA fintech) — confirmed live
-        "hala",          # Hala (SA SMB digital bank) — confirmed live
+        "tamara",        # Tamara (SA fintech) — 15 SA roles at probe time
+        "hala",          # Hala (SA SMB digital bank) — sourced from seed CSV
         "careem",        # Careem — confirmed live (regional, lots of SA roles)
+        "datadog",       # Datadog — 5 SA roles at probe time
+        "raisin",        # Raisin (German fintech, hiring SA growth team)
     )
 
     # ------------------------------------------------------------------
