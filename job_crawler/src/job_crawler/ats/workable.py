@@ -66,6 +66,9 @@ class WorkableCrawler(ATSBoardCrawler):
         "foodics",   # FOODICS (Riyadh, POS for restaurants) — 62 jobs at probe time
         "salla",     # Salla (Jeddah, e-commerce SaaS) — 36 jobs
         "tamatem",   # Tamatem Games (Riyadh ops) — 9 jobs
+        "lucidya",   # Lucidya (Riyadh, customer-experience SaaS) — 25 SA jobs at probe time
+        "mrsool-3",  # Mrsool (Riyadh, quick-commerce) — sourced from seed CSV (Workable
+                     # rate-limits unauthenticated probes; slug verified via CSV careers_url)
     )
 
     async def discover_listings(self, *, since: datetime) -> AsyncIterator[Listing]:
