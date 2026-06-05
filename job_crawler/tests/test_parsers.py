@@ -6,8 +6,7 @@ Covers FINDINGS:
          entity-encoded. Parser now `html.unescape()`s before stripping tags.
   * 12 — Wuzzuf rows were saved with no description / company; treat them as
          parse failures so the runner records the failure and clusters
-         aren't created from empty rows. Mihnati saved a promotional card
-         titled "أعلن عن وظيفتك الأولى مجاناً!" as a real job — reject those.
+         aren't created from empty rows.
   * 13 — Defensive: a JSON-LD title with `&amp;` should be unescaped by
          `to_upsert` before persistence.
 """
@@ -19,7 +18,6 @@ from typing import Any
 from uuid import UUID
 
 from job_crawler.ats.greenhouse import GreenhouseCrawler
-from job_crawler.boards.mihnati import MihnatiCrawler
 from job_crawler.boards.wuzzuf import WuzzufCrawler
 from job_crawler.core.normalise import (
     LocationResolution,
@@ -224,42 +222,6 @@ def test_wuzzuf_extracts_arabic_body_after_heading() -> None:
     # Location stripped of the company prefix
     assert parsed.raw_location is not None
     assert parsed.raw_location.startswith("الرياض")
-
-
-# ---------------------------------------------------------------------------
-# Mihnati promo-title filter (Finding 12b)
-# ---------------------------------------------------------------------------
-def _mihnati(title: str, body: str = "Some real description.") -> ParsedPosting | None:
-    crawler = MihnatiCrawler.__new__(MihnatiCrawler)
-    crawler.http = None  # type: ignore[assignment]
-    crawler.db = None
-    html = f"""
-    <html><body>
-      <h1>{title}</h1>
-      <span class="company">Acme</span>
-      <span class="location">Riyadh</span>
-      <div class="description">{body}</div>
-    </body></html>
-    """
-    return crawler.parse(_raw({"html": html}, url="https://mihnati.com/jobs/1"))
-
-
-def test_mihnati_rejects_promo_card_arabic() -> None:
-    """Mihnati's 'post your job free' promo card was being stored as a job
-    (live row `019e5e2a-d4fa-7142-afc9-0d097723b4b6`)."""
-    parsed = _mihnati("أعلن عن وظيفتك الأولى مجاناً!")
-    assert parsed is None
-
-
-def test_mihnati_rejects_promo_card_english() -> None:
-    parsed = _mihnati("Post your job for free")
-    assert parsed is None
-
-
-def test_mihnati_accepts_real_job() -> None:
-    parsed = _mihnati("Senior Accountant")
-    assert parsed is not None
-    assert parsed.title == "Senior Accountant"
 
 
 # ---------------------------------------------------------------------------

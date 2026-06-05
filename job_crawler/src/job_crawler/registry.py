@@ -2,8 +2,18 @@
 
 Every registered source is a real, runnable crawler. Sources that depend
 on external constraints (residential proxies for LinkedIn/Indeed/Glassdoor,
-a queue-token for Jadarat, broken upstream like Mihnati) ship the working
-code path and log clearly when they can't reach data.
+a queue-token for Jadarat) ship the working code path and log clearly
+when they can't reach data.
+
+Retired sources:
+  * `mihnati` — removed in 2026-06 after the upstream search/listing
+    endpoint went dead. `Search.aspx` returns a 404 page (the site
+    sniffed the URL through its Rozee.pk parent and dropped the SA
+    layer) and every `/category/...` URL responds 500. Probing
+    `https://www.mihnati.com/` produced HTTP 500 with empty bodies on
+    every UA tried. With no surviving endpoint there's no parser to
+    fix; keeping the registry slot only generated noise. If the brand
+    revives, re-add a fresh crawler against the new shape.
 """
 
 from __future__ import annotations
@@ -25,7 +35,6 @@ from .boards.glassdoor import GlassdoorCrawler
 from .boards.indeed import IndeedCrawler
 from .boards.jadarat import JadaratCrawler
 from .boards.linkedin import LinkedInCrawler
-from .boards.mihnati import MihnatiCrawler
 from .boards.naukrigulf import NaukrigulfCrawler
 from .boards.tanqeeb import TanqeebCrawler
 from .boards.wuzzuf import WuzzufCrawler
@@ -48,7 +57,6 @@ REGISTRY: dict[str, type[BaseCrawler]] = {
     "naukrigulf": NaukrigulfCrawler,
     "wuzzuf": WuzzufCrawler,
     "tanqeeb": TanqeebCrawler,
-    "mihnati": MihnatiCrawler,
     "jadarat": JadaratCrawler,
     # Company-owned careers pages — the long-tail SA employers that
     # don't show up in Bayt or any standard ATS. Playwright-driven.

@@ -113,10 +113,6 @@ src/job_crawler_db/
   Al Khair" hits UAE Ras Al Khaimah. Crawlers that already know the
   country (ATS feeds for a SA-only company; GCC-tagged ATS detail
   page) must pass `parsed.country_code` into `resolve_city`.
-* **Mihnati interleaves promo cards** ("أعلن عن وظيفتك / Post your job
-  free") in the same DOM as real jobs. `_is_promo_title` in
-  `boards/mihnati.py` rejects them by title pattern — add new variants
-  to `_PROMO_TITLE_PHRASES` rather than fixing them downstream.
 * **Wuzzuf selector drift gate**: `boards/wuzzuf.py::parse` returns
   `None` (counts as a parse failure) when both `description` and
   `raw_company_name` are missing. Before this gate the runner happily
@@ -219,7 +215,7 @@ findings. Status:
 | 9 | High | DONE PR#18 | `region_code` plumbed through ParsedPosting → upsert → cluster |
 | 14 | High | DONE PR#18 | `SourcesRepo.upsert` COALESCEs `crawl_enabled`           |
 | 11 | Med  | DONE PR#20 | Greenhouse `html.unescape` before `HTMLParser`           |
-| 12 | Med  | DONE PR#20 | Wuzzuf required-field gate + Mihnati promo filter        |
+| 12 | Med  | DONE PR#20 | Wuzzuf required-field gate + Mihnati promo filter (Mihnati retired in 2026-06) |
 | 13 | Med  | DONE PR#20 | `to_upsert` already unescapes; regression test added     |
 | 4  | Med  | DONE PR#21 | Wikidata `WikidataFetchError` + tenacity + nonzero exit  |
 | 5  | Med  | DONE PR#21 | Seed CSV duplicate audit + whitelist test                |
