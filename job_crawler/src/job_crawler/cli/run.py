@@ -196,7 +196,34 @@ def main() -> None:
     slugs = tuple(resolve_slugs(args.selector))
     if not slugs:
         parser.error(f"no slugs resolved from selector '{args.selector}'")
-    sys.exit(asyncio.run(_main(slugs)))
+    valid_slugs, dropped = partition_known_slugs(slugs)
+    for slug in dropped:
+        print(
+            f"warning: source '{slug}' is not in the registry; "
+            f"skipping (known: {', '.join(REGISTRY)})",
+            file=sys.stderr,
+        )
+    if not valid_slugs:
+        parser.error(
+            f"none of the requested slugs ({', '.join(slugs)}) are registered",
+        )
+    sys.exit(asyncio.run(_main(valid_slugs)))
+
+
+def partition_known_slugs(
+    slugs: tuple[str, ...],
+) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """Split `slugs` into (known, unknown) based on REGISTRY membership.
+
+    Used to tolerate slugs that no longer exist in the registry — a
+    retired source (e.g. mihnati, removed in 2026-06 after its upstream
+    went dead) commonly stays in operator-side systemd unit files until
+    the next deploy. The caller warns + skips unknowns rather than
+    crashing the whole run, which would orphan every other source.
+    """
+    known = tuple(s for s in slugs if s in REGISTRY)
+    unknown = tuple(s for s in slugs if s not in REGISTRY)
+    return known, unknown
 
 
 if __name__ == "__main__":
