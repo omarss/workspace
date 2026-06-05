@@ -309,7 +309,6 @@ k8s-logs:  ## Tail API logs (override with POD=...)
 #     make crawl-naukrigulf        (SPA — yields ~0 without app-id)
 #     make crawl-wuzzuf            JC_WUZZUF_QUERY=... JC_WUZZUF_MAX_PAGES=...
 #     make crawl-tanqeeb           (homepage + regional landing pages)
-#     make crawl-mihnati           JC_MIHNATI_QUERY=... JC_MIHNATI_MAX_PAGES=...
 #     make crawl-jadarat           (Playwright — sits through Queue-It)
 #     make crawl-company-careers   (Playwright JSON-LD scrape of company websites)
 #   Aggregators (bot-hostile — expect ~0 yield without residential proxies):
@@ -329,7 +328,7 @@ k8s-logs:  ## Tail API logs (override with POD=...)
 .PHONY: crawl crawl-list canary canary-list discover discover-seed discover-wikidata \
         crawl-greenhouse crawl-lever crawl-workday crawl-workable \
         crawl-smartrecruiters crawl-successfactors crawl-recruitee crawl-personio \
-        crawl-bayt crawl-naukrigulf crawl-wuzzuf crawl-tanqeeb crawl-mihnati \
+        crawl-bayt crawl-naukrigulf crawl-wuzzuf crawl-tanqeeb \
         crawl-jadarat crawl-linkedin crawl-indeed crawl-glassdoor \
         crawl-ats crawl-boards crawl-all
 
@@ -389,8 +388,6 @@ crawl-wuzzuf:        ## Board: Wuzzuf (set JC_WUZZUF_QUERY, JC_WUZZUF_MAX_PAGES)
 	$(call _run_crawler,wuzzuf)
 crawl-tanqeeb:       ## Board: Tanqeeb SA (homepage + regional landing pages)
 	$(call _run_crawler,tanqeeb)
-crawl-mihnati:       ## Board: Mihnati (set JC_MIHNATI_QUERY, JC_MIHNATI_MAX_PAGES)
-	$(call _run_crawler,mihnati)
 crawl-jadarat:       ## Board: Jadarat (KSA gov — Playwright sits through Queue-It)
 	$(call _run_crawler,jadarat)
 crawl-company-careers: ## Boards: per-company careers pages (Playwright JSON-LD scrape)
