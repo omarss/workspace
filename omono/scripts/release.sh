@@ -3,13 +3,14 @@
 #
 # Steps (any failure aborts the rest):
 #   1. Refuse if there's a dirty working tree (we're about to commit).
-#   2. Auto-bump versionName + versionCode from conventional commits.
-#   3. Generate the changelog (raw lines, written to a tempfile).
-#   4. Stage + commit the version bump.
-#   5. Tag the commit `omono/v${VERSION}`.
-#   6. Build the release APK.
-#   7. Publish (rsync + manifest update on the apps host).
-#   8. Push origin main + the new tag.
+#   2. Validate the required API configuration in this worktree.
+#   3. Auto-bump versionName + versionCode from conventional commits.
+#   4. Generate the changelog (raw lines, written to a tempfile).
+#   5. Stage + commit the version bump.
+#   6. Tag the commit `omono/v${VERSION}`.
+#   7. Build the release APK.
+#   8. Publish (rsync + manifest update on the apps host).
+#   9. Push origin main + the new tag.
 #
 # Override the publish target with OMONO_RELEASE_HOST / OMONO_RELEASE_URL.
 set -euo pipefail
@@ -21,6 +22,9 @@ if ! git diff --quiet -- . || ! git diff --cached --quiet -- .; then
     echo "Commit or stash them first." >&2
     exit 1
 fi
+
+echo "==> Validating release API configuration"
+make validate-release-config
 
 echo "==> Computing next version"
 NEW_VERSION=$(./scripts/bump-version.sh)

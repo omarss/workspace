@@ -17,18 +17,37 @@ val keystoreProps = Properties().apply {
 }
 
 // Third-party API keys live in the gitignored local.properties at the
-// repo root. Missing keys fall back to an empty string — features that
-// need them show an empty state with a pointer to README.
+// repo root. Debug builds may omit credentials; release builds must
+// validate them before generating an APK.
 val rootLocalProps = Properties().apply {
     rootProject.file("local.properties").takeIf { it.exists() }
         ?.inputStream()?.use { load(it) }
 }
 // Self-hosted Google Places proxy (gplaces_parser backend) — the only
-// POI source the app uses. Missing values build an APK that renders
-// a "not configured" empty state on the places screen; the rest of
-// the app still works.
-val gplacesApiUrl: String = rootLocalProps.getProperty("gplaces.api.url", "")
-val gplacesApiKey: String = rootLocalProps.getProperty("gplaces.api.key", "")
+// POI source the app uses. Roads, quizzes, and docs share these values.
+val gplacesApiUrl: String = rootLocalProps.getProperty("gplaces.api.url", "").trim()
+val gplacesApiKey: String = rootLocalProps.getProperty("gplaces.api.key", "").trim()
+
+val validateReleaseApiConfiguration by tasks.registering {
+    group = "verification"
+    description = "Reject release builds missing the shared API configuration."
+    // Capture property names only: diagnostics must never print the API key.
+    val missingProperties = listOfNotNull(
+        "gplaces.api.url".takeIf { gplacesApiUrl.isBlank() },
+        "gplaces.api.key".takeIf { gplacesApiKey.isBlank() },
+    ).joinToString()
+    doLast {
+        check(missingProperties.isEmpty()) {
+            "Release API configuration is missing: $missingProperties. " +
+                "Set these values in this worktree's omono/local.properties. " +
+                "See omono/RELEASING.md."
+        }
+    }
+}
+
+tasks.matching { it.name == "preReleaseBuild" }.configureEach {
+    dependsOn(validateReleaseApiConfiguration)
+}
 
 // Homelab tweets feed service (see /tweets in this monorepo). Missing
 // URL builds an APK that renders the Twitter tab as "not configured"
@@ -43,8 +62,8 @@ android {
 
     defaultConfig {
         applicationId = "net.omarss.omono"
-        versionCode = 79
-        versionName = "0.58.2"
+        versionCode = 80
+        versionName = "0.58.3"
 
         buildConfigField("String", "GPLACES_API_URL", "\"${gplacesApiUrl}\"")
         buildConfigField("String", "GPLACES_API_KEY", "\"${gplacesApiKey}\"")

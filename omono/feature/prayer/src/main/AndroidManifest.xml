@@ -6,7 +6,7 @@
          the prayer tab surfaces the system "Alarms & reminders" toggle
          when the user hasn't granted it. -->
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
-    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <!-- Reliability-mode foreground service. `specialUse` is the right
          category here because the service does no real work — it only
