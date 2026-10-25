@@ -32,6 +32,10 @@ assemble-release: ## Assemble release APK without bumping/publishing
 	@echo
 	@echo "  APK: app/build/outputs/apk/release/app-release.apk"
 
+.PHONY: validate-release-config
+validate-release-config: ## Verify required release API configuration
+	$(GRADLEW) :app:validateReleaseApiConfiguration
+
 .PHONY: release-keystore
 release-keystore: ## Generate a personal release keystore (interactive)
 	@if [ -f app/keystore.properties ]; then \
