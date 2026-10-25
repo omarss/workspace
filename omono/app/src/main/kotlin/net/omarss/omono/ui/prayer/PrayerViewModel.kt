@@ -22,6 +22,11 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import net.omarss.omono.feature.prayer.PrayerAlarmCoordinator
+import net.omarss.omono.feature.prayer.PrayerAlarmCheckpoints
+import net.omarss.omono.feature.prayer.PrayerAlarmCheckpointState
+import net.omarss.omono.feature.prayer.PrayerAlarmReadiness
+import net.omarss.omono.feature.prayer.checkPrayerAlarmReadiness
 import net.omarss.omono.feature.prayer.AthanItem
 import net.omarss.omono.feature.prayer.AthanPlayer
 import net.omarss.omono.feature.prayer.AthanSelection
@@ -54,6 +59,8 @@ class PrayerViewModel @Inject constructor(
     private val settings: PrayerSettingsRepository,
     private val scheduler: PrayerScheduler,
     private val athanPlayer: AthanPlayer,
+    private val alarmCoordinator: PrayerAlarmCoordinator,
+    private val alarmCheckpoints: PrayerAlarmCheckpoints,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(PrayerUiState())
@@ -62,6 +69,12 @@ class PrayerViewModel @Inject constructor(
     private var recomputeJob: Job? = null
 
     init {
+        viewModelScope.launch {
+            alarmCheckpoints.state.collect { checkpoint ->
+                _state.update { it.copy(alarmCheckpoints = checkpoint) }
+            }
+        }
+        refreshAlarmChecks()
         viewModelScope.launch {
             // Seed from the cache so the screen isn't blank while
             // waiting for the first fix. If no fix has ever been
@@ -80,6 +93,7 @@ class PrayerViewModel @Inject constructor(
                     it.copy(
                         athanSelection = snap.athanSelection,
                         method = snap.method,
+                        playAthanAtFajr = snap.playAthanAtFajr,
                     )
                 }
             }
@@ -148,11 +162,60 @@ class PrayerViewModel @Inject constructor(
     }
 
     fun playAthanPreview() {
-        athanPlayer.play(_state.value.athanSelection)
+        PrayerKeepAliveService.play(context, PrayerKind.Fajr, System.currentTimeMillis(), test = true)
     }
 
     fun stopAthanPreview() {
-        athanPlayer.stop()
+        scheduler.cancelTest()
+        viewModelScope.launch { alarmCheckpoints.testCancelled() }
+        PrayerKeepAliveService.stopPlayback(context)
+    }
+
+    fun refreshAlarmChecks() {
+        viewModelScope.launch {
+            _state.update { it.copy(alarmReadiness = checkPrayerAlarmReadiness(context, scheduler)) }
+            alarmCoordinator.repair()
+            refreshBatteryOptStatus()
+        }
+    }
+
+    fun runTimedAlarmTest() {
+        viewModelScope.launch {
+            runCatching { scheduler.scheduleTest() }
+                .onSuccess { alarmCheckpoints.testScheduled(it.atEpochMs) }
+                .onFailure { alarmCheckpoints.testFailed("FAILED: ${it.message ?: it.javaClass.simpleName}") }
+        }
+    }
+
+    fun confirmTestHeard() {
+        viewModelScope.launch { alarmCheckpoints.confirmTestHeard() }
+    }
+
+    fun setPlayAthanAtFajr(enabled: Boolean) {
+        viewModelScope.launch { settings.setPlayAthanAtFajr(enabled) }
+    }
+
+    fun launchExactAlarmSettings() = launchAlarmSettings(
+        Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, packageUri = true,
+    )
+
+    fun launchNotificationSettings() = launchAlarmSettings(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+    fun launchDndSettings() = launchAlarmSettings("android.settings.ZEN_MODE_SETTINGS")
+    fun launchSoundSettings() = launchAlarmSettings(Settings.ACTION_SOUND_SETTINGS)
+    fun launchFullScreenSettings() = launchAlarmSettings(
+        "android.settings.MANAGE_APP_USE_FULL_SCREEN_INTENT", packageUri = true,
+    )
+
+    private fun launchAlarmSettings(action: String, packageUri: Boolean = false) {
+        val intent = Intent(action).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            if (packageUri) data = "package:${context.packageName}".toUri()
+            putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+        }
+        runCatching { context.startActivity(intent) }.onFailure {
+            Timber.w(it, "Alarm settings page unavailable")
+            runCatching { context.startActivity(Intent(Settings.ACTION_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+        }
     }
 
     fun athansDirectory(): File = athanPlayer.athansDirectory()
@@ -251,15 +314,6 @@ class PrayerViewModel @Inject constructor(
             }.onFailure { Timber.w(it, "prayer compute failed") }
                 .getOrNull()
             if (day != null) {
-                scheduler.schedule(day)
-                // Also queue tomorrow's Fajr so users who only open
-                // the app once a day still get the next morning's
-                // alarm without another launch.
-                val tomorrow = runCatching {
-                    PrayerTimesCalculator.computeDay(lat, lon, today.plusDays(1), snap)
-                }.getOrNull()
-                if (tomorrow != null) scheduler.schedule(tomorrow)
-
                 _state.update {
                     it.copy(
                         today = day,
@@ -308,6 +362,9 @@ data class PrayerUiState(
     val method: PrayerCalculationMethod = PrayerCalculationMethod.UmmAlQura,
     val athanSelection: AthanSelection = AthanSelection.Random,
     val availableAthans: List<AthanItem> = emptyList(),
+    val alarmCheckpoints: PrayerAlarmCheckpointState = PrayerAlarmCheckpointState(),
+    val alarmReadiness: PrayerAlarmReadiness = PrayerAlarmReadiness(),
+    val playAthanAtFajr: Boolean = true,
     val reliabilityMode: Boolean = false,
     val requireChallengeToStop: Boolean = false,
     val ignoringBatteryOptimisations: Boolean = true,

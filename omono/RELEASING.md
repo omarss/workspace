@@ -28,3 +28,26 @@ Use `make release` for the normal version, build, publish, and push flow.
 Use `make publish` only for an already verified release APK. After publishing,
 verify the public manifest's version, size, and SHA-256 against the downloaded
 APK. Test installation on a connected Android device when one is available.
+
+## Fajr alarm verification
+
+The loud athan is Fajr only. The Prayer screen's **Alarm checks** panel shows
+exact-alarm access, notification access, DND alarm restrictions, current alarm
+volume, the next scheduled time, and durable delivery/audio checkpoints.
+**Repair and check alarms** rebuilds the next occurrence of every prayer from
+saved location and current settings. Today and tomorrow must be scheduled as
+one batch; their PendingIntents intentionally share per-prayer identities.
+
+Use **Run 30-second alarm test**, lock the screen, and listen. This uses the
+real AlarmManager receiver and foreground playback service, raises the alarm
+stream immediately to maximum, and stops after 20 seconds. A recorded audio
+start is not proof of audible sound; **I heard the test** records explicit
+confirmation. Check again after changing DND, battery, or audio routing settings.
+
+Verify rescheduling after reboot, app update, time/time-zone changes, and exact
+alarm access changes. Android does not run alarms while powered off or after a
+user force-stops the app; reopen Omono after a force-stop. Prayer settings use
+credential-protected storage, so unlock the phone once after restarting it. A phone's DND policy,
+restricted profile, speaker routing, or manufacturer power controls can still
+prevent audible playback; use the panel's settings links and the locked-screen
+test on the actual phone rather than treating a scheduled alarm as a guarantee.

@@ -4,6 +4,7 @@ import android.app.Application
 import dagger.hilt.android.HiltAndroidApp
 import net.omarss.omono.diagnostics.DiagnosticsLogger
 import net.omarss.omono.feature.speed.InternetGovernor
+import net.omarss.omono.feature.prayer.PrayerAlarmCoordinator
 import timber.log.Timber
 import javax.inject.Inject
 
@@ -22,6 +23,8 @@ class OmonoApp : Application() {
     // hardware can share the log from Settings → Share diagnostics.
     @Inject lateinit var diagnosticsLogger: DiagnosticsLogger
 
+    @Inject lateinit var prayerAlarms: PrayerAlarmCoordinator
+
     override fun onCreate() {
         super.onCreate()
         if (BuildConfig.DEBUG) {
@@ -29,5 +32,6 @@ class OmonoApp : Application() {
         }
         Timber.plant(diagnosticsLogger)
         internetGovernor.start()
+        prayerAlarms.start()
     }
 }
