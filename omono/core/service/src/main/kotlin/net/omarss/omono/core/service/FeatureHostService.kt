@@ -55,26 +55,32 @@ class FeatureHostService : LifecycleService() {
             }
             else -> ensureStarted()
         }
-        return START_STICKY
+        return if (started) START_STICKY else START_NOT_STICKY
     }
 
     private fun ensureStarted() {
         if (started) return
-        started = true
-        stateHolder.setRunning(true)
-
         // Promote to foreground BEFORE launching feature collectors —
         // Android requires startForeground within 5s of startForegroundService.
-        ServiceCompat.startForeground(
-            this,
-            OmonoNotificationController.NOTIFICATION_ID,
-            buildNotification(),
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
-            } else {
-                0
-            },
-        )
+        try {
+            ServiceCompat.startForeground(
+                this,
+                OmonoNotificationController.NOTIFICATION_ID,
+                buildNotification(),
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
+                } else {
+                    0
+                },
+            )
+        } catch (error: SecurityException) {
+            Timber.w(error, "Location foreground service denied; keeping the app available for prayer alarms")
+            stateHolder.setRunning(false)
+            stopSelf()
+            return
+        }
+        started = true
+        stateHolder.setRunning(true)
 
         // Re-render the notification whenever any feature emits a new state.
         lifecycleScope.launch {
