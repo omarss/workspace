@@ -27,6 +27,7 @@ dependencies {
     implementation(projects.core.data)
 
     testImplementation(libs.junit)
+    testImplementation(libs.robolectric)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.kotest.assertions.core)
 }
