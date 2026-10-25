@@ -3,11 +3,13 @@ package net.omarss.omono.feature.prayer
 import android.content.Context
 import android.media.AudioAttributes
 import android.media.AudioManager
+import android.media.AudioFocusRequest
+import android.media.AudioDeviceInfo
 import android.media.MediaPlayer
 import android.media.RingtoneManager
 import android.net.Uri
-import android.os.Handler
-import android.os.Looper
+import android.os.PowerManager
+import android.os.Build
 import android.provider.OpenableColumns
 import androidx.core.content.getSystemService
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -51,31 +53,25 @@ sealed interface AthanItem {
     }
 }
 
-// Plays the athan at Fajr. Sources come from two places:
-//   * Bundled assets — assets/athans/*.mp3 shipped in the APK. Six
-//     public-domain recordings seed day-one usage.
-//   * Local files — whatever the user has imported via SAF. Copied
-//     into the app's external files dir on import.
-//
-// Playback runs through STREAM_ALARM with USAGE_ALARM so it bypasses
-// silent mode and fires even during Doze. Volume ramps up from
-// ~10% to 100% over FADE_DURATION_MS so the user isn't jolted awake
-// by a sudden full-blast call; the same ramp is what every well-
-// designed alarm clock does.
+// Uses the alarm stream at maximum volume immediately. A foreground service
+// owns scheduled playback; the player holds a CPU wake lock while sounding.
 @Singleton
 class AthanPlayer @Inject constructor(
     @param:ApplicationContext private val context: Context,
 ) {
 
     @Volatile private var current: MediaPlayer? = null
-    private val mainHandler = Handler(Looper.getMainLooper())
-    private var fadeRunnable: Runnable? = null
+    private var finished: ((String) -> Unit)? = null
+    private var fallbackUsed = false
+    private var focusRequest: AudioFocusRequest? = null
+    val isPlaying: Boolean get() = runCatching { current?.isPlaying == true }.getOrDefault(false)
 
     // Saved volume for STREAM_ALARM so we can restore after playback.
     // The alarm volume is maxed while the athan plays so the user
     // hears it at the loudest the device allows, even if they'd
     // dialled STREAM_ALARM down the night before.
     private var savedStreamVolume: Int? = null
+    private var savedStreamMuted: Boolean? = null
 
     // Returns the external dir where user-imported athans live.
     // Created on demand. The UI uses this to show the user where
@@ -117,11 +113,12 @@ class AthanPlayer @Inject constructor(
     }
 
     // Plays the selected item (or a random one from the pool) with
-    // a gradual volume ramp. Returns true if playback started
+    // maximum alarm volume. Returns true if playback started
     // successfully (bundled / local file OR the system default alarm
     // sound when the pool is empty).
-    fun play(selection: AthanSelection = AthanSelection.Random): Boolean {
+    fun play(selection: AthanSelection = AthanSelection.Random, onFinished: ((String) -> Unit)? = null): Boolean {
         stop()
+        fallbackUsed = false
         val pool = availableAthans()
         val chosen: AthanItem? = when {
             pool.isEmpty() -> null
@@ -130,18 +127,24 @@ class AthanPlayer @Inject constructor(
             else -> pool.random()
         }
         snapshotAndMaxAlarmVolume()
+        requestAlarmFocus()
+        finished = onFinished
         val player = if (chosen != null) {
             Timber.i("AthanPlayer: playing %s", chosen.identifier)
             when (chosen) {
                 is AthanItem.Bundled -> startFromAsset(chosen.assetPath)
                 is AthanItem.Local -> startFromFile(chosen.file)
-            } ?: startFromDefault()
+            } ?: startFallback()
         } else {
             Timber.i("AthanPlayer: pool empty, falling back to default alarm sound")
-            startFromDefault()
+            startFallback()
         }
         current = player
-        if (player != null) startFadeIn(player) else restoreAlarmVolume()
+        if (player == null) {
+            restoreAlarmVolume()
+            abandonAlarmFocus()
+            finished = null
+        }
         return player != null
     }
 
@@ -152,15 +155,25 @@ class AthanPlayer @Inject constructor(
     fun playRandom(): Boolean = play(AthanSelection.Random)
 
     fun stop() {
-        cancelFade()
-        current?.let { mp ->
-            runCatching {
-                if (mp.isPlaying) mp.stop()
-                mp.release()
-            }
-        }
+        val player = current
         current = null
+        player?.let { runCatching { it.stop() }; runCatching { it.release() } }
         restoreAlarmVolume()
+        abandonAlarmFocus()
+        val callback = finished
+        finished = null
+        callback?.invoke("Stopped")
+    }
+
+    private fun finishPlayback(player: MediaPlayer, status: String) {
+        if (current !== player) return
+        current = null
+        runCatching { player.release() }
+        restoreAlarmVolume()
+        abandonAlarmFocus()
+        val callback = finished
+        finished = null
+        callback?.invoke(status)
     }
 
     // Copies the content behind a SAF uri (ACTION_OPEN_DOCUMENT
@@ -197,67 +210,85 @@ class AthanPlayer @Inject constructor(
 
     // ------------------------------------------------------------------
 
-    private fun startFromAsset(assetPath: String): MediaPlayer? {
-        val afd = runCatching { context.assets.openFd(assetPath) }
-            .onFailure { Timber.w(it, "AthanPlayer: openFd failed for %s", assetPath) }
-            .getOrNull() ?: return null
+    private fun startFromAsset(assetPath: String): MediaPlayer? = runCatching {
+        context.assets.openFd(assetPath).use { fd ->
+            createPlayer { setDataSource(fd.fileDescriptor, fd.startOffset, fd.length) }
+        }
+    }.onFailure { Timber.e(it, "AthanPlayer: asset unavailable: %s", assetPath) }.getOrNull()
+
+    private fun startFromFile(file: File): MediaPlayer? = createPlayer { setDataSource(file.absolutePath) }
+
+    private fun startFallback(): MediaPlayer? {
+        fallbackUsed = true
+        return startFromDefault()
+    }
+
+    private fun startFromDefault(): MediaPlayer? {
+        val uri = RingtoneManager.getActualDefaultRingtoneUri(context, RingtoneManager.TYPE_ALARM)
+            ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+            ?: return null
+        return createPlayer { setDataSource(context, uri) }
+    }
+
+    private fun alarmAttributes(): AudioAttributes = AudioAttributes.Builder()
+        .setUsage(AudioAttributes.USAGE_ALARM)
+        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+        .build()
+
+    private fun createPlayer(source: MediaPlayer.() -> Unit): MediaPlayer? {
+        val player = MediaPlayer()
         return runCatching {
-            MediaPlayer().apply {
-                applyAlarmAudioAttributes()
-                setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
-                afd.close()
-                setOnCompletionListener { runCatching { release() } }
-                setOnErrorListener { _, _, _ -> runCatching { release() }; true }
+            player.apply {
+                setAudioAttributes(alarmAttributes())
+                setWakeMode(context, PowerManager.PARTIAL_WAKE_LOCK)
+                source()
+                setOnCompletionListener { finishPlayback(it, "Completed") }
+                setOnErrorListener { failed, what, extra ->
+                    if (current === failed && !fallbackUsed) {
+                        Timber.e("AthanPlayer: decoder error %d/%d; trying default alarm", what, extra)
+                        runCatching { failed.release() }
+                        val fallback = startFallback()
+                        if (fallback != null) {
+                            current = fallback
+                        } else finishPlayback(failed, "FAILED: audio error $what/$extra and default alarm unavailable")
+                    } else finishPlayback(failed, "FAILED: audio error $what/$extra")
+                    true
+                }
+                val speaker = context.getSystemService<AudioManager>()
+                    ?.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
+                    ?.firstOrNull { it.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER }
+                if (Build.VERSION.SDK_INT >= 28 && speaker != null && !setPreferredDevice(speaker)) {
+                    Timber.w("AthanPlayer: speaker routing preference refused")
+                }
                 prepare()
-                // Start at fade-from volume so the first audible
-                // sample lands quietly, not at full-blast.
-                setVolume(FADE_START_VOLUME, FADE_START_VOLUME)
+                setVolume(1f, 1f)
                 start()
             }
         }.onFailure {
-            Timber.w(it, "AthanPlayer: failed to play asset %s", assetPath)
-            runCatching { afd.close() }
+            Timber.e(it, "AthanPlayer: audio start failed")
+            runCatching { player.release() }
         }.getOrNull()
     }
 
-    private fun startFromFile(file: File): MediaPlayer? = runCatching {
-        MediaPlayer().apply {
-            applyAlarmAudioAttributes()
-            setDataSource(file.absolutePath)
-            setOnCompletionListener { runCatching { release() } }
-            setOnErrorListener { _, _, _ -> runCatching { release() }; true }
-            prepare()
-            setVolume(FADE_START_VOLUME, FADE_START_VOLUME)
-            start()
-        }
-    }.onFailure { Timber.w(it, "AthanPlayer: failed to play %s", file.name) }.getOrNull()
-
-    private fun startFromDefault(): MediaPlayer? {
-        val uri: Uri = RingtoneManager.getActualDefaultRingtoneUri(
-            context, RingtoneManager.TYPE_ALARM,
-        ) ?: RingtoneManager.getActualDefaultRingtoneUri(
-            context, RingtoneManager.TYPE_NOTIFICATION,
-        ) ?: return null
-        return runCatching {
-            MediaPlayer().apply {
-                applyAlarmAudioAttributes()
-                setDataSource(context, uri)
-                setOnCompletionListener { runCatching { release() } }
-                setOnErrorListener { _, _, _ -> runCatching { release() }; true }
-                prepare()
-                setVolume(FADE_START_VOLUME, FADE_START_VOLUME)
-                start()
+    private fun requestAlarmFocus() {
+        val audio = context.getSystemService<AudioManager>() ?: return
+        val request = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
+            .setAudioAttributes(alarmAttributes())
+            .setOnAudioFocusChangeListener { change ->
+                Timber.i("AthanPlayer: audio focus changed: %d", change)
             }
-        }.onFailure { Timber.w(it, "AthanPlayer: default sound fallback failed") }.getOrNull()
+            .build()
+        focusRequest = request
+        if (audio.requestAudioFocus(request) != AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
+            Timber.w("AthanPlayer: alarm audio focus not granted; verify sound with the timed test")
+        }
     }
 
-    private fun MediaPlayer.applyAlarmAudioAttributes() {
-        setAudioAttributes(
-            AudioAttributes.Builder()
-                .setUsage(AudioAttributes.USAGE_ALARM)
-                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                .build(),
-        )
+    private fun abandonAlarmFocus() {
+        focusRequest?.let { request ->
+            runCatching { context.getSystemService<AudioManager>()?.abandonAudioFocusRequest(request) }
+        }
+        focusRequest = null
     }
 
     // Snapshot the user's current STREAM_ALARM setting and raise it
@@ -269,45 +300,40 @@ class AthanPlayer @Inject constructor(
         if (savedStreamVolume != null) return // already elevated
         runCatching {
             savedStreamVolume = am.getStreamVolume(AudioManager.STREAM_ALARM)
+            savedStreamMuted = am.isStreamMute(AudioManager.STREAM_ALARM)
+            am.adjustStreamVolume(AudioManager.STREAM_ALARM, AudioManager.ADJUST_UNMUTE, 0)
             val max = am.getStreamMaxVolume(AudioManager.STREAM_ALARM)
             am.setStreamVolume(AudioManager.STREAM_ALARM, max, 0)
         }.onFailure { Timber.w(it, "AthanPlayer: raising STREAM_ALARM failed") }
     }
 
+    // Other app features or volume controls may change the shared alarm
+    // stream while sounding. Reassert loudness only while this player owns it.
+    fun ensureLoudAlarm(): Boolean {
+        if (!isPlaying) return false
+        val audio = context.getSystemService<AudioManager>() ?: return false
+        return runCatching {
+            val max = audio.getStreamMaxVolume(AudioManager.STREAM_ALARM)
+            if (audio.isStreamMute(AudioManager.STREAM_ALARM)) {
+                audio.adjustStreamVolume(AudioManager.STREAM_ALARM, AudioManager.ADJUST_UNMUTE, 0)
+            }
+            if (audio.getStreamVolume(AudioManager.STREAM_ALARM) != max) {
+                audio.setStreamVolume(AudioManager.STREAM_ALARM, max, 0)
+            }
+            audio.getStreamVolume(AudioManager.STREAM_ALARM) == max && !audio.isStreamMute(AudioManager.STREAM_ALARM)
+        }.onFailure { Timber.e(it, "AthanPlayer: maintaining alarm volume failed") }.getOrDefault(false)
+    }
+
     private fun restoreAlarmVolume() {
         val am = context.getSystemService<AudioManager>() ?: return
         val saved = savedStreamVolume ?: return
-        runCatching { am.setStreamVolume(AudioManager.STREAM_ALARM, saved, 0) }
-        savedStreamVolume = null
-    }
-
-    // Gradual linear ramp from FADE_START_VOLUME to 1.0 over
-    // FADE_DURATION_MS. Driven off a Handler rather than a coroutine
-    // so it keeps ticking even while the process is nominally asleep
-    // — MediaPlayer.setVolume is thread-safe and cheap.
-    private fun startFadeIn(player: MediaPlayer) {
-        cancelFade()
-        val totalSteps = FADE_STEPS
-        val perStepMs = FADE_DURATION_MS / totalSteps
-        val perStepDelta = (1f - FADE_START_VOLUME) / totalSteps
-        var step = 0
-        val runnable = object : Runnable {
-            override fun run() {
-                step++
-                val vol = (FADE_START_VOLUME + perStepDelta * step).coerceAtMost(1f)
-                runCatching { player.setVolume(vol, vol) }
-                if (step < totalSteps && current === player) {
-                    mainHandler.postDelayed(this, perStepMs.toLong())
-                }
-            }
+        runCatching {
+            am.setStreamVolume(AudioManager.STREAM_ALARM, saved, 0)
+            am.adjustStreamVolume(AudioManager.STREAM_ALARM,
+                if (savedStreamMuted == true) AudioManager.ADJUST_MUTE else AudioManager.ADJUST_UNMUTE, 0)
         }
-        fadeRunnable = runnable
-        mainHandler.postDelayed(runnable, perStepMs.toLong())
-    }
-
-    private fun cancelFade() {
-        fadeRunnable?.let { mainHandler.removeCallbacks(it) }
-        fadeRunnable = null
+        savedStreamVolume = null
+        savedStreamMuted = null
     }
 
     private fun queryDisplayName(uri: Uri): String? = runCatching {
@@ -330,14 +356,6 @@ class AthanPlayer @Inject constructor(
         const val DIRECTORY_NAME = "athans"
         const val BUNDLED_DIR = "athans"
         val SUPPORTED_EXTS = setOf("mp3", "ogg", "oga", "m4a", "aac", "wav", "flac", "opus")
-
-        // Fade parameters. 15 s from 10% to 100% is the same ramp
-        // most gentle-wake alarm clocks use — long enough to avoid
-        // startling, short enough that a heavy sleeper still gets
-        // blasted awake by Fajr.
-        const val FADE_START_VOLUME: Float = 0.10f
-        const val FADE_DURATION_MS: Long = 15_000L
-        const val FADE_STEPS: Int = 60
 
         // Per-file attribution / source line for the bundled set.
         // Keys are asset filenames inside BUNDLED_DIR; values render

@@ -94,7 +94,7 @@ fun PrayerRoute(
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) viewModel.refreshBatteryOptStatus()
+            if (event == Lifecycle.Event.ON_RESUME) viewModel.refreshAlarmChecks()
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
@@ -114,12 +114,6 @@ fun PrayerRoute(
             },
         )
 
-        val today = state.today
-        if (today == null) {
-            WaitingForFix(state.permissionDenied)
-            return@Column
-        }
-
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -127,6 +121,11 @@ fun PrayerRoute(
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            AlarmChecksCard(state, viewModel)
+            if (state.today == null) {
+                WaitingForFix(state.permissionDenied)
+                return@Column
+            }
             LocationAndMethodRow(state)
             NextPrayerCard(state)
             PrayerList(state)
@@ -147,6 +146,68 @@ fun PrayerRoute(
                 onDelete = viewModel::deleteAthan,
                 onAddFile = { importLauncher.launch(arrayOf("audio/*")) },
             )
+        }
+    }
+}
+
+@Composable
+private fun AlarmChecksCard(state: PrayerUiState, viewModel: PrayerViewModel) {
+    val readiness = state.alarmReadiness
+    val checkpoint = state.alarmCheckpoints
+    fun at(epoch: Long): String = if (epoch <= 0) "Not recorded" else
+        DateTimeFormatter.ofPattern("EEE HH:mm:ss", Locale.getDefault())
+            .withZone(ZoneId.systemDefault()).format(Instant.ofEpochMilli(epoch))
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Alarm checks", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Text("Fajr only. Athan starts at maximum alarm volume; original volume is restored afterward.")
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Fajr athan", Modifier.weight(1f))
+                Switch(state.playAthanAtFajr, viewModel::setPlayAthanAtFajr)
+            }
+            if (!state.playAthanAtFajr) {
+                Text("Fajr athan audio is disabled. Enable the switch above.", color = MaterialTheme.colorScheme.error)
+            }
+            Text(if (readiness.exactAllowed) "Exact alarms: allowed" else "Exact alarms: blocked — alarms may be late")
+            if (!readiness.exactAllowed) {
+                OutlinedButton(onClick = viewModel::launchExactAlarmSettings) { Text("Allow Alarms & reminders") }
+            }
+            Text(if (readiness.notificationsAllowed) "Notifications: allowed" else "Notifications blocked — audio can play, but alarm controls may be hidden")
+            if (!readiness.notificationsAllowed) {
+                OutlinedButton(onClick = viewModel::launchNotificationSettings) { Text("Allow notifications") }
+            }
+            Text(if (readiness.dndAllowsAlarms) "Do Not Disturb: alarms allowed" else "Do Not Disturb: verify that alarms are allowed")
+            if (!readiness.dndAllowsAlarms) {
+                OutlinedButton(onClick = viewModel::launchDndSettings) { Text("Do Not Disturb settings") }
+            }
+            Text("Alarm volume now: ${readiness.alarmVolume}/${readiness.maximumVolume}; raised to maximum when sounding")
+            if (readiness.fixedVolume || readiness.maximumVolume == 0) {
+                Text("Device volume cannot be raised normally. Verify sound settings and the timed test.", color = MaterialTheme.colorScheme.error)
+                OutlinedButton(onClick = viewModel::launchSoundSettings) { Text("Sound settings") }
+            }
+            if (state.requireChallengeToStop && !readiness.fullScreenAllowed) {
+                Text("Full-screen alarm access is off; the Fajr challenge may not open on the lock screen.")
+                OutlinedButton(onClick = viewModel::launchFullScreenSettings) { Text("Allow full-screen alarm") }
+            }
+            HorizontalDivider()
+            Text(checkpoint.scheduleStatus)
+            Text("Next scheduled: ${checkpoint.nextAlarmKind} ${at(checkpoint.nextAlarmAt)}")
+            Text("Last delivery: ${checkpoint.receivedKind} ${at(checkpoint.receivedAt)}")
+            Text("Last audio: ${checkpoint.playbackStatus} · ${at(checkpoint.playbackAt)}")
+            Text("Timed test: ${checkpoint.testStatus}")
+            if (checkpoint.testAt > 0 && state.now > checkpoint.testAt + 15_000 && checkpoint.testAudioAt == 0L) {
+                Text("Test overdue: no audio-start checkpoint. Repair alarms and check the restrictions above.", color = MaterialTheme.colorScheme.error)
+            }
+            OutlinedButton(onClick = viewModel::refreshAlarmChecks) { Text("Repair and check alarms") }
+            OutlinedButton(onClick = viewModel::runTimedAlarmTest, enabled = readiness.exactAllowed) {
+                Text("Run 30-second alarm test")
+            }
+            Text("The test uses the real alarm and playback path at maximum volume. Lock the screen; sound stops after 20 seconds. Confirm below only if you hear it.", style = MaterialTheme.typography.bodySmall)
+            if (checkpoint.testAudioAt > 0) {
+                OutlinedButton(onClick = viewModel::confirmTestHeard) { Text("I heard the test") }
+            }
+            OutlinedButton(onClick = viewModel::stopAthanPreview) { Text("Stop sound / cancel test") }
+            Text("After restarting your phone, unlock it once. After force-stopping Omono, reopen it before relying on alarms.", style = MaterialTheme.typography.bodySmall)
         }
     }
 }
@@ -351,8 +412,8 @@ private fun ReliabilityCard(
                     )
                     Text(
                         text = "Keeps a low-priority background notification " +
-                            "so Fajr fires even if the OS would otherwise kill " +
-                            "the app overnight. Costs one notification slot.",
+                            "to help on phones with aggressive background restrictions. " +
+                            "Run the locked-screen test to verify your phone.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -385,8 +446,7 @@ private fun ReliabilityCard(
                             color = MaterialTheme.colorScheme.error,
                         )
                         Text(
-                            text = "Tap to whitelist omono. Without this, Doze can " +
-                                "delay or silence Fajr entirely.",
+                            text = "Tap to allow unrestricted battery use, then run the timed alarm test.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -402,7 +462,7 @@ private fun ReliabilityCard(
                     )
                     Spacer(Modifier.width(8.dp))
                     Text(
-                        text = "Battery optimisation exempt — alarms fire on schedule.",
+                        text = "Battery optimisation exemption enabled.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -468,13 +528,12 @@ private fun AthanPickerCard(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Text(
-                text = "Fajr athan",
+                text = "Athan recording",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
             )
             Text(
-                text = "Played only at Fajr — never at any other prayer. " +
-                    "Volume fades in over 15 seconds from soft to loud. Pick " +
+                text = "Starts immediately at maximum alarm volume for Fajr when enabled above. Pick " +
                     "one to play every day, or leave on Random to rotate. Add " +
                     "your favourite recordings with the ➕ button — they're " +
                     "copied into omono's own storage so the Fajr alarm works " +

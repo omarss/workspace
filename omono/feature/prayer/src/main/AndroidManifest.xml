@@ -7,6 +7,10 @@
          when the user hasn't granted it. -->
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
 
     <!-- Reliability-mode foreground service. `specialUse` is the right
          category here because the service does no real work — it only
@@ -24,11 +28,23 @@
             android:name="net.omarss.omono.feature.prayer.PrayerAlarmReceiver"
             android:exported="false" />
 
-        <!-- Keep-alive service for reliability mode. -->
+        <receiver
+            android:name="net.omarss.omono.feature.prayer.PrayerRestoreReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <action android:name="android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Keeps playback alive while ringing; optionally anchors reliability mode. -->
         <service
             android:name="net.omarss.omono.feature.prayer.PrayerKeepAliveService"
             android:exported="false"
-            android:foregroundServiceType="specialUse">
+            android:foregroundServiceType="specialUse|mediaPlayback">
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="Keeps the process alive so AlarmManager can fire prayer alarms on aggressive OEMs that would otherwise silence them overnight." />
